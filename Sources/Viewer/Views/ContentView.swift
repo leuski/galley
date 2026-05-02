@@ -165,14 +165,14 @@ struct ContentView: View {
       scrollYStored = y
     }
     if overrideTemplatePersistent == nil,
-       let t = stored.templatePersistent
+       let template = stored.templatePersistent
     {
-      overrideTemplatePersistent = t
+      overrideTemplatePersistent = template
     }
     if overrideRendererPersistent == nil,
-       let r = stored.rendererPersistent
+       let renderer = stored.rendererPersistent
     {
-      overrideRendererPersistent = r
+      overrideRendererPersistent = renderer
     }
   }
 

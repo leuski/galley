@@ -25,7 +25,6 @@ struct MenuBarContent: View {
       Divider()
 
       Button("Open File…") { openFile() }
-        .keyboardShortcut("o")
 
       Divider()
 
@@ -33,10 +32,8 @@ struct MenuBarContent: View {
         NSApp.activate(ignoringOtherApps: true)
         openSettings()
       }
-      .keyboardShortcut(",")
 
       Button("Quit") { NSApplication.shared.terminate(nil) }
-        .keyboardShortcut("q")
     }
   }
 

@@ -22,13 +22,13 @@ struct Action {
   }
 
   // Standard macOS glyph order: ⌃⌥⇧⌘ then key.
-  private static func format(_ s: KeyboardShortcut) -> String {
+  private static func format(_ shortcut: KeyboardShortcut) -> String {
     var out = ""
-    if s.modifiers.contains(.control) { out += "⌃" }
-    if s.modifiers.contains(.option)  { out += "⌥" }
-    if s.modifiers.contains(.shift)   { out += "⇧" }
-    if s.modifiers.contains(.command) { out += "⌘" }
-    out.append(glyph(for: s.key))
+    if shortcut.modifiers.contains(.control) { out += "⌃" }
+    if shortcut.modifiers.contains(.option)  { out += "⌥" }
+    if shortcut.modifiers.contains(.shift)   { out += "⇧" }
+    if shortcut.modifiers.contains(.command) { out += "⌘" }
+    out.append(glyph(for: shortcut.key))
     return out
   }
 
