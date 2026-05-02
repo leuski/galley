@@ -115,8 +115,8 @@ final class AppModel {
     Task { @MainActor [weak self] in
       while !Task.isCancelled {
         guard let self else { return }
-        await withCheckedContinuation {
-          (cont: CheckedContinuation<Void, Never>) in
+        await withCheckedContinuation
+        { (cont: CheckedContinuation<Void, Never>) in
           withObservationTracking {
             _ = self.templates.selected
             _ = self.processors.selected

@@ -29,7 +29,7 @@ struct ContentView: View {
 
   /// Per-window zoom factor. Mirrored to/from `model.pageZoom` so the
   /// window comes back at the size the user left it.
-  @SceneStorage("\(keyPrefix).pageZoom") private var pageZoomStored: Double = 1.0
+  @SceneStorage("\(keyPrefix).pageZoom") private var pageZoomStored: Double = 1
 
   /// Per-window resting scroll position in pixels. Mirrored from
   /// `model.currentScrollY` whenever the user pauses scrolling, so a

@@ -135,9 +135,9 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   func consumePendingScrollLine(for url: URL) -> Int? {
     let key = pendingKey(for: url)
     let line = pendingScrollLines.removeValue(forKey: key)
-    if line != nil {
+    if let line {
       logger.debug("""
-        Consumed scroll line \(line!) for \(key, privacy: .public)
+        Consumed scroll line \(line) for \(key, privacy: .public)
         """)
     }
     return line
