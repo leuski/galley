@@ -598,10 +598,9 @@ private struct RendererToolbarPicker: View {
 
   var body: some View {
     ProcessorMenu(
-      localTitle: appModel.processors.selected.name,
-      globalTitle: appModel.processors.selected.name,
+      title: appModel.processors.selected.name,
       appModel: appModel,
-      processors: docModel.processors)
+      choices: docModel.processors)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Markdown processor")
   }
@@ -613,10 +612,9 @@ private struct TemplateToolbarPicker: View {
 
   var body: some View {
     TemplateMenu(
-      localTitle: appModel.templates.selected.name,
-      globalTitle: appModel.templates.selected.name,
+      title: appModel.templates.selected.name,
       appModel: appModel,
-      templates: docModel.templates)
+      choices: docModel.templates)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Template")
   }

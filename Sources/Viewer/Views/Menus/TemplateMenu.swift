@@ -7,6 +7,18 @@ struct TemplateMenu: View {
   @Bindable var appModel: AppModel
   let templates: SceneTemplateChoice?
 
+  init(
+    title: String = "Template",
+    globalTitle: String? = nil,
+    appModel: AppModel,
+    choices templates: SceneTemplateChoice? = nil)
+  {
+    self.localTitle = title
+    self.globalTitle = globalTitle ?? title
+    self.appModel = appModel
+    self.templates = templates
+  }
+
   var title: String {
     appModel.enablePerDocumentOverrides && templates != nil
     ? localTitle : globalTitle

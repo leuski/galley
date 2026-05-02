@@ -21,16 +21,16 @@ struct RenderingCommands: Commands {
       // and the system menu rebuilds when an override flips. NSMenu
       // doesn't pick up internal Toggle invalidations on its own.
       ProcessorMenu(
-        localTitle: "Markdown Processor",
+        title: "Markdown Processor",
         globalTitle: "Global Markdown Processor",
         appModel: appModel,
-        processors: processors)
+        choices: processors)
 
       TemplateMenu(
-        localTitle: "Template",
+        title: "Template",
         globalTitle: "Global Template",
         appModel: appModel,
-        templates: templates)
+        choices: templates)
     }
   }
 }
