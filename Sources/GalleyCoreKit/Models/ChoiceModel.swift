@@ -141,7 +141,7 @@ extension ChoiceModelEnvelope {
 @Observable @MainActor
 final public class ConcreteChoiceModel<Element, Source>: ChoiceModelEnvelope,
                                                          ChoiceModelObject
-where Element: ChoiceValueEnvelopeProtocol,
+where Element: ChoiceValueEnvelopeProtocol & Sendable,
       Source: ChoiceModelSource<Element.Value>
 {
   private let source: Source
@@ -202,11 +202,11 @@ public protocol ChoiceModelObject: ChoiceModel, Hashable, AnyObject {
 }
 
 public extension ChoiceModelObject {
-  nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
   }
 
-  nonisolated public func hash(into hasher: inout Hasher) {
+  nonisolated func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
   }
 }
@@ -270,7 +270,7 @@ where Choice.Element: SectionedChoiceValue
     switch self {
     case .local(let value):
       return value.section
-    case .global(let choice):
+    case .global:
       return -1
     }
   }

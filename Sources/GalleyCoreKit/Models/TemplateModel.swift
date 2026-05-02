@@ -37,4 +37,3 @@ extension TemplateStore: ChoiceModelSource<Template> {
 
 public typealias TemplateChoice = ConcreteChoiceModel<
   TemplateChoiceValue, TemplateStore>
-

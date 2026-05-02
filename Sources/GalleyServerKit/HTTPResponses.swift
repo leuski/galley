@@ -28,8 +28,10 @@ enum HTTPResponses {
       body: Data(html.utf8))
   }
 
+  private final class Helper {}
+
   private static let errorPageTemplate: String =
-    Bundle.module.requiredString(
+  Bundle(for: Helper.self).requiredString(
       forResource: "ErrorPage", withExtension: "html")
 
   private static func plainText(

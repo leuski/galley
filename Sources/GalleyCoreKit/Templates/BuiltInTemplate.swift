@@ -14,6 +14,8 @@ public struct BuiltInTemplate: TemplateProtocol {
 
   public func resolveAsset(file: String) -> URL? { nil }
 
-  private static let html: String = Bundle.module.requiredString(
+  private final class Helper: NSObject {}
+
+  private static let html: String = Bundle(for: Helper.self).requiredString(
     forResource: "DefaultTemplate", withExtension: "html")
 }

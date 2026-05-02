@@ -1,7 +1,6 @@
 import Foundation
 import ALFoundation
 import SwiftUI
-import GalleyCoreKit
 
 public enum ScriptInstaller {
   enum InstallError: LocalizedError {
