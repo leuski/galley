@@ -68,7 +68,10 @@ let package = Package(
     ),
     .testTarget(
       name: "GalleyCoreKitTests",
-      dependencies: ["GalleyCoreKit"]
+      dependencies: [
+        "GalleyCoreKit",
+        .product(name: "ALFoundation", package: "swift-core-kit")
+      ]
     ),
     .testTarget(
       name: "GalleyServerKitTests",

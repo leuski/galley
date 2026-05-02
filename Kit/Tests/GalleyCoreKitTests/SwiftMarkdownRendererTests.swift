@@ -6,19 +6,9 @@ import Testing
 struct SwiftMarkdownRendererTests {
   private let baseURL = URL(fileURLWithPath: "/tmp/doc.md")
 
-  @Test("Default renderer omits data-source-line attributes")
-  func defaultIsUnannotated() async throws {
+  @Test("Renderer tags block elements with source line")
+  func tagsBlocks() async throws {
     let renderer = SwiftMarkdownRenderer()
-    let html = try await renderer.render(
-      "# Heading\n\nA paragraph.\n", baseURL: baseURL)
-    #expect(!html.contains("data-source-line"))
-    #expect(html.contains("<h1>"))
-    #expect(html.contains("<p>"))
-  }
-
-  @Test("Annotated renderer tags blocks with source line")
-  func annotatedTagsBlocks() async throws {
-    let renderer = SwiftMarkdownRenderer(annotatesSourceLines: true)
     let source = """
       # Heading
 
@@ -32,9 +22,9 @@ struct SwiftMarkdownRendererTests {
     #expect(html.contains("<p data-source-line=\"5\">"))
   }
 
-  @Test("Annotated renderer tags lists, code, and quotes")
-  func annotatedTagsBlockLikeStructures() async throws {
-    let renderer = SwiftMarkdownRenderer(annotatesSourceLines: true)
+  @Test("Renderer tags lists, code, and quotes")
+  func tagsBlockLikeStructures() async throws {
+    let renderer = SwiftMarkdownRenderer()
     let source = """
       - item one
       - item two
