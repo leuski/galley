@@ -25,7 +25,7 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
   var onMarkdownLink: ((URL) -> Void)?
 
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.Markdown-Eye",
+    subsystem: bundleIdentifier,
     category: "LinkBridge")
 
   func userContentController(

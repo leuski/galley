@@ -136,7 +136,7 @@ final class EditorChoice: ChoiceModel {
   @ObservationIgnored private let pickAppBundle: @MainActor () -> URL?
 
   init(
-    key: String = "MarkdownEye.editorChoice",
+    key: String = "\(keyPrefix).editorChoice",
     pickAppBundle: @escaping @MainActor () -> URL? = EditorChoice
       .defaultPickAppBundle
   ) {

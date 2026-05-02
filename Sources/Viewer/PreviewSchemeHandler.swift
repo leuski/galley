@@ -4,6 +4,9 @@ import WebKit
 import os
 import ALFoundation
 
+let bundleIdentifier = Bundle.main.bundleIdentifier ?? "net.leuski.galley"
+let keyPrefix = bundleIdentifier
+
 /// Custom URL scheme that lets the Viewer's WebView load template
 /// assets (CSS, fonts, images) and document-relative files. The
 /// scheme mirrors the live HTTP server's routing — `/template/<id>/…`
@@ -34,7 +37,7 @@ struct PreviewSchemeHandler: URLSchemeHandler {
   let templateProvider: @MainActor @Sendable () -> Template
 
   private static let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.Markdown-Eye",
+    subsystem: bundleIdentifier,
     category: "PreviewSchemeHandler")
 
   nonisolated

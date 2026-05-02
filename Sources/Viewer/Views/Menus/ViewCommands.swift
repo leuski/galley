@@ -1,0 +1,25 @@
+import AppKit
+import SwiftUI
+
+/// Menu items that mirror the toolbar's navigation buttons. Lives in
+/// the View menu (replacing the system-provided sidebar group, which
+/// the Viewer doesn't use).
+struct ViewCommands: Commands {
+  @FocusedValue(\.viewerModel) private var model
+
+  var body: some Commands {
+    CommandGroup(before: .toolbar) {
+      Action.zoomIn.menuItem(model: model)
+      Action.zoomOut.menuItem(model: model)
+      Action.resetZoom.menuItem(model: model)
+
+      Divider()
+
+      Action.back.menuItem(model: model)
+      Action.forward.menuItem(model: model)
+      Action.reload.menuItem(model: model)
+
+      Divider()
+    }
+  }
+}

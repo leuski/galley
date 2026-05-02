@@ -60,7 +60,7 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
 
   @ObservationIgnored
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.galley",
+    subsystem: bundleIdentifier,
     category: "ViewerAppDelegate")
 
   /// Mirrors `NSDocumentController.shared.recentDocumentURLs`. Updated

@@ -16,26 +16,26 @@ struct ContentView: View {
   /// Per-window persisted back/forward stack. SwiftUI's `@SceneStorage`
   /// gives each WindowGroup window its own keyspace, so two windows
   /// each get their own history that survives app relaunch.
-  @SceneStorage("MarkdownEye.history") private var historyJSON: String = ""
+  @SceneStorage("\(keyPrefix).history") private var historyJSON: String = ""
 
   /// Per-window renderer / template overrides, encoded as
   /// `{id, name}` JSON blobs from `SceneChoice.persistent`. `nil`
   /// means "no override — use the global selection." Only honored
   /// when `AppModel.enablePerDocumentOverrides` is on.
-  @SceneStorage("MarkdownEye.overrideRendererPersistent")
+  @SceneStorage("\(keyPrefix).overrideRendererPersistent")
   private var overrideRendererPersistent: String?
-  @SceneStorage("MarkdownEye.overrideTemplatePersistent")
+  @SceneStorage("\(keyPrefix).overrideTemplatePersistent")
   private var overrideTemplatePersistent: String?
 
   /// Per-window zoom factor. Mirrored to/from `model.pageZoom` so the
   /// window comes back at the size the user left it.
-  @SceneStorage("MarkdownEye.pageZoom") private var pageZoomStored: Double = 1.0
+  @SceneStorage("\(keyPrefix).pageZoom") private var pageZoomStored: Double = 1.0
 
   /// Per-window resting scroll position in pixels. Mirrored from
   /// `model.currentScrollY` whenever the user pauses scrolling, so a
   /// relaunched window comes back at the same place. Hydrated into
   /// `model` at first bind / restore.
-  @SceneStorage("MarkdownEye.scrollY") private var scrollYStored: Double = 0
+  @SceneStorage("\(keyPrefix).scrollY") private var scrollYStored: Double = 0
 
   var body: some View {
     if let appModel = boot.model {

@@ -40,10 +40,10 @@ final class AppModel {
   }
 
   private enum Keys {
-    static let rendererPersistent = "MarkdownEye.rendererPersistent"
-    static let perDocOverrides = "MarkdownEye.perDocumentOverrides"
-    static let openBehavior = "MarkdownEye.openBehavior"
-    static let templatePersistent = "MarkdownEye.templatePersistent"
+    static let rendererPersistent = "\(keyPrefix).rendererPersistent"
+    static let perDocOverrides = "\(keyPrefix).perDocumentOverrides"
+    static let openBehavior = "\(keyPrefix).openBehavior"
+    static let templatePersistent = "\(keyPrefix).templatePersistent"
   }
 
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is

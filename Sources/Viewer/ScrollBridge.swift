@@ -38,7 +38,7 @@ final class ScrollBridge: NSObject, WKScriptMessageHandler {
   var onScroll: ((Double) -> Void)?
 
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.galley",
+    subsystem: bundleIdentifier,
     category: "ScrollBridge")
 
   func userContentController(

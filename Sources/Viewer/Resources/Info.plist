@@ -18,7 +18,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>net.leuski.Markdown-Eye.galley</string>
+			<string>net.leuski.galley</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>galley</string>

@@ -75,7 +75,7 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
   var onEditorClick: ((Int) -> Void)?
 
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.Markdown-Eye",
+    subsystem: bundleIdentifier,
     category: "EditorBridge")
 
   func userContentController(

@@ -86,8 +86,7 @@ final class DocumentModel {
   private(set) var currentScrollY: Double = 0
 
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.galley",
-    category: "DocumentModel")
+    subsystem: bundleIdentifier, category: "DocumentModel")
 
   init() {
     var configuration = WebPage.Configuration()

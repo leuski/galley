@@ -39,11 +39,11 @@ final class PerFileStateStore {
   private var cache: [String: PerFileState] = [:]
 
   @ObservationIgnored
-  private let defaultsKey = "MarkdownEye.perFileState"
+  private let defaultsKey = "\(keyPrefix).perFileState"
 
   @ObservationIgnored
   private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.galley",
+    subsystem: bundleIdentifier,
     category: "PerFileStateStore")
 
   init() {
