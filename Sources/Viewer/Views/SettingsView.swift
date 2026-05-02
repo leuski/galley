@@ -9,6 +9,13 @@ import GalleyCoreKit
 /// `.app` bundle.
 struct SettingsView: View {
   @Bindable var appModel: AppModel
+  @Bindable var defaults = Defaults.shared
+
+  @State private var portString: String = String(Defaults.shared.port)
+
+  init(appModel: AppModel) {
+    self.appModel = appModel
+  }
 
   @ViewBuilder
   var editorPicker: some View {
@@ -65,7 +72,7 @@ struct SettingsView: View {
       HStack {
         Text("Open document")
         Spacer()
-        Picker(selection: $appModel.openBehavior) {
+        Picker(selection: $defaults.openBehavior) {
           ForEach(OpenBehavior.allCases) { behavior in
             Text(behavior.displayName).tag(behavior)
           }
@@ -89,7 +96,7 @@ struct SettingsView: View {
   @ViewBuilder
   private var rediscoverRenderersButton: some View {
     Button {
-      Task { await appModel.rediscoverRenderers() }
+      appModel.rediscoverRenderers()
     } label: {
       Image(systemName: "arrow.clockwise")
         .frame(width: 16, height: 16)
@@ -170,7 +177,7 @@ struct SettingsView: View {
       Section {
         Toggle(
           "Allow per-window processor and template overrides",
-          isOn: $appModel.enablePerDocumentOverrides)
+          isOn: $defaults.enablePerDocumentOverrides)
         Text(
           "Adds a Format menu section that lets each window pin its own "
           + "Markdown processor or template, overriding the global "
@@ -178,10 +185,52 @@ struct SettingsView: View {
         )
         .subtitle()
       }
+
+      Section("Markdown Preview Server") {
+        Toggle("Run server", isOn: serverEnabledBinding)
+        Text(
+          "When on, a background server makes documents available in any "
+          + "browser. Registered as a login item so it restarts after "
+          + "logout."
+        )
+        .subtitle()
+
+        LabeledContent {
+          TextField("", text: $portString)
+            .labelsHidden()
+            .onSubmit { commitPort() }
+            .frame(width: 80)
+        } label: {
+          Text("Port")
+          Text("""
+              Default: \(String(GalleyConstants.defaultPort)). \
+              The server binds to 127.0.0.1 only.
+              """)
+          .fixedSize(horizontal: true, vertical: false)
+        }
+      }
     }
     .padding()
     .formStyle(.grouped)
     .frame(minWidth: 580, maxWidth: 580, minHeight: 360)
+    .onChange(of: Defaults.shared.port) { _, newPort in
+      portString = String(newPort)
+    }
+  }
+
+  private var serverEnabledBinding: Binding<Bool> {
+    Binding(
+      get: { ServerAgent.isEnabled },
+      set: { ServerAgent.setEnabled($0) }
+    )
+  }
+
+  private func commitPort() {
+    guard let value = UInt16(portString), value > 0 else {
+      portString = String(Defaults.shared.port)
+      return
+    }
+    Defaults.shared.port = value
   }
 
   /// Reads/writes the customURL template via `selected`. The setter

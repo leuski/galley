@@ -154,10 +154,9 @@ struct ContentView: View {
   /// scene's storage hasn't already overridden. Leaves untouched
   /// fields the user has explicitly modified in this scene
   /// (recognized by their value being non-default).
-  private func hydrateFromPerFileState(
-    store: PerFileStateStore, url: URL
-  ) {
-    let stored = store.state(for: url)
+  private func hydrateFromPerFileState(url: URL) {
+    let stored = Defaults.shared
+      .perFileStateStore[PerFileState.key(for: url), default: .init()]
     if pageZoomStored == 1.0, let z = stored.pageZoom {
       pageZoomStored = z
     }
@@ -204,10 +203,10 @@ struct ContentView: View {
   private func writePerFileState(
     _ mutation: (inout PerFileState) -> Void
   ) {
-    guard let appModel = boot.model,
-          let url = model.documentURL
+    guard let url = model.documentURL
     else { return }
-    appModel.perFileState.update(url, mutation)
+    mutation(&Defaults.shared
+      .perFileStateStore[PerFileState.key(for: url), default: .init()])
   }
 
   /// Swap this window's bound document for `newURL` in place. Used by
@@ -245,26 +244,18 @@ struct ContentView: View {
     // window-specific values, which beat per-file defaults.
     let willRestore = !didRestore && decodeHistory(historyJSON) != nil
     if let fileURL, !willRestore {
-      hydrateFromPerFileState(
-        store: appModel.perFileState, url: fileURL)
+      hydrateFromPerFileState(url: fileURL)
     }
 
     // Hydrate zoom from scene storage *before* the first render so
     // the page comes up at the right size — `setZoom` only triggers
     // a JS update; the next render reads `pageZoom` to inject CSS.
     model.setZoom(pageZoomStored)
-    let displaced = model.bindSettings(
+    model.bindSettings(
       appModel,
       templatePersistent: overrideTemplatePersistent,
       processorPersistent: overrideRendererPersistent)
-    if let name = displaced.templateDisplaced {
-      Task { await DisplacementNotifier.post(
-        kind: .template, displaced: name) }
-    }
-    if let name = displaced.processorDisplaced {
-      Task { await DisplacementNotifier.post(
-        kind: .processor, displaced: name) }
-    }
+
     // Keep the delegate's appModel reference fresh — `application(_:open:)`
     // and Open Recent dispatch consult `openBehavior` from there.
     appDelegate.appModel = appModel
@@ -482,7 +473,7 @@ private struct ChangeHandlers: ViewModifier {
       .onChange(of: model.documentURL) { _, new in onDocumentBound(new) }
       .onChange(of: appModel.processors.selected) { reload() }
       .onChange(of: appModel.templates.selected) { reload() }
-      .onChange(of: appModel.enablePerDocumentOverrides) { reload() }
+      .onChange(of: Defaults.shared.enablePerDocumentOverrides) { reload() }
       .onChange(of: model.templates?.persistent) { _, new in
         onTemplatePersistent(new)
         reload()
@@ -597,7 +588,7 @@ private struct RendererToolbarPicker: View {
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    ProcessorMenu(
+    processorMenu(
       title: appModel.processors.selected.name,
       appModel: appModel,
       choices: docModel.processors)
@@ -611,7 +602,7 @@ private struct TemplateToolbarPicker: View {
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    TemplateMenu(
+    templateMenu(
       title: appModel.templates.selected.name,
       appModel: appModel,
       choices: docModel.templates)

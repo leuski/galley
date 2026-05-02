@@ -168,20 +168,19 @@ where Element: ChoiceValueEnvelopeProtocol & Sendable,
     return displaced
   }
 
-  public static func create(source: Source, persistent: String?)
-  -> (ConcreteChoiceModel<Element, Source>, String?)
+  public convenience init(
+    source: Source, persistent: String?, notifier: (String) -> Void)
   {
-    let choice = Self(source: source, selected: Element(source.defaultValue))
+    self.init(source: source, selected: Element(source.defaultValue))
     if let persistent {
       do {
-        choice.selected = try choice.decode(persistent)
+        self.selected = try self.decode(persistent)
       } catch AnyChoiceValueDecodingError.missingValue(let name) {
-        return (choice, name)
+        notifier(name)
       } catch {
         // ignore the rest
       }
     }
-    return (choice, nil)
   }
 
   private init(source: Source, selected: Element) {
@@ -303,21 +302,19 @@ where Choice: ChoiceModelEnvelope & Equatable & Hashable
     self.selected = selected
   }
 
-  public static func create(
-    from source: Choice, persistent: String?)
-  -> (SceneChoice<Choice>, String?)
+  public convenience init(
+    source: Choice, persistent: String?, notifier: (String) -> Void)
   {
-    let choice = Self(source: source, selected: .global(source))
+    self.init(source: source, selected: .global(source))
     if let persistent {
       do {
-        choice.selected = .local(try source.decode(persistent))
+        self.selected = .local(try source.decode(persistent))
       } catch AnyChoiceValueDecodingError.missingValue(let name) {
-        return (choice, name)
+        notifier(name)
       } catch {
         // ignore the rest
       }
     }
-    return (choice, nil)
   }
 
   public var persistent: String? {

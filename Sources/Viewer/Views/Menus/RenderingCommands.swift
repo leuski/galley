@@ -20,13 +20,13 @@ struct RenderingCommands: Commands {
       // Subscribe to per-window selections so this body re-evaluates
       // and the system menu rebuilds when an override flips. NSMenu
       // doesn't pick up internal Toggle invalidations on its own.
-      ProcessorMenu(
+      processorMenu(
         title: "Markdown Processor",
         globalTitle: "Global Markdown Processor",
         appModel: appModel,
         choices: processors)
 
-      TemplateMenu(
+      templateMenu(
         title: "Template",
         globalTitle: "Global Template",
         appModel: appModel,

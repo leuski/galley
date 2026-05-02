@@ -93,8 +93,8 @@ final class EditorChoice: ChoiceModel {
 
   private(set) var values: [Element]
 
-  /// EditorChoice owns its own UserDefaults persistence (see
-  /// `persist()`), so the protocol's read-side here returns nil —
+  /// EditorChoice owns its own UserDefaults persistence,
+  /// so the protocol's read-side here returns nil —
   /// nothing for an outside coordinator to mirror to scene storage.
   var persistent: String? { nil }
 
@@ -128,26 +128,23 @@ final class EditorChoice: ChoiceModel {
       if let index = values.firstIndex(where: { $0.kind == resolved.kind }) {
         values[index] = resolved
       }
-      persist()
+      Defaults.shared.editorChoice = storedSelected
     }
   }
 
-  @ObservationIgnored private let key: String
   @ObservationIgnored private let pickAppBundle: @MainActor () -> URL?
 
   init(
-    key: String = "\(keyPrefix).editorChoice",
     pickAppBundle: @escaping @MainActor () -> URL? = EditorChoice
       .defaultPickAppBundle
   ) {
-    self.key = key
     self.pickAppBundle = pickAppBundle
 
     var initial: [Element] = EditorPreset.allCases.map { .preset($0) }
     initial.append(.customURL(template: EditorPreset.bbedit.template))
     initial.append(.appBundle(nil))
 
-    let loaded = Self.load(key: key) ?? .default
+    let loaded = Defaults.shared.editorChoice
     if let index = initial.firstIndex(where: { $0.kind == loaded.kind }) {
       initial[index] = loaded
     }
@@ -160,18 +157,6 @@ final class EditorChoice: ChoiceModel {
       if case .appBundle(let url) = value, let url { return url }
     }
     return nil
-  }
-
-  private func persist() {
-    guard let data = try? JSONEncoder().encode(storedSelected) else { return }
-    UserDefaults.standard.set(data, forKey: key)
-  }
-
-  private static func load(key: String) -> Element? {
-    guard let data = UserDefaults.standard.data(forKey: key),
-          let decoded = try? JSONDecoder().decode(Element.self, from: data)
-    else { return nil }
-    return decoded
   }
 
   /// Default app-bundle picker — runs `NSOpenPanel` filtered to

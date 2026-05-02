@@ -6,12 +6,8 @@ import GalleyCoreKit
 import GalleyServerKit
 
 struct MenuBarContent: View {
-  let model: AppModel
+  @Bindable var model: AppModel
   let server: PreviewServerController
-  let templateStore: TemplateStore
-  @Bindable var templates: TemplateChoice
-
-  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     Group {
@@ -19,8 +15,8 @@ struct MenuBarContent: View {
 
       Divider()
 
-      templatesMenu
-      rendererMenu
+      TemplateMenu(model: model.templates)
+      ProcessorMenu(model: model.processors)
 
       Divider()
 
@@ -29,11 +25,8 @@ struct MenuBarContent: View {
       Divider()
 
       Button("Settings…") {
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
+        NSWorkspace.shared.open(GalleyConstants.settingsURL)
       }
-
-      Button("Quit") { NSApplication.shared.terminate(nil) }
     }
   }
 
@@ -46,24 +39,6 @@ struct MenuBarContent: View {
       Text("Server stopped")
     case .failed(let message):
       Text("Server error: \(message)")
-    }
-  }
-
-  @ViewBuilder
-  private var templatesMenu: some View {
-    Menu("Template") {
-      MenuCore(model: templates)
-      Divider()
-      Button("Reveal Templates Folder") {
-        templateStore.revealFolder()
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var rendererMenu: some View {
-    Menu("Processor") {
-      MenuCore(model: model.processors)
     }
   }
 

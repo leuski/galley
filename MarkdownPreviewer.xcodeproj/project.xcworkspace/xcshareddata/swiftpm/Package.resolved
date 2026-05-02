@@ -1,5 +1,5 @@
 {
-  "originHash" : "e8f6d00e416a982619d815af8df1f5d05f6b2a93daaaf893f01d5fada6d6e702",
+  "originHash" : "b8e736f838b57c9ac4bacc119c4799eceb317e2200b8555394895cc173c7780c",
   "pins" : [
     {
       "identity" : "flyingfox",
@@ -11,12 +11,21 @@
       }
     },
     {
+      "identity" : "observabledefaults",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/fatbobman/ObservableDefaults",
+      "state" : {
+        "revision" : "29edb909f2492d54a33e48c4fb75c23304aa7597",
+        "version" : "1.8.6"
+      }
+    },
+    {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leuski//swift-argument-parser.git",
       "state" : {
         "branch" : "property-metadata",
-        "revision" : "8fd4536067af136861e04820a00a3a0e88c232e2"
+        "revision" : "2aa91a943492d8988bdff3afc00cc35c4af54d32"
       }
     },
     {
@@ -34,7 +43,7 @@
       "location" : "https://github.com/leuski/swift-core-kit",
       "state" : {
         "branch" : "main",
-        "revision" : "cca51c55b48d92d0940cc8cdc69f1a25247d80e9"
+        "revision" : "7861715f474a26447c6fdf59f1b76fca5366286c"
       }
     },
     {
@@ -51,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
-        "revision" : "64889f0c732f210a935a0ad7cda38f77f876262d",
-        "version" : "509.1.1"
+        "revision" : "0687f71944021d616d34d922343dcef086855920",
+        "version" : "600.0.1"
       }
     }
   ],

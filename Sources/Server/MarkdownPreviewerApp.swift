@@ -18,9 +18,7 @@ struct MarkdownPreviewerApp: App {
       if let model = boot.model {
         MenuBarContent(
           model: model,
-          server: model.server,
-          templateStore: model.templateStore,
-          templates: model.templates)
+          server: model.server)
       } else {
         Text("Starting…")
       }
@@ -28,16 +26,6 @@ struct MarkdownPreviewerApp: App {
       MenuBarLabel(state: boot.model?.server.state ?? .stopped)
     }
     .menuBarExtraStyle(.menu)
-
-    Settings {
-      if let model = boot.model {
-        SettingsView(model: model)
-      } else {
-        ProgressView("Starting…")
-          .padding()
-          .frame(minWidth: 320, minHeight: 200)
-      }
-    }
   }
 }
 

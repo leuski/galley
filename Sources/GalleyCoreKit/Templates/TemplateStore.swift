@@ -6,6 +6,8 @@ import AppKit
 @Observable
 @MainActor
 public final class TemplateStore {
+  public static let shared = TemplateStore()
+
   public private(set) var templates: [Template] = []
 
   @ObservationIgnored public let directoryURL: URL

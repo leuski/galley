@@ -1,50 +1,39 @@
 import Foundation
 import GalleyCoreKit
-import Observation
 import SwiftUI
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
-/// (catalog discovery + persisted ID) and the user's template store
-/// both live here, separately from any single window's `DocumentModel`.
-/// Windows read the active renderer + template at render time, so the
-/// user can switch globally and have every open document re-render.
-@Observable
-@MainActor
+/// (catalog discovery + persisted ID), template store, server config,
+/// and window-open behavior all live here, separately from any single
+/// window's `DocumentModel`. Windows read the active renderer + template
+/// at render time, so the user can switch globally and have every open
+/// document re-render.
+///
+/// Backed by `@ObservableDefaults` on the shared `net.leuski.galley`
+/// suite so port and processor/template choices are readable by the
+/// Server process without any IPC.
+@ObservableDefaults
+final class Defaults: GalleyDefaults {
+  @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
+  @DefaultsKey var rendererPersistent: String?
+  @DefaultsKey var templatePersistent: String?
+  @DefaultsKey var enablePerDocumentOverrides: Bool = false
+  @DefaultsKey var openBehavior: OpenBehavior = .newWindow
+  @DefaultsKey var editorChoice: EditorChoice.Element = .preset(.bbedit)
+  @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
+
+  @MainActor static let shared = Defaults()
+}
+
+@MainActor @Observable
 final class AppModel {
+  // MARK: - In-memory state (not persisted by the macro)
+
   @ObservationIgnored let templateStore: TemplateStore
   let templates: TemplateChoice
   @ObservationIgnored let processorStore: ProcessorStore
   let processors: ProcessorChoice
   @ObservationIgnored let editors: EditorChoice
-  @ObservationIgnored let perFileState: PerFileStateStore
-
-  /// When on, each window can pin its own renderer / template that
-  /// wins over the global selection. Stored per-window via
-  /// `@SceneStorage`; toggling this off doesn't erase the per-window
-  /// values, but stops them from taking effect.
-  var enablePerDocumentOverrides: Bool {
-    didSet {
-      UserDefaults.standard.set(
-        enablePerDocumentOverrides, forKey: Keys.perDocOverrides)
-    }
-  }
-
-  /// How the app should handle a new document open request from
-  /// Finder, the open panel, or Open Recent. Defaults to opening a
-  /// fresh window (the historical behavior).
-  var openBehavior: OpenBehavior {
-    didSet {
-      UserDefaults.standard.set(
-        openBehavior.rawValue, forKey: Keys.openBehavior)
-    }
-  }
-
-  private enum Keys {
-    static let rendererPersistent = "\(keyPrefix).rendererPersistent"
-    static let perDocOverrides = "\(keyPrefix).perDocumentOverrides"
-    static let openBehavior = "\(keyPrefix).openBehavior"
-    static let templatePersistent = "\(keyPrefix).templatePersistent"
-  }
 
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
   /// expected to have run async catalog discovery
@@ -55,30 +44,20 @@ final class AppModel {
     self.templateStore = templateStore
     self.processorStore = processorStore
     self.editors = EditorChoice()
-    self.perFileState = PerFileStateStore()
-    self.enablePerDocumentOverrides = UserDefaults.standard.bool(
-      forKey: Keys.perDocOverrides)
-    self.openBehavior = OpenBehavior(
-      rawValue: UserDefaults.standard.string(forKey: Keys.openBehavior)
-        ?? "")
-      ?? .newWindow
 
-    let (templates, displacedTemplate) = TemplateChoice.create(
+    self.templates = TemplateChoice(
       source: templateStore,
-      persistent: UserDefaults.standard.string(
-        forKey: Keys.templatePersistent))
-    self.templates = templates
+      persistent: Defaults.shared.templatePersistent) { name in
+        Self.notify(.template, name)
+      }
 
-    let (processors, displacedProcessor) = ProcessorChoice.create(
+    self.processors = ProcessorChoice(
       source: processorStore,
-      persistent: UserDefaults.standard.string(
-        forKey: Keys.rendererPersistent))
-    self.processors = processors
+      persistent: Defaults.shared.rendererPersistent) { name in
+        Self.notify(.processor, name)
+      }
 
     templateStore.onReload = { [weak self] in self?.afterTemplateReload() }
-
-    if let name = displacedTemplate { Self.notify(.template, name) }
-    if let name = displacedProcessor { Self.notify(.processor, name) }
 
     startPersistenceObservation()
   }
@@ -103,10 +82,12 @@ final class AppModel {
 
   /// Re-runs discovery and heals the persisted pick against the
   /// fresh catalog. Posts a notification if the pick was displaced.
-  func rediscoverRenderers() async {
-    await processorStore.discover()
-    if let name = processors.healIfDisplaced() {
-      Self.notify(.processor, name)
+  func rediscoverRenderers() {
+    Task {
+      await processorStore.discover()
+      if let name = processors.healIfDisplaced() {
+        Self.notify(.processor, name)
+      }
     }
   }
 
@@ -119,12 +100,13 @@ final class AppModel {
   private static func notify(
     _ kind: DisplacementNotifier.Kind, _ name: String)
   {
-    Task { await DisplacementNotifier.post(kind: kind, displaced: name) }
+    DisplacementNotifier.post(kind: kind, displaced: name)
   }
 
-  /// Mirror `selected` changes back to UserDefaults. One observation
-  /// loop tracks both choices; each iteration rewrites both keys
-  /// (cheap — they're tiny strings) and re-arms.
+  /// Mirror `selected` changes back to the shared defaults suite so
+  /// the Server process picks them up at request time. The macro
+  /// handles the actual UserDefaults write; this loop just keeps
+  /// the `@DefaultsKey`-backed properties in sync with the choice envelopes.
   private func startPersistenceObservation() {
     Task { @MainActor [weak self] in
       while !Task.isCancelled {
@@ -138,10 +120,8 @@ final class AppModel {
             cont.resume()
           }
         }
-        UserDefaults.standard.set(
-          self.templates.persistent, forKey: Keys.templatePersistent)
-        UserDefaults.standard.set(
-          self.processors.persistent, forKey: Keys.rendererPersistent)
+        Defaults.shared.templatePersistent = self.templates.persistent
+        Defaults.shared.rendererPersistent = self.processors.persistent
       }
     }
   }

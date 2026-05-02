@@ -25,10 +25,14 @@ public enum DisplacementNotifier {
     case template = "Template"
   }
 
+  public static func post(kind: Kind, displaced: String) {
+    Task { await _post(kind: kind, displaced: displaced) }
+  }
+
   /// Post a "<thing> unavailable" notification. The display name is
   /// what the user previously picked; we already healed the
   /// selection by the time this is called.
-  public static func post(kind: Kind, displaced: String) async {
+  private static func _post(kind: Kind, displaced: String) async {
     let content = UNMutableNotificationContent()
     content.title = "\(kind.rawValue) unavailable"
     content.body = """

@@ -21,6 +21,8 @@
 		62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62D5E4B62FA5DB9200CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B52FA5DB9200CADD72 /* ALFoundation */; };
 		62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
+		62FA000300000000CADD7300 /* ObservableDefaults in Frameworks */ = {isa = PBXBuildFile; productRef = 62FA000200000000CADD7300 /* ObservableDefaults */; };
+		62FA000500000000CADD7300 /* net.leuski.galley.server.plist in Copy Launch Agent Plist */ = {isa = PBXBuildFile; fileRef = 62FA000400000000CADD7300 /* net.leuski.galley.server.plist */; };
 		62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
 		62FE000300000000CADD7201 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE000400000000CADD7201 /* ALFoundation */; };
@@ -80,6 +82,17 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		62FA000600000000CADD7300 /* Copy Launch Agent Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchAgents;
+			dstSubfolderSpec = 1;
+			files = (
+				62FA000500000000CADD7300 /* net.leuski.galley.server.plist in Copy Launch Agent Plist */,
+			);
+			name = "Copy Launch Agent Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -89,6 +102,7 @@
 		62D5CA192FA048F000CADD72 /* Galley.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Galley.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GalleyCoreKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GalleyServerKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		62FA000400000000CADD7300 /* net.leuski.galley.server.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = net.leuski.galley.server.plist; path = Sources/Viewer/Resources/net.leuski.galley.server.plist; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -96,6 +110,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
+				Resources/net.leuski.galley.server.plist,
 			);
 			target = 62D5CA182FA048F000CADD72 /* Viewer */;
 		};
@@ -183,6 +198,7 @@
 			files = (
 				62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */,
 				62D5E49C2FA5D9D900CADD72 /* Markdown in Frameworks */,
+				62FA000300000000CADD7300 /* ObservableDefaults in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,6 +243,7 @@
 			isa = PBXGroup;
 			children = (
 				62D5C88E2F9FBD0000CADD72 /* Scripts */,
+				62FA000400000000CADD7300 /* net.leuski.galley.server.plist */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -326,6 +343,7 @@
 				62D5CA162FA048F000CADD72 /* Frameworks */,
 				62D5CA172FA048F000CADD72 /* Resources */,
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
+				62FA000600000000CADD7300 /* Copy Launch Agent Plist */,
 				62D5E1102FA5C60500CADD72 /* Install Release */,
 			);
 			buildRules = (
@@ -366,6 +384,7 @@
 			packageProductDependencies = (
 				62D5E49B2FA5D9D900CADD72 /* Markdown */,
 				62D5E4B22FA5DAEC00CADD72 /* ALFoundation */,
+				62FA000200000000CADD7300 /* ObservableDefaults */,
 			);
 			productName = GalleyCoreKit;
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
@@ -440,6 +459,7 @@
 				62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */,
 				62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 626E8D502F9DD1C700BD51F9 /* Products */;
@@ -1106,6 +1126,14 @@
 				minimumVersion = 0.26.2;
 			};
 		};
+		62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/fatbobman/ObservableDefaults";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.8.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1153,6 +1181,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
 			productName = ALFoundation;
+		};
+		62FA000200000000CADD7300 /* ObservableDefaults */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */;
+			productName = ObservableDefaults;
 		};
 		62FE000400000000CADD7201 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;

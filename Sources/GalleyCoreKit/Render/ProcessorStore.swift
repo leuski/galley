@@ -46,6 +46,8 @@ public struct Processor: Sendable, Identifiable, CustomStringConvertible {
 @Observable
 @MainActor
 public final class ProcessorStore {
+  public static let shared = ProcessorStore()
+
   public private(set) var processors: [Processor]
 
   public init() {
@@ -54,6 +56,10 @@ public final class ProcessorStore {
 
   public func discover() async {
     self.processors = await Self.discoverAll()
+  }
+
+  public func rediscover() {
+    Task { await discover() }
   }
 
   // MARK: - Catalog

@@ -85,6 +85,16 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
 
   func application(_ application: NSApplication, open urls: [URL]) {
     for url in urls {
+      // galley://settings opens Viewer Settings without going through
+      // the document-open pipeline. The AppDelegate intercepts before
+      // SwiftUI's onOpenURL sees anything, so we handle it here.
+      if url.scheme?.lowercased() == "galley",
+         url.host?.lowercased() == "settings"
+      {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        continue
+      }
       let normalized = normalize(url)
       record(normalized)
       dispatch(normalized)
@@ -156,7 +166,7 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   /// already on screen; with no windows, every mode collapses to
   /// "spawn a new window" since there's no frontmost to tab onto.
   func dispatch(_ url: URL) {
-    let behavior = appModel?.openBehavior ?? .newWindow
+    let behavior = Defaults.shared.openBehavior
 
     // Pre-launch (or no windows yet): only newWindow makes sense.
     // Queue if the SwiftUI handler isn't installed; otherwise just

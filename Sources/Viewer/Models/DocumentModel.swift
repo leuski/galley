@@ -221,21 +221,21 @@ final class DocumentModel {
   /// Returns the displaced names (template, processor) when the
   /// scene-stored persistent string can't be decoded against the
   /// current catalog — caller posts the user notification.
-  @discardableResult
   func bindSettings(
     _ appModel: AppModel,
     templatePersistent: String?,
     processorPersistent: String?
-  ) -> (templateDisplaced: String?, processorDisplaced: String?) {
+  ) {
     self.appModel = appModel
-    let (templates, displacedTemplate) = SceneTemplateChoice.create(
-      from: appModel.templates, persistent: templatePersistent)
-    self.templates = templates
-    let (processors, displacedProcessor) = SceneProcessorChoice.create(
-      from: appModel.processors, persistent: processorPersistent)
-    self.processors = processors
+    self.templates = SceneTemplateChoice(
+      source: appModel.templates,
+      persistent: templatePersistent) { name in DisplacementNotifier.post(
+        kind: .template, displaced: name) }
+    self.processors = SceneProcessorChoice(
+      source: appModel.processors,
+      persistent: processorPersistent) { name in DisplacementNotifier.post(
+        kind: .processor, displaced: name) }
     templateBox.template = resolvedTemplate()
-    return (displacedTemplate, displacedProcessor)
   }
 
   /// Initial bind (called from ContentView's `.task(id: fileURL)`).
@@ -723,7 +723,7 @@ final class DocumentModel {
   /// to the global selection if its pick is unavailable). Otherwise
   /// always use the global selection.
   private func resolvedRenderer() -> any MarkdownRenderer {
-    if appModel?.enablePerDocumentOverrides == true,
+    if Defaults.shared.enablePerDocumentOverrides == true,
        let processors,
        let renderer = processors.selected.value.renderer
     {
@@ -733,7 +733,7 @@ final class DocumentModel {
   }
 
   private func resolvedTemplate() -> Template {
-    if appModel?.enablePerDocumentOverrides == true,
+    if Defaults.shared.enablePerDocumentOverrides == true,
        let templates
     {
       return templates.selected.value
