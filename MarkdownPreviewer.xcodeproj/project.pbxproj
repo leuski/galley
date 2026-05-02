@@ -21,23 +21,12 @@
 		62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62D5E4B62FA5DB9200CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B52FA5DB9200CADD72 /* ALFoundation */; };
 		62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
+		62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
+		62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
+		62FE000300000000CADD7201 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE000400000000CADD7201 /* ALFoundation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		626E8D5D2F9DD1C800BD51F9 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 626E8D4E2F9DD1C700BD51F9;
-			remoteInfo = MarkdownPreviewer;
-		};
-		62D5E0A32FA5BE6100CADD72 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 626E8D4E2F9DD1C700BD51F9;
-			remoteInfo = Server;
-		};
 		62D5E4A82FA5DA1F00CADD72 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
@@ -51,6 +40,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = 62D5E4432FA5D95400CADD72;
 			remoteInfo = GalleyServerKit;
+		};
+		62D5E4DD2FA5E08800CADD72 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 62D5CA182FA048F000CADD72;
+			remoteInfo = Viewer;
+		};
+		62D5E7682FA5E20100CADD72 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 626E8D4E2F9DD1C700BD51F9;
+			remoteInfo = Server;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -96,6 +99,13 @@
 			);
 			target = 62D5CA182FA048F000CADD72 /* Viewer */;
 		};
+		62D5EB3A2FA5E36900CADD72 /* Exceptions for "Tests" folder in "Tests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TestPlan.xctestplan,
+			);
+			target = 626E8D5B2F9DD1C800BD51F9 /* Tests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -127,6 +137,14 @@
 			path = GalleyCoreKit;
 			sourceTree = "<group>";
 		};
+		62D5E4D52FA5E06F00CADD72 /* Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				62D5EB3A2FA5E36900CADD72 /* Exceptions for "Tests" folder in "Tests" target */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +161,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */,
+				62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */,
+				62FE000300000000CADD7201 /* ALFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,11 +202,12 @@
 		626E8D462F9DD1C700BD51F9 = {
 			isa = PBXGroup;
 			children = (
-				62D5C9302FA01C3900CADD72 /* Scripts */,
-				62D5D51C2FA1672700CADD72 /* Sources */,
-				62D5C8842F9FBCA700CADD72 /* Resources */,
 				62D5E0FF2FA5C53400CADD72 /* Frameworks */,
 				626E8D502F9DD1C700BD51F9 /* Products */,
+				62D5C8842F9FBCA700CADD72 /* Resources */,
+				62D5C9302FA01C3900CADD72 /* Scripts */,
+				62D5D51C2FA1672700CADD72 /* Sources */,
+				62D5E4D52FA5E06F00CADD72 /* Tests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -282,10 +304,14 @@
 			buildRules = (
 			);
 			dependencies = (
-				626E8D5E2F9DD1C800BD51F9 /* PBXTargetDependency */,
+				62D5E4DE2FA5E08800CADD72 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				62D5E4D52FA5E06F00CADD72 /* Tests */,
 			);
 			name = Tests;
 			packageProductDependencies = (
+				62FE000400000000CADD7201 /* ALFoundation */,
 			);
 			productName = MarkdownPreviewerTests;
 			productReference = 626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */;
@@ -305,7 +331,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				62D5E0A42FA5BE6100CADD72 /* PBXTargetDependency */,
+				62D5E7692FA5E20100CADD72 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				62D5D5432FA1674A00CADD72 /* Viewer */,
@@ -420,11 +446,11 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				626E8D4E2F9DD1C700BD51F9 /* Server */,
-				626E8D5B2F9DD1C800BD51F9 /* Tests */,
-				62D5CA182FA048F000CADD72 /* Viewer */,
 				62D5E4322FA5D93700CADD72 /* GalleyCoreKit */,
 				62D5E4432FA5D95400CADD72 /* GalleyServerKit */,
+				626E8D4E2F9DD1C700BD51F9 /* Server */,
+				62D5CA182FA048F000CADD72 /* Viewer */,
+				626E8D5B2F9DD1C800BD51F9 /* Tests */,
 			);
 		};
 /* End PBXProject section */
@@ -549,16 +575,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		626E8D5E2F9DD1C800BD51F9 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
-			targetProxy = 626E8D5D2F9DD1C800BD51F9 /* PBXContainerItemProxy */;
-		};
-		62D5E0A42FA5BE6100CADD72 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
-			targetProxy = 62D5E0A32FA5BE6100CADD72 /* PBXContainerItemProxy */;
-		};
 		62D5E4A32FA5DA0600CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			productRef = 62D5E4A22FA5DA0600CADD72 /* ALFoundation */;
@@ -584,6 +600,16 @@
 			isa = PBXTargetDependency;
 			target = 62D5E4432FA5D95400CADD72 /* GalleyServerKit */;
 			targetProxy = 62D5E4AE2FA5DA2A00CADD72 /* PBXContainerItemProxy */;
+		};
+		62D5E4DE2FA5E08800CADD72 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 62D5CA182FA048F000CADD72 /* Viewer */;
+			targetProxy = 62D5E4DD2FA5E08800CADD72 /* PBXContainerItemProxy */;
+		};
+		62D5E7692FA5E20100CADD72 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
+			targetProxy = 62D5E7682FA5E20100CADD72 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -781,7 +807,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Markdown Preview Server.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Markdown Preview Server";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Galley.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Galley";
 			};
 			name = Debug;
 		};
@@ -802,7 +828,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Markdown Preview Server.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Markdown Preview Server";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Galley.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Galley";
 			};
 			name = Release;
 		};
@@ -1124,6 +1150,11 @@
 			productName = ALFoundation;
 		};
 		62D5E4B52FA5DB9200CADD72 /* ALFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
+			productName = ALFoundation;
+		};
+		62FE000400000000CADD7201 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
 			productName = ALFoundation;

@@ -2,6 +2,6 @@ import Testing
 @testable import GalleyServerKit
 
 @Test("GalleyServerKit module loads")
-func moduleLoads() {
+func galleyServerKitModuleLoads() {
   #expect(Bool(true))
 }

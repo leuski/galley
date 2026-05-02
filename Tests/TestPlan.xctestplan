@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Default",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:MarkdownPreviewer.xcodeproj",
+      "identifier" : "626E8D5B2F9DD1C800BD51F9",
+      "name" : "Tests"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:MarkdownPreviewer.xcodeproj",
+        "identifier" : "626E8D5B2F9DD1C800BD51F9",
+        "name" : "Tests"
+      }
+    }
+  ],
+  "version" : 1
+}
