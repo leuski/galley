@@ -9,7 +9,7 @@ struct ViewerApp: App {
 
   var body: some Scene {
     WindowGroup(for: URL.self) { $url in
-      ContentView(fileURL: $url)
+      WindowRoot(url: $url)
         .environment(boot)
         .environment(appDelegate)
     }
@@ -33,5 +33,25 @@ struct ViewerApp: App {
           .frame(minWidth: 320, minHeight: 200)
       }
     }
+  }
+}
+
+/// Thin wrapper so `@Environment(\.openSettings)` is in scope for the
+/// `.onOpenURL` handler that routes `galley://settings` to Viewer
+/// Settings. Document-bearing file URLs continue to flow through
+/// `ViewerAppDelegate.application(_:open:)`.
+private struct WindowRoot: View {
+  @Binding var url: URL?
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    ContentView(fileURL: $url)
+      .onOpenURL { incoming in
+        guard incoming.scheme?.lowercased() == "galley",
+              incoming.host?.lowercased() == "settings"
+        else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+      }
   }
 }

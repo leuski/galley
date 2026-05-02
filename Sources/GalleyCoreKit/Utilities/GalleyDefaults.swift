@@ -12,11 +12,28 @@ public protocol GalleyDefaults: AnyObject {
   var port: UInt16 { get set }
   var rendererPersistent: String? { get set }
   var templatePersistent: String? { get set }
-  var enablePerDocumentOverrides: Bool { get set }
   @MainActor static var shared: Self { get }
 }
 
 public enum GalleyConstants {
+  public static let defaultHost: String = "127.0.0.1"
   public static let defaultPort: UInt16 = 8089
   public static let settingsURL: URL = "galley://settings"
+}
+
+nonisolated private func hostURL(port: UInt16) -> URL {
+  var components = URLComponents()
+  components.scheme = "http"
+  components.host = GalleyConstants.defaultHost
+  components.port = Int(port)
+  guard let url = components.url else {
+    preconditionFailure("hostURL components produced no URL")
+  }
+  return url
+}
+
+public extension GalleyDefaults {
+  var host: URL {
+    hostURL(port: port)
+  }
 }

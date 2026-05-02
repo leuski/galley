@@ -23,24 +23,8 @@ struct MarkdownPreviewerApp: App {
         Text("Starting…")
       }
     } label: {
-      MenuBarLabel(state: boot.model?.server.state ?? .stopped)
+      Image("MenuBarIcon")
     }
     .menuBarExtraStyle(.menu)
-  }
-}
-
-private struct MenuBarLabel: View {
-  let state: PreviewServerController.State
-
-  var body: some View {
-    Image("MenuBarIcon")
-  }
-
-  private var tint: AnyShapeStyle {
-    switch state {
-    case .running: AnyShapeStyle(.primary)
-    case .stopped: AnyShapeStyle(.secondary)
-    case .failed: AnyShapeStyle(.red)
-    }
   }
 }

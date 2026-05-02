@@ -25,7 +25,7 @@ enum ServerAgent {
   /// Returns the resulting enabled state. On failure, returns the
   /// current state and logs the error.
   @MainActor
- @discardableResult
+  @discardableResult
   static func setEnabled(_ enabled: Bool) -> Bool {
     do {
       if enabled {

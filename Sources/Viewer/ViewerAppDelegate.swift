@@ -85,14 +85,13 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
 
   func application(_ application: NSApplication, open urls: [URL]) {
     for url in urls {
-      // galley://settings opens Viewer Settings without going through
-      // the document-open pipeline. The AppDelegate intercepts before
-      // SwiftUI's onOpenURL sees anything, so we handle it here.
+      // `galley://settings` is handled by `.onOpenURL` on the
+      // WindowGroup root view, which calls SwiftUI's `openSettings()`.
+      // Skip it here so it doesn't collide with the document-open
+      // pipeline.
       if url.scheme?.lowercased() == "galley",
          url.host?.lowercased() == "settings"
       {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         continue
       }
       let normalized = normalize(url)

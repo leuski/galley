@@ -16,7 +16,6 @@ final class Defaults: GalleyDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
   @DefaultsKey var rendererPersistent: String?
   @DefaultsKey var templatePersistent: String?
-  @DefaultsKey var enablePerDocumentOverrides: Bool = false
 
   @MainActor static let shared = Defaults()
 }
@@ -88,23 +87,8 @@ final class AppModel {
     DisplacementNotifier.post(kind: kind, displaced: name)
   }
 
-  nonisolated private static func hostURL(port: UInt16) -> URL {
-    var components = URLComponents()
-    components.scheme = "http"
-    components.host = Self.defaultHost
-    components.port = Int(port)
-    guard let url = components.url else {
-      preconditionFailure("hostURL components produced no URL")
-    }
-    return url
-  }
-
-  var hostURL: URL {
-    Self.hostURL(port: Defaults.shared.port)
-  }
-
   private func startServer() {
-    server.start(url: hostURL)
+    server.start(url: Defaults.shared.host)
   }
 
   private func restartServerIfRunning() {

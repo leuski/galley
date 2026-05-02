@@ -148,7 +148,10 @@ struct SettingsView: View {
         if appModel.editors.selected == .preset(.bbedit) {
           LabeledContent {
             Button("Install scripts…") {
-              ScriptInstaller.installScripts()
+              ScriptInstaller.installScripts(context: [
+                "__LOCATION__": Defaults.shared
+                  .host.appendingPreviewPath().absoluteString
+              ])
             }
           } label: {
             Text("Integration")
