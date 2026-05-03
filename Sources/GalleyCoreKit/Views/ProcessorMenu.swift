@@ -6,20 +6,17 @@ where Model: ChoiceModel & AnyObject & Observable,
 {
   let title: String
   let model: Model
-  let action: @MainActor (String?) -> Void
 
   public init(
-    title: String = "Processor", model: Model,
-    action: @escaping @MainActor (String?) -> Void)
+    title: String = "Processor", model: Model)
   {
     self.title = title
     self.model = model
-    self.action = action
   }
 
   public var body: some View {
     Menu(title, systemImage: "wand.and.stars") {
-      MenuPickerCore(model: model, action: action)
+      MenuCore(model: model)
       Divider()
       Button(
         "Rescan Installed Processors",

@@ -122,9 +122,7 @@ struct SettingsView: View {
   @ViewBuilder
   private var templatePicker: some View {
     Menu {
-      MenuPickerCore(model: appModel.templates) {
-        Defaults.shared.templatePersistent = $0
-      }
+      MenuCore(model: appModel.templates)
     } label: {
       Text(appModel.templates.selected.name)
     }
@@ -133,9 +131,7 @@ struct SettingsView: View {
   @ViewBuilder
   private var processorPicker: some View {
     Menu {
-      MenuPickerCore(model: appModel.processors) {
-        Defaults.shared.rendererPersistent = $0
-      }
+      MenuCore(model: appModel.processors)
     } label: {
       Text(appModel.processors.selected.name)
     }

@@ -15,12 +15,8 @@ struct MenuBarContent: View {
 
       Divider()
 
-      TemplateMenu(model: model.templates) {
-        Defaults.shared.templatePersistent = $0
-      }
-      ProcessorMenu(model: model.processors) {
-        Defaults.shared.rendererPersistent = $0
-      }
+      TemplateMenu(model: model.templates)
+      ProcessorMenu(model: model.processors)
 
       Divider()
 
