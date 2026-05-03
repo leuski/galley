@@ -26,6 +26,7 @@ struct WelcomeView: View {
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
+  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     Color.clear
@@ -48,7 +49,16 @@ struct WelcomeView: View {
         // Welcome is always alive, so this always has a chance to
         // fire — replaces the AppDelegate's
         // application(_:open:) hook.
-        dispatcher.handleOpenURLs([url])
+        //
+        // `galley://settings` works even when no document window is
+        // open: the dispatcher hands the openSettings outcome back
+        // to us via `onSettingsRequested`, and we activate the app
+        // (otherwise the Settings window would open behind whatever
+        // app the user clicked from, e.g. the Server menu bar).
+        dispatcher.handleOpenURLs([url]) {
+          NSApp.activate(ignoringOtherApps: true)
+          openSettings()
+        }
         // Keep the recents list in sync. recents.openRecent goes
         // through dispatcher.handleOpenURLs again, so we record
         // directly to avoid double-dispatch.

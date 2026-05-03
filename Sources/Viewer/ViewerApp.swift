@@ -48,7 +48,7 @@ struct ViewerApp: App {
     .restorationBehavior(.disabled)
 
     WindowGroup(for: URL.self) { $url in
-      WindowRoot(url: $url)
+      ContentView(fileURL: $url)
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
@@ -76,22 +76,3 @@ struct ViewerApp: App {
   }
 }
 
-/// Thin wrapper so `@Environment(\.openSettings)` is in scope for
-/// the `.onOpenURL` handler that routes `galley://settings` to
-/// Viewer Settings. Document-bearing file URLs flow through
-/// WelcomeView's `.onOpenURL`.
-private struct WindowRoot: View {
-  @Binding var url: URL?
-  @Environment(\.openSettings) private var openSettings
-
-  var body: some View {
-    ContentView(fileURL: $url)
-      .onOpenURL { incoming in
-        guard incoming.scheme?.lowercased() == "galley",
-              incoming.host?.lowercased() == "settings"
-        else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
-      }
-  }
-}

@@ -14,6 +14,14 @@ struct SettingsView: View {
   @State private var portString: String = String(Defaults.shared.port)
   @State private var serverStatus = ServerStatusModel()
 
+  /// Mirrors `ServerAgent.isEnabled` as @State so SwiftUI tracks
+  /// changes. `ServerAgent.isEnabled` reads `SMAppService.status`,
+  /// which is *not* an Observable source — without this @State,
+  /// flipping the toggle wouldn't re-evaluate `probeKey` and the
+  /// `.task(id:)` loop wouldn't restart, leaving the pill stuck at
+  /// "Disabled".
+  @State private var serverEnabled: Bool = ServerAgent.isEnabled
+
   init(appModel: AppModel) {
     self.appModel = appModel
   }
@@ -26,11 +34,11 @@ struct SettingsView: View {
   }
 
   private var probeKey: ProbeKey {
-    ProbeKey(enabled: ServerAgent.isEnabled, port: defaults.port)
+    ProbeKey(enabled: serverEnabled, port: defaults.port)
   }
 
   private var probeHost: URL? {
-    ServerAgent.isEnabled ? defaults.host : nil
+    serverEnabled ? defaults.host : nil
   }
 
   @ViewBuilder
@@ -246,8 +254,17 @@ struct SettingsView: View {
 
   private var serverEnabledBinding: Binding<Bool> {
     Binding(
-      get: { ServerAgent.isEnabled },
-      set: { ServerAgent.setEnabled($0) }
+      get: { serverEnabled },
+      set: { newValue in
+        // Optimistic flip so the pill starts probing immediately for
+        // the requested state. setEnabled returns the post-call status
+        // — if it disagrees (registration failed), reconcile.
+        serverEnabled = newValue
+        let actual = ServerAgent.setEnabled(newValue)
+        if actual != newValue {
+          serverEnabled = actual
+        }
+      }
     )
   }
 
