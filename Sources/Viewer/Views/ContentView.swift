@@ -50,26 +50,23 @@ struct ContentView: View {
 
   @ViewBuilder
   private func readyBody(appModel: AppModel) -> some View {
-    Group {
-      if fileURL != nil {
-        WebView(model.page)
-          .overlay(alignment: .bottom) {
-            if let error = model.lastError {
-              Text(error)
-                .padding(8)
-                .background(.regularMaterial, in: .rect(cornerRadius: 8))
-                .padding()
-            }
-          }
-      } else {
-        // Empty placeholder while the launch open panel is up. The
-        // window is hidden via alphaValue=0 in `launchTask`, so the
-        // user only sees the open panel — never an "open a document"
-        // label.
-        Color.clear
+    // SwiftUI's `WindowGroup(for: URL.self)` always exposes a
+    // `Binding<URL?>` even when our architecture guarantees a non-
+    // nil URL: every doc window is spawned via `openWindow(value:)`
+    // or restored with a saved URL. The optional is purely a
+    // SwiftUI API constraint. If a stray nil ever surfaces during
+    // a transient SwiftUI binding state, WebView renders an empty
+    // page for the few milliseconds until the URL settles.
+    WebView(model.page)
+      .overlay(alignment: .bottom) {
+        if let error = model.lastError {
+          Text(error)
+            .padding(8)
+            .background(.regularMaterial, in: .rect(cornerRadius: 8))
+            .padding()
+        }
       }
-    }
-    .background(WindowAccessor(
+      .background(WindowAccessor(
       onAttach: { window in
         if hostWindow == nil {
           hostWindow = window
