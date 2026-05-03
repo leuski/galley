@@ -74,36 +74,61 @@ struct WelcomeView: View {
 
   /// Applies every NSWindow knob needed to make the welcome window
   /// invisible AND non-interactive. `alphaValue = 0` alone leaves a
-  /// click-eating phantom window in the visible bounds, so we layer:
+  /// click-eating phantom window in the visible bounds, so we layer
+  /// other flags on top.
   ///
-  /// - `ignoresMouseEvents = true`    → clicks pass through
-  /// - off-screen frame                → not in any visible region
-  /// - `isExcludedFromWindowsMenu`     → not listed in Window menu
-  /// - `collectionBehavior` flags      → not in Mission Control or
-  ///                                     window cycle
-  /// - `styleMask = .borderless`       → no title bar / traffic lights
-  /// - `hasShadow = false`             → no shadow leaking onto screen
-  /// - `isReleasedWhenClosed = false`  → survives any spurious close
+  /// Things to NOT do here:
+  /// - `styleMask = .borderless` forces AppKit to recreate the
+  ///   window, which detaches the SwiftUI hosting view and cancels
+  ///   `.task` mid-flight.
+  /// - `setFrame(...)` to an extreme offscreen position (e.g.
+  ///   {-10000, -10000, 1, 1}) crashes inside AppKit's constraint
+  ///   solver during `_postWindowNeedsUpdateConstraints`.
+  ///
+  /// SwiftUI re-asserts a Window-menu entry for `Window` scenes
+  /// even after `isExcludedFromWindowsMenu = true`, so we also call
+  /// `NSApp.removeWindowsItem(window)` to drop our entry from the
+  /// menu after SwiftUI has had its say.
+  ///
+  /// Welcome still *can* become key (the user can route focus to it
+  /// via cmd-` cycling, AppleScript, etc.), and that would steal
+  /// focus from a real document window. We attach a
+  /// `didBecomeKeyNotification` observer that redirects key status
+  /// to the first eligible visible document window the moment
+  /// welcome becomes key.
   private func configureHidden(_ window: NSWindow?) {
     guard let window else { return }
-    // Things to NOT do here:
-    // - `styleMask = .borderless` forces AppKit to recreate the
-    //   window, which detaches the SwiftUI hosting view and cancels
-    //   `.task` mid-flight.
-    // - `setFrame(...)` to an extreme offscreen position (e.g.
-    //   {-10000, -10000, 1, 1}) crashes inside AppKit's constraint
-    //   solver during `_postWindowNeedsUpdateConstraints`.
-    //
-    // alpha=0 + ignoresMouseEvents is enough to make it invisible
-    // and non-interactive. The other flags keep it out of menus,
-    // Mission Control, and the cmd-` cycle so the user never finds
-    // it indirectly.
     window.alphaValue = 0
     window.ignoresMouseEvents = true
     window.isExcludedFromWindowsMenu = true
+    NSApp.removeWindowsItem(window)
     window.collectionBehavior = [.transient, .ignoresCycle, .stationary]
     window.hasShadow = false
     window.isReleasedWhenClosed = false
+
+    NotificationCenter.default.addObserver(
+      forName: NSWindow.didBecomeKeyNotification,
+      object: window,
+      queue: .main
+    ) { _ in
+      // Find a visible, hittable document window and route focus
+      // there. If welcome is somehow the only visible window
+      // (e.g., last doc just closed and welcome got promoted),
+      // there's nothing to redirect to — just resign key. The
+      // brief flash where welcome is key is acceptable; the
+      // important guarantee is that focus doesn't *stay* on it.
+      let alternate = NSApp.windows.first { other in
+        other !== window
+          && other.isVisible
+          && other.alphaValue > 0.01
+          && other.canBecomeKey
+      }
+      if let alternate {
+        alternate.makeKeyAndOrderFront(nil)
+      } else {
+        window.resignKey()
+      }
+    }
   }
 
   // MARK: - Bootstrap
