@@ -74,6 +74,7 @@ final class RecentDocumentsModel {
   /// transaction commit.
   func runOpenPanel() async -> [URL] {
     let panel = NSOpenPanel()
+    panel.identifier = .init(rawValue: "open.file.panel")
     panel.allowsMultipleSelection = true
     panel.canChooseDirectories = false
     panel.canChooseFiles = true

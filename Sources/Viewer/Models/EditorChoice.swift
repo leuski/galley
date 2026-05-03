@@ -167,6 +167,7 @@ final class EditorChoice: ChoiceModel {
   /// `.app` bundles. Returns nil if the user cancels.
   static func defaultPickAppBundle() -> URL? {
     let panel = NSOpenPanel()
+    panel.identifier = .init(rawValue: "pick-editor.panel")
     panel.allowsMultipleSelection = false
     panel.canChooseDirectories = false
     panel.canChooseFiles = true

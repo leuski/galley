@@ -86,6 +86,7 @@ public enum ScriptInstaller {
   @MainActor
   static public func installScripts(context: [String: String] = [:]) {
     let panel = NSOpenPanel()
+    panel.identifier = .init(rawValue: "install-scripts")
     panel.canChooseFiles = false
     panel.canChooseDirectories = true
     panel.canCreateDirectories = true

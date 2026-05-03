@@ -129,6 +129,7 @@ private func runExportPDFPanel(model: DocumentModel) {
   guard let url = model.documentURL else { return }
 
   let panel = NSSavePanel()
+  panel.identifier = .init(rawValue: "export-pdf")
   panel.title = "Export as PDF"
   panel.allowedContentTypes = [.pdf]
   panel.nameFieldStringValue =
