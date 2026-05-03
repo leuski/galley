@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 /// build it ourselves from the delegate's observed list.
 struct FileCommands: Commands {
   @Bindable var delegate: ViewerAppDelegate
-  @FocusedValue(\.viewerModel) private var model
+  @FocusedValue(\.documentModel) private var model
   @FocusedValue(\.viewerRenameContext) private var renameContext
 
   var body: some Commands {

@@ -5,7 +5,7 @@ import SwiftUI
 /// the View menu (replacing the system-provided sidebar group, which
 /// the Viewer doesn't use).
 struct ViewCommands: Commands {
-  @FocusedValue(\.viewerModel) private var model
+  @FocusedValue(\.documentModel) private var model
 
   var body: some Commands {
     CommandGroup(before: .toolbar) {

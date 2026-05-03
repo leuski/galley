@@ -25,32 +25,26 @@ final class AppModel {
 
   // MARK: - In-memory state
 
-  @ObservationIgnored private let templateStore: TemplateStore
   let templates: TemplateChoice
-  @ObservationIgnored private let processorStore: ProcessorStore
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
 
   nonisolated static let defaultHost: String = "127.0.0.1"
 
-  init(templateStore: TemplateStore, processorStore: ProcessorStore) {
-    self.templateStore = templateStore
-    self.processorStore = processorStore
-
+  init() {
     self.templates = TemplateChoice(
-      source: templateStore,
+      source: TemplateStore.shared,
       persistent: Defaults.shared.templatePersistent) { name in
         Self.notify(.template, name)
       }
 
     self.processors = ProcessorChoice(
-      source: processorStore,
+      source: ProcessorStore.shared,
       persistent: Defaults.shared.rendererPersistent) { name in
         Self.notify(.processor, name)
       }
 
     self.server = PreviewServerController(
-      templateStore: templateStore,
       selectedTemplateProvider: { [weak templates] in
         await templates?.selected.value ?? .default
       },
@@ -58,27 +52,8 @@ final class AppModel {
         await processors?.selected.value.renderer
       })
 
-    templateStore.onReload = { [weak self] in self?.afterTemplateReload() }
-
     startServer()
     startPortObservation()
-  }
-
-  /// Re-runs discovery and heals the persisted pick against the
-  /// fresh catalog. Posts a notification if the pick was displaced.
-  func rediscoverRenderers() {
-    Task {
-      await processorStore.discover()
-      if let name = processors.healIfDisplaced() {
-        Self.notify(.processor, name)
-      }
-    }
-  }
-
-  private func afterTemplateReload() {
-    if let name = templates.healIfDisplaced() {
-      Self.notify(.template, name)
-    }
   }
 
   private static func notify(
@@ -117,7 +92,6 @@ final class AppModel {
       }
     }
   }
-
 }
 
 /// Boot wrapper that runs async processor discovery before
@@ -133,12 +107,8 @@ final class AppBoot {
     // responds. Fire it in parallel and let it resolve whenever.
     Task { await DisplacementNotifier.requestAuthorization() }
     Task { @MainActor in
-      let templateStore = TemplateStore()
-      let processorStore = ProcessorStore()
-      await processorStore.discover()
-      self.model = AppModel(
-        templateStore: templateStore,
-        processorStore: processorStore)
+      await ProcessorStore.shared.discover()
+      self.model = AppModel()
     }
   }
 }

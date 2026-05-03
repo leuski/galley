@@ -86,3 +86,26 @@ where Model: ChoiceModel, Model.Element: SectionedChoiceValue
     }
   }
 }
+
+public struct MenuPickerCore<Model>: View
+where Model: ChoiceModel & AnyObject & Observable,
+      Model.Element: SectionedChoiceValue
+{
+  @Bindable var model: Model
+  let action: @MainActor (String?) -> Void
+
+  public init(
+    model: Model,
+    action: @escaping @MainActor (String?) -> Void)
+  {
+    self.action = action
+    self.model = model
+  }
+
+  public var body: some View {
+    MenuCore(model: model)
+      .onChange(of: model.persistent) {
+        action(model.persistent)
+      }
+  }
+}

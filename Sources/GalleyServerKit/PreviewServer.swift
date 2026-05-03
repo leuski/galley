@@ -20,7 +20,6 @@ public final class PreviewServerController {
 
   @ObservationIgnored public let watcher = DocumentWatcher()
 
-  @ObservationIgnored private let templateStore: TemplateStore
   @ObservationIgnored private let selectedTemplateProvider: @Sendable ()
   async -> Template
   @ObservationIgnored private let rendererProvider: @Sendable ()
@@ -30,11 +29,9 @@ public final class PreviewServerController {
   public static let defaultPort: UInt16 = 8089
 
   public init(
-    templateStore: TemplateStore,
     selectedTemplateProvider: @escaping @Sendable () async -> Template,
     rendererProvider: @escaping @Sendable () async -> (any MarkdownRenderer)?
   ) {
-    self.templateStore = templateStore
     self.selectedTemplateProvider = selectedTemplateProvider
     self.rendererProvider = rendererProvider
   }
@@ -42,7 +39,6 @@ public final class PreviewServerController {
   public func start(url: URL) {
     stop()
 
-    let store = templateStore
     let templateProvider = selectedTemplateProvider
     let provider = rendererProvider
     let watcher = self.watcher
@@ -84,7 +80,6 @@ public final class PreviewServerController {
       await Routes.register(
         on: server,
         hostURL: fullURL,
-        templateStore: store,
         selectedTemplateProvider: templateProvider,
         rendererProvider: provider,
         watcher: watcher)

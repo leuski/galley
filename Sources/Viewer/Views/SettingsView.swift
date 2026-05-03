@@ -96,7 +96,7 @@ struct SettingsView: View {
   @ViewBuilder
   private var rediscoverRenderersButton: some View {
     Button {
-      appModel.rediscoverRenderers()
+      ProcessorStore.shared.rediscover()
     } label: {
       Image(systemName: "arrow.clockwise")
         .frame(width: 16, height: 16)
@@ -109,7 +109,7 @@ struct SettingsView: View {
   @ViewBuilder
   private var revealTemplatesButton: some View {
     Button {
-      appModel.revealTemplatesFolder()
+      TemplateStore.shared.revealFolder()
     } label: {
       Image(systemName: "folder")
         .frame(width: 16, height: 16)
@@ -122,16 +122,20 @@ struct SettingsView: View {
   @ViewBuilder
   private var templatePicker: some View {
     Menu {
-      MenuCore(model: appModel.templates)
+      MenuPickerCore(model: appModel.templates) {
+        Defaults.shared.templatePersistent = $0
+      }
     } label: {
-      Text(appModel.activeTemplate.name)
+      Text(appModel.templates.selected.name)
     }
   }
 
   @ViewBuilder
   private var processorPicker: some View {
     Menu {
-      MenuCore(model: appModel.processors)
+      MenuPickerCore(model: appModel.processors) {
+        Defaults.shared.rendererPersistent = $0
+      }
     } label: {
       Text(appModel.processors.selected.name)
     }
@@ -286,7 +290,5 @@ struct EditorMenuCore: View {
 }
 
 #Preview {
-  SettingsView(appModel: AppModel(
-    templateStore: TemplateStore(),
-    processorStore: ProcessorStore()))
+  SettingsView(appModel: AppModel())
 }

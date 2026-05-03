@@ -28,18 +28,23 @@ func templateMenu(
   title: String = "Template",
   globalTitle: String? = nil,
   appModel: AppModel,
-  choices templates: SceneTemplateChoice? = nil) -> some View
+  documentModel: DocumentModel? = nil) -> some View
 {
-  let title = Defaults.shared.enablePerDocumentOverrides && templates != nil
+  let title = Defaults.shared.enablePerDocumentOverrides
+  && documentModel != nil
   ? title : (globalTitle ?? title)
-  if let templates, Defaults.shared.enablePerDocumentOverrides {
+  if let documentModel, let templates = documentModel.templates,
+     Defaults.shared.enablePerDocumentOverrides {
     TemplateMenu(
       title: title,
-      model: templates)
+      model: templates) { _ in
+      }
   } else {
     TemplateMenu(
       title: title,
-      model: appModel.templates)
+      model: appModel.templates) {
+        Defaults.shared.templatePersistent = $0
+      }
   }
 }
 
@@ -48,17 +53,22 @@ func processorMenu(
   title: String = "Template",
   globalTitle: String? = nil,
   appModel: AppModel,
-  choices processors: SceneProcessorChoice? = nil) -> some View
+  documentModel: DocumentModel? = nil) -> some View
 {
-  let title = Defaults.shared.enablePerDocumentOverrides && processors != nil
+  let title = Defaults.shared.enablePerDocumentOverrides
+  && documentModel != nil
   ? title : (globalTitle ?? title)
-  if let processors, Defaults.shared.enablePerDocumentOverrides {
-    TemplateMenu(
+  if let documentModel, let processors = documentModel.processors,
+     Defaults.shared.enablePerDocumentOverrides {
+    ProcessorMenu(
       title: title,
-      model: processors)
+      model: processors) { _ in
+      }
   } else {
-    TemplateMenu(
+    ProcessorMenu(
       title: title,
-      model: appModel.processors)
+      model: appModel.processors) {
+        Defaults.shared.rendererPersistent = $0
+      }
   }
 }

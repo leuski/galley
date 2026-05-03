@@ -29,9 +29,7 @@ final class Defaults: GalleyDefaults {
 final class AppModel {
   // MARK: - In-memory state (not persisted by the macro)
 
-  @ObservationIgnored let templateStore: TemplateStore
   let templates: TemplateChoice
-  @ObservationIgnored let processorStore: ProcessorStore
   let processors: ProcessorChoice
   @ObservationIgnored let editors: EditorChoice
 
@@ -40,61 +38,22 @@ final class AppModel {
   /// (`await processorStore.discover()`) before invoking this so
   /// `create(source:persistent:)` decodes the persisted pick against
   /// the live catalog and reports displacement honestly.
-  init(templateStore: TemplateStore, processorStore: ProcessorStore) {
-    self.templateStore = templateStore
-    self.processorStore = processorStore
+  init() {
     self.editors = EditorChoice()
 
     self.templates = TemplateChoice(
-      source: templateStore,
+      source: TemplateStore.shared,
       persistent: Defaults.shared.templatePersistent) { name in
         Self.notify(.template, name)
       }
 
     self.processors = ProcessorChoice(
-      source: processorStore,
+      source: ProcessorStore.shared,
       persistent: Defaults.shared.rendererPersistent) { name in
         Self.notify(.processor, name)
       }
 
-    templateStore.onReload = { [weak self] in self?.afterTemplateReload() }
-
     startPersistenceObservation()
-  }
-
-  func template(forID id: String) -> Template? {
-    templateStore.existingTemplate(forID: id)
-  }
-
-  /// Renderer to use for the current preview. Wraps swift-markdown
-  /// with `annotatesSourceLines: true` so cmd-click → BBEdit works.
-  var activeRenderer: any MarkdownRenderer {
-    processors.selected.value.renderer ?? SwiftMarkdownRenderer()
-  }
-
-  var activeTemplate: Template {
-    templates.selected.value
-  }
-
-  func selectTemplate(_ template: Template) {
-    templates.selected = TemplateChoice.Element(template)
-  }
-
-  /// Re-runs discovery and heals the persisted pick against the
-  /// fresh catalog. Posts a notification if the pick was displaced.
-  func rediscoverRenderers() {
-    Task {
-      await processorStore.discover()
-      if let name = processors.healIfDisplaced() {
-        Self.notify(.processor, name)
-      }
-    }
-  }
-
-  private func afterTemplateReload() {
-    if let name = templates.healIfDisplaced() {
-      Self.notify(.template, name)
-    }
   }
 
   private static func notify(
@@ -125,10 +84,6 @@ final class AppModel {
       }
     }
   }
-
-  func revealTemplatesFolder() {
-    templateStore.revealFolder()
-  }
 }
 
 /// Boot wrapper that runs async processor discovery before
@@ -146,12 +101,8 @@ final class AppBoot {
     // responds. Fire it in parallel and let it resolve whenever.
     Task { await DisplacementNotifier.requestAuthorization() }
     Task { @MainActor in
-      let templateStore = TemplateStore()
-      let processorStore = ProcessorStore()
-      await processorStore.discover()
-      self.model = AppModel(
-        templateStore: templateStore,
-        processorStore: processorStore)
+      await ProcessorStore.shared.discover()
+      self.model = AppModel()
     }
   }
 }

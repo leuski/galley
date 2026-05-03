@@ -729,7 +729,9 @@ final class DocumentModel {
     {
       return renderer
     }
-    return appModel?.activeRenderer ?? SwiftMarkdownRenderer()
+
+    return appModel?.processors.selected.value.renderer
+    ?? SwiftMarkdownRenderer()
   }
 
   private func resolvedTemplate() -> Template {
@@ -738,7 +740,8 @@ final class DocumentModel {
     {
       return templates.selected.value
     }
-    return appModel?.activeTemplate ?? .default
+
+    return appModel?.templates.selected.value ?? .default
   }
 
   private func currentScrollY() async -> Double? {

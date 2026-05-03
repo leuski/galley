@@ -16,13 +16,10 @@ enum Routes {
   static func register(
     on server: HTTPServer,
     hostURL: URL,
-    templateStore: TemplateStore,
     selectedTemplateProvider: @Sendable @escaping () async -> Template,
     rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
   ) async {
-    let storeRef = TemplateStoreRef(templateStore)
-
     await server.appendRoute(
       .init(method: .GET, path: "/\(RouteNames.preview)/*")) { request in
         if let denied = guardRequest(request, hostURL: hostURL) {
@@ -40,8 +37,7 @@ enum Routes {
         if let denied = guardRequest(request, hostURL: hostURL) {
           return denied
         }
-        return await templateAssetResponse(
-          request: request, templateStore: storeRef)
+        return await templateAssetResponse(request: request)
       }
 
     await server.appendRoute(
@@ -190,15 +186,16 @@ enum Routes {
   // MARK: - /template/<id>/<file>
 
   private static func templateAssetResponse(
-    request: HTTPRequest,
-    templateStore: TemplateStoreRef
+    request: HTTPRequest
   ) async -> HTTPResponse {
     guard case .templateAsset(let templateID, let file)
       = PreviewRoute(path: request.path)
     else {
       return HTTPResponses.badRequest("Invalid template asset path")
     }
-    guard let template = await templateStore.template(id: templateID) else {
+    guard let template = await TemplateStore.shared
+      .existingTemplate(forID: templateID)
+    else {
       return HTTPResponses.notFound("Template not found: \(templateID)")
     }
     guard let assetURL = template.resolveAsset(file: file) else {

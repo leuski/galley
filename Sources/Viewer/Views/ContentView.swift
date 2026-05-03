@@ -498,9 +498,7 @@ private struct SceneValuesModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .focusedSceneValue(\.viewerModel, model)
-      .focusedSceneValue(\.viewerTemplates, model.templates)
-      .focusedSceneValue(\.viewerProcessors, model.processors)
+      .focusedSceneValue(\.documentModel, model)
       .focusedSceneValue(\.viewerRenameContext, renameContext)
   }
 }
@@ -591,7 +589,7 @@ private struct RendererToolbarPicker: View {
     processorMenu(
       title: appModel.processors.selected.name,
       appModel: appModel,
-      choices: docModel.processors)
+      documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Markdown processor")
   }
@@ -605,7 +603,7 @@ private struct TemplateToolbarPicker: View {
     templateMenu(
       title: appModel.templates.selected.name,
       appModel: appModel,
-      choices: docModel.templates)
+      documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Template")
   }

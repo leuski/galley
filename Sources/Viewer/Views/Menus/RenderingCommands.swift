@@ -12,8 +12,7 @@ import SwiftUI
 /// selection directly.
 struct RenderingCommands: Commands {
   @Bindable var appModel: AppModel
-  @FocusedValue(\.viewerTemplates) private var templates
-  @FocusedValue(\.viewerProcessors) private var processors
+  @FocusedValue(\.documentModel) private var documentModel
 
   var body: some Commands {
     CommandMenu("Format") {
@@ -24,13 +23,13 @@ struct RenderingCommands: Commands {
         title: "Markdown Processor",
         globalTitle: "Global Markdown Processor",
         appModel: appModel,
-        choices: processors)
+        documentModel: documentModel)
 
       templateMenu(
         title: "Template",
         globalTitle: "Global Template",
         appModel: appModel,
-        choices: templates)
+        documentModel: documentModel)
     }
   }
 }
