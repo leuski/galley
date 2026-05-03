@@ -216,8 +216,11 @@ struct SettingsView: View {
       Section("Markdown Preview Server") {
         LabeledContent {
           ServerStatusPill(status: serverStatus.status)
-        } label: {
           Toggle("Run server", isOn: serverEnabledBinding)
+            .toggleStyle(.switch)
+            .labelsHidden()
+        } label: {
+          Text("Run server")
         }
         Text(
           "When on, a background server makes documents available in any "
