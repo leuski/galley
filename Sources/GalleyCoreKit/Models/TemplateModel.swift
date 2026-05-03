@@ -30,6 +30,10 @@ extension TemplateChoiceValue: SectionedChoiceValue {
   }
 }
 
+extension TemplateChoiceValue: RestorableChoiceValue {
+  public typealias Source = TemplateStore
+}
+
 extension TemplateStore: ChoiceModelSource<Template> {
   public var values: [Template] { templates }
   public var defaultValue: Template { .default }

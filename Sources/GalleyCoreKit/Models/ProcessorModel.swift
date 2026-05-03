@@ -25,6 +25,10 @@ extension ProcessorChoiceValue: SectionedChoiceValue {
   }
 }
 
+extension ProcessorChoiceValue: RestorableChoiceValue {
+  public typealias Source = ProcessorStore
+}
+
 extension ProcessorStore: ChoiceModelSource<Processor> {
   public var values: [Processor] { processors }
   public var defaultValue: Processor { .builtIn }

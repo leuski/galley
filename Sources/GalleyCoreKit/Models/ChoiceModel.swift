@@ -92,7 +92,15 @@ public protocol ChoiceModel<Element> {
   associatedtype Element: ChoiceValue
   var values: [Element] { get }
   var selected: Element { get nonmutating set }
-  var persistent: String? { get }
+  /// The serialized form of the current selection. Read returns the
+  /// pending hydration string (if one is buffered and not yet
+  /// consumed) or the current selection's serialized form.
+  /// Assigning hydrates: the model attempts to decode the new value
+  /// and update `selected`. If the source's catalog isn't ready
+  /// yet, the assignment is buffered and retried on the next
+  /// observed source change. Assigning `nil` clears any pending
+  /// hydration and snaps `selected` to the default.
+  var persistent: String? { get nonmutating set }
 }
 
 public extension ChoiceModel {
@@ -120,14 +128,6 @@ where Element: ChoiceValueEnvelopeProtocol
 }
 
 extension ChoiceModelEnvelope {
-  public var persistent: String? {
-    do {
-      return try selected.value.persisted
-    } catch {
-      return nil
-    }
-  }
-
   func decode(_ persistent: String) throws -> Element {
     let persistent = try PersistentChoiceValue<Element.Value>(from: persistent)
     guard let value = findValue(forID: persistent.id)
@@ -135,57 +135,6 @@ extension ChoiceModelEnvelope {
       throw AnyChoiceValueDecodingError.missingValue(persistent.name)
     }
     return Element(value)
-  }
-}
-
-@Observable @MainActor
-final public class ConcreteChoiceModel<Element, Source>: ChoiceModelEnvelope,
-                                                         ChoiceModelObject
-where Element: ChoiceValueEnvelopeProtocol & Sendable,
-      Source: ChoiceModelSource<Element.Value>
-{
-  private let source: Source
-  public var values: [Element] { source.values.map(Element.init) }
-  public var selected: Element
-
-  public func findValue(
-    forID id: Element.Value.PersistentID) -> Element.Value?
-  {
-    source.values.first(where: { $0.persistentID == id })
-  }
-
-  /// If `selected.value` is no longer in `source.values`, snap to the
-  /// default and return the displaced display name. Call after the
-  /// source mutates its catalog (e.g. template watcher fires) so
-  /// persisted state and UI stay consistent. Returns nil when no
-  /// heal was needed.
-  @discardableResult
-  public func healIfDisplaced() -> String? {
-    let id = selected.value.persistentID
-    if findValue(forID: id) != nil { return nil }
-    let displaced = selected.name
-    selected = Element(source.defaultValue)
-    return displaced
-  }
-
-  public convenience init(
-    source: Source, persistent: String?, notifier: (String) -> Void)
-  {
-    self.init(source: source, selected: Element(source.defaultValue))
-    if let persistent {
-      do {
-        self.selected = try self.decode(persistent)
-      } catch AnyChoiceValueDecodingError.missingValue(let name) {
-        notifier(name)
-      } catch {
-        // ignore the rest
-      }
-    }
-  }
-
-  private init(source: Source, selected: Element) {
-    self.source = source
-    self.selected = selected
   }
 }
 
@@ -209,6 +158,211 @@ public extension ChoiceModelObject {
     hasher.combine(ObjectIdentifier(self))
   }
 }
+
+// MARK: - Restorable element
+
+/// Element-level protocol that bundles all flavor-specific behavior
+/// (option list, default, persistence, decoding, residency check).
+/// One conforming element type per flavor; `Choice<Element>` is the
+/// single class body that drives any flavor.
+@MainActor
+public protocol RestorableChoiceValue<Source>: ChoiceValue {
+  associatedtype Source
+
+  func persist() -> String?
+  func isResident(in source: Source) -> Bool
+  static func decode(_ persistent: String, from source: Source) throws -> Self
+  static func values(from source: Source) -> [Self]
+  static func defaultElement(from source: Source) -> Self
+
+  /// Whether the source's underlying catalog has loaded enough data
+  /// to make a real decision. Returning `false` defers hydration and
+  /// healing until the next observed change. Default checks whether
+  /// `values(from:)` is non-empty, which is right for the envelope
+  /// flavor; the scene flavor overrides this to bypass its `.global`
+  /// sentinel that would otherwise mask emptiness.
+  static func isCatalogReady(_ source: Source) -> Bool
+}
+
+extension RestorableChoiceValue {
+  public static func isCatalogReady(_ source: Source) -> Bool {
+    !values(from: source).isEmpty
+  }
+}
+
+/// Default behavior for envelope-style elements (one element per
+/// catalog entry, persisted by the underlying value's persistentID).
+extension RestorableChoiceValue
+where Self: ChoiceValueEnvelopeProtocol,
+      Source: ChoiceModelSource,
+      Source.Value == Self.Value
+{
+  public func persist() -> String? { try? value.persisted }
+
+  public func isResident(in source: Source) -> Bool {
+    source.values.contains { $0.persistentID == value.persistentID }
+  }
+
+  public static func decode(
+    _ persistent: String, from source: Source
+  ) throws -> Self {
+    let parsed = try PersistentChoiceValue<Value>(from: persistent)
+    guard let value = source.values.first(
+      where: { $0.persistentID == parsed.id })
+    else {
+      throw AnyChoiceValueDecodingError.missingValue(parsed.name)
+    }
+    return Self(value)
+  }
+
+  public static func values(from source: Source) -> [Self] {
+    source.values.map(Self.init)
+  }
+
+  public static func defaultElement(from source: Source) -> Self {
+    Self(source.defaultValue)
+  }
+}
+
+// MARK: - Unified Choice
+
+/// Single class implementing every flavor of `ChoiceModel`. All
+/// flavor-specific behavior lives on `Element: RestorableChoiceValue`.
+///
+/// Lifecycle:
+/// - `init` records the persisted string as *pending* and runs one
+///   reconcile pass. If the source's catalog is already loaded, the
+///   pending string is consumed at init time. Otherwise it stays
+///   pending and gets retried on each observed source change.
+/// - `startTracking()` (auto-called by `init`) subscribes to the
+///   source's observable surface. Each change triggers a reconcile:
+///   first we try to consume any pending hydration, then we heal the
+///   current selection if it's no longer resident in the source.
+/// - `stopTracking()` cancels the subscription. The deinit cancels
+///   too, so manual stops are only needed for early teardown.
+@Observable @MainActor
+final public class Choice<Element>: ChoiceModelObject
+where Element: RestorableChoiceValue
+{
+  @ObservationIgnored private let source: Element.Source
+  @ObservationIgnored private var pendingPersistent: String?
+  @ObservationIgnored private let notifier: @MainActor (String) -> Void
+  @ObservationIgnored private var observation: Cancelable?
+
+  public var values: [Element] { Element.values(from: source) }
+  public var selected: Element
+  /// See the protocol doc on `ChoiceModel.persistent`. The getter
+  /// prefers a still-pending hydration string over the current
+  /// selection's persisted form so an external observer that mirrors
+  /// this property to storage doesn't clobber the user's pick during
+  /// async catalog discovery (during which `selected` is still the
+  /// default).
+  public var persistent: String? {
+    get { pendingPersistent ?? selected.persist() }
+    set {
+      guard let newValue else {
+        pendingPersistent = nil
+        selected = Element.defaultElement(from: source)
+        return
+      }
+      pendingPersistent = newValue
+      reconcile()
+    }
+  }
+
+  public init(
+    source: Element.Source,
+    persistent: String?,
+    notifier: @escaping @MainActor (String) -> Void
+  ) {
+    self.source = source
+    self.notifier = notifier
+    self.selected = Element.defaultElement(from: source)
+    self.pendingPersistent = persistent
+    reconcile()
+    startTracking()
+  }
+
+  deinit { observation?.cancel() }
+
+  /// Subscribe to the source's observable surface. Idempotent —
+  /// calling again replaces the prior subscription. Auto-called by
+  /// `init`; explicit invocation is only needed if you stopped
+  /// tracking and want to resume.
+  public func startTracking() {
+    stopTracking()
+    observation = onObservedChange(
+      track: { [weak self] in
+        guard let self else { return }
+        // Touch the observable surface that determines residency
+        // and hydration. Both flavors funnel through `values(from:)`.
+        _ = Element.values(from: self.source)
+      },
+      onChange: { [weak self] in self?.reconcile() })
+  }
+
+  public func stopTracking() {
+    observation?.cancel()
+    observation = nil
+  }
+
+  /// One pass of (a) try to consume `pendingPersistent`, then (b)
+  /// heal the current selection if displaced. Both steps require
+  /// the catalog to be ready; if it isn't, we defer until the next
+  /// observed change. Idempotent.
+  private func reconcile() {
+    guard Element.isCatalogReady(source) else { return }
+
+    if let pending = pendingPersistent {
+      pendingPersistent = nil
+      do {
+        selected = try Element.decode(pending, from: source)
+        return
+      } catch AnyChoiceValueDecodingError.missingValue(let name) {
+        notifier(name)
+      } catch {
+        // ignore the rest
+      }
+    }
+
+    if !selected.isResident(in: source) {
+      let displaced = selected.name
+      selected = Element.defaultElement(from: source)
+      notifier(displaced)
+    }
+  }
+
+  /// Manual heal entry point for callers that don't track or want to
+  /// force a check. Returns the displaced display name, or nil when
+  /// the current selection is still resident.
+  @discardableResult
+  public func healIfDisplaced() -> String? {
+    if selected.isResident(in: source) { return nil }
+    let displaced = selected.name
+    selected = Element.defaultElement(from: source)
+    return displaced
+  }
+}
+
+extension Choice: ChoiceModelEnvelope
+where Element: ChoiceValueEnvelopeProtocol
+{
+  public func findValue(
+    forID id: Element.Value.PersistentID
+  ) -> Element.Value? {
+    values.first(where: { $0.value.persistentID == id })?.value
+  }
+}
+
+// MARK: - Concrete flavor
+
+public typealias ConcreteChoiceModel<Element, Source>
+  = Choice<Element>
+where Element: ChoiceValueEnvelopeProtocol & RestorableChoiceValue & Sendable,
+      Source: ChoiceModelSource<Element.Value>,
+      Element.Source == Source
+
+// MARK: - Scene flavor
 
 public enum SceneChoiceValueEnvelope<Choice>: ChoiceValue
 where Choice: ChoiceModel & Equatable & Hashable
@@ -284,68 +438,51 @@ where Choice.Element: SectionedChoiceValue
   }
 }
 
-@Observable @MainActor
-final public class SceneChoice<Choice>: ChoiceModel
-where Choice: ChoiceModelEnvelope & Equatable & Hashable
+extension SceneChoiceValueEnvelope: RestorableChoiceValue
+where Choice: ChoiceModelEnvelope
 {
-  public typealias Element = SceneChoiceValueEnvelope<Choice>
-  private let source: Choice
+  public typealias Source = Choice
 
-  public var values: [Element] {
+  public func persist() -> String? {
+    switch self {
+    case .global:
+      return nil
+    case .local(let value):
+      return try? value.value.persisted
+    }
+  }
+
+  public func isResident(in source: Choice) -> Bool {
+    switch self {
+    case .global:
+      return true
+    case .local(let value):
+      return source.findValue(forID: value.value.persistentID) != nil
+    }
+  }
+
+  public static func decode(
+    _ persistent: String, from source: Choice
+  ) throws -> Self {
+    .local(try source.decode(persistent))
+  }
+
+  public static func values(from source: Choice) -> [Self] {
     [.global(source)] + source.values.map { .local($0) }
   }
 
-  public var selected: Element
-
-  private init(source: Choice, selected: Element) {
-    self.source = source
-    self.selected = selected
+  public static func defaultElement(from source: Choice) -> Self {
+    .global(source)
   }
 
-  public convenience init(
-    source: Choice, persistent: String?, notifier: (String) -> Void)
-  {
-    self.init(source: source, selected: .global(source))
-    if let persistent {
-      do {
-        self.selected = .local(try source.decode(persistent))
-      } catch AnyChoiceValueDecodingError.missingValue(let name) {
-        notifier(name)
-      } catch {
-        // ignore the rest
-      }
-    }
-  }
-
-  public var persistent: String? {
-    switch selected {
-    case .local(let value):
-      do {
-        return try value.value.persisted
-      } catch {
-        return nil
-      }
-    case .global:
-      return nil
-    }
-  }
-
-  /// If a local override's underlying value is no longer in the
-  /// source's catalog, snap back to `.global(source)` and return the
-  /// displaced display name. The `.global` case never displaces — it
-  /// always resolves through the source's own (already-healed)
-  /// `selected`.
-  @discardableResult
-  public func healIfDisplaced() -> String? {
-    switch selected {
-    case .global:
-      return nil
-    case .local(let value):
-      let id = value.value.persistentID
-      if source.findValue(forID: id) != nil { return nil }
-      let displaced = value.name
-      selected = .global(source)
-      return displaced
-    }
+  /// Bypass the `.global` sentinel — readiness is about the parent's
+  /// underlying catalog, not the augmented option list (which is
+  /// never empty thanks to `.global`).
+  public static func isCatalogReady(_ source: Choice) -> Bool {
+    !source.values.isEmpty
   }
 }
+
+public typealias SceneChoice<Source>
+  = Choice<SceneChoiceValueEnvelope<Source>>
+where Source: ChoiceModelEnvelope & Hashable

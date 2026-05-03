@@ -12,9 +12,9 @@ public func observationChanges(
   AsyncStream { cont in
     let task = Task { @MainActor in
       while !Task.isCancelled {
-        await withCheckedContinuation {
-          (k: CheckedContinuation<Void, Never>) in
-          withObservationTracking(track) { k.resume() }
+        await withCheckedContinuation
+        { (checked: CheckedContinuation<Void, Never>) in
+          withObservationTracking(track) { checked.resume() }
         }
         cont.yield(())
       }
@@ -32,8 +32,8 @@ public func onObservedChange(
 ) -> Cancelable {
   let task = Task { @MainActor in
     while !Task.isCancelled {
-      await withCheckedContinuation {
-        (cont: CheckedContinuation<Void, Never>) in
+      await withCheckedContinuation
+      { (cont: CheckedContinuation<Void, Never>) in
         withObservationTracking(track) { cont.resume() }
       }
       if Task.isCancelled { break }
