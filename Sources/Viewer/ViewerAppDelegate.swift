@@ -12,6 +12,13 @@ import UniformTypeIdentifiers
 /// before any window has appeared. We buffer URLs until a window comes
 /// up and installs its open handler, then flush.
 ///
+/// Pure routing decisions live in `GalleyCoreKit/Routing/`
+/// (`OpenURLRouter`, `WindowRegistry`, `LaunchURLBuffer`,
+/// `PendingScrollLines`, `URLNormalizer`). This delegate is the AppKit
+/// bridge: it owns the `NSWindow`-keyed maps, drives state mutations
+/// in response to AppKit callbacks, and interprets the router's
+/// `DispatchAction` against the live `NSApplication`.
+///
 /// Also tracks recently-opened URLs so the File > Open Recent menu can
 /// observe them. `WindowGroup` doesn't get the system Open Recent for
 /// free (that menu is wired to NSDocument), so we surface
@@ -21,19 +28,33 @@ import UniformTypeIdentifiers
 @Observable
 final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   @ObservationIgnored private(set) var openHandler: ((URL) -> Void)?
-  @ObservationIgnored private var pending: [URL] = []
+  @ObservationIgnored private var launchBuffer = LaunchURLBuffer()
+  @ObservationIgnored private var registry = WindowRegistry()
+  @ObservationIgnored private var pendingScrolls = PendingScrollLines()
+  @ObservationIgnored private let router = OpenURLRouter()
+  @ObservationIgnored private var idAllocator = WindowIDAllocator()
+
+  /// Maps the live AppKit `NSWindow` (by `ObjectIdentifier`) to the
+  /// stable `WindowID` we issued at registration time. Production-only
+  /// table — the routing layer itself never sees `NSWindow`.
+  @ObservationIgnored
+  private var idsByObject: [ObjectIdentifier: WindowID] = [:]
+
+  /// Reverse lookup so `apply(_:for:)` can dereference an opaque
+  /// `WindowID` back to the live `NSWindow` it represents.
+  @ObservationIgnored private var windowsByID: [WindowID: NSWindow] = [:]
+
+  /// Closures the registry can't carry (they aren't `Sendable`). Keyed
+  /// by the same `WindowID` as `windowsByID`. Each closure rebinds the
+  /// owning window's WindowGroup binding + `DocumentModel` to a new
+  /// URL — installed by `ContentView` at registration time.
+  @ObservationIgnored
+  private var rebindClosures: [WindowID: @MainActor (URL) -> Void] = [:]
 
   /// Reference to the shared `AppModel`, set by `ViewerApp` so
   /// `application(_:open:)` and friends can consult `openBehavior`
   /// without a SwiftUI environment lookup.
   @ObservationIgnored weak var appModel: AppModel?
-
-  /// Window registry — each `ContentView` registers its `NSWindow`
-  /// along with a closure that rebinds the window to a new URL. Used
-  /// for the `replaceCurrent` open behavior, and to identify the
-  /// frontmost window for the `newTab` handoff.
-  @ObservationIgnored
-  private var registrations: [ObjectIdentifier: WindowRegistration] = [:]
 
   /// FIFO queue of hosts for the next `newTab` opens. Populated
   /// immediately before calling `openHandler`; each new window's
@@ -47,16 +68,6 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   /// incoming document rebinds the placeholder out from under the
   /// launch picker.
   @ObservationIgnored private weak var activeOpenPanel: NSOpenPanel?
-
-  /// Pending source-line scroll targets keyed by the standardized
-  /// file path. Populated by `normalize(_:)` when an incoming
-  /// `galley://` URL carries a `line=N` query parameter, drained by
-  /// ContentView at bind time. Keyed by path string rather than URL
-  /// because URL Hashable equality is sensitive to encoding/symlink
-  /// differences between the URL we construct here and whatever
-  /// SwiftUI hands back through the WindowGroup binding.
-  @ObservationIgnored
-  private var pendingScrollLines: [String: Int] = [:]
 
   @ObservationIgnored
   private let logger = Logger(
@@ -74,9 +85,23 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   /// before deciding to show the FTUE open panel.
   private(set) var didFinishLaunching = false
 
+  /// Parsed view of `CommandLine.arguments`. In production every flag
+  /// is at its default, so the delegate behaves exactly as before.
+  /// Tests that exec the built `.app` with `--ui-test-mode` (and
+  /// friends) get deterministic, ephemeral behavior.
+  @ObservationIgnored let launchArgs: LaunchArguments
+
   override init() {
+    self.launchArgs = LaunchArguments.fromProcess()
     super.init()
     self.recentURLs = NSDocumentController.shared.recentDocumentURLs
+    if let seed = launchArgs.seedFile {
+      // Pure injection point — equivalent to the URL having arrived
+      // via `application(_:open:)` immediately after launch. The
+      // dispatch pipeline (registry, buffer drain, openHandler) is
+      // unchanged from the production path.
+      launchBuffer.append(seed)
+    }
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -85,162 +110,88 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
 
   func application(_ application: NSApplication, open urls: [URL]) {
     for url in urls {
-      // `galley://settings` is handled by `.onOpenURL` on the
-      // WindowGroup root view, which calls SwiftUI's `openSettings()`.
-      // Skip it here so it doesn't collide with the document-open
-      // pipeline.
-      if url.scheme?.lowercased() == "galley",
-         url.host?.lowercased() == "settings"
-      {
+      switch URLNormalizer.normalize(url) {
+      case .openSettings:
+        // Handled by `.onOpenURL` on the WindowGroup root view, which
+        // calls SwiftUI's `openSettings()`. Skip here so it doesn't
+        // collide with the document-open pipeline.
         continue
+      case .document(let fileURL, let line):
+        if let line {
+          pendingScrolls.stash(line, for: fileURL)
+          logger.debug("""
+            Stashed scroll line \(line) for \
+            \(fileURL.path, privacy: .public)
+            """)
+        }
+        record(fileURL)
+        dispatch(fileURL)
+      case .unparseable(let original):
+        logger.warning("""
+          Could not parse inbound URL: \
+          \(original.absoluteString, privacy: .public)
+          """)
+        record(original)
+        dispatch(original)
       }
-      let normalized = normalize(url)
-      record(normalized)
-      dispatch(normalized)
     }
-  }
-
-  /// Translate inbound URLs into the canonical file URL the rest of
-  /// the dispatch pipeline expects. `galley://...?line=N` becomes a
-  /// plain `file://` URL with the line stashed in `pendingScrollLines`
-  /// for ContentView to consume at bind time. Other URLs pass through
-  /// unchanged.
-  private func normalize(_ url: URL) -> URL {
-    guard url.scheme?.lowercased() == "galley" else { return url }
-    guard let components = URLComponents(
-      url: url, resolvingAgainstBaseURL: false)
-    else {
-      logger.warning("""
-        galley:// URL had no parseable components: \
-        \(url.absoluteString, privacy: .public)
-        """)
-      return url
-    }
-    let path = components.path
-    guard !path.isEmpty else {
-      logger.warning("""
-        galley:// URL had empty path: \
-        \(url.absoluteString, privacy: .public)
-        """)
-      return url
-    }
-    let fileURL = URL(fileURLWithPath: path)
-    let key = pendingKey(for: fileURL)
-    if let value = components.queryItems?
-      .first(where: { $0.name == "line" })?.value,
-       let line = Int(value), line > 0
-    {
-      pendingScrollLines[key] = line
-      logger.debug("""
-        Stashed scroll line \(line) for \(key, privacy: .public)
-        """)
-    }
-    return fileURL
   }
 
   /// Take and clear the pending scroll-to-line for `url`, if any.
   /// Called by ContentView at the bind sites for both initial open and
   /// in-place replace.
   func consumePendingScrollLine(for url: URL) -> Int? {
-    let key = pendingKey(for: url)
-    let line = pendingScrollLines.removeValue(forKey: key)
+    let line = pendingScrolls.consume(for: url)
     if let line {
       logger.debug("""
-        Consumed scroll line \(line) for \(key, privacy: .public)
+        Consumed scroll line \(line) for \
+        \(url.standardizedFileURL.path, privacy: .public)
         """)
     }
     return line
   }
 
-  /// Stable lookup key for `pendingScrollLines`. Uses the standardized
-  /// file path so `URL(fileURLWithPath:)` results match whatever URL
-  /// SwiftUI/AppKit eventually hands back to ContentView, regardless
-  /// of encoding/symlink/trailing-slash variations.
-  private func pendingKey(for url: URL) -> String {
-    url.standardizedFileURL.path
-  }
-
   /// Single entry point all "open this URL" requests funnel through.
-  /// Honors `AppModel.openBehavior` when at least one window is
+  /// Honors `Defaults.shared.openBehavior` when at least one window is
   /// already on screen; with no windows, every mode collapses to
   /// "spawn a new window" since there's no frontmost to tab onto.
   func dispatch(_ url: URL) {
-    let behavior = Defaults.shared.openBehavior
+    let action = router.decide(
+      for: url,
+      behavior: Defaults.shared.openBehavior,
+      registry: registry,
+      handlerInstalled: openHandler != nil,
+      mainWindow: NSApp.mainWindow.flatMap { windowID(for: $0) },
+      keyWindow: NSApp.keyWindow.flatMap { windowID(for: $0) })
+    apply(action, for: url)
+  }
 
-    // Pre-launch (or no windows yet): only newWindow makes sense.
-    // Queue if the SwiftUI handler isn't installed; otherwise just
-    // hand off and let WindowGroup spawn a fresh window.
-    guard let openHandler else {
-      pending.append(url)
-      return
-    }
+  /// Interpret a `DispatchAction` from the router against the live
+  /// `NSApplication`. The split keeps the routing decisions pure
+  /// (testable in `Tests/GalleyCoreKitTests/Routing/`) and limits
+  /// `NSWindow`/`NSApp` coupling to this one method.
+  private func apply(_ action: DispatchAction, for url: URL) {
+    switch action {
+    case .queue:
+      launchBuffer.append(url)
 
-    // If a window is already showing this URL, route through its
-    // rebind closure regardless of the configured behavior. SwiftUI's
-    // `openWindow(value: url)` no-ops on an already-bound value — it
-    // brings the existing scene to front but does not re-fire
-    // `.task(id:)`, so the pending-scroll-line consume side never
-    // runs. Going through `rebind` reaches `replaceDocument`, which
-    // detects the same-URL case and just scrolls without resetting
-    // history.
-    if let match = registration(matching: url) {
-      match.window?.makeKeyAndOrderFront(nil)
-      NSApp.activate(ignoringOtherApps: true)
-      match.rebind(url)
-      return
-    }
+    case .openNew:
+      openHandler?(url)
 
-    // Priority for every behavior: prefer a real document window
-    // (tab/replace target) over the launch placeholder. A coexisting
-    // placeholder will self-dismiss once it sees `hasAnyDocumentWindow`
-    // is true. Falling back to the placeholder happens only when no
-    // real doc window exists yet.
-    switch behavior {
-    case .newWindow:
-      // If the only thing up is the placeholder, rebind it instead
-      // of stacking another empty window. With a real doc window
-      // present the user explicitly wants a new window, so just
-      // spawn — the placeholder (if any) will dismiss itself.
-      if frontmostDocumentRegistration() == nil,
-         let placeholder = frontmostPlaceholderRegistration()
-      {
-        activeOpenPanel?.cancel(nil)
-        placeholder.rebind(url)
-        return
-      }
-      openHandler(url)
+    case .rebind(let id):
+      activeOpenPanel?.cancel(nil)
+      rebindClosures[id]?(url)
 
-    case .newTab:
-      // Tab onto the frontmost real document window. The freshly
-      // spawned window's WindowAccessor will consume the queued host
-      // and merge into its tab group.
-      if let host = frontmostDocumentRegistration()?.window {
+    case .tabOnto(let id):
+      if let host = windowsByID[id] {
         pendingTabHosts.append(host)
-        openHandler(url)
-        return
       }
-      // No real doc to tab onto — reuse the placeholder if present
-      // (cancelling its FTUE picker), else spawn fresh.
-      if let placeholder = frontmostPlaceholderRegistration() {
-        activeOpenPanel?.cancel(nil)
-        placeholder.rebind(url)
-        return
-      }
-      openHandler(url)
+      openHandler?(url)
 
-    case .replaceCurrent:
-      // Replace the frontmost real doc; if none, reuse a placeholder;
-      // else spawn fresh.
-      if let registration = frontmostDocumentRegistration() {
-        registration.rebind(url)
-        return
-      }
-      if let placeholder = frontmostPlaceholderRegistration() {
-        activeOpenPanel?.cancel(nil)
-        placeholder.rebind(url)
-        return
-      }
-      openHandler(url)
+    case .focusExisting(let id):
+      windowsByID[id]?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+      rebindClosures[id]?(url)
     }
   }
 
@@ -254,111 +205,49 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     initialURL: URL?,
     rebind: @escaping @MainActor (URL) -> Void
   ) {
+    let id = idAllocator.next()
+    idsByObject[ObjectIdentifier(window)] = id
+    windowsByID[id] = window
+    rebindClosures[id] = rebind
     // A window that's already bound to a URL at registration time is
     // a real document window — not a placeholder. Setting
     // `hasDocument` here (rather than waiting for `markWindowReady`)
     // lets `dispatch` and `runLaunchPicker` see the truth immediately,
     // before the model's binding completes asynchronously.
-    registrations[ObjectIdentifier(window)] = WindowRegistration(
-      window: window,
-      rebind: rebind,
+    registry.register(WindowRecord(
+      id: id,
       hasDocument: initialURL != nil,
-      currentURL: initialURL)
+      currentURL: initialURL))
   }
 
   func unregisterWindow(_ window: NSWindow) {
-    registrations.removeValue(forKey: ObjectIdentifier(window))
+    guard let id = idsByObject
+      .removeValue(forKey: ObjectIdentifier(window)) else { return }
+    registry.unregister(id)
+    windowsByID.removeValue(forKey: id)
+    rebindClosures.removeValue(forKey: id)
   }
 
   /// Flip a registration from "placeholder" to "real document window"
   /// so subsequent dispatches treat it as a valid tab host. Called
   /// once `model.documentURL` becomes non-nil for the first time.
   func markWindowReady(_ window: NSWindow) {
-    let key = ObjectIdentifier(window)
-    if var reg = registrations[key] {
-      reg.hasDocument = true
-      registrations[key] = reg
-    }
+    guard let id = idsByObject[ObjectIdentifier(window)] else { return }
+    registry.markReady(id)
   }
 
   /// Track the URL each window is currently bound to. ContentView
   /// calls this whenever `model.documentURL` changes so `dispatch`
   /// can short-circuit re-opens of an already-visible document.
   func updateCurrentURL(_ window: NSWindow, _ url: URL?) {
-    let key = ObjectIdentifier(window)
-    if var reg = registrations[key] {
-      reg.currentURL = url
-      registrations[key] = reg
-    }
-  }
-
-  /// First registration whose `currentURL` matches `url` by
-  /// standardized file path. Used by `dispatch` to detect
-  /// "this URL is already open in some window".
-  private func registration(matching url: URL) -> WindowRegistration? {
-    let target = url.standardizedFileURL.path
-    return registrations.values.first { reg in
-      guard reg.window != nil,
-            let bound = reg.currentURL?.standardizedFileURL.path
-      else { return false }
-      return bound == target
-    }
+    guard let id = idsByObject[ObjectIdentifier(window)] else { return }
+    registry.updateCurrentURL(id, url)
   }
 
   /// Consume the oldest pending `newTab` host. The new window calls
   /// this after attaching, then merges itself onto the returned host.
   func consumePendingTabHost() -> NSWindow? {
     pendingTabHosts.isEmpty ? nil : pendingTabHosts.removeFirst()
-  }
-
-  /// Pick the registered window that should receive the next "replace"
-  /// or "new tab" request. Prefers the system's main window, falls
-  /// back to the key window, then to any still-live registration.
-  private func frontmostRegistration() -> WindowRegistration? {
-    let keys = [NSApp.mainWindow, NSApp.keyWindow]
-      .compactMap { $0 }
-      .map { ObjectIdentifier($0) }
-    for key in keys {
-      if let registration = registrations[key],
-         registration.window != nil
-      {
-        return registration
-      }
-    }
-    return registrations.values.first { $0.window != nil }
-  }
-
-  private func frontmostRegisteredWindow() -> NSWindow? {
-    frontmostRegistration()?.window
-  }
-
-  /// Frontmost registration whose window already has a document
-  /// bound — i.e. is a real viewer tab host, not the alpha=0 launch
-  /// placeholder.
-  private func frontmostDocumentRegistration() -> WindowRegistration? {
-    let keys = [NSApp.mainWindow, NSApp.keyWindow]
-      .compactMap { $0 }
-      .map { ObjectIdentifier($0) }
-    for key in keys {
-      if let reg = registrations[key],
-         reg.hasDocument,
-         reg.window != nil
-      {
-        return reg
-      }
-    }
-    return registrations.values.first {
-      $0.hasDocument && $0.window != nil
-    }
-  }
-
-  /// First registration that is still a placeholder (no document
-  /// bound yet). Used to redirect newTab / replaceCurrent dispatches
-  /// at the launch placeholder rather than tabbing onto it.
-  private func frontmostPlaceholderRegistration() -> WindowRegistration? {
-    registrations.values.first {
-      !$0.hasDocument && $0.window != nil
-    }
   }
 
   /// True when at least one registered window already has a document
@@ -368,9 +257,13 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   /// `application(_:open:)` or anywhere else), the placeholder is
   /// redundant.
   func hasAnyDocumentWindow() -> Bool {
-    registrations.values.contains {
-      $0.hasDocument && $0.window != nil
-    }
+    registry.hasAnyDocumentWindow
+  }
+
+  /// Reverse-lookup helper for `dispatch`: given a live `NSWindow`,
+  /// return the `WindowID` we registered it under (if still tracked).
+  private func windowID(for window: NSWindow) -> WindowID? {
+    idsByObject[ObjectIdentifier(window)]
   }
 
   /// Allow an untitled placeholder window so SwiftUI has a host view
@@ -397,11 +290,9 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   /// document windows are about to appear.
   @discardableResult
   func install(_ handler: @escaping (URL) -> Void) -> Bool {
-    let hadPending = !pending.isEmpty
+    let hadPending = !launchBuffer.isEmpty
     openHandler = handler
-    let queue = pending
-    pending.removeAll()
-    for url in queue { handler(url) }
+    for url in launchBuffer.drain() { handler(url) }
     return hadPending
   }
 
@@ -461,26 +352,6 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
   func clearRecents() {
     NSDocumentController.shared.clearRecentDocuments(nil)
     recentURLs = NSDocumentController.shared.recentDocumentURLs
-  }
-
-  /// Weak link to a `ContentView`'s `NSWindow` plus the closure that
-  /// rebinds that window's WindowGroup binding + `DocumentModel` to a
-  /// new URL. Closures live for the lifetime of the registration —
-  /// they capture `self` from the enclosing view, so the registry
-  /// must drop entries when the window goes away to avoid leaks.
-  ///
-  /// `currentURL` tracks the document the window is presently bound
-  /// to. ContentView keeps it current via `updateCurrentURL` so
-  /// `dispatch` can detect "this URL is already open" and route to
-  /// the existing window instead of going through SwiftUI's
-  /// `openWindow`, which no-ops for an already-bound URL value
-  /// (and therefore wouldn't fire `.task(id:)` to consume a pending
-  /// scroll line).
-  private struct WindowRegistration {
-    weak var window: NSWindow?
-    let rebind: @MainActor (URL) -> Void
-    var hasDocument: Bool
-    var currentURL: URL?
   }
 
   private static let openPanelContentTypes: [UTType] = {

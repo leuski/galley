@@ -21,25 +21,30 @@ struct MenuBarContent: View {
       Divider()
 
       Button("Open File…") { openFile() }
+        .accessibilityIdentifier(ServerA11yID.MenuBar.openFile)
 
       Divider()
 
       Button("Settings…") {
         NSWorkspace.shared.open(GalleyConstants.settingsURL)
       }
+      .accessibilityIdentifier(ServerA11yID.MenuBar.settings)
     }
   }
 
   @ViewBuilder
   private var statusItem: some View {
-    switch server.state {
-    case .running(let url):
-      Text("Listening on \(url.hostAndPort)")
-    case .stopped:
-      Text("Server stopped")
-    case .failed(let message):
-      Text("Server error: \(message)")
+    Group {
+      switch server.state {
+      case .running(let url):
+        Text("Listening on \(url.hostAndPort)")
+      case .stopped:
+        Text("Server stopped")
+      case .failed(let message):
+        Text("Server error: \(message)")
+      }
     }
+    .accessibilityIdentifier(ServerA11yID.MenuBar.statusItem)
   }
 
   private func openFile() {

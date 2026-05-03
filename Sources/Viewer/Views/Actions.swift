@@ -5,6 +5,7 @@
 //  Created by Anton Leuski on 4/30/26.
 //
 
+import GalleyCoreKit
 import SwiftUI
 
 @MainActor
@@ -14,6 +15,7 @@ struct Action {
   let action: @MainActor (DocumentModel) -> Void
   let isEnabled: @MainActor (DocumentModel) -> Bool
   let shortcut: KeyboardShortcut?
+  let accessibilityID: String
 
   var helpLabel: String {
     let titleString = String(localized: title)
@@ -55,6 +57,7 @@ struct Action {
     }
     .disabled(!(model.map { isEnabled($0) } ?? false))
     .keyboardShortcut(shortcut)
+    .accessibilityIdentifier(accessibilityID)
   }
 
   @ViewBuilder @MainActor
@@ -65,6 +68,7 @@ struct Action {
     }
     .disabled(!(model.map { isEnabled($0) } ?? false))
     .help(helpLabel)
+    .accessibilityIdentifier(accessibilityID)
   }
 
   static let zoomIn = Action(
@@ -72,7 +76,8 @@ struct Action {
     image: "plus.magnifyingglass",
     action: { $0.zoomIn() },
     isEnabled: { $0.canZoomOut },
-    shortcut: .init("+", modifiers: [.command])
+    shortcut: .init("+", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.zoomIn
   )
 
   static let zoomOut = Action(
@@ -80,7 +85,8 @@ struct Action {
     image: "minus.magnifyingglass",
     action: { $0.zoomOut() },
     isEnabled: { $0.canZoomOut },
-    shortcut: .init("-", modifiers: [.command])
+    shortcut: .init("-", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.zoomOut
   )
 
   static let resetZoom = Action(
@@ -88,7 +94,8 @@ struct Action {
     image: "1.magnifyingglass",
     action: { $0.resetZoom() },
     isEnabled: { $0.canResetZoom },
-    shortcut: .init("0", modifiers: [.command])
+    shortcut: .init("0", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.actualSize
   )
 
   static let back = Action(
@@ -96,7 +103,8 @@ struct Action {
     image: "chevron.backward",
     action: { model in Task { await model.goBack() } },
     isEnabled: { $0.canGoBack },
-    shortcut: .init("[", modifiers: [.command])
+    shortcut: .init("[", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.back
   )
 
   static let forward = Action(
@@ -104,7 +112,8 @@ struct Action {
     image: "chevron.forward",
     action: { model in Task { await model.goForward() } },
     isEnabled: { $0.canGoForward },
-    shortcut: .init("]", modifiers: [.command])
+    shortcut: .init("]", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.forward
   )
 
   static let reload = Action(
@@ -112,6 +121,7 @@ struct Action {
     image: "arrow.clockwise",
     action: { model in Task { await model.reload() } },
     isEnabled: { _ in true },
-    shortcut: .init("r", modifiers: [.command])
+    shortcut: .init("r", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.reload
   )
 }

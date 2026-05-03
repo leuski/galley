@@ -1,4 +1,5 @@
 import AppKit
+import GalleyCoreKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -16,19 +17,24 @@ struct FileCommands: Commands {
         delegate.presentOpenPanel()
       }
         .keyboardShortcut("o", modifiers: .command)
+        .accessibilityIdentifier(ViewerA11yID.FileMenu.open)
 
       Menu("Open Recent", systemImage: "clock") {
         ForEach(delegate.recentURLs, id: \.self) { url in
           Button(url.lastPathComponent) {
             delegate.openRecent(url)
           }
+          .accessibilityIdentifier(
+            "\(ViewerA11yID.FileMenu.openRecentItem).\(url.lastPathComponent)")
         }
         if !delegate.recentURLs.isEmpty {
           Divider()
         }
         Button("Clear Menu") { delegate.clearRecents() }
           .disabled(delegate.recentURLs.isEmpty)
+          .accessibilityIdentifier(ViewerA11yID.FileMenu.openRecentClear)
       }
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.openRecentMenu)
     }
 
     CommandGroup(after: .saveItem) {
@@ -38,6 +44,7 @@ struct FileCommands: Commands {
         runRenamePopup(currentURL: url, model: model, context: context)
       }
       .disabled(renameContext?.url == nil)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 
       Button("Open in Editor", systemImage: "arrow.up.forward.app") {
         guard let model else { return }
@@ -45,6 +52,7 @@ struct FileCommands: Commands {
       }
       .keyboardShortcut("e", modifiers: .command)
       .disabled(model?.documentURL == nil)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.openInEditor)
 
       Divider()
 
@@ -54,6 +62,7 @@ struct FileCommands: Commands {
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
       .disabled(model?.documentURL == nil)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.exportPDF)
     }
 
     CommandGroup(replacing: .printItem) {
@@ -63,6 +72,7 @@ struct FileCommands: Commands {
       }
       .keyboardShortcut("p", modifiers: [.command, .shift])
       .disabled(model?.documentURL == nil)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.pageSetup)
 
       Button("Print…", systemImage: "printer") {
         guard let model else { return }
@@ -71,6 +81,7 @@ struct FileCommands: Commands {
       }
       .keyboardShortcut("p", modifiers: .command)
       .disabled(model?.documentURL == nil)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.print)
     }
   }
 }
