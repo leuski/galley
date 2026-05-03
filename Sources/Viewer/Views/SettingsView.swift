@@ -12,9 +12,25 @@ struct SettingsView: View {
   @Bindable var defaults = Defaults.shared
 
   @State private var portString: String = String(Defaults.shared.port)
+  @State private var serverStatus = ServerStatusModel()
 
   init(appModel: AppModel) {
     self.appModel = appModel
+  }
+
+  /// Stable id for `.task(id:)` — restarts the probe loop only when
+  /// the toggle flips or the port changes.
+  private struct ProbeKey: Equatable {
+    let enabled: Bool
+    let port: UInt16
+  }
+
+  private var probeKey: ProbeKey {
+    ProbeKey(enabled: ServerAgent.isEnabled, port: defaults.port)
+  }
+
+  private var probeHost: URL? {
+    ServerAgent.isEnabled ? defaults.host : nil
   }
 
   @ViewBuilder
@@ -190,7 +206,11 @@ struct SettingsView: View {
       }
 
       Section("Markdown Preview Server") {
-        Toggle("Run server", isOn: serverEnabledBinding)
+        LabeledContent {
+          ServerStatusPill(status: serverStatus.status)
+        } label: {
+          Toggle("Run server", isOn: serverEnabledBinding)
+        }
         Text(
           "When on, a background server makes documents available in any "
           + "browser. Registered as a login item so it restarts after "
@@ -218,6 +238,9 @@ struct SettingsView: View {
     .frame(minWidth: 580, maxWidth: 580, minHeight: 360)
     .onChange(of: Defaults.shared.port) { _, newPort in
       portString = String(newPort)
+    }
+    .task(id: probeKey) {
+      await serverStatus.run(host: probeHost)
     }
   }
 
