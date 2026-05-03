@@ -252,7 +252,10 @@ enum Routes {
   /// the resolved file URL or nil if the extracted path is not absolute,
   /// escapes the filesystem root, has no extension, or refers to a
   /// dotfile (last path component starts with ".").
-  private static func decodeFilePath(
+  ///
+  /// Internal (not `private`) so unit tests can drive the path-decoding
+  /// rules directly.
+  static func decodeFilePath(
     from requestPath: String, prefix: String) -> URL?
   {
     guard requestPath.hasPrefix(prefix) else { return nil }
@@ -266,7 +269,9 @@ enum Routes {
     return url
   }
 
-  private static func injectReloadScript(
+  /// Internal (not `private`) so unit tests can verify the script is
+  /// injected before `</body>` and that the nonce is wired through.
+  static func injectReloadScript(
     into html: String, documentURL: URL, nonce: String) -> String
   {
     let encodedPath = documentURL.path.percentEncodedForPath
@@ -307,7 +312,9 @@ enum Routes {
     return nil
   }
 
-  private static func isHostAllowed(
+  /// Internal (not `private`) so unit tests can drive the loopback host
+  /// allowlist directly without constructing a full `HTTPRequest`.
+  static func isHostAllowed(
     _ value: String, expectedPort: Int) -> Bool
   {
     let trimmed = value.trimmingCharacters(in: .whitespaces)
