@@ -23,6 +23,49 @@ final class UITests: XCTestCase {
 
   // MARK: - Real product invariants
 
+  /// Welcome must NOT appear in the Window menu. SwiftUI's `Window`
+  /// scene auto-generates a Window-menu entry tied to the scene's
+  /// title, separate from per-NSWindow entries. Both
+  /// `isExcludedFromWindowsMenu` and `NSApp.removeWindowsItem` only
+  /// affect the per-window entries — the scene-level entry needs a
+  /// different mechanism. This test pins the user-facing invariant
+  /// regardless of which lever fixes it.
+  @MainActor
+  func testWelcomeNotInWindowMenu() throws {
+    // Use a seeded launch so there's at least one real document
+    // window for the Window menu to populate around — easier to
+    // verify "no Welcome entry among real entries" than "Window
+    // menu is empty."
+    let app = try seedAndWaitForWindow(fileName: "WindowMenu.md")
+    let windowMenu = app.menuBars.menuBarItems["Window"]
+    XCTAssertTrue(windowMenu.waitForExistence(timeout: 5),
+                  "Window menu should exist in the menu bar")
+    windowMenu.click()
+    // Wait for the menu to populate.
+    Thread.sleep(forTimeInterval: 0.5)
+
+    // Capture every menu item under Window for diagnostics.
+    var titles: [String] = []
+    for index in 0..<app.menuBars.menuItems.count {
+      let item = app.menuBars.menuItems.element(boundBy: index)
+      let title = item.title
+      if !title.isEmpty { titles.append(title) }
+    }
+    let attachment = XCTAttachment(
+      string: "Window menu items at click time:\n" +
+      titles.joined(separator: "\n"))
+    attachment.name = "Window menu contents"
+    attachment.lifetime = .keepAlways
+    add(attachment)
+
+    XCTAssertFalse(
+      app.menuBars.menuItems["Welcome"].exists,
+      "Window menu must not contain a 'Welcome' entry. " +
+      "Captured menu contents in attachment.")
+
+    app.typeKey(.escape, modifierFlags: [])
+  }
+
   /// Welcome window must never be visible/hittable. The bootstrap
   /// scene exists for the lifetime of the app, but its NSWindow is
   /// configured with alpha=0 + ignoresMouseEvents and excluded from

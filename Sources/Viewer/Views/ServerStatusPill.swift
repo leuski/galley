@@ -1,5 +1,6 @@
 import SwiftUI
 import GalleyCoreKit
+import ALFoundation
 
 /// Compact status indicator next to the "Run server" toggle. Renders
 /// `ServerStatus` as a colored dot + label pair so the user can tell
@@ -44,10 +45,10 @@ struct ServerStatusPill: View {
 
 #Preview {
   VStack(alignment: .leading, spacing: 8) {
+    let url: URL = "http://127.0.0.1:8089"
     ServerStatusPill(status: .unknown)
     ServerStatusPill(status: .disabled)
-    ServerStatusPill(
-      status: .running(URL(string: "http://127.0.0.1:8089")!))
+    ServerStatusPill(status: .running(url))
     ServerStatusPill(status: .stopped)
     ServerStatusPill(status: .notResponding)
   }

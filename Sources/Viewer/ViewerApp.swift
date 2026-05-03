@@ -46,6 +46,16 @@ struct ViewerApp: App {
     // We never want it remembered as closed; we always want it
     // ready as the bootstrap anchor.
     .restorationBehavior(.disabled)
+    // Strip SwiftUI's auto-generated commands for this scene —
+    // notably the Window-menu entry SwiftUI inserts for every
+    // `Window` scene. Without this, `Welcome` shows up alongside
+    // real document windows in the Window menu and the user can
+    // bring it forward (stealing focus from doc windows). The
+    // per-NSWindow flags `isExcludedFromWindowsMenu` and
+    // `NSApp.removeWindowsItem` operate on the AppKit window
+    // list; this scene-level entry is a separate construct that
+    // only `.commandsRemoved()` reaches.
+    .commandsRemoved()
 
     WindowGroup(for: URL.self) { $url in
       ContentView(fileURL: $url)
