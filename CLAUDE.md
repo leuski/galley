@@ -187,12 +187,42 @@ The Viewer is **pure SwiftUI** — there is no `NSApplicationDelegateAdaptor`. R
 
 - `docs/handoff-galleykit.md` — phase-by-phase notes on the `refactor/galleykit` branch (Kit extraction, editor coupling, cross-document navigation, WindowGroup migration, state restoration).
 - `docs/native-viewer-ideas.md` — running list of features the native Viewer could offer beyond what a generic browser does, with status (done / partial / not started / will-not-do) and rationale for the rejections.
+- `docs/test-framework.md` — the test pyramid (routing logic / app logic / snapshot / UI / integration), where each kind of test goes, the launch-arg conventions for tests.
 
 ## Architecture decisions
+
+### Two apps sharing frameworks (not one bundle)
 
 The codebase tried a single-bundle factoring (Viewer with embedded server, soft-quit, activation-policy switching) and reverted to two apps sharing frameworks. Reasons the split won:
 - Viewer wants `.regular` always; Server wants `MenuBarExtra`-only with `LSUIElement`. Reconciling those into one bundle required activation-policy juggling (soft-quit, `applicationWillFinishLaunching` policy restore, `applicationShouldHandleReopen` re-entry, suppressed-quit detection for log-out) — substantial complexity for the convenience of one bundle.
 - Engine sharing is what actually mattered, and the framework targets give that without forcing a single process model.
 - Server can keep running headless without dragging document-window state restoration along with it; Viewer can quit normally without thinking about a daemon.
 
+### Frameworks not SwiftPM
+
 The shared engine is two **Xcode framework targets** (`GalleyCoreKit`, `GalleyServerKit`), not a Swift Package. The earlier SwiftPM `Kit/` package was abandoned because `xcodebuild` test discovery for embedded local packages was unreliable while Xcode's GUI-driven test runs worked fine — a CI/scriptability liability the framework targets sidestep.
+
+### `WindowGroup<URL>` not `DocumentGroup`
+
+`DocumentGroup(viewing:)` was the original choice and was abandoned (commit `485cffb`). Two reasons:
+- `DocumentGroup` ties one window to one `FileDocument`; titles, state restoration, and revision history all assume "this window represents this file." The Viewer is a *navigator* — one window walks through linked Markdown documents (`a.md` → click link → `b.md` rebinds the window's URL, title follows the navigation), which conflicts with `DocumentGroup`'s identity model.
+- `DocumentGroup` attaches AppKit's "document menu" hover affordance to the title bar (rename / move / version-browse popover). For a read-only viewer this is wrong — there's no in-memory document to rename — and suppressing it via `.documentURL` modifier and similar workarounds wasn't sufficient.
+
+### Why the `Window("welcome")` scene exists (and is invisible)
+
+`WindowGroup(for: URL.self)` does **not** auto-spawn a window at cold launch when no URL is supplied. The `applicationShouldOpenUntitledFile` AppKit hook isn't bridged to value-driven `WindowGroup`s. With no view alive at launch, nothing captures `@Environment(\.openWindow)`, so URLs that arrive via Finder dispatch can't reach `openWindow(value:)` and never become document windows — the "first document doesn't open, only the second one does" bug.
+
+The fix is a singleton `Window("welcome")` scene (commit `a888360`) that auto-spawns at launch and hosts `WelcomeView`. Welcome's job is to capture `openWindow`, hand it to the `WindowDispatcher` via `install(_:)`, drain the launch buffer, and run the FTUE Open panel when there's nothing else to do. The window itself is invisible (alpha=0 + `ignoresMouseEvents` + `isExcludedFromWindowsMenu` + transient/ignoresCycle/stationary collection behavior) — it's a pure adapter scene, not user-facing UI.
+
+### Why no `ViewerAppDelegate` (anymore)
+
+`ViewerAppDelegate` lived through several iterations (window registry, launch buffer, recents, FTUE picker, URL receipt). Once the welcome scene gave SwiftUI a guaranteed-alive view at launch, every AppDelegate hook had a SwiftUI equivalent or was redundant:
+- `application(_:open:)` → `.onOpenURL` on `WelcomeView` (commit `c7b1d01`).
+- Routing state → `WindowDispatcher` `@Observable @MainActor` (commit `4aa20b0`).
+- Recents + Open panel → `RecentDocumentsModel` `@Observable @MainActor` (commit `fccac1b`).
+- `applicationShouldTerminateAfterLastWindowClosed` / `applicationShouldOpenUntitledFile` → defaults are correct without overriding.
+- `applicationSupportsSecureRestorableState` → modern SwiftUI Apps opt in by default.
+- `applicationDidFinishLaunching → didFinishLaunching` → replaced with a fixed 250ms settle in `WelcomeView`'s task after `boot.model` is ready.
+- `LaunchArguments` parsing → moved to `ViewerApp.init`.
+
+`ViewerAppDelegate.swift` is gone (commit `d7ac967`). `@NSApplicationDelegateAdaptor` is gone. The Viewer is pure SwiftUI. If a hook resurfaces that genuinely requires an AppDelegate (e.g., `applicationShouldHandleReopen` for dock-icon click semantics), reintroduce a minimal one — don't reabsorb the routing state.
