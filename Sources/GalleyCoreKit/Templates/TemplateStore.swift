@@ -6,7 +6,15 @@ import AppKit
 @Observable
 @MainActor
 public final class TemplateStore {
-  public static let shared = TemplateStore()
+  /// Process-wide singleton pinned to the shared
+  /// `~/Library/Application Support/net.leuski.galley/Templates/`
+  /// folder, so the Viewer and Server processes see the same custom
+  /// templates and a persistent ID round-trips through the shared
+  /// defaults suite without dropping into "missing value" healing.
+  /// Tests should construct their own instances via
+  /// `init(directoryURL:)` against a tmp directory.
+  public static let shared = TemplateStore(
+    directoryURL: GalleyConstants.applicationSupportDirectory / "Templates")
 
   public private(set) var templates: [Template] = []
 
@@ -19,8 +27,8 @@ public final class TemplateStore {
   /// need to react (e.g. to run reconciliation) hook in here.
   @ObservationIgnored public var onReload: (@MainActor () -> Void)?
 
-  public init() {
-    self.directoryURL = URL.ourApplicationSupportDirectory / "Templates"
+  public init(directoryURL: URL) {
+    self.directoryURL = directoryURL
 
     // Non-fatal: built-in template still works if this fails.
     try? directoryURL.createDirectory()

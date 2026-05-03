@@ -19,6 +19,21 @@ public enum GalleyConstants {
   public static let defaultHost: String = "127.0.0.1"
   public static let defaultPort: UInt16 = 8089
   public static let settingsURL: URL = "galley://settings"
+
+  /// Bundle id of the Viewer app, which doubles as the shared
+  /// `UserDefaults` suite name and the shared Application Support
+  /// folder name. The Server reads/writes the same plist and the same
+  /// `Templates/` directory so picks made in either app survive a
+  /// process boundary.
+  public static let suiteName: String = "net.leuski.galley"
+
+  /// Shared `~/Library/Application Support/net.leuski.galley/`. Used
+  /// by both apps so user-defined templates and any other shared
+  /// on-disk state live in one place regardless of which process is
+  /// running.
+  public static var applicationSupportDirectory: URL {
+    URL.applicationSupportDirectory / suiteName
+  }
 }
 
 nonisolated private func hostURL(port: UInt16) -> URL {
