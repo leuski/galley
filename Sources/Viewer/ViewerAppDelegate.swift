@@ -58,28 +58,15 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  func application(_ application: NSApplication, open urls: [URL]) {
-    guard let dispatcher else { return }
-    dispatcher.handleOpenURLs(urls) {
-      // `galley://settings` is also handled by `.onOpenURL` on the
-      // WindowGroup root view (which calls SwiftUI's
-      // `openSettings()`); leave the closure empty here so we
-      // don't double-fire the Settings window.
-    }
-    // Mirror the URLs into the recents list. We can't piggy-back
-    // on the dispatcher's normalization since recents wants the
-    // *file* URL, not the original galley:// scheme — re-normalize.
-    for url in urls {
-      switch URLNormalizer.normalize(url) {
-      case .openSettings:
-        continue
-      case .document(let fileURL, _):
-        recents?.record(fileURL)
-      case .unparseable(let original):
-        recents?.record(original)
-      }
-    }
-  }
+  // application(_:open:) intentionally not implemented here.
+  // SwiftUI's `.onOpenURL` on the always-alive WelcomeView catches
+  // every URL the system delivers — Finder file dispatches, the
+  // `galley://` scheme handler, NSWorkspace.open, dock drops. The
+  // welcome scene calls `dispatcher.handleOpenURLs(...)` and
+  // records the URL into `recents` directly. Owning the URL
+  // intake there keeps the routing path in one place and removes
+  // the chicken-and-egg between the AppDelegate and the SwiftUI
+  // view tree.
 
   /// Returning false here is deliberate: the always-alive
   /// `Window("welcome")` scene defined in `ViewerApp` captures

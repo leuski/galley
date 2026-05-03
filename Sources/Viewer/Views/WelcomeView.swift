@@ -34,13 +34,30 @@ struct WelcomeView: View {
       .background(WindowAccessor(onAttach: configureHidden))
       .task(id: boot.model != nil) {
         // Re-fires when boot.model flips from nil to non-nil. Bail
-        // until ready; then run once. install() is idempotent on the
-        // delegate side (subsequent calls overwrite openHandler with
-        // the latest captured action), so even if SwiftUI invalidates
-        // and re-fires this task with a fresh closure, we recapture
-        // openWindow rather than getting stuck with a stale handler.
+        // until ready; then run once. install() is idempotent on
+        // the dispatcher side (subsequent calls overwrite the
+        // openHandler with the latest captured action), so even if
+        // SwiftUI invalidates and re-fires this task with a fresh
+        // closure, we recapture openWindow rather than getting
+        // stuck with a stale handler.
         guard boot.model != nil else { return }
         await runLaunchTask()
+      }
+      .onOpenURL { url in
+        // Catches Finder dispatches, NSWorkspace.open(_:),
+        // galley:// URL scheme handlers, and dock-icon drops.
+        // Welcome is always alive, so this always has a chance to
+        // fire — replaces the AppDelegate's
+        // application(_:open:) hook.
+        dispatcher.handleOpenURLs([url])
+        // Keep the recents list in sync. recents.openRecent goes
+        // through dispatcher.handleOpenURLs again, so we record
+        // directly to avoid double-dispatch.
+        switch URLNormalizer.normalize(url) {
+        case .openSettings: break
+        case .document(let fileURL, _): recents.record(fileURL)
+        case .unparseable(let original): recents.record(original)
+        }
       }
   }
 
