@@ -16,15 +16,20 @@ See `README.md` for HTTP routes, template placeholders, and BBEdit integration.
 ## Layout
 
 ```
-MarkdownPreviewer.xcodeproj   # 5 targets: Viewer, Server, GalleyCoreKit, GalleyServerKit, Tests
+MarkdownPreviewer.xcodeproj   # 6 targets: Viewer, Server, GalleyCoreKit, GalleyServerKit, Tests, UITests
 Sources/
-  GalleyCoreKit/              # framework — rendering, templates, watch, scripts, shared models
+  GalleyCoreKit/              # framework — rendering, templates, watch, scripts, shared models, routing
+    Accessibility/              # ViewerA11yID, ServerA11yID — UI-test identifier catalogs
     Models/                     # ChoiceModel, ProcessorModel, TemplateModel
     Render/                     # MarkdownRenderer, SwiftMarkdownRenderer,
                                 # ExternalProcessRenderer, ProcessorStore
+    Routing/                    # OpenBehavior, WindowID + WindowIDAllocator, WindowRegistry,
+                                # WindowRecord, LaunchURLBuffer, PendingScrollLines,
+                                # URLNormalizer, OpenURLRouter + DispatchAction,
+                                # LaunchArguments
+    Routes/                     # PreviewRoute, RouteNames (shared HTTP/scheme parser)
     Templates/                  # Template, BuiltInTemplate, UserTemplate, TemplateStore,
                                 # Placeholders
-    Routes/                     # PreviewRoute, RouteNames (shared HTTP/scheme parser)
     Scripts/                    # ScriptInstaller (BBEdit helper installer)
     Watch/                      # DocumentWatcher
     Notifications/              # DisplacementNotifier (catalog-displacement user notice)
@@ -35,16 +40,17 @@ Sources/
   GalleyServerKit/            # framework — HTTP server (FlyingFox), routes, SSE
     PreviewServer.swift         # PreviewServerController (lifecycle + state)
     Routes.swift, SSE.swift, HTTPResponses.swift
-  Viewer/                     # the Galley document app
-    ViewerApp.swift           @main — WindowGroup<URL> + Settings
-    ViewerAppDelegate.swift
+  Viewer/                     # the Galley document app — pure SwiftUI, no AppDelegate
+    ViewerApp.swift           @main — Window("welcome") + WindowGroup<URL> + Settings
     EditorBridge.swift, LinkBridge.swift, ScrollBridge.swift
     PreviewSchemeHandler.swift
     Models/                     # AppModel (global doc state), DocumentModel (per-window),
+                                # WindowDispatcher (routing/registry), RecentDocumentsModel,
                                 # PerFileStateStore, SceneProcessorModel,
                                 # SceneTemplateModel, EditorChoice
-    Views/                      # ContentView, SettingsView, AssortedViews,
-                                # Actions, FocusedValues
+    Views/                      # ContentView, WelcomeView (always-alive bootstrap anchor),
+                                # WindowAccessor (NSWindow resolution helper),
+                                # SettingsView, AssortedViews, Actions, FocusedValues
     Views/Menus/                # FileCommands, ViewCommands, RenderingCommands,
                                 # ProcessorMenu, TemplateMenu
     Resources/                  # AppIcon, Assets.xcassets
@@ -53,14 +59,18 @@ Sources/
     App/                        # AppModel (server-owning), LoginItem
     Menu/                       # MenuBarContent, SettingsView
     Resources/                  # AppIcon, Assets.xcassets, MenuBarIcon
-Tests/                        # Swift Testing — single Xcode unit-test bundle
-  GalleyCoreKitTests/           # PlaceholderContext, BuiltInTemplate,
-                                # UserTemplateRewriter, URLPathHelpers,
-                                # SwiftMarkdownRenderer
+Tests/                        # Swift Testing — kit + app-logic unit tests
+  GalleyCoreKitTests/           # PlaceholderContext, BuiltInTemplate, UserTemplateRewriter,
+                                # URLPathHelpers, SwiftMarkdownRenderer,
+    Routing/                    # WindowRegistry, OpenURLRouter, URLNormalizer,
+                                # LaunchURLBuffer, PendingScrollLines, LaunchArguments
   GalleyServerKitTests/
+  TestPlan.xctestplan           # enrols both Tests and UITests bundles
+UITests/                      # XCUITest bundle — testTargetName: Viewer
+                                # UITests.swift, UITestsLaunchTests.swift, AppLauncher.swift
 Resources/Scripts/            # bundled BBEdit helper scripts (Galley + browser variants)
 Scripts/                      # release.sh
-docs/                         # branch handoff notes, native-viewer-ideas
+docs/                         # branch handoff notes, native-viewer-ideas, test-framework
 ```
 
 ## Build & test
@@ -81,7 +91,9 @@ xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer test
 # (Or run from Xcode's Test navigator.)
 ```
 
-Tests use **Swift Testing** (`@Test`, `#expect`), not XCTest. Engine coverage includes placeholder substitution, template rewriting, URL path helpers, and the swift-markdown renderer. The single `Tests` target embeds `GalleyCoreKitTests/` and `GalleyServerKitTests/`; one bundle is enough at this scale.
+Logic tests use **Swift Testing** (`@Test`, `#expect`); UI tests use **XCTest** (XCUITest is XCTest-based). The shared `TestPlan.xctestplan` enrols both targets. Logic coverage includes placeholder substitution, template rewriting, URL path helpers, the swift-markdown renderer, and every routing-layer decision (`WindowRegistry`, `OpenURLRouter`, `URLNormalizer`, `LaunchURLBuffer`, `PendingScrollLines`, `LaunchArguments`). UI coverage exercises real product invariants — welcome stays hidden, FTUE Open panel surfaces on cold launch, seeded launches produce visible document windows, File/View menus reachable on a populated doc. See `docs/test-framework.md` for the test pyramid.
+
+The UITests target launches Galley with a `--seed-file <path>` flag handled by `LaunchArguments` (parsed in `ViewerApp.init`, pre-buffered into `WindowDispatcher`). Test mode also passes `-ApplePersistenceIgnoreState YES` to skip the post-crash "Reopen?" alert that would otherwise hang launches. **Don't pass `--ui-test-mode` as a launch argument** — AppKit's command-line `NSUserDefaults` parser eats `--`-prefixed tokens and pollutes the defaults domain in ways that suppress the welcome scene from spawning. Use `launchEnvironment` for the test-mode marker instead.
 
 ## Lint
 
@@ -112,10 +124,12 @@ External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdo
 
 ### Frameworks — shared engine
 
-**`GalleyCoreKit`** — pure rendering, no networking:
+**`GalleyCoreKit`** — pure rendering and platform-agnostic primitives, no networking:
 - `Render/` — `MarkdownRenderer` protocol; `SwiftMarkdownRenderer` (with optional `annotatesSourceLines` that emits `data-source-line="N"` on every block, used by the Viewer for cmd-click→editor); `ExternalProcessRenderer` (shells out via `Process`); `ProcessorStore` exposes the ordered list of `Processor` rows (each with `installHint` and either a live `MarkdownRenderer` or `nil` if unavailable). The Viewer's cmd-click bridge also accepts pandoc's `data-pos` and cmark-gfm's `data-sourcepos` so source-line jumps work across renderers.
 - `Templates/` — `Template` protocol; `BuiltInTemplate` (compiled-in `DefaultTemplate.html`) and `UserTemplate`; `TemplateStore` watches `~/Library/Application Support/MarkdownPreviewer/Templates/` and accepts **two shapes** — a folder containing `Template.html`/`template.html` (Galley convention), or a top-level `*.html`/`*.htm` file with sibling assets (BBEdit preview-template convention). `Placeholders.swift` does `#TOKEN#` substitution (`#TITLE#`, `#DOCUMENT_CONTENT#`, `#BASE#`, `#FILE#`, `#BASENAME#`, `#FILE_EXTENSION#`, `#DATE#`, `#TIME#` — token names match BBEdit's). `UserTemplate.Rewriter` rewrites template-relative paths through `/template/<id>/...` and absolute filesystem paths through `/preview/<absolute-path>` (also a BBEdit convention) so the resulting URLs resolve in either the HTTP server or the Viewer's scheme handler.
 - `Models/` — `ChoiceValueProtocol` / `ChoiceValueEnvelopeProtocol` plus `ProcessorChoiceValue` and `TemplateChoiceValue`. A small generic layer for "pick one of N" UIs that also persist their selection by stable `persistentID`.
+- `Routing/` — pure value types for the Viewer's URL routing. `OpenBehavior` (`.newWindow` / `.newTab` / `.replaceCurrent`); `WindowID` + `WindowIDAllocator` (counter-based opaque identity, intentionally *not* `ObjectIdentifier(NSWindow)` — see comment in source for why); `WindowRegistry` + `WindowRecord` (records of open document windows, keyed by `WindowID`); `LaunchURLBuffer` (FIFO buffer for URLs that arrive before the SwiftUI `openWindow` action is captured); `PendingScrollLines` (`galley://...?line=N` scroll-line cache, keyed by standardized file path); `URLNormalizer` (turns `galley://path?line=N` into a `(URL, scrollLine)` pair, recognizes `galley://settings` as a separate `Outcome` case); `OpenURLRouter` + `DispatchAction` (pure decision function — given the URL, behavior, registry, returns `.queue` / `.openNew` / `.rebind(WindowID)` / `.tabOnto(WindowID)` / `.focusExisting(WindowID)`); `LaunchArguments` parser. The Viewer's `WindowDispatcher` is the AppKit interpreter that holds the live `NSWindow` references and applies the router's actions.
+- `Accessibility/` — `ViewerA11yID` and `ServerA11yID` enum-of-string-constants catalogs. Single source of truth for every UITest-visible accessibility identifier; both apps and the UITests target import these. Note: SwiftUI's `.accessibilityIdentifier(...)` does *not* propagate to `NSMenuItem` from `.commands { ... }` blocks (AX dump shows synthetic `menuAction:` placeholders) — menu tests fall back to title-based queries; toolbar / inline-view surfaces use the catalog identifiers.
 - `Watch/DocumentWatcher` — file-system watch over a document and its sibling directory; multiplexes events to all subscribers.
 - `Routes/PreviewRoute.swift` + `RouteNames.swift` — shared parser for `/template/<id>/<file>` and `/preview/<absolute-path>` paths. Used by both the Server's HTTP routes and the Viewer's `x-galley://` scheme handler.
 - `Scripts/ScriptInstaller` — copies bundled BBEdit helper scripts to `~/Library/Application Support/BBEdit/Scripts/`, rewriting the hardcoded port to match the running server. Lives in the kit because both apps want to reuse the same install logic.
@@ -139,27 +153,34 @@ External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdo
 
 ### `Sources/Viewer/` — Galley document app
 
-- **`ViewerApp`** — `@main`, two Scenes: `WindowGroup(for: URL.self)` driving `ContentView(fileURL:)` and `Settings`. Adds `FileCommands` (Open / Open Recent / Rename / Open in Editor / Print / Page Setup / Export as PDF), `ViewCommands` (Back/Forward/Reload, zoom), `RenderingCommands` (processor + template submenus, also surfaced in the toolbar via `ProcessorMenu` / `TemplateMenu`). No `MenuBarExtra` — that's the Server app's job. The Viewer is a pure document app: `.regular` activation policy, normal ⌘Q, no soft-quit, no daemon behavior.
-- **`ViewerAppDelegate`** — `NSApplicationDelegateAdaptor`-bridged. Buffers `application(_:open:)` URLs until SwiftUI installs an `openWindow` handler, then flushes. Drains `?line=N` from `galley://...?line=N` URLs and stashes the line so `ContentView` can scroll to it on bind. Tracks `NSDocumentController.shared.recentDocumentURLs` for File > Open Recent (`WindowGroup` doesn't get this for free). Owns `presentOpenPanel()` for ⌘O. Maintains a window registry that supports three open behaviors (`OpenBehavior` in `AppModel`): `newWindow`, `newTab` (merge into frontmost via `addTabbedWindow`), `replaceCurrent` (rebind the frontmost in place). Re-opens of an already-bound URL route to that window and rebind in place.
-- **`Models/AppModel`** — `@Observable @MainActor`, single owner of Viewer-wide preferences. Manages processor-catalog discovery (via `ProcessorStore`), persisted processor + template selection, the `TemplateStore`, the user's `EditorChoice`, `enablePerDocumentOverrides`, and `openBehavior`. UserDefaults keys are namespaced under the Viewer bundle identifier. `AppBoot` is a thin `@Observable` wrapper that holds the `AppModel` once async hydration finishes; `ContentView` always mounts even before hydration completes so `@SceneStorage` and URL restoration work as usual. Note: this `AppModel` does **not** own the HTTP server — that's a separate app.
+The Viewer is **pure SwiftUI** — there is no `NSApplicationDelegateAdaptor`. Routing state lives in `WindowDispatcher`, recents in `RecentDocumentsModel`, both `@Observable @MainActor` and injected via `.environment()`. The bootstrap problem (SwiftUI's `WindowGroup(for: URL.self)` doesn't auto-spawn at launch) is solved by an always-alive hidden `Window("welcome")` scene; see "Why the welcome scene" under Architecture decisions.
+
+- **`ViewerApp`** — `@main`, three Scenes: `Window("welcome")` (always-spawning bootstrap anchor, see `WelcomeView`), `WindowGroup(for: URL.self)` driving `ContentView(fileURL:)`, and `Settings`. The welcome scene has `.defaultLaunchBehavior(.presented)` (force re-spawn on every launch) and `.restorationBehavior(.disabled)` (never remembered as closed). `ViewerApp.init` parses `LaunchArguments` and pre-buffers any `--seed-file` URL into the dispatcher before scenes register. Adds `FileCommands` (Open / Open Recent / Rename / Open in Editor / Print / Page Setup / Export as PDF), `ViewCommands` (Back/Forward/Reload, zoom), `RenderingCommands` (processor + template submenus, also surfaced in the toolbar via `ProcessorMenu` / `TemplateMenu`). No `MenuBarExtra` — that's the Server app's job. The Viewer is a pure document app: `.regular` activation policy, normal ⌘Q, no soft-quit, no daemon behavior. The `WindowRoot` private wrapper only exists so `@Environment(\.openSettings)` is in scope for `galley://settings` routing via `.onOpenURL`.
+- **`Views/WelcomeView`** — content view for the singleton welcome window. Configures the host `NSWindow` to be invisible and non-interactive (`alphaValue = 0`, `ignoresMouseEvents = true`, `isExcludedFromWindowsMenu = true`, `collectionBehavior = [.transient, .ignoresCycle, .stationary]`, `isReleasedWhenClosed = false`). **Don't** mutate `styleMask` (forces window recreation, detaches the SwiftUI host view, cancels `.task`) and **don't** move the window to extreme offscreen coordinates (AppKit's constraint solver crashes inside `_postWindowNeedsUpdateConstraints`). The view's `.task(id: boot.model != nil)` captures `openWindow`, calls `dispatcher.install(_:)` to hand it over, drains the launch buffer, then — if no doc windows came back from state restoration — runs the FTUE Open panel via `recents.runOpenPanel()`. The view also hosts `.onOpenURL { dispatcher.handleOpenURLs(...) }`, replacing the old `application(_:open:)` AppDelegate hook for Finder / LaunchServices / `galley://` URL dispatches.
+- **`Views/WindowAccessor`** — small `NSViewRepresentable` that resolves the host `NSWindow` synchronously via `viewDidMoveToWindow`, used by both `WelcomeView` (to apply hidden-window settings + register tab merges) and `ContentView` (to set `alphaValue` on doc bind, register/unregister with the dispatcher).
+- **`Models/WindowDispatcher`** — `@Observable @MainActor`. Holds all routing state: `LaunchURLBuffer`, `WindowRegistry`, `PendingScrollLines`, `OpenURLRouter`, `WindowIDAllocator`, the `[ObjectIdentifier: WindowID]` map and reverse `[WindowID: NSWindow]` lookup, `[WindowID: rebind closure]` map, `pendingTabHosts: [NSWindow]`, captured `openHandler`. Methods: `handleOpenURLs(_:onSettingsRequested:)` (entry point, normalizes + dispatches), `dispatch(_:)` (router decide + apply), `register/unregister/updateCurrentURL` (window lifecycle), `consumePendingScrollLine`, `consumePendingTabHost`, `install(_:)` (capture openWindow + drain buffer), `enqueueAtLaunch(_:)` (test-mode `--seed-file` injection), `hasAnyDocumentWindow()`. The pure routing decisions live in `GalleyCoreKit/Routing/`; this is the AppKit adapter that holds live `NSWindow` references and converts router actions into AppKit calls (`makeKeyAndOrderFront`, `addTabbedWindow`, etc.).
+- **`Models/RecentDocumentsModel`** — `@Observable @MainActor`. Wraps `NSDocumentController.shared.recentDocumentURLs` (because `WindowGroup` doesn't get File > Open Recent for free), runs `NSOpenPanel` for File > Open. `record(_:)`, `clearAll()`, `openRecent(_:)` (routes through `dispatcher.handleOpenURLs`), `runOpenPanel()` (async `panel.begin`), `presentOpenPanel()` (panel + dispatch). Bound by `FileCommands` for the menu UI.
+- **`Models/AppModel`** — `@Observable @MainActor`, single owner of Viewer-wide preferences. Manages processor-catalog discovery (via `ProcessorStore`), persisted processor + template selection, the `TemplateStore`, the user's `EditorChoice`, `enablePerDocumentOverrides`, and `openBehavior`. UserDefaults keys are namespaced under the Viewer bundle identifier. `AppBoot` is a thin `@Observable` wrapper that holds the `AppModel` once async hydration finishes; `WelcomeView`'s task waits on `boot.model` before installing. `ContentView` always mounts even before hydration completes so `@SceneStorage` and URL restoration work as usual. Note: this `AppModel` does **not** own the HTTP server — that's a separate app.
 - **`Models/DocumentModel`** — `@Observable @MainActor`. Per-window state: a `WebPage`, a `DocumentWatcher`, the bridges, and a back/forward `history` of URLs (persisted via `@SceneStorage` as `HistorySnapshot`). `bind(to:)` resets the stack; `navigate(to:)` pushes; `goBack` / `goForward` move `currentIndex`. A `bindGeneration` counter cancels stale watcher loops when the URL changes mid-stream. Re-renders preserve scroll position. Owns the Print / Page Setup / Export-as-PDF entry points (see "Print pipeline" below). Includes `renameCurrentDocument(toName:)` that moves the file and rewrites matching history entries.
 - **`Models/SceneProcessorModel`, `Models/SceneTemplateModel`** — per-window override stores. Each holds an optional override that, when `enablePerDocumentOverrides` is on, wins over the global selection. Persisted via `@SceneStorage` so a restored window keeps its override; also propagated through `PerFileStateStore` so a fresh window opening a previously-seen file hydrates from disk.
 - **`Models/PerFileStateStore`** — keyed by resolved file path. Persists per-document zoom, scroll position, processor override, and template override across launches. Two-tier with `@SceneStorage`: the scene store survives state restoration of an open window; the file store hydrates a fresh window on first open.
 - **`Models/EditorChoice`** — Codable enum with `.preset(EditorPreset)` (BBEdit `x-bbedit://`, TextMate `txmt://`, VS Code `vscode://file{path}:{line}`, Sublime `subl://`, Zed `zed://file{path}:{line}`), `.customURL(template:)` with `{url}`/`{path}`/`{line}` placeholders, and `.appBundle(URL)` (silently drops the line — no portable way to pass it). Persisted as JSON in UserDefaults.
+- **`Views/ContentView`** — pure document viewer. Mounts with a non-nil `fileURL` from the `WindowGroup<URL>` binding (the binding type is `Binding<URL?>` because that's what SwiftUI hands us, but the welcome scene's bootstrap guarantees the binding always has a real URL by the time ContentView body fires). The `Group { if fileURL != nil { … } else { Color.clear } }` defensive branch is gone — see commit `195260a`. The `WindowAccessor` sets `alphaValue = 0` initially and flips to `1` once `model.documentURL` becomes non-nil, then registers with the dispatcher and consumes any pending tab host.
 - **`PreviewSchemeHandler`** — `WKURLSchemeHandler` for `x-galley://local`. Mirrors the HTTP server's route shapes (`/template/<id>/<file>`, `/preview/<absolute-path>`) using the shared `PreviewRoute` parser, so `Template.rewriteAssets(...)` produces URLs that resolve in the WebView the same way they resolve over HTTP. Reads the active template at request time via a `TemplateBox` reference (defined in `DocumentModel.swift`) so global template switches take effect on the next render. The non-bridged `ClassicPreviewSchemeHandler` (also in this file) is the `WKURLSchemeHandler` adapter used by the offscreen WKWebView during Print/Export — same resolution logic, no SwiftUI dependency.
 - **`EditorBridge`** — `WKScriptMessageHandler` named `editor`. A single user script handles cmd-click (→ editor) and plain click (→ `LinkBridge`) in one combined listener; routing both through one `addEventListener` avoids capture-phase ordering issues that drop the editor handler after navigations in macOS 26 WebPage. Parses any of three source-line annotation formats (`data-source-line`, pandoc's `data-pos`, cmark-gfm's `data-sourcepos`). Closure-based — the actual open call is in `DocumentModel.openInEditor(line:)` so every cmd-click reads the current `EditorChoice` from settings.
 - **`LinkBridge`** — `WKScriptMessageHandler` named `linkclick`. `.md` family → in-window navigation; external HTTP → default browser; other local files → `NSWorkspace`.
 - **`ScrollBridge`** — `WKScriptMessageHandler` named `scroll`. Page injects a scroll listener; the bridge forwards the latest position to `DocumentModel`, which writes it through to `@SceneStorage` and `PerFileStateStore`.
 - **Print pipeline** (in `DocumentModel`) — three entry points (Print, Page Setup, Export as PDF) share one path. SwiftUI's `WebPage` doesn't expose `printOperation(with:)`, so the pipeline spins up an offscreen `WKWebView` per operation, configured with `ClassicPreviewSchemeHandler`, awaits `didFinish` via `PrintLoadBridge`, then runs `webView.printOperation(with:)`. Two non-obvious bits: `printInfo.horizontalPagination` / `verticalPagination` must be `.automatic` (otherwise the whole document prints onto a single tall page), and the operation must be dispatched via `runModal(for:delegate:didRun:contextInfo:)` — `runOperation()` produces blank pages. Export-as-PDF uses the same path with `jobDisposition = .save` + `jobSavingURL` and the panel suppressed.
-- **Window visibility** — every window opens with `alphaValue = 0` and unhides on first non-nil `documentURL`, to avoid empty-window flashes during state restoration. The placeholder window stays hidden through the FTUE open panel; cancel dismisses it without ever showing.
+- **Window visibility** — document windows open with `alphaValue = 0` and unhide on first non-nil `documentURL`. Welcome stays at `alphaValue = 0` for its entire lifetime. There is no longer a placeholder concept in the registry/router — every registered window is a document window.
 - **Sandbox is disabled** on the Viewer target (it was blocking sibling-document opens; the value was low for a developer tool). The Server target is also unsandboxed — it needs to read arbitrary user files to render them.
 
 ## Concurrency conventions
 
-- UI-facing state (`AppModel` in both apps, `DocumentModel`, `ViewerAppDelegate`, scene/per-file stores) is `@MainActor`.
+- UI-facing state (`AppModel` in both apps, `DocumentModel`, `WindowDispatcher`, `RecentDocumentsModel`, scene/per-file stores) is `@MainActor`.
 - The HTTP server runs in a background `Task`; route handlers are `async` and capture only `Sendable` collaborators (closures, actors, value types).
 - Renderer + template selection is read at request time via `@Sendable` provider closures rather than via shared mutable state — there is no dedicated `CurrentRenderer` actor.
-- `@ObservationIgnored` is used for collaborators that should not trigger view invalidation (watchers, bridges, server controller, stores keyed by ID).
+- The routing layer in `GalleyCoreKit/Routing/` is pure value types (`Sendable`); the `WindowDispatcher` adapter is the only place that holds live `NSWindow` references.
+- `@ObservationIgnored` is used for collaborators that should not trigger view invalidation (watchers, bridges, server controller, stores keyed by ID, the dispatcher's NSWindow maps).
 - Swift 6 strict concurrency is enabled; prefer typed throws, `Sendable` value types, and structured concurrency.
 
 ## Reference
