@@ -7,9 +7,12 @@
 	<key>BundleProgram</key>
 	<string>Contents/Resources/Markdown Preview Server.app/Contents/MacOS/Markdown Preview Server</string>
 	<key>RunAtLoad</key>
-	<false/>
+	<true/>
 	<key>KeepAlive</key>
-	<false/>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
 	<key>AssociatedBundleIdentifiers</key>
 	<array>
 		<string>net.leuski.galley.server</string>
