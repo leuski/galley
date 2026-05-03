@@ -6,7 +6,6 @@ import WebKit
 struct ContentView: View {
   @Binding var fileURL: URL?
   @Environment(AppBoot.self) private var boot
-  @Environment(ViewerAppDelegate.self) private var appDelegate
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @State private var model = DocumentModel()

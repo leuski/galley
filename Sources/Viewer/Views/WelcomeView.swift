@@ -23,7 +23,6 @@ import SwiftUI
 /// process-level events and SwiftUI's view-bound APIs.
 struct WelcomeView: View {
   @Environment(AppBoot.self) private var boot
-  @Environment(ViewerAppDelegate.self) private var appDelegate
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
@@ -108,16 +107,13 @@ struct WelcomeView: View {
   /// launch with no Finder URL, no state restoration), runs the
   /// FTUE Open panel so the user has a way to open something.
   private func runLaunchTask() async {
-    guard let appModel = boot.model else { return }
+    guard boot.model != nil else { return }
 
-    // Keep the delegate's appModel reference fresh — `dispatch`
-    // consults `openBehavior` through it.
-    appDelegate.appModel = appModel
-
-    // Capture openWindow for the dispatcher. install() returns true
-    // when the launch buffer had pending URLs (Finder dispatched
-    // before any view existed); each gets replayed through
-    // openWindow(value:) here, spawning real document windows.
+    // Capture openWindow for the dispatcher. install() returns
+    // true when the launch buffer had pending URLs (Finder
+    // dispatched before any view existed); each gets replayed
+    // through openWindow(value:) here, spawning real document
+    // windows.
     let action = openWindow
     let flushed = dispatcher.install { url in
       action(value: url)
@@ -125,18 +121,13 @@ struct WelcomeView: View {
 
     if flushed { return }
 
-    // Wait for AppKit to finish launching so state restoration has
-    // had time to bring back document windows. If any are alive,
-    // there's nothing for the FTUE picker to do.
-    while !appDelegate.didFinishLaunching {
-      try? await Task.sleep(for: .milliseconds(50))
-      if Task.isCancelled { return }
-    }
-
-    // Settle: if `application(_:open:)` fired a URL into the now-
-    // installed openHandler during this task, a doc window may still
-    // be attaching. Give it a moment.
-    try? await Task.sleep(for: .milliseconds(150))
+    // Settle: state restoration brings back WindowGroup<URL>
+    // windows during launch; give them a beat to register so the
+    // FTUE picker doesn't run on top of restored docs. Boot is
+    // already complete by this point (we got here from
+    // `task(id: boot.model != nil)` flipping to true), so a
+    // fixed sleep is enough.
+    try? await Task.sleep(for: .milliseconds(250))
     if Task.isCancelled { return }
 
     if dispatcher.hasAnyDocumentWindow() { return }
