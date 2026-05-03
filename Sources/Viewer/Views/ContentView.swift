@@ -90,6 +90,14 @@ struct ContentView: View {
           {
             host.addTabbedWindow(window, ordered: .above)
           }
+          // Neutralize the AppKit tab bar's "+" button — see
+          // `NoNewTabAction.install(on:)`. The "+" sends
+          // `newWindowForTab:` into a `WindowGroup<URL>` that has
+          // no default value, and SwiftUI tears down the current
+          // window instead of spawning a new tab. Tabs themselves
+          // (programmatic via `addTabbedWindow`, user via Window
+          // menu's Move/Merge) keep working — only the "+" no-ops.
+          NoNewTabAction.install(on: window)
           dispatcher.registerWindow(
             window,
             initialURL: fileURL
