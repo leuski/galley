@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 @main
 struct ViewerApp: App {
+  @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()

@@ -16,10 +16,18 @@ enum AppLauncher {
   /// Without this, `launch()` finds the app still running and either
   /// activates it (state: Running Background) or fails outright.
   ///
+  /// Pass `ignorePersistedState: false` only when the test depends
+  /// on state restoration persisting across launches (the
+  /// `testWindowsRestoreOnRelaunch` flow). The flag affects both
+  /// reading *and* writing of persisted window state, so phase 1 of
+  /// such a test must opt out too — otherwise nothing gets saved
+  /// for phase 2 to restore.
+  ///
   /// Returns the launched application handle.
   @MainActor
   static func launchClean(
     extraArgs: [String] = [],
+    ignorePersistedState: Bool = true,
     file: StaticString = #file,
     line: UInt = #line
   ) -> XCUIApplication {
@@ -30,8 +38,9 @@ enum AppLauncher {
     // shows after any recent crash. That alert is a modal NSAlert
     // attached to a hidden window — XCUITest can't see it, so the
     // test would hang at launch waiting for a window that's
-    // blocked behind the alert. The flag is pure isolation: it
-    // doesn't change app behavior, it just declines the prompt.
+    // blocked behind the alert. The flag also suppresses state
+    // writes — opt out only when persistence behavior is itself
+    // under test.
     //
     // We deliberately do NOT pass `--ui-test-mode` as a launch arg.
     // AppKit's command-line `NSUserDefaults` parser eats `--`-prefixed
@@ -41,9 +50,12 @@ enum AppLauncher {
     // never fires). Inject the test-mode marker via the environment
     // instead — `ProcessInfo.environment` isn't touched by AppKit's
     // arg parser.
-    app.launchArguments = [
-      "-ApplePersistenceIgnoreState", "YES"
-    ] + extraArgs
+    var args: [String] = []
+    if ignorePersistedState {
+      args.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
+    }
+    args.append(contentsOf: extraArgs)
+    app.launchArguments = args
     app.launchEnvironment["GALLEY_UI_TEST_MODE"] = "1"
     app.launch()
     return app
@@ -78,10 +90,14 @@ enum AppLauncher {
   /// without going through LaunchServices. The caller is responsible
   /// for cleaning the temp directory; for one-shot tests, prefer
   /// `XCTestCase.addTeardownBlock` to remove the parent directory.
+  ///
+  /// Pass `ignorePersistedState: false` for the persistence test —
+  /// see `launchClean` for the rationale.
   @MainActor
   static func launchWithSeed(
     _ markdownContent: String,
     fileName: String = "Test.md",
+    ignorePersistedState: Bool = true,
     file: StaticString = #file,
     line: UInt = #line
   ) throws -> (app: XCUIApplication, fileURL: URL) {
@@ -93,8 +109,32 @@ enum AppLauncher {
     try markdownContent.write(to: fileURL, atomically: true, encoding: .utf8)
     let app = launchClean(
       extraArgs: ["--seed-file", fileURL.path],
+      ignorePersistedState: ignorePersistedState,
       file: file,
       line: line)
     return (app, fileURL)
   }
+
+  /// Launch *without* `-ApplePersistenceIgnoreState YES`, so AppKit
+  /// reads the saved-state directory and SwiftUI restores any
+  /// `WindowGroup<URL>` windows that were open at last quit.
+  ///
+  /// Used only by the state-restoration test, which seeds a window
+  /// in a first launch, quits, and then expects this launcher to
+  /// bring the window back. Every other test should use
+  /// `launchClean` so saved state is ignored.
+  ///
+  /// Caller is responsible for ensuring no previous Galley instance
+  /// is running and that the saved-state directory is in the
+  /// expected pre-launch shape.
+  @MainActor
+  static func launchForRestoration() -> XCUIApplication {
+    let app = XCUIApplication()
+    terminateAndWait(app, file: #file, line: #line)
+    app.launchArguments = []
+    app.launchEnvironment["GALLEY_UI_TEST_MODE"] = "1"
+    app.launch()
+    return app
+  }
+
 }

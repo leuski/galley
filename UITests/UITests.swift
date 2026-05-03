@@ -111,6 +111,93 @@ final class UITests: XCTestCase {
       "containing the file basename")
   }
 
+  /// State restoration: a document window open at quit time must
+  /// come back on the next launch.
+  ///
+  /// Phase 1 seeds a markdown file via `--seed-file`, waits for its
+  /// window to become visible (proves the seed flowed through the
+  /// dispatcher → openWindow → ContentView path), then issues a
+  /// graceful terminate. macOS's `talagentd` daemon (managing
+  /// saved state since macOS 15) captures the open `WindowGroup<URL>`
+  /// values into its container at
+  /// `~/Library/Daemon Containers/<talagentd-UUID>/Data/Library/Saved
+  /// Application State/<app-UUID>/`. The container is sandboxed away
+  /// from terminal access, so we don't try to introspect it — we
+  /// rely on the end-to-end assertion in phase 2 instead.
+  ///
+  /// Phase 2 launches *without* `--seed-file` and *without*
+  /// `-ApplePersistenceIgnoreState YES` (via `launchForRestoration`),
+  /// so SwiftUI's `WindowGroup<URL>` reads the saved URL from
+  /// talagentd and restores the window. We verify a window with
+  /// the same file's title comes back, hittable.
+  ///
+  /// The temp directory holding the seeded file is preserved across
+  /// the quit/relaunch (teardown removes it after both phases) so
+  /// the restored URL still resolves to a real file.
+  ///
+  /// Requires the user's macOS state-restoration preference to be
+  /// enabled (System Settings → Desktop & Dock → "Close windows
+  /// when quitting an application" must be **off**, equivalent to
+  /// `NSQuitAlwaysKeepsWindows = true` in `NSGlobalDomain`). The
+  /// test fails informatively if restoration doesn't bring the
+  /// window back; the failure message points at the system
+  /// preference as the most common cause.
+  @MainActor
+  func testWindowsRestoreOnRelaunch() throws {
+    // Phase 1 — seed a doc and wait for its window. Don't pass
+    // `-ApplePersistenceIgnoreState YES` here: that flag suppresses
+    // saving as well as loading, and we need talagentd to capture
+    // the seeded URL so phase 2 can restore it.
+    let (app1, fileURL) = try AppLauncher.launchWithSeed(
+      "# Persistent doc\n\nThis should survive a relaunch.",
+      fileName: "Persistent.md",
+      ignorePersistedState: false)
+    addTeardownBlock {
+      try? FileManager.default.removeItem(
+        at: fileURL.deletingLastPathComponent())
+    }
+    XCTAssertTrue(
+      app1.wait(for: .runningForeground, timeout: 5),
+      "Phase 1 app should reach foreground")
+    let phase1 = waitForHittableWindow(
+      in: app1,
+      titleContains: "Persistent",
+      timeout: 10)
+    XCTAssertNotNil(
+      phase1,
+      "Seeded doc window should be visible in phase 1 before quit")
+
+    // Quit gracefully so AppKit/SwiftUI hand the open URL to
+    // talagentd. `terminate()` sends a normal terminate request,
+    // which triggers the app's normal termination path including
+    // state-restoration save.
+    app1.terminate()
+    let terminateDeadline = Date().addingTimeInterval(5)
+    while Date() < terminateDeadline, app1.state != .notRunning {
+      Thread.sleep(forTimeInterval: 0.1)
+    }
+    XCTAssertEqual(
+      app1.state, .notRunning,
+      "Phase 1 app should fully terminate before phase 2 launches")
+
+    // Phase 2 — launch fresh with state restoration enabled.
+    // No --seed-file. No -ApplePersistenceIgnoreState.
+    let app2 = AppLauncher.launchForRestoration()
+    XCTAssertTrue(
+      app2.wait(for: .runningForeground, timeout: 5),
+      "Phase 2 app should reach foreground")
+    let phase2 = waitForHittableWindow(
+      in: app2,
+      titleContains: "Persistent",
+      timeout: 15)
+    XCTAssertNotNil(
+      phase2,
+      "Restored doc window should reappear on relaunch. " +
+      "If this fails, check System Settings → Desktop & Dock " +
+      "→ 'Close windows when quitting an application' — that " +
+      "must be OFF for macOS to save and restore window state.")
+  }
+
   // MARK: - Menu items (after a seeded launch — gives us a populated UI)
 
   // SwiftUI's `.accessibilityIdentifier(...)` does NOT propagate
