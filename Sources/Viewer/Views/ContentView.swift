@@ -503,30 +503,6 @@ private struct SceneValuesModifier: ViewModifier {
   }
 }
 
-/// Resolves the host `NSWindow` so the SwiftUI view can drive
-/// AppKit-only properties on it (alpha, close). Reports through
-/// `viewDidMoveToWindow` so the resolution is synchronous with
-/// AppKit attachment — async dispatch raced the `.task` that drives
-/// the launch picker, leaving `hostWindow` nil when it was needed.
-private struct WindowAccessor: NSViewRepresentable {
-  let onAttach: (NSWindow?) -> Void
-  let onDetach: (NSWindow?) -> Void
-
-  init(
-    onAttach: @escaping (NSWindow?) -> Void,
-    onDetach: @escaping (NSWindow?) -> Void = { _ in }
-  ) {
-    self.onAttach = onAttach
-    self.onDetach = onDetach
-  }
-
-  func makeNSView(context: Context) -> NSView {
-    ResolvingView(onAttach: onAttach, onDetach: onDetach)
-  }
-
-  func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
 /// Pins `window.alphaValue = 0` while the AppModel is still booting.
 /// Used by the boot branch of `ContentView.body`; once the body
 /// swaps to `readyBody`, the regular `WindowAccessor` takes over
@@ -540,36 +516,6 @@ private struct BootWindowHider: NSViewRepresentable {
       super.viewDidMoveToWindow()
       window?.alphaValue = 0
     }
-  }
-}
-
-private final class ResolvingView: NSView {
-  let onAttach: (NSWindow?) -> Void
-  let onDetach: (NSWindow?) -> Void
-
-  init(
-    onAttach: @escaping (NSWindow?) -> Void,
-    onDetach: @escaping (NSWindow?) -> Void
-  ) {
-    self.onAttach = onAttach
-    self.onDetach = onDetach
-    super.init(frame: .zero)
-  }
-
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  override func viewWillMove(toWindow newWindow: NSWindow?) {
-    super.viewWillMove(toWindow: newWindow)
-    if newWindow == nil, let current = window {
-      onDetach(current)
-    }
-  }
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    onAttach(window)
   }
 }
 

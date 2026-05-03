@@ -266,12 +266,14 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     idsByObject[ObjectIdentifier(window)]
   }
 
-  /// Allow an untitled placeholder window so SwiftUI has a host view
-  /// up early enough to install the `openWindow` handler — otherwise
-  /// URLs queued during launch never flush. The placeholder shows a
-  /// "no document" prompt; users get File > Open / Open Recent there.
+  /// Returning false here is deliberate: the always-alive
+  /// `Window("welcome")` scene defined in `ViewerApp` captures
+  /// `openWindow` and hosts the FTUE Open panel. SwiftUI doesn't
+  /// bridge `applicationShouldOpenUntitledFile` to value-driven
+  /// `WindowGroup`s anyway, so returning true here was a no-op that
+  /// previously masked the missing welcome scene.
   func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
-    true
+    false
   }
 
   /// Opt in to secure state restoration so macOS persists the open

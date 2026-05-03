@@ -25,7 +25,26 @@ enum AppLauncher {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     terminateAndWait(app, file: file, line: line)
-    app.launchArguments = ["--ui-test-mode"] + extraArgs
+    // `-ApplePersistenceIgnoreState YES` skips the "Reopen the
+    // windows that were open before the crash?" alert that AppKit
+    // shows after any recent crash. That alert is a modal NSAlert
+    // attached to a hidden window — XCUITest can't see it, so the
+    // test would hang at launch waiting for a window that's
+    // blocked behind the alert. The flag is pure isolation: it
+    // doesn't change app behavior, it just declines the prompt.
+    //
+    // We deliberately do NOT pass `--ui-test-mode` as a launch arg.
+    // AppKit's command-line `NSUserDefaults` parser eats `--`-prefixed
+    // tokens and interprets the next token as the value, which polutes
+    // the defaults domain in ways that suppress the `Window("welcome")`
+    // scene from spawning at launch (the symptom: WelcomeView body
+    // never fires). Inject the test-mode marker via the environment
+    // instead — `ProcessInfo.environment` isn't touched by AppKit's
+    // arg parser.
+    app.launchArguments = [
+      "-ApplePersistenceIgnoreState", "YES"
+    ] + extraArgs
+    app.launchEnvironment["GALLEY_UI_TEST_MODE"] = "1"
     app.launch()
     return app
   }
