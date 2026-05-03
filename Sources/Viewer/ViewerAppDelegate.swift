@@ -209,15 +209,7 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     idsByObject[ObjectIdentifier(window)] = id
     windowsByID[id] = window
     rebindClosures[id] = rebind
-    // A window that's already bound to a URL at registration time is
-    // a real document window — not a placeholder. Setting
-    // `hasDocument` here (rather than waiting for `markWindowReady`)
-    // lets `dispatch` and `runLaunchPicker` see the truth immediately,
-    // before the model's binding completes asynchronously.
-    registry.register(WindowRecord(
-      id: id,
-      hasDocument: initialURL != nil,
-      currentURL: initialURL))
+    registry.register(WindowRecord(id: id, currentURL: initialURL))
   }
 
   func unregisterWindow(_ window: NSWindow) {
@@ -226,14 +218,6 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     registry.unregister(id)
     windowsByID.removeValue(forKey: id)
     rebindClosures.removeValue(forKey: id)
-  }
-
-  /// Flip a registration from "placeholder" to "real document window"
-  /// so subsequent dispatches treat it as a valid tab host. Called
-  /// once `model.documentURL` becomes non-nil for the first time.
-  func markWindowReady(_ window: NSWindow) {
-    guard let id = idsByObject[ObjectIdentifier(window)] else { return }
-    registry.markReady(id)
   }
 
   /// Track the URL each window is currently bound to. ContentView
@@ -250,14 +234,13 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     pendingTabHosts.isEmpty ? nil : pendingTabHosts.removeFirst()
   }
 
-  /// True when at least one registered window already has a document
-  /// bound. The launch placeholder uses this to decide whether to
-  /// dismiss itself instead of running the FTUE open panel — if a
-  /// real document window has appeared (from a URL dispatched out of
-  /// `application(_:open:)` or anywhere else), the placeholder is
-  /// redundant.
+  /// True when at least one document window is registered. The
+  /// welcome scene's launch task uses this to decide whether to
+  /// surface the FTUE Open panel — if a doc window already exists
+  /// (from a URL dispatched out of `application(_:open:)` or from
+  /// state restoration), the picker is redundant.
   func hasAnyDocumentWindow() -> Bool {
-    registry.hasAnyDocumentWindow
+    !registry.isEmpty
   }
 
   /// Reverse-lookup helper for `dispatch`: given a live `NSWindow`,

@@ -27,6 +27,11 @@ public enum DispatchAction: Sendable, Equatable {
 ///
 /// Returning a `DispatchAction` (instead of doing the work directly)
 /// keeps every routing decision testable without an `NSApplication`.
+///
+/// The registry only contains document windows (the welcome scene
+/// is a separate SwiftUI scene and is never registered), so the
+/// router has no placeholder fallback — every `frontmost` is a
+/// real document.
 public struct OpenURLRouter: Sendable {
   public init() {}
 
@@ -44,37 +49,20 @@ public struct OpenURLRouter: Sendable {
       return .focusExisting(match.id)
     }
 
-    let frontDoc = registry.frontmostDocument(
+    let frontDoc = registry.frontmost(
       mainWindow: mainWindow,
       keyWindow: keyWindow)
-    let placeholder = registry.frontmostPlaceholder()
 
     switch behavior {
     case .newWindow:
-      // If the only thing up is a placeholder, rebind it instead of
-      // stacking another empty window. With a real doc window
-      // present the user explicitly wants a new window — spawn.
-      if frontDoc == nil, let placeholder {
-        return .rebind(placeholder.id)
-      }
       return .openNew
 
     case .newTab:
-      if let frontDoc {
-        return .tabOnto(frontDoc.id)
-      }
-      if let placeholder {
-        return .rebind(placeholder.id)
-      }
+      if let frontDoc { return .tabOnto(frontDoc.id) }
       return .openNew
 
     case .replaceCurrent:
-      if let frontDoc {
-        return .rebind(frontDoc.id)
-      }
-      if let placeholder {
-        return .rebind(placeholder.id)
-      }
+      if let frontDoc { return .rebind(frontDoc.id) }
       return .openNew
     }
   }

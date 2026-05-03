@@ -13,13 +13,12 @@ private final class IDFountain: @unchecked Sendable {
 struct WindowRegistryTests {
   private let ids = IDFountain()
 
-  @Test("Empty registry has no documents and no records")
+  @Test("Empty registry has no records")
   func emptyByDefault() {
     let registry = WindowRegistry()
     #expect(registry.all.isEmpty)
-    #expect(!registry.hasAnyDocumentWindow)
-    #expect(registry.frontmostDocument() == nil)
-    #expect(registry.frontmostPlaceholder() == nil)
+    #expect(registry.isEmpty)
+    #expect(registry.frontmost() == nil)
   }
 
   @Test("Register, lookup, unregister round-trip")
@@ -27,35 +26,21 @@ struct WindowRegistryTests {
     var registry = WindowRegistry()
     let id = ids.next()
     let url = URL(fileURLWithPath: "/tmp/a.md")
-    registry.register(WindowRecord(
-      id: id, hasDocument: true, currentURL: url))
+    registry.register(WindowRecord(id: id, currentURL: url))
     #expect(registry.record(for: id)?.currentURL == url)
     #expect(registry.all.count == 1)
+    #expect(!registry.isEmpty)
     registry.unregister(id)
     #expect(registry.record(for: id) == nil)
     #expect(registry.all.isEmpty)
-  }
-
-  @Test("markReady flips a placeholder into a document window")
-  func markReadyFlips() {
-    var registry = WindowRegistry()
-    let id = ids.next()
-    registry.register(WindowRecord(id: id))
-    #expect(registry.record(for: id)?.hasDocument == false)
-    #expect(registry.frontmostPlaceholder()?.id == id)
-    #expect(!registry.hasAnyDocumentWindow)
-
-    registry.markReady(id)
-    #expect(registry.record(for: id)?.hasDocument == true)
-    #expect(registry.hasAnyDocumentWindow)
-    #expect(registry.frontmostPlaceholder() == nil)
+    #expect(registry.isEmpty)
   }
 
   @Test("updateCurrentURL writes through")
   func updateCurrentURL() {
     var registry = WindowRegistry()
     let id = ids.next()
-    registry.register(WindowRecord(id: id, hasDocument: true))
+    registry.register(WindowRecord(id: id))
     let url = URL(fileURLWithPath: "/tmp/x.md")
     registry.updateCurrentURL(id, url)
     #expect(registry.record(for: id)?.currentURL == url)
@@ -68,13 +53,12 @@ struct WindowRegistryTests {
     var registry = WindowRegistry()
     let id = ids.next()
     let stored = URL(fileURLWithPath: "/tmp/foo bar.md")
-    registry.register(WindowRecord(
-      id: id, hasDocument: true, currentURL: stored))
+    registry.register(WindowRecord(id: id, currentURL: stored))
     let lookup = URL(string: "file:///tmp/foo%20bar.md")!
     #expect(registry.registration(matching: lookup)?.id == id)
   }
 
-  @Test("registration(matching:) skips placeholders without a URL")
+  @Test("registration(matching:) skips records without a URL")
   func matchingSkipsEmpty() {
     var registry = WindowRegistry()
     registry.register(WindowRecord(id: ids.next()))
@@ -82,58 +66,41 @@ struct WindowRegistryTests {
     #expect(registry.registration(matching: url) == nil)
   }
 
-  @Test("frontmostDocument prefers mainWindow hint")
+  @Test("frontmost prefers mainWindow hint")
   func frontmostPrefersMain() {
     var registry = WindowRegistry()
     let main = ids.next()
     let key = ids.next()
     let other = ids.next()
-    registry.register(WindowRecord(id: main, hasDocument: true))
-    registry.register(WindowRecord(id: key, hasDocument: true))
-    registry.register(WindowRecord(id: other, hasDocument: true))
-    let chosen = registry.frontmostDocument(
-      mainWindow: main, keyWindow: key)
+    registry.register(WindowRecord(id: main))
+    registry.register(WindowRecord(id: key))
+    registry.register(WindowRecord(id: other))
+    let chosen = registry.frontmost(mainWindow: main, keyWindow: key)
     #expect(chosen?.id == main)
   }
 
-  @Test("frontmostDocument falls back to keyWindow then any")
+  @Test("frontmost falls back to keyWindow then any")
   func frontmostFallbacks() {
     var registry = WindowRegistry()
     let key = ids.next()
     let other = ids.next()
-    registry.register(WindowRecord(id: key, hasDocument: true))
-    registry.register(WindowRecord(id: other, hasDocument: true))
+    registry.register(WindowRecord(id: key))
+    registry.register(WindowRecord(id: other))
 
     // mainWindow hint not in registry: fall back to keyWindow.
     let unknown = ids.next()
-    let viaKey = registry.frontmostDocument(
-      mainWindow: unknown, keyWindow: key)
+    let viaKey = registry.frontmost(mainWindow: unknown, keyWindow: key)
     #expect(viaKey?.id == key)
 
-    // Neither hint registered: any document window.
-    let viaAny = registry.frontmostDocument(
-      mainWindow: unknown, keyWindow: unknown)
+    // Neither hint registered: any record.
+    let viaAny = registry.frontmost(mainWindow: unknown, keyWindow: unknown)
     #expect(viaAny != nil)
-    #expect(viaAny?.hasDocument == true)
   }
 
-  @Test("frontmostDocument ignores placeholders even when hinted")
-  func frontmostIgnoresPlaceholders() {
-    var registry = WindowRegistry()
-    let placeholder = ids.next()
-    let real = ids.next()
-    registry.register(WindowRecord(id: placeholder, hasDocument: false))
-    registry.register(WindowRecord(id: real, hasDocument: true))
-    let chosen = registry.frontmostDocument(
-      mainWindow: placeholder, keyWindow: nil)
-    #expect(chosen?.id == real)
-  }
-
-  @Test("frontmostDocument returns nil when only placeholders exist")
-  func frontmostNilWithOnlyPlaceholders() {
-    var registry = WindowRegistry()
-    registry.register(WindowRecord(id: ids.next()))
-    registry.register(WindowRecord(id: ids.next()))
-    #expect(registry.frontmostDocument() == nil)
+  @Test("frontmost returns nil for empty registry")
+  func frontmostNilWhenEmpty() {
+    let registry = WindowRegistry()
+    #expect(registry.frontmost() == nil)
+    #expect(registry.frontmost(mainWindow: WindowID(raw: 1)) == nil)
   }
 }

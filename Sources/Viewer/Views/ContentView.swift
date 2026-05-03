@@ -7,8 +7,6 @@ struct ContentView: View {
   @Binding var fileURL: URL?
   @Environment(AppBoot.self) private var boot
   @Environment(ViewerAppDelegate.self) private var appDelegate
-  @Environment(\.openWindow) private var openWindow
-  @Environment(\.dismiss) private var dismiss
   @State private var model = DocumentModel()
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
@@ -131,9 +129,9 @@ struct ContentView: View {
   }
 
   /// First time content is bound (whether via initial bind, restore,
-  /// or in-window navigation), reveal the window and promote it from
-  /// "placeholder" to "real document window" so future dispatches can
-  /// tab onto it.
+  /// or in-window navigation), reveal the window and update the
+  /// registry's current URL so re-opens of the same URL focus this
+  /// existing window instead of spawning a new one.
   private func handleDocumentBound(_ new: URL?) {
     saveHistory()
     if let window = hostWindow {
@@ -141,9 +139,6 @@ struct ContentView: View {
     }
     guard new != nil else { return }
     hostWindow?.alphaValue = 1
-    if let window = hostWindow {
-      appDelegate.markWindowReady(window)
-    }
   }
 
   private func reloadModel() {
@@ -229,11 +224,15 @@ struct ContentView: View {
     }
   }
 
-  /// Drives launch wiring + initial bind + FTUE picker. Re-runs when
-  /// `fileURL` changes — typically once: nil → picked URL.
-  /// Only mounted once `boot.model` is non-nil, so by the time this
-  /// fires processor discovery has completed and the persisted pick
-  /// has been decoded against the live catalog.
+  /// Drives initial bind for a document window. Only mounted once
+  /// `boot.model` is non-nil, so by the time this fires processor
+  /// discovery has completed and the persisted pick has been
+  /// decoded against the live catalog.
+  ///
+  /// Document windows are always spawned with a non-nil URL — the
+  /// FTUE / launch-bootstrap path lives in `WelcomeView` now, so
+  /// `ContentView.fileURL` can never legitimately be nil at task
+  /// time outside of an in-flight rebind.
   private func launchTask(appModel: AppModel) async {
     // Fresh open of a file we've seen before: hydrate the
     // window's `@SceneStorage` slots from `PerFileStateStore` so
@@ -255,15 +254,6 @@ struct ContentView: View {
       appModel,
       templatePersistent: overrideTemplatePersistent,
       processorPersistent: overrideRendererPersistent)
-
-    // Keep the delegate's appModel reference fresh — `application(_:open:)`
-    // and Open Recent dispatch consult `openBehavior` from there.
-    appDelegate.appModel = appModel
-
-    // First view to come up captures `openWindow` for the delegate
-    // so Finder file opens and File > Open Recent route into new
-    // windows. install() returns true when launch-time URLs flushed.
-    let flushed = installOpenWindowHandlerIfNeeded()
 
     // SwiftUI fires `.task(id:)` more than once even when the id
     // is stable (the modifier is recreated on body re-eval). If a
@@ -288,83 +278,7 @@ struct ContentView: View {
         to: fileURL,
         scrollToLine: line,
         initialScrollY: scrollYStored > 0 ? scrollYStored : nil)
-      return
     }
-
-    // application(_:open:) URLs are spawning real windows of their
-    // own. Drop the placeholder.
-    if flushed {
-      dismiss()
-      return
-    }
-
-    // Truly empty placeholder — wait for launch (and any in-flight
-    // state restoration) to settle, then run the FTUE picker.
-    await runLaunchPicker()
-  }
-
-  /// FTUE: wait for app launch to settle, then run the open panel.
-  /// If the user picks files, route the first into this same window
-  /// (by writing the binding) and any extras into new windows;
-  /// cancel closes the placeholder.
-  ///
-  /// The window is already alpha=0 from `WindowAccessor` and will
-  /// stay hidden until `model.documentURL` becomes non-nil — set
-  /// when the picked file binds.
-  private func runLaunchPicker() async {
-    // Wait for AppKit to finish launching. State restoration is
-    // complete by then, so any restored window's URL has already
-    // landed in its scene's binding — this window is genuinely
-    // the empty placeholder, not a restored window in transit.
-    while !appDelegate.didFinishLaunching {
-      try? await Task.sleep(for: .milliseconds(50))
-      if Task.isCancelled { return }
-    }
-    if Task.isCancelled || fileURL != nil { return }
-
-    // Settle window: if `application(_:open:)` fired a URL into the
-    // existing `openHandler` (warm-launch dispatch), the spawned
-    // doc window may still be attaching. Give it a moment to arrive
-    // and register before we decide whether the picker is needed.
-    try? await Task.sleep(for: .milliseconds(150))
-    if Task.isCancelled || fileURL != nil { return }
-
-    // A real document window already exists (either spawned from a
-    // dispatched URL or restored from a previous session). This
-    // placeholder is redundant — close it instead of pestering the
-    // user with the FTUE open panel.
-    if appDelegate.hasAnyDocumentWindow() {
-      dismiss()
-      return
-    }
-
-    let picks = await appDelegate.runOpenPanel()
-    // An incoming dispatch can rebind this placeholder while the
-    // panel is up — in that case the panel was cancelled out from
-    // under us and `fileURL` is now non-nil. Don't dismiss the
-    // window we just got handed a document for.
-    if Task.isCancelled || fileURL != nil { return }
-    guard let first = picks.first else {
-      dismiss()
-      return
-    }
-    for extra in picks.dropFirst() {
-      appDelegate.record(extra)
-      openWindow(value: extra)
-    }
-    appDelegate.record(first)
-    fileURL = first
-    // Setting `fileURL` re-fires `task(id: fileURL)` which binds
-    // the model. The bind sets model.documentURL, which our
-    // .onChange flips alphaValue=1 — revealing the window with
-    // content already rendered.
-  }
-
-  @discardableResult
-  private func installOpenWindowHandlerIfNeeded() -> Bool {
-    guard appDelegate.openHandler == nil else { return false }
-    let action = openWindow
-    return appDelegate.install { url in action(value: url) }
   }
 
   private func saveHistory() {

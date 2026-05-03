@@ -35,11 +35,9 @@ struct OpenURLRouterTests {
     var registry = WindowRegistry()
     let openWindow = ids.next()
     let otherDoc = ids.next()
-    registry.register(WindowRecord(
-      id: openWindow, hasDocument: true, currentURL: url))
+    registry.register(WindowRecord(id: openWindow, currentURL: url))
     registry.register(WindowRecord(
       id: otherDoc,
-      hasDocument: true,
       currentURL: URL(fileURLWithPath: "/tmp/other.md")))
     let action = router.decide(
       for: url,
@@ -65,42 +63,26 @@ struct OpenURLRouterTests {
 
   // MARK: - newWindow behavior
 
-  @Test("newWindow rebinds the placeholder when no doc window exists")
-  func newWindowReusesLonePlaceholder() {
+  @Test("newWindow always spawns regardless of existing windows")
+  func newWindowAlwaysSpawns() {
     var registry = WindowRegistry()
-    let placeholder = ids.next()
-    registry.register(WindowRecord(id: placeholder))
+    registry.register(WindowRecord(id: ids.next(), currentURL: url))
+    registry.register(WindowRecord(id: ids.next()))
     let action = router.decide(
-      for: url,
+      for: URL(fileURLWithPath: "/tmp/fresh.md"),
       behavior: .newWindow,
       registry: registry,
       handlerInstalled: true)
-    #expect(action == .rebind(placeholder))
-  }
-
-  @Test("newWindow ignores the placeholder when a doc window exists")
-  func newWindowIgnoresPlaceholderWhenDocExists() {
-    var registry = WindowRegistry()
-    let doc = ids.next()
-    let placeholder = ids.next()
-    registry.register(WindowRecord(id: doc, hasDocument: true))
-    registry.register(WindowRecord(id: placeholder))
-    let action = router.decide(
-      for: url,
-      behavior: .newWindow,
-      registry: registry,
-      handlerInstalled: true,
-      mainWindow: doc)
     #expect(action == .openNew)
   }
 
   // MARK: - newTab behavior
 
-  @Test("newTab onto frontmost document window")
+  @Test("newTab onto frontmost window")
   func newTabOntoFront() {
     var registry = WindowRegistry()
     let doc = ids.next()
-    registry.register(WindowRecord(id: doc, hasDocument: true))
+    registry.register(WindowRecord(id: doc))
     let action = router.decide(
       for: url,
       behavior: .newTab,
@@ -110,26 +92,23 @@ struct OpenURLRouterTests {
     #expect(action == .tabOnto(doc))
   }
 
-  @Test("newTab falls back to placeholder rebind when no real doc window")
-  func newTabFallsBackToPlaceholder() {
-    var registry = WindowRegistry()
-    let placeholder = ids.next()
-    registry.register(WindowRecord(id: placeholder))
+  @Test("newTab spawns when registry is empty")
+  func newTabSpawnsWhenEmpty() {
     let action = router.decide(
       for: url,
       behavior: .newTab,
-      registry: registry,
+      registry: WindowRegistry(),
       handlerInstalled: true)
-    #expect(action == .rebind(placeholder))
+    #expect(action == .openNew)
   }
 
   // MARK: - replaceCurrent behavior
 
-  @Test("replaceCurrent rebinds the frontmost document window")
-  func replaceFrontDocument() {
+  @Test("replaceCurrent rebinds the frontmost window")
+  func replaceFront() {
     var registry = WindowRegistry()
     let doc = ids.next()
-    registry.register(WindowRecord(id: doc, hasDocument: true))
+    registry.register(WindowRecord(id: doc))
     let action = router.decide(
       for: url,
       behavior: .replaceCurrent,
@@ -139,32 +118,28 @@ struct OpenURLRouterTests {
     #expect(action == .rebind(doc))
   }
 
-  @Test("replaceCurrent falls back to placeholder when no real doc")
-  func replaceFallsBackToPlaceholder() {
-    var registry = WindowRegistry()
-    let placeholder = ids.next()
-    registry.register(WindowRecord(id: placeholder))
+  @Test("replaceCurrent spawns when registry is empty")
+  func replaceSpawnsWhenEmpty() {
     let action = router.decide(
       for: url,
       behavior: .replaceCurrent,
-      registry: registry,
+      registry: WindowRegistry(),
       handlerInstalled: true)
-    #expect(action == .rebind(placeholder))
+    #expect(action == .openNew)
   }
 
   // MARK: - Frontmost-hint behavior
 
-  @Test("Without main/key hints, newTab still picks any document window")
+  @Test("Without main/key hints, newTab still picks any registered window")
   func newTabWithoutHints() {
     var registry = WindowRegistry()
     let doc = ids.next()
-    registry.register(WindowRecord(id: doc, hasDocument: true))
+    registry.register(WindowRecord(id: doc))
     let action = router.decide(
       for: url,
       behavior: .newTab,
       registry: registry,
       handlerInstalled: true)
-    // mainWindow/keyWindow nil — falls back to "any doc" lookup.
     #expect(action == .tabOnto(doc))
   }
 }
