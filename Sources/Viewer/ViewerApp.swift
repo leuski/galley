@@ -6,8 +6,16 @@ import UniformTypeIdentifiers
 struct ViewerApp: App {
   @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
+  @State private var dispatcher = WindowDispatcher()
 
   var body: some Scene {
+    // Hand the AppDelegate a reference to the dispatcher so its
+    // `application(_:open:)` callback can route URLs through the
+    // same model the SwiftUI views use. (Pattern mirrors
+    // `appDelegate.appModel = appModel` below; both go away once
+    // we drop AppDelegate entirely in favor of `.onOpenURL`.)
+    let _ = { appDelegate.dispatcher = dispatcher }()
+
     // Always-alive hidden anchor scene. SwiftUI auto-spawns this
     // because it's a `Window` (singular) — guarantees a view exists
     // at launch to capture `openWindow` and host `.onOpenURL` for
@@ -17,6 +25,7 @@ struct ViewerApp: App {
       WelcomeView()
         .environment(boot)
         .environment(appDelegate)
+        .environment(dispatcher)
     }
     // Always present at launch. Without this, SwiftUI may remember
     // a previous "closed" state and skip auto-spawning, leaving us
@@ -31,6 +40,7 @@ struct ViewerApp: App {
       WindowRoot(url: $url)
         .environment(boot)
         .environment(appDelegate)
+        .environment(dispatcher)
     }
     .defaultSize(width: 700, height: 900)
     .windowToolbarStyle(.unifiedCompact)

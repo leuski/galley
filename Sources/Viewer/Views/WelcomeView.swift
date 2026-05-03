@@ -24,6 +24,7 @@ import SwiftUI
 struct WelcomeView: View {
   @Environment(AppBoot.self) private var boot
   @Environment(ViewerAppDelegate.self) private var appDelegate
+  @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
@@ -95,12 +96,12 @@ struct WelcomeView: View {
     // consults `openBehavior` through it.
     appDelegate.appModel = appModel
 
-    // Capture openWindow for the delegate. install() returns true
+    // Capture openWindow for the dispatcher. install() returns true
     // when the launch buffer had pending URLs (Finder dispatched
     // before any view existed); each gets replayed through
     // openWindow(value:) here, spawning real document windows.
     let action = openWindow
-    let flushed = appDelegate.install { url in
+    let flushed = dispatcher.install { url in
       action(value: url)
     }
 
@@ -120,7 +121,7 @@ struct WelcomeView: View {
     try? await Task.sleep(for: .milliseconds(150))
     if Task.isCancelled { return }
 
-    if appDelegate.hasAnyDocumentWindow() { return }
+    if dispatcher.hasAnyDocumentWindow() { return }
 
     // Truly empty launch — present the FTUE Open panel.
     let picks = await appDelegate.runOpenPanel()

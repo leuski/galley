@@ -7,6 +7,7 @@ struct ContentView: View {
   @Binding var fileURL: URL?
   @Environment(AppBoot.self) private var boot
   @Environment(ViewerAppDelegate.self) private var appDelegate
+  @Environment(WindowDispatcher.self) private var dispatcher
   @State private var model = DocumentModel()
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
@@ -84,12 +85,12 @@ struct ContentView: View {
           // came in under the `newTab` behavior. Has to happen as
           // soon as the new window exists so the user never sees
           // it as a separate floating window first.
-          if let host = appDelegate.consumePendingTabHost(),
+          if let host = dispatcher.consumePendingTabHost(),
              host !== window
           {
             host.addTabbedWindow(window, ordered: .above)
           }
-          appDelegate.registerWindow(
+          dispatcher.registerWindow(
             window,
             initialURL: fileURL
           ) { newURL in
@@ -98,7 +99,7 @@ struct ContentView: View {
         }
       },
       onDetach: { window in
-        if let window { appDelegate.unregisterWindow(window) }
+        if let window { dispatcher.unregisterWindow(window) }
       }))
     .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
     .modifier(SceneValuesModifier(
@@ -132,7 +133,7 @@ struct ContentView: View {
   private func handleDocumentBound(_ new: URL?) {
     saveHistory()
     if let window = hostWindow {
-      appDelegate.updateCurrentURL(window, new)
+      dispatcher.updateCurrentURL(window, new)
     }
     guard new != nil else { return }
     hostWindow?.alphaValue = 1
@@ -208,7 +209,7 @@ struct ContentView: View {
   private func replaceDocument(with newURL: URL) {
     appDelegate.record(newURL)
     if fileURL != newURL { fileURL = newURL }
-    let line = appDelegate.consumePendingScrollLine(for: newURL)
+    let line = dispatcher.consumePendingScrollLine(for: newURL)
     Task {
       // Same URL re-dispatch (e.g. BBEdit's preview script firing
       // again on a file already showing): just scroll, don't tear
@@ -270,7 +271,7 @@ struct ContentView: View {
     // Initial bind for a freshly-opened URL.
     if let fileURL {
       appDelegate.record(fileURL)
-      let line = appDelegate.consumePendingScrollLine(for: fileURL)
+      let line = dispatcher.consumePendingScrollLine(for: fileURL)
       await model.bind(
         to: fileURL,
         scrollToLine: line,
