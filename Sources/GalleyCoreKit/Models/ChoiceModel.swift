@@ -262,9 +262,13 @@ where Element: RestorableChoiceValue
     set {
       guard let newValue else {
         pendingPersistent = nil
-        selected = Element.defaultElement(from: source)
+        let dflt = Element.defaultElement(from: source)
+        if selected != dflt { selected = dflt }
         return
       }
+      // Already settled at this value? Skip the round-trip so a
+      // bidirectional sync (e.g. defaults ↔ choice) doesn't churn.
+      if pendingPersistent == nil, selected.persist() == newValue { return }
       pendingPersistent = newValue
       reconcile()
     }
@@ -316,7 +320,8 @@ where Element: RestorableChoiceValue
     if let pending = pendingPersistent {
       pendingPersistent = nil
       do {
-        selected = try Element.decode(pending, from: source)
+        let decoded = try Element.decode(pending, from: source)
+        if decoded != selected { selected = decoded }
         return
       } catch AnyChoiceValueDecodingError.missingValue(let name) {
         notifier(name)
@@ -352,6 +357,52 @@ where Element: ChoiceValueEnvelopeProtocol
   ) -> Element.Value? {
     values.first(where: { $0.value.persistentID == id })?.value
   }
+}
+
+// MARK: - Persistence sync
+
+/// Bidirectional bridge between a `ChoiceModel`'s `persistent` and an
+/// external string-valued slot (typically a `@DefaultsKey` on a
+/// `GalleyDefaults`-conforming class). Two observation loops:
+///
+/// - **Outbound**: when the choice's persistent string changes
+///   (driven by `selected` mutating), write it through if it differs
+///   from what's already stored.
+/// - **Inbound**: when the external slot changes, push it into
+///   `choice.persistent`. After any settling (in-flight hydration or
+///   missing-value heal), mirror the settled value back if the choice
+///   ended up at something different — this also cleans stale entries
+///   out of storage when the persisted value wasn't found in the
+///   catalog.
+///
+/// Returns the cancelable observation tokens; retain them for the
+/// lifetime you want the binding active. Both sides dedupe writes so
+/// the loop converges in one round-trip.
+@MainActor
+@discardableResult
+public func bindPersistent<Choice>(
+  _ choice: Choice,
+  read: @escaping @MainActor () -> String?,
+  write: @escaping @MainActor (String?) -> Void
+) -> [Cancelable]
+where Choice: ChoiceModel & AnyObject
+{
+  let outbound = onObservedChange(
+    track: { [weak choice] in _ = choice?.persistent },
+    onChange: { [weak choice] in
+      guard let value = choice?.persistent else { return }
+      if read() != value { write(value) }
+    })
+  let inbound = onObservedChange(
+    track: { _ = read() },
+    onChange: { [weak choice] in
+      guard let choice else { return }
+      let incoming = read()
+      if choice.persistent != incoming { choice.persistent = incoming }
+      let settled = choice.persistent
+      if settled != incoming { write(settled) }
+    })
+  return [outbound, inbound]
 }
 
 // MARK: - Concrete flavor

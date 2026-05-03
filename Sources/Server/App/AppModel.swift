@@ -28,6 +28,7 @@ final class AppModel {
   let templates: TemplateChoice
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
+  @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
   nonisolated static let defaultHost: String = "127.0.0.1"
 
@@ -51,6 +52,20 @@ final class AppModel {
       rendererProvider: { [weak processors] in
         await processors?.selected.value.renderer
       })
+
+    // Bidirectional sync with the shared `net.leuski.galley` suite.
+    // Outbound: menu-bar picks here surface in the Viewer process.
+    // Inbound: Viewer Settings picks here update the Server's request-
+    // time renderer/template providers. Defaults observation rides on
+    // `limitToInstance: false` (cross-process via cfprefsd).
+    persistenceTokens = bindPersistent(
+      templates,
+      read: { Defaults.shared.templatePersistent },
+      write: { Defaults.shared.templatePersistent = $0 })
+    + bindPersistent(
+      processors,
+      read: { Defaults.shared.rendererPersistent },
+      write: { Defaults.shared.rendererPersistent = $0 })
 
     startServer()
     startPortObservation()

@@ -11,8 +11,11 @@ import SwiftUI
 ///
 /// Backed by `@ObservableDefaults` on the shared `net.leuski.galley`
 /// suite so port and processor/template choices are readable by the
-/// Server process without any IPC.
-@ObservableDefaults
+/// Server process without any IPC. `limitToInstance: false` lets
+/// cross-process writes from the Server (cfprefsd-broadcast) surface
+/// here as Observable changes, which is what `bindPersistent` rides
+/// to keep the model in sync.
+@ObservableDefaults(limitToInstance: false)
 final class Defaults: GalleyDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
   @DefaultsKey var rendererPersistent: String?
@@ -32,12 +35,15 @@ final class AppModel {
   let templates: TemplateChoice
   let processors: ProcessorChoice
   @ObservationIgnored let editors: EditorChoice
+  @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
   /// expected to have run async catalog discovery
-  /// (`await processorStore.discover()`) before invoking this so
-  /// `create(source:persistent:)` decodes the persisted pick against
-  /// the live catalog and reports displacement honestly.
+  /// (`await processorStore.discover()`) before invoking this so the
+  /// initial decode lands honestly. Once constructed, processor and
+  /// template selections stay in sync with the shared defaults suite
+  /// in both directions — Server writes propagate here automatically
+  /// via `limitToInstance: false`.
   init() {
     self.editors = EditorChoice()
 
@@ -53,36 +59,20 @@ final class AppModel {
         Self.notify(.processor, name)
       }
 
-    startPersistenceObservation()
+    persistenceTokens = bindPersistent(
+      templates,
+      read: { Defaults.shared.templatePersistent },
+      write: { Defaults.shared.templatePersistent = $0 })
+    + bindPersistent(
+      processors,
+      read: { Defaults.shared.rendererPersistent },
+      write: { Defaults.shared.rendererPersistent = $0 })
   }
 
   private static func notify(
     _ kind: DisplacementNotifier.Kind, _ name: String)
   {
     DisplacementNotifier.post(kind: kind, displaced: name)
-  }
-
-  /// Mirror `selected` changes back to the shared defaults suite so
-  /// the Server process picks them up at request time. The macro
-  /// handles the actual UserDefaults write; this loop just keeps
-  /// the `@DefaultsKey`-backed properties in sync with the choice envelopes.
-  private func startPersistenceObservation() {
-    Task { @MainActor [weak self] in
-      while !Task.isCancelled {
-        guard let self else { return }
-        await withCheckedContinuation
-        { (cont: CheckedContinuation<Void, Never>) in
-          withObservationTracking {
-            _ = self.templates.selected
-            _ = self.processors.selected
-          } onChange: {
-            cont.resume()
-          }
-        }
-        Defaults.shared.templatePersistent = self.templates.persistent
-        Defaults.shared.rendererPersistent = self.processors.persistent
-      }
-    }
   }
 }
 
