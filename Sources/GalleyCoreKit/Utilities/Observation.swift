@@ -30,14 +30,25 @@ public func onObservedChange(
   track: @escaping @MainActor () -> Void,
   onChange: @escaping @MainActor () -> Void
 ) -> Cancelable {
+  let (stream, continuation) = AsyncStream<Void>.makeStream()
+
+  // Arm the observation synchronously so a mutation that happens
+  // between this call returning and the consumer Task being scheduled
+  // is not lost. (`withObservationTracking` is single-shot — once the
+  // tracked block fires, observation must be re-armed for the next
+  // change.)
+  @MainActor func arm() {
+    withObservationTracking(track) {
+      continuation.yield(())
+    }
+  }
+  arm()
+
   let task = Task { @MainActor in
-    while !Task.isCancelled {
-      await withCheckedContinuation
-      { (cont: CheckedContinuation<Void, Never>) in
-        withObservationTracking(track) { cont.resume() }
-      }
+    for await _ in stream {
       if Task.isCancelled { break }
       onChange()
+      arm()
     }
   }
   return ObservationToken(task)
