@@ -4,34 +4,34 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// File menu — Open and Open Recent. SwiftUI's `WindowGroup` does not
-/// install a system Open Recent menu (that's NSDocument's job), so we
-/// build it ourselves from the delegate's observed list.
+/// install a system Open Recent menu (that's `NSDocument`-driven),
+/// so we build it ourselves from `RecentDocumentsModel.urls`.
 struct FileCommands: Commands {
-  @Bindable var delegate: ViewerAppDelegate
+  @Bindable var recents: RecentDocumentsModel
   @FocusedValue(\.documentModel) private var model
   @FocusedValue(\.viewerRenameContext) private var renameContext
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
       Button("Open…", systemImage: "arrow.up.forward") {
-        delegate.presentOpenPanel()
+        recents.presentOpenPanel()
       }
         .keyboardShortcut("o", modifiers: .command)
         .accessibilityIdentifier(ViewerA11yID.FileMenu.open)
 
       Menu("Open Recent", systemImage: "clock") {
-        ForEach(delegate.recentURLs, id: \.self) { url in
+        ForEach(recents.urls, id: \.self) { url in
           Button(url.lastPathComponent) {
-            delegate.openRecent(url)
+            recents.openRecent(url)
           }
           .accessibilityIdentifier(
             "\(ViewerA11yID.FileMenu.openRecentItem).\(url.lastPathComponent)")
         }
-        if !delegate.recentURLs.isEmpty {
+        if !recents.urls.isEmpty {
           Divider()
         }
-        Button("Clear Menu") { delegate.clearRecents() }
-          .disabled(delegate.recentURLs.isEmpty)
+        Button("Clear Menu") { recents.clearAll() }
+          .disabled(recents.urls.isEmpty)
           .accessibilityIdentifier(ViewerA11yID.FileMenu.openRecentClear)
       }
       .accessibilityIdentifier(ViewerA11yID.FileMenu.openRecentMenu)

@@ -25,6 +25,7 @@ struct WelcomeView: View {
   @Environment(AppBoot.self) private var boot
   @Environment(ViewerAppDelegate.self) private var appDelegate
   @Environment(WindowDispatcher.self) private var dispatcher
+  @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
@@ -124,10 +125,10 @@ struct WelcomeView: View {
     if dispatcher.hasAnyDocumentWindow() { return }
 
     // Truly empty launch — present the FTUE Open panel.
-    let picks = await appDelegate.runOpenPanel()
+    let picks = await recents.runOpenPanel()
     if Task.isCancelled { return }
     for url in picks {
-      appDelegate.record(url)
+      recents.record(url)
       action(value: url)
     }
   }

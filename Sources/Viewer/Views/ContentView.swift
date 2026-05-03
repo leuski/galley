@@ -8,6 +8,7 @@ struct ContentView: View {
   @Environment(AppBoot.self) private var boot
   @Environment(ViewerAppDelegate.self) private var appDelegate
   @Environment(WindowDispatcher.self) private var dispatcher
+  @Environment(RecentDocumentsModel.self) private var recents
   @State private var model = DocumentModel()
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
@@ -107,7 +108,7 @@ struct ContentView: View {
       renameContext: RenameContext(
         url: model.documentURL,
         apply: { newURL in
-          appDelegate.record(newURL)
+          recents.record(newURL)
           if fileURL != newURL { fileURL = newURL }
         })))
     .navigationTitle(model.documentURL?.lastPathComponent
@@ -207,7 +208,7 @@ struct ContentView: View {
   /// binding so state restoration follows, and rebinds the model so
   /// history/watcher restart on the new URL.
   private func replaceDocument(with newURL: URL) {
-    appDelegate.record(newURL)
+    recents.record(newURL)
     if fileURL != newURL { fileURL = newURL }
     let line = dispatcher.consumePendingScrollLine(for: newURL)
     Task {
@@ -264,13 +265,13 @@ struct ContentView: View {
       await model.restore(
         snapshot: snapshot,
         initialScrollY: scrollYStored > 0 ? scrollYStored : nil)
-      if let current = model.documentURL { appDelegate.record(current) }
+      if let current = model.documentURL { recents.record(current) }
       return
     }
 
     // Initial bind for a freshly-opened URL.
     if let fileURL {
-      appDelegate.record(fileURL)
+      recents.record(fileURL)
       let line = dispatcher.consumePendingScrollLine(for: fileURL)
       await model.bind(
         to: fileURL,
