@@ -61,14 +61,8 @@ public actor DocumentWatcher {
       latency: 0.05,
       queue: .global(qos: .userInitiated))
 
-    var debounce: Task<Void, Never>?
-    for await _ in events {
-      debounce?.cancel()
-      debounce = Task { [weak self] in
-        try? await Task.sleep(for: .milliseconds(120))
-        guard !Task.isCancelled else { return }
-        await self?.broadcast(key: key)
-      }
+    for await _ in events.debounce(for: .milliseconds(120)) {
+      broadcast(key: key)
     }
   }
 

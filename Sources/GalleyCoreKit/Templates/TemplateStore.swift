@@ -100,15 +100,10 @@ public final class TemplateStore {
   private func startWatching() {
     let url = directoryURL
     watcherTask = Task { [weak self] in
-      var debounce: Task<Void, Never>?
-      for await _ in url.fileEvents(eventMask: .all) {
-        guard self != nil else { break }
-        debounce?.cancel()
-        debounce = Task { @MainActor [weak self] in
-          try? await Task.sleep(for: .milliseconds(150))
-          guard !Task.isCancelled else { return }
-          self?.reload()
-        }
+      let events = url.fileEvents(eventMask: .all)
+        .debounce(for: .milliseconds(150))
+      for await _ in events {
+        self?.reload()
       }
     }
   }

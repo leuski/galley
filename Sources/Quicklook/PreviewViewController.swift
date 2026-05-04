@@ -84,8 +84,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   /// `ClassicPreviewSchemeHandler` instead of an HTTP server.
   private func renderInProcess(file: URL) async throws -> String {
     let source = try String(contentsOf: file, encoding: .utf8)
-    let body = try await SwiftMarkdownRenderer().render(
-      source, baseURL: file)
+    let body = try await SwiftMarkdownRenderer().render(source, baseURL: file)
     let template: Template = .builtIn(.shared)
     let templateHTML = try template.loadHTML()
     let origin = PreviewScheme.originURL
