@@ -23,56 +23,48 @@ final class Defaults: GalleyNetworkDefaults {
 /// against `PreviewScheme.originURL`, with `ClassicPreviewSchemeHandler`
 /// resolving asset URLs back to the filesystem.
 final class PreviewViewController: NSViewController, QLPreviewingController {
-  private var webView: WKWebView?
-  private var navProxy: NavigationProxy?
+  private lazy var navProxy = NavigationProxy()
+
+  /// Lazy so that `preparePreviewOfFile(at:)` — which Quick Look calls
+  /// before asking for our view — can touch the WebView and have it
+  /// fully wired up. `loadView()` would otherwise run too late.
+  private lazy var webView: WKWebView = {
+    let configuration = WKWebViewConfiguration()
+    let handler = ClassicPreviewSchemeHandler { .builtIn(.shared) }
+    configuration.setURLSchemeHandler(
+      handler, forURLScheme: PreviewScheme.name)
+    let web = WKWebView(frame: .zero, configuration: configuration)
+    web.translatesAutoresizingMaskIntoConstraints = false
+    web.navigationDelegate = navProxy
+    return web
+  }()
 
   override var nibName: NSNib.Name? { nil }
 
   override func loadView() {
-    let configuration = WKWebViewConfiguration()
-    let handler = ClassicPreviewSchemeHandler {
-      .builtIn(.shared)
-    }
-    configuration.setURLSchemeHandler(
-      handler, forURLScheme: PreviewScheme.name)
-
-    let web = WKWebView(frame: .zero, configuration: configuration)
-    web.translatesAutoresizingMaskIntoConstraints = false
-    let proxy = NavigationProxy()
-    web.navigationDelegate = proxy
-    self.webView = web
-    self.navProxy = proxy
-    self.view = web
+    self.view = webView
   }
 
   func preparePreviewOfFile(at url: URL) async throws {
-    let serverURL = Defaults.shared.host.appendingPreview(url)
-    if await isServerReachable(serverURL) {
-      try await loadFromServer(serverURL)
-    } else {
+    do {
+      try await loadFromServer(Defaults.shared.host.appendingPreview(url))
+    } catch {
       try await loadInProcess(file: url)
     }
   }
 
   // MARK: - Server path
 
-  private func isServerReachable(_ url: URL) async -> Bool {
-    var req = URLRequest(url: url)
-    req.httpMethod = "HEAD"
-    req.timeoutInterval = 0.5
-    do {
-      let (_, response) = try await URLSession.shared.data(for: req)
-      guard let http = response as? HTTPURLResponse else { return false }
-      return (200..<400).contains(http.statusCode)
-    } catch {
-      return false
-    }
-  }
-
+  /// Loads the preview URL in the WebView and waits for navigation
+  /// to finish. On any navigation failure (server down → connection
+  /// refused, ATS denial, etc.) the underlying error propagates so
+  /// the caller can fall back. The WebView load is itself the
+  /// reachability probe — no separate ping needed, no race against a
+  /// short timeout.
   @MainActor
   private func loadFromServer(_ url: URL) async throws {
-    try await navProxy?.run { [webView] in
-      webView?.load(URLRequest(url: url))
+    try await navProxy.run {
+      self.webView.load(URLRequest(url: url))
     }
   }
 
@@ -81,8 +73,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   @MainActor
   private func loadInProcess(file: URL) async throws {
     let html = try await renderInProcess(file: file)
-    try await navProxy?.run { [webView] in
-      webView?.loadHTMLString(html, baseURL: PreviewScheme.originURL)
+    try await navProxy.run {
+      self.webView.loadHTMLString(html, baseURL: PreviewScheme.originURL)
     }
   }
 
