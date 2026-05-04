@@ -41,7 +41,14 @@ final class AppModel {
   init() {
     let pid = ProcessInfo.processInfo.processIdentifier
     let bid = Bundle.main.bundleIdentifier ?? "?"
-    defaultsLog.notice("Server AppModel init pid=\(pid) bundle=\(bid, privacy: .public) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+    let renderer = Defaults.shared.rendererPersistent ?? "nil"
+    let template = Defaults.shared.templatePersistent ?? "nil"
+    defaultsLog.notice(
+      """
+      Server AppModel init pid=\(pid) bundle=\(bid, privacy: .public) \
+      renderer=\(renderer, privacy: .public) \
+      template=\(template, privacy: .public)
+      """)
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
       persistent: Defaults.shared.templatePersistent) { name in
@@ -94,7 +101,16 @@ final class AppModel {
       object: nil,
       queue: .main
     ) { _ in
-      defaultsLog.debug("Server didChangeNotification pid=\(pid) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+      MainActor.assumeIsolated {
+        let renderer = Defaults.shared.rendererPersistent ?? "nil"
+        let template = Defaults.shared.templatePersistent ?? "nil"
+        defaultsLog.debug(
+          """
+          Server didChange pid=\(pid) \
+          renderer=\(renderer, privacy: .public) \
+          template=\(template, privacy: .public)
+          """)
+      }
     }
 
     startServer()

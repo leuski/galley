@@ -127,15 +127,13 @@ private struct HTMLVisitor: MarkupVisitor {
   private func isTightList(_ list: any Markup) -> Bool {
     let items = list.children.compactMap { $0 as? ListItem }
     guard !items.isEmpty else { return true }
-    for (prev, next) in zip(items, items.dropFirst()) {
-      if hasBlankLine(between: prev, and: next) { return false }
-    }
+    for (prev, next) in zip(items, items.dropFirst())
+    where hasBlankLine(between: prev, and: next) { return false }
     for item in items {
       let blocks = Array(item.children)
       if blocks.filter({ $0 is Paragraph }).count > 1 { return false }
-      for (prev, next) in zip(blocks, blocks.dropFirst()) {
-        if hasBlankLine(between: prev, and: next) { return false }
-      }
+      for (prev, next) in zip(blocks, blocks.dropFirst())
+      where hasBlankLine(between: prev, and: next) { return false }
     }
     return true
   }

@@ -102,4 +102,3 @@ struct ViewerApp: App {
     }
   }
 }
-

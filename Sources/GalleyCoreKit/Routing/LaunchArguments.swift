@@ -124,28 +124,18 @@ public struct LaunchArguments: Sendable, Equatable {
     iterator: inout IndexingIterator<ArraySlice<String>>
   ) -> Token {
     let (name, inlineValue) = splitFlag(token)
+    func take() -> String? { inlineValue ?? iterator.next() }
     switch name {
-    case "--ui-test-mode":
-      return .uiTestMode
-    case "--reset-state":
-      return .resetState
-    case "--no-reset-state":
-      return .noResetState
-    case "--scratch-dir":
-      guard let value = inlineValue ?? iterator.next() else { return .unknown }
-      return .scratchDirectory(value)
-    case "--seed-file":
-      guard let value = inlineValue ?? iterator.next() else { return .unknown }
-      return .seedFile(value)
-    case "--mock-editor":
-      guard let value = inlineValue ?? iterator.next() else { return .unknown }
-      return .mockEditor(value)
+    case "--ui-test-mode":     return .uiTestMode
+    case "--reset-state":      return .resetState
+    case "--no-reset-state":   return .noResetState
+    case "--scratch-dir":      return take().map(Token.scratchDirectory)
+                                 ?? .unknown
+    case "--seed-file":        return take().map(Token.seedFile) ?? .unknown
+    case "--mock-editor":      return take().map(Token.mockEditor) ?? .unknown
     case "--fixed-port":
-      guard let raw = inlineValue ?? iterator.next(),
-            let port = UInt16(raw) else { return .unknown }
-      return .fixedPort(port)
-    default:
-      return .unknown
+      return take().flatMap(UInt16.init).map(Token.fixedPort) ?? .unknown
+    default:                   return .unknown
     }
   }
 

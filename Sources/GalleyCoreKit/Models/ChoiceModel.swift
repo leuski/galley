@@ -229,7 +229,7 @@ where Self: ChoiceValueEnvelopeProtocol,
   }
 
   public static func values(from source: Source) -> [Self] {
-    source.values.map(Self.init)
+    source.values.map { Self($0) }
   }
 
   public static func defaultElement(from source: Source) -> Self {
@@ -266,7 +266,13 @@ where Element: RestorableChoiceValue
   public var selected: Element {
     didSet {
       let pid = ProcessInfo.processInfo.processIdentifier
-      log.debug("Choice.selected pid=\(pid) \(oldValue.name, privacy: .public) → \(self.selected.name, privacy: .public)")
+      let from = oldValue.name
+      let next = self.selected.name
+      log.debug(
+        """
+        Choice.selected pid=\(pid) \
+        \(from, privacy: .public) → \(next, privacy: .public)
+        """)
     }
   }
   /// See the protocol doc on `ChoiceModel.persistent`. The getter
@@ -279,7 +285,14 @@ where Element: RestorableChoiceValue
     get { pendingPersistent ?? selected.persist() }
     set {
       let pid = ProcessInfo.processInfo.processIdentifier
-      log.debug("Choice.persistent setter pid=\(pid) incoming=\(newValue ?? "nil", privacy: .public) current=\(self.selected.name, privacy: .public)")
+      let incoming = newValue ?? "nil"
+      let current = self.selected.name
+      log.debug(
+        """
+        Choice.persistent set pid=\(pid) \
+        incoming=\(incoming, privacy: .public) \
+        current=\(current, privacy: .public)
+        """)
       guard let newValue else {
         pendingPersistent = nil
         let dflt = Element.defaultElement(from: source)
@@ -409,17 +422,32 @@ public func bindPersistent<Choice>(
 where Choice: ChoiceModel & AnyObject
 {
   let pid = ProcessInfo.processInfo.processIdentifier
-  log.debug("bindPersistent[\(label, privacy: .public)] install pid=\(pid) initial=\(choice.persistent ?? "nil", privacy: .public) stored=\(read() ?? "nil", privacy: .public)")
+  let initial = choice.persistent ?? "nil"
+  let stored0 = read() ?? "nil"
+  log.debug(
+    """
+    bindPersistent[\(label, privacy: .public)] install pid=\(pid) \
+    initial=\(initial, privacy: .public) \
+    stored=\(stored0, privacy: .public)
+    """)
   let outbound = onObservedChange(
     track: { [weak choice] in _ = choice?.persistent },
     onChange: { [weak choice] in
       guard let value = choice?.persistent else { return }
-      let stored = read()
+      let stored = read() ?? "nil"
       if stored != value {
-        log.debug("bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) write \(stored ?? "nil", privacy: .public) → \(value, privacy: .public)")
+        log.debug(
+          """
+          bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) \
+          write \(stored, privacy: .public) → \(value, privacy: .public)
+          """)
         write(value)
       } else {
-        log.debug("bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) skip (already \(value, privacy: .public))")
+        log.debug(
+          """
+          bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) \
+          skip (\(value, privacy: .public))
+          """)
       }
     })
   let inbound = onObservedChange(
@@ -427,12 +455,24 @@ where Choice: ChoiceModel & AnyObject
     onChange: { [weak choice] in
       guard let choice else { return }
       let incoming = read()
-      let before = choice.persistent
-      log.debug("bindPersistent[\(label, privacy: .public)] IN pid=\(pid) incoming=\(incoming ?? "nil", privacy: .public) current=\(before ?? "nil", privacy: .public)")
+      let incomingDesc = incoming ?? "nil"
+      let before = choice.persistent ?? "nil"
+      log.debug(
+        """
+        bindPersistent[\(label, privacy: .public)] IN pid=\(pid) \
+        incoming=\(incomingDesc, privacy: .public) \
+        current=\(before, privacy: .public)
+        """)
       if choice.persistent != incoming { choice.persistent = incoming }
       let settled = choice.persistent
       if settled != incoming {
-        log.debug("bindPersistent[\(label, privacy: .public)] IN pid=\(pid) settled→stored \(incoming ?? "nil", privacy: .public) → \(settled ?? "nil", privacy: .public)")
+        let settledDesc = settled ?? "nil"
+        log.debug(
+          """
+          bindPersistent[\(label, privacy: .public)] IN pid=\(pid) \
+          settled→stored \(incomingDesc, privacy: .public) \
+          → \(settledDesc, privacy: .public)
+          """)
         write(settled)
       }
     })

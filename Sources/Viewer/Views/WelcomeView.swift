@@ -81,22 +81,24 @@ struct WelcomeView: View {
       object: window,
       queue: .main
     ) { _ in
-      // Find a visible, hittable document window and route focus
-      // there. If welcome is somehow the only visible window
-      // (e.g., last doc just closed and welcome got promoted),
-      // there's nothing to redirect to — just resign key. The
-      // brief flash where welcome is key is acceptable; the
-      // important guarantee is that focus doesn't *stay* on it.
-      let alternate = NSApp.windows.first { other in
-        other !== window
-          && other.isVisible
-          && other.alphaValue > 0.01
-          && other.canBecomeKey
-      }
-      if let alternate {
-        alternate.makeKeyAndOrderFront(nil)
-      } else {
-        window.resignKey()
+      MainActor.assumeIsolated {
+        // Find a visible, hittable document window and route focus
+        // there. If welcome is somehow the only visible window
+        // (e.g., last doc just closed and welcome got promoted),
+        // there's nothing to redirect to — just resign key. The
+        // brief flash where welcome is key is acceptable; the
+        // important guarantee is that focus doesn't *stay* on it.
+        let alternate = NSApp.windows.first { other in
+          other !== window
+            && other.isVisible
+            && other.alphaValue > 0.01
+            && other.canBecomeKey
+        }
+        if let alternate {
+          alternate.makeKeyAndOrderFront(nil)
+        } else {
+          window.resignKey()
+        }
       }
     }
   }

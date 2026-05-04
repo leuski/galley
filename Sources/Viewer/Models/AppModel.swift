@@ -56,7 +56,14 @@ final class AppModel {
   init() {
     let pid = ProcessInfo.processInfo.processIdentifier
     let bid = Bundle.main.bundleIdentifier ?? "?"
-    defaultsLog.notice("Viewer AppModel init pid=\(pid) bundle=\(bid, privacy: .public) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+    let renderer = Defaults.shared.rendererPersistent ?? "nil"
+    let template = Defaults.shared.templatePersistent ?? "nil"
+    defaultsLog.notice(
+      """
+      Viewer AppModel init pid=\(pid) bundle=\(bid, privacy: .public) \
+      renderer=\(renderer, privacy: .public) \
+      template=\(template, privacy: .public)
+      """)
     self.editors = EditorChoice()
 
     self.templates = TemplateChoice(
@@ -106,7 +113,16 @@ final class AppModel {
       object: nil,
       queue: .main
     ) { _ in
-      defaultsLog.debug("Viewer didChangeNotification pid=\(pid) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+      MainActor.assumeIsolated {
+        let renderer = Defaults.shared.rendererPersistent ?? "nil"
+        let template = Defaults.shared.templatePersistent ?? "nil"
+        defaultsLog.debug(
+          """
+          Viewer didChange pid=\(pid) \
+          renderer=\(renderer, privacy: .public) \
+          template=\(template, privacy: .public)
+          """)
+      }
     }
   }
 
