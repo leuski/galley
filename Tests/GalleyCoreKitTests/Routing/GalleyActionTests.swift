@@ -2,19 +2,19 @@ import Foundation
 import Testing
 @testable import GalleyCoreKit
 
-@Suite("URLNormalizer")
-struct URLNormalizerTests {
+@Suite("GalleyAction")
+struct GalleyActionTests {
   @Test("file:// URL passes through unchanged with no scroll line")
   func fileURLPassthrough() {
     let url = URL(fileURLWithPath: "/tmp/note.md")
-    let outcome = URLNormalizer.normalize(url)
+    let outcome = url.galleyAction
     #expect(outcome == .document(url, scrollLine: nil))
   }
 
   @Test("galley://settings becomes openSettings")
   func settingsURL() {
     let url = URL(string: "galley://settings")!
-    #expect(URLNormalizer.normalize(url) == .openSettings)
+    #expect(url.galleyAction == .openSettings)
   }
 
   @Test("galley:// scheme is case-insensitive")
@@ -24,7 +24,7 @@ struct URLNormalizerTests {
     let upper = URL(string: "GALLEY:///tmp/a.md")!
     let expected = URL(fileURLWithPath: "/tmp/a.md")
     for url in [lower, mixed, upper] {
-      #expect(URLNormalizer.normalize(url)
+      #expect(url.galleyAction
               == .document(expected, scrollLine: nil))
     }
   }
@@ -32,14 +32,14 @@ struct URLNormalizerTests {
   @Test("settings host is case-insensitive")
   func settingsHostCaseInsensitive() {
     let upper = URL(string: "galley://Settings")!
-    #expect(URLNormalizer.normalize(upper) == .openSettings)
+    #expect(upper.galleyAction == .openSettings)
   }
 
   @Test("galley://path?line=N stashes scroll line")
   func scrollLineExtracted() {
     let url = URL(string: "galley:///tmp/note.md?line=42")!
     let expected = URL(fileURLWithPath: "/tmp/note.md")
-    #expect(URLNormalizer.normalize(url)
+    #expect(url.galleyAction
             == .document(expected, scrollLine: 42))
   }
 
@@ -48,9 +48,9 @@ struct URLNormalizerTests {
     let zero = URL(string: "galley:///tmp/note.md?line=0")!
     let negative = URL(string: "galley:///tmp/note.md?line=-5")!
     let expected = URL(fileURLWithPath: "/tmp/note.md")
-    #expect(URLNormalizer.normalize(zero)
+    #expect(zero.galleyAction
             == .document(expected, scrollLine: nil))
-    #expect(URLNormalizer.normalize(negative)
+    #expect(negative.galleyAction
             == .document(expected, scrollLine: nil))
   }
 
@@ -58,17 +58,17 @@ struct URLNormalizerTests {
   func nonNumericLineDropped() {
     let url = URL(string: "galley:///tmp/note.md?line=foo")!
     let expected = URL(fileURLWithPath: "/tmp/note.md")
-    #expect(URLNormalizer.normalize(url)
+    #expect(url.galleyAction
             == .document(expected, scrollLine: nil))
   }
 
   @Test("galley:// with empty path is unparseable")
   func emptyPathUnparseable() {
     let url = URL(string: "galley://")!
-    if case .unparseable = URLNormalizer.normalize(url) {
+    if case .unparseable = url.galleyAction {
       // expected
     } else {
-      Issue.record("Expected .unparseable, got \(URLNormalizer.normalize(url))")
+      Issue.record("Expected .unparseable, got \(url.galleyAction)")
     }
   }
 
@@ -76,14 +76,14 @@ struct URLNormalizerTests {
   func extraQueryIgnored() {
     let url = URL(string: "galley:///tmp/note.md?foo=bar&line=7&baz=qux")!
     let expected = URL(fileURLWithPath: "/tmp/note.md")
-    #expect(URLNormalizer.normalize(url)
+    #expect(url.galleyAction
             == .document(expected, scrollLine: 7))
   }
 
   @Test("http:// URLs pass through unchanged")
   func httpPassthrough() {
     let url = URL(string: "https://example.com/page.md")!
-    #expect(URLNormalizer.normalize(url)
+    #expect(url.galleyAction
             == .document(url, scrollLine: nil))
   }
 }

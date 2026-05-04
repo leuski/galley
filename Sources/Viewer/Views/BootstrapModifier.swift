@@ -50,7 +50,7 @@ struct BootstrapDispatchModifier: ViewModifier {
           NSApp.activate(ignoringOtherApps: true)
           openSettings()
         }
-        switch URLNormalizer.normalize(url) {
+        switch url.galleyAction {
         case .openSettings:
           break
         case .document(let fileURL, _):

@@ -74,7 +74,7 @@ final class WindowDispatcher {
     onSettingsRequested: () -> Void = {}
   ) {
     for url in urls {
-      switch URLNormalizer.normalize(url) {
+      switch url.galleyAction {
       case .openSettings:
         onSettingsRequested()
       case .document(let fileURL, let line):
@@ -188,7 +188,7 @@ final class WindowDispatcher {
   func openAsTabs(_ urls: [URL], onto host: NSWindow) {
     guard let openHandler else { return }
     for url in urls {
-      switch URLNormalizer.normalize(url) {
+      switch url.galleyAction {
       case .openSettings:
         continue
       case .document(let fileURL, let line):
