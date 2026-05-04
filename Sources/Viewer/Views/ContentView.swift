@@ -77,72 +77,72 @@ struct ContentView: View {
         }
       }
       .background(WindowAccessor(
-      onAttach: { window in
-        if hostWindow == nil {
-          hostWindow = window
-          // Every window opens hidden until content is bound. State
-          // restoration applies the URL ~half a second after a view
-          // mounts, and a fresh placeholder sits empty until the
-          // open panel returns. We can't predict the order of this
-          // resolve vs. .task firing — if a previous fire already
-          // bound content (e.g. openWindow(value:) → immediate
-          // bind), unhide right away.
-          window?.alphaValue = (model.documentURL == nil) ? 0 : 1
-        }
-        if let window {
-          // Merge into the frontmost window's tab group if this open
-          // came in under the `newTab` behavior. Has to happen as
-          // soon as the new window exists so the user never sees
-          // it as a separate floating window first.
-          if let host = dispatcher.consumePendingTabHost(),
-             host !== window
-          {
-            host.addTabbedWindow(window, ordered: .above)
+        onAttach: { window in
+          if hostWindow == nil {
+            hostWindow = window
+            // Every window opens hidden until content is bound. State
+            // restoration applies the URL ~half a second after a view
+            // mounts, and a fresh placeholder sits empty until the
+            // open panel returns. We can't predict the order of this
+            // resolve vs. .task firing — if a previous fire already
+            // bound content (e.g. openWindow(value:) → immediate
+            // bind), unhide right away.
+            window?.alphaValue = (model.documentURL == nil) ? 0 : 1
           }
-          // Hook the AppKit tab bar's "+" button — see
-          // `NewTabAction.install(on:)`. The "+" sends
-          // `newWindowForTab:` into a `WindowGroup<URL>` that has
-          // no default value, and SwiftUI's default tears down the
-          // current window instead of spawning a new tab. We
-          // intercept that selector and dispatch to the static
-          // `handler` (configured by `ViewerApp`) so "+" runs the
-          // Open panel and merges picks as tabs onto the source
-          // window — the Safari/Preview pattern.
-          NewTabAction.install(on: window)
-          dispatcher.registerWindow(
-            window,
-            initialURL: fileURL
-          ) { newURL in
-            replaceDocument(with: newURL)
+          if let window {
+            // Merge into the frontmost window's tab group if this open
+            // came in under the `newTab` behavior. Has to happen as
+            // soon as the new window exists so the user never sees
+            // it as a separate floating window first.
+            if let host = dispatcher.consumePendingTabHost(),
+               host !== window
+            {
+              host.addTabbedWindow(window, ordered: .above)
+            }
+            // Hook the AppKit tab bar's "+" button — see
+            // `NewTabAction.install(on:)`. The "+" sends
+            // `newWindowForTab:` into a `WindowGroup<URL>` that has
+            // no default value, and SwiftUI's default tears down the
+            // current window instead of spawning a new tab. We
+            // intercept that selector and dispatch to the static
+            // `handler` (configured by `ViewerApp`) so "+" runs the
+            // Open panel and merges picks as tabs onto the source
+            // window — the Safari/Preview pattern.
+            NewTabAction.install(on: window)
+            dispatcher.registerWindow(
+              window,
+              initialURL: fileURL
+            ) { newURL in
+              replaceDocument(with: newURL)
+            }
           }
-        }
-      },
-      onDetach: { window in
-        if let window { dispatcher.unregisterWindow(window) }
-      }))
-    .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
-    .modifier(SceneValuesModifier(
-      model: model,
-      renameContext: RenameContext(
-        url: model.documentURL,
-        apply: { newURL in
-          recents.record(newURL)
-          if fileURL != newURL { fileURL = newURL }
-        })))
-    .navigationTitle(model.documentURL?.lastPathComponent
-      ?? fileURL?.lastPathComponent
-      ?? "Markdown Preview")
-    .task(id: fileURL) { await launchTask(appModel: appModel) }
-    .modifier(ChangeHandlers(
-      model: model,
-      appModel: appModel,
-      onDocumentBound: handleDocumentBound,
-      onTemplatePersistent: mirrorPerFileTemplate,
-      onRendererPersistent: mirrorPerFileRenderer,
-      onZoom: mirrorPerFileZoom,
-      onScrollY: mirrorPerFileScrollY,
-      reload: reloadModel))
-    .navigationDocument(model.documentURL ?? URL.homeDirectory)
+        },
+        onDetach: { window in
+          if let window { dispatcher.unregisterWindow(window) }
+        }))
+      .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
+      .modifier(SceneValuesModifier(
+        model: model,
+        renameContext: RenameContext(
+          url: model.documentURL,
+          apply: { newURL in
+            recents.record(newURL)
+            if fileURL != newURL { fileURL = newURL }
+          })))
+      .navigationTitle(model.documentURL?.lastPathComponent
+                       ?? fileURL?.lastPathComponent
+                       ?? "Markdown Preview")
+      .task(id: fileURL) { await launchTask(appModel: appModel) }
+      .modifier(ChangeHandlers(
+        model: model,
+        appModel: appModel,
+        onDocumentBound: handleDocumentBound,
+        onTemplatePersistent: mirrorPerFileTemplate,
+        onRendererPersistent: mirrorPerFileRenderer,
+        onZoom: mirrorPerFileZoom,
+        onScrollY: mirrorPerFileScrollY,
+        reload: reloadModel))
+      .navigationDocument(model.documentURL ?? URL.homeDirectory)
   }
 
   /// First time content is bound (whether via initial bind, restore,
@@ -325,8 +325,10 @@ struct ContentView: View {
     appModel: AppModel
   ) -> some CustomizableToolbarContent {
     navigationToolbarItems
+    ToolbarSpacer(.flexible, placement: .automatic)
     mainToolbarItems(appModel: appModel)
     zoomToolbarItems
+    ToolbarSpacer(.fixed, placement: .automatic)
   }
 
   @ToolbarContentBuilder
@@ -464,7 +466,7 @@ private struct RendererToolbarPicker: View {
 
   var body: some View {
     processorMenu(
-      title: appModel.processors.selected.name,
+      title: "Processor",
       appModel: appModel,
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
@@ -478,7 +480,7 @@ private struct TemplateToolbarPicker: View {
 
   var body: some View {
     templateMenu(
-      title: appModel.templates.selected.name,
+      title: "Template",
       appModel: appModel,
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
