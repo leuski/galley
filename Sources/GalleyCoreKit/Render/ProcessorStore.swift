@@ -101,12 +101,16 @@ public final class ProcessorStore {
       name: "Pandoc",
       installHint: "brew install pandoc",
       discover: {
-        // `+sourcepos` is a reader extension that emits `data-pos`
-        // attributes on every block, used by the viewer's cmd-click
-        // → editor jump and BBEdit's scroll-to-line on open.
+        // `+sourcepos` emits `data-pos` attributes on every block,
+        // used by the viewer's cmd-click → editor jump and BBEdit's
+        // scroll-to-line on open. Pandoc only supports sourcepos on
+        // CommonMark-family readers (`commonmark`, `commonmark_x`,
+        // `gfm`); the default `markdown` reader rejects the
+        // extension. `commonmark_x` is the closest analogue to
+        // pandoc's extended markdown.
         await ExternalProcessRenderer.discover(
           toolName: "pandoc",
-          arguments: ["--from=markdown+sourcepos", "--to=html"])
+          arguments: ["--from=commonmark_x+sourcepos", "--to=html"])
       }),
     Spec(
       id: "cmark-gfm",

@@ -2,13 +2,19 @@ import Foundation
 import SwiftUI
 import GalleyCoreKit
 import GalleyServerKit
+import os
+
+private let defaultsLog = Logger(
+  subsystem: "net.leuski.galley", category: "Defaults")
 
 /// App-wide state for the Server. Port, processor, and template come
-/// from the shared `net.leuski.galley` suite — the same plist the
-/// Viewer writes — so Viewer Settings changes propagate here without
-/// any IPC. `limitToInstance: false` tells ObservableDefaults to watch
-/// for cross-process writes via `cfprefsd` and surface them as
-/// Observable changes.
+/// from the `net.leuski.galley` suite — the same plist the Viewer
+/// writes via its standard domain — so picks made in either app
+/// surface in the other. `limitToInstance: false` widens the local
+/// observer to react to any UserDefaults change in this process;
+/// cross-process change signaling is handled separately by
+/// `DefaultsBroadcast` (Darwin notification) because
+/// `UserDefaults.didChangeNotification` is process-local.
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
@@ -33,6 +39,9 @@ final class AppModel {
   nonisolated static let defaultHost: String = "127.0.0.1"
 
   init() {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    let bid = Bundle.main.bundleIdentifier ?? "?"
+    defaultsLog.notice("Server AppModel init pid=\(pid) bundle=\(bid, privacy: .public) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
       persistent: Defaults.shared.templatePersistent) { name in
@@ -53,19 +62,40 @@ final class AppModel {
         await processors?.selected.value.renderer
       })
 
-    // Bidirectional sync with the shared `net.leuski.galley` suite.
-    // Outbound: menu-bar picks here surface in the Viewer process.
-    // Inbound: Viewer Settings picks here update the Server's request-
-    // time renderer/template providers. Defaults observation rides on
-    // `limitToInstance: false` (cross-process via cfprefsd).
+    // Bidirectional sync with the shared `net.leuski.galley.shared`
+    // suite. Outbound: menu-bar picks here surface in the Viewer
+    // process. Inbound: Viewer Settings picks here update the
+    // Server's request-time renderer/template providers.
+    // See the same block in `Sources/Viewer/Models/AppModel.swift`
+    // for the rationale: `UserDefaults.didChangeNotification` is
+    // process-local; the Darwin-notification bridge is what makes
+    // cross-process change observation actually work.
+    DefaultsBroadcast.startListening()
+
     persistenceTokens = bindPersistent(
       templates,
+      label: "Server.template",
       read: { Defaults.shared.templatePersistent },
-      write: { Defaults.shared.templatePersistent = $0 })
+      write: {
+        Defaults.shared.templatePersistent = $0
+        DefaultsBroadcast.post()
+      })
     + bindPersistent(
       processors,
+      label: "Server.processor",
       read: { Defaults.shared.rendererPersistent },
-      write: { Defaults.shared.rendererPersistent = $0 })
+      write: {
+        Defaults.shared.rendererPersistent = $0
+        DefaultsBroadcast.post()
+      })
+
+    NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      defaultsLog.debug("Server didChangeNotification pid=\(pid) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+    }
 
     startServer()
     startPortObservation()

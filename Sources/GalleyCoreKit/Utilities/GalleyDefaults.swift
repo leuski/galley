@@ -3,11 +3,14 @@ import Foundation
 import ALFoundation
 
 /// Shared defaults contract between the Viewer and Server apps.
-/// Both AppModels conform to this protocol and back its properties
-/// with `@ObservableDefaults(suiteName: GalleyDefaults.suiteName)`.
-/// The suite maps to `~/Library/Preferences/net.leuski.galley.plist`,
-/// the same file as the Viewer's standard domain, so cross-process
-/// reads from the Server require no sandbox entitlements.
+/// Both AppModels conform to this protocol. The Viewer backs it with
+/// its standard domain (its bundle id is `net.leuski.galley`, so
+/// `UserDefaults(suiteName:)` refuses that name); the Server opens
+/// the same plist via `UserDefaults(suiteName: "net.leuski.galley")`.
+/// Cross-process change observation is provided by
+/// `DefaultsBroadcast` (Darwin notification), not by `cfprefsd`
+/// notifications — `UserDefaults.didChangeNotification` is
+/// process-local.
 public protocol GalleyDefaults: AnyObject {
   var port: UInt16 { get set }
   var rendererPersistent: String? { get set }
@@ -21,10 +24,9 @@ public enum GalleyConstants {
   public static let settingsURL: URL = "galley://settings"
 
   /// Bundle id of the Viewer app, which doubles as the shared
-  /// `UserDefaults` suite name and the shared Application Support
-  /// folder name. The Server reads/writes the same plist and the same
-  /// `Templates/` directory so picks made in either app survive a
-  /// process boundary.
+  /// `UserDefaults` suite identifier (the Server opens it explicitly,
+  /// the Viewer reaches it as `.standard`) and the shared Application
+  /// Support folder name.
   public static let suiteName: String = "net.leuski.galley"
 
   /// Shared `~/Library/Application Support/net.leuski.galley/`. Used

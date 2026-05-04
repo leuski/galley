@@ -7,6 +7,10 @@
 
 import SwiftUI
 import ALFoundation
+import os
+
+private let log = Logger(
+  subsystem: "net.leuski.galley", category: "Defaults")
 
 public protocol ChoiceValueProtocol: CustomStringConvertible, Sendable {
   associatedtype PersistentID: Hashable, Codable
@@ -29,9 +33,18 @@ where Value: ChoiceValueProtocol
     self = try decoder.decode(Self.self, from: string.utf8Data)
   }
 
+  /// Deterministic encoding — `.sortedKeys` matters because the
+  /// encoded string is the on-disk identity used by `bindPersistent`
+  /// to dedupe writes. Without sorted keys, a re-encode in another
+  /// process can produce a string with the same semantic content but
+  /// different field order, which `bindPersistent`'s string-equality
+  /// dedup mistakes for "the other side disagrees" and writes back —
+  /// and once the cross-process Darwin bridge is in place, the two
+  /// sides ping-pong forever.
   var encoded: String {
     get throws {
       let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
       return try encoder.encode(self).utf8String
     }
   }
@@ -250,7 +263,12 @@ where Element: RestorableChoiceValue
   @ObservationIgnored private var observation: Cancelable?
 
   public var values: [Element] { Element.values(from: source) }
-  public var selected: Element
+  public var selected: Element {
+    didSet {
+      let pid = ProcessInfo.processInfo.processIdentifier
+      log.debug("Choice.selected pid=\(pid) \(oldValue.name, privacy: .public) → \(self.selected.name, privacy: .public)")
+    }
+  }
   /// See the protocol doc on `ChoiceModel.persistent`. The getter
   /// prefers a still-pending hydration string over the current
   /// selection's persisted form so an external observer that mirrors
@@ -260,6 +278,8 @@ where Element: RestorableChoiceValue
   public var persistent: String? {
     get { pendingPersistent ?? selected.persist() }
     set {
+      let pid = ProcessInfo.processInfo.processIdentifier
+      log.debug("Choice.persistent setter pid=\(pid) incoming=\(newValue ?? "nil", privacy: .public) current=\(self.selected.name, privacy: .public)")
       guard let newValue else {
         pendingPersistent = nil
         let dflt = Element.defaultElement(from: source)
@@ -382,25 +402,39 @@ where Element: ChoiceValueEnvelopeProtocol
 @discardableResult
 public func bindPersistent<Choice>(
   _ choice: Choice,
+  label: String = "",
   read: @escaping @MainActor () -> String?,
   write: @escaping @MainActor (String?) -> Void
 ) -> [Cancelable]
 where Choice: ChoiceModel & AnyObject
 {
+  let pid = ProcessInfo.processInfo.processIdentifier
+  log.debug("bindPersistent[\(label, privacy: .public)] install pid=\(pid) initial=\(choice.persistent ?? "nil", privacy: .public) stored=\(read() ?? "nil", privacy: .public)")
   let outbound = onObservedChange(
     track: { [weak choice] in _ = choice?.persistent },
     onChange: { [weak choice] in
       guard let value = choice?.persistent else { return }
-      if read() != value { write(value) }
+      let stored = read()
+      if stored != value {
+        log.debug("bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) write \(stored ?? "nil", privacy: .public) → \(value, privacy: .public)")
+        write(value)
+      } else {
+        log.debug("bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) skip (already \(value, privacy: .public))")
+      }
     })
   let inbound = onObservedChange(
     track: { _ = read() },
     onChange: { [weak choice] in
       guard let choice else { return }
       let incoming = read()
+      let before = choice.persistent
+      log.debug("bindPersistent[\(label, privacy: .public)] IN pid=\(pid) incoming=\(incoming ?? "nil", privacy: .public) current=\(before ?? "nil", privacy: .public)")
       if choice.persistent != incoming { choice.persistent = incoming }
       let settled = choice.persistent
-      if settled != incoming { write(settled) }
+      if settled != incoming {
+        log.debug("bindPersistent[\(label, privacy: .public)] IN pid=\(pid) settled→stored \(incoming ?? "nil", privacy: .public) → \(settled ?? "nil", privacy: .public)")
+        write(settled)
+      }
     })
   return [outbound, inbound]
 }

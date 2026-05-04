@@ -1,6 +1,10 @@
 import Foundation
 import GalleyCoreKit
 import SwiftUI
+import os
+
+private let defaultsLog = Logger(
+  subsystem: "net.leuski.galley", category: "Defaults")
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
 /// (catalog discovery + persisted ID), template store, server config,
@@ -9,12 +13,17 @@ import SwiftUI
 /// at render time, so the user can switch globally and have every open
 /// document re-render.
 ///
-/// Backed by `@ObservableDefaults` on the shared `net.leuski.galley`
-/// suite so port and processor/template choices are readable by the
-/// Server process without any IPC. `limitToInstance: false` lets
-/// cross-process writes from the Server (cfprefsd-broadcast) surface
-/// here as Observable changes, which is what `bindPersistent` rides
-/// to keep the model in sync.
+/// Backed by `@ObservableDefaults` on `UserDefaults.standard` — for
+/// the Viewer that's `~/Library/Preferences/net.leuski.galley.plist`,
+/// the same plist the Server reaches via
+/// `UserDefaults(suiteName: "net.leuski.galley")`. (The Viewer cannot
+/// itself open a suite with that name: `UserDefaults(suiteName:)`
+/// returns nil when the suite equals the calling app's own bundle
+/// id.) `limitToInstance: false` widens the local observer to react
+/// to any UserDefaults change in this process; cross-process change
+/// signaling is handled separately by `DefaultsBroadcast` (Darwin
+/// notification) because `UserDefaults.didChangeNotification` is
+/// process-local.
 @ObservableDefaults(limitToInstance: false)
 final class Defaults: GalleyDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
@@ -45,6 +54,9 @@ final class AppModel {
   /// in both directions — Server writes propagate here automatically
   /// via `limitToInstance: false`.
   init() {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    let bid = Bundle.main.bundleIdentifier ?? "?"
+    defaultsLog.notice("Viewer AppModel init pid=\(pid) bundle=\(bid, privacy: .public) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
     self.editors = EditorChoice()
 
     self.templates = TemplateChoice(
@@ -59,14 +71,43 @@ final class AppModel {
         Self.notify(.processor, name)
       }
 
+    // Darwin-notification bridge: `UserDefaults.didChangeNotification`
+    // is process-local, so the Server (a near-idle menu-bar app) never
+    // wakes up to re-read the shared suite when the Viewer writes.
+    // `startListening` translates inbound Darwin notifications into a
+    // local didChangeNotification post that the ObservableDefaults
+    // macro observer is already subscribed to. `post()` after each
+    // outbound write fires the cross-process signal.
+    DefaultsBroadcast.startListening()
+
     persistenceTokens = bindPersistent(
       templates,
+      label: "Viewer.template",
       read: { Defaults.shared.templatePersistent },
-      write: { Defaults.shared.templatePersistent = $0 })
+      write: {
+        Defaults.shared.templatePersistent = $0
+        DefaultsBroadcast.post()
+      })
     + bindPersistent(
       processors,
+      label: "Viewer.processor",
       read: { Defaults.shared.rendererPersistent },
-      write: { Defaults.shared.rendererPersistent = $0 })
+      write: {
+        Defaults.shared.rendererPersistent = $0
+        DefaultsBroadcast.post()
+      })
+
+    // Log every ObservableDefaults notification arriving in this
+    // process — that's the signal bindPersistent's inbound side
+    // listens to. If this fires but the choice doesn't update,
+    // the gap is in bindPersistent or downstream observation.
+    NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      defaultsLog.debug("Viewer didChangeNotification pid=\(pid) renderer=\(Defaults.shared.rendererPersistent ?? "nil", privacy: .public) template=\(Defaults.shared.templatePersistent ?? "nil", privacy: .public)")
+    }
   }
 
   private static func notify(
