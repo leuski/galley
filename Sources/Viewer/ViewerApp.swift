@@ -24,8 +24,12 @@ struct ViewerApp: App {
 
   var body: some Scene {
     // Wire the cross-references the recents model needs to dispatch
-    // through the same path as Finder dispatches.
-    let _ = { recents.dispatcher = dispatcher }()
+    // through the same path as Finder dispatches, plus the
+    // tab-bar "+" handler that runs the Open panel and merges picks
+    // as tabs onto the source window. Both assignments are
+    // idempotent — body may re-run.
+    // swiftlint:disable:next redundant_discardable_let
+    let _ = configureRouting()
 
     // Always-alive hidden anchor scene. SwiftUI auto-spawns this
     // because it's a `Window` (singular) — guarantees a view exists
@@ -81,6 +85,19 @@ struct ViewerApp: App {
         ProgressView("Starting…")
           .padding()
           .frame(minWidth: 320, minHeight: 200)
+      }
+    }
+  }
+
+  private func configureRouting() {
+    recents.dispatcher = dispatcher
+    let recents = recents
+    let dispatcher = dispatcher
+    NewTabAction.handler = { source in
+      Task { @MainActor in
+        let picks = await recents.runOpenPanel()
+        for url in picks { recents.record(url) }
+        dispatcher.openAsTabs(picks, onto: source)
       }
     }
   }

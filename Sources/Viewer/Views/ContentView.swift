@@ -37,16 +37,25 @@ struct ContentView: View {
   @SceneStorage("\(keyPrefix).scrollY") private var scrollYStored: Double = 0
 
   var body: some View {
-    if let appModel = boot.model {
-      readyBody(appModel: appModel)
-    } else {
-      // Boot in flight (processor discovery). Keep the window hidden
-      // so the user never sees a pre-render flash. ContentView stays
-      // mounted so `@SceneStorage` and the WindowGroup URL binding
-      // hydrate normally; only the body underneath swaps.
-      Color.clear
-        .background(BootWindowHider())
+    Group {
+      if let appModel = boot.model {
+        readyBody(appModel: appModel)
+      } else {
+        // Boot in flight (processor discovery). Keep the window
+        // hidden so the user never sees a pre-render flash.
+        // ContentView stays mounted so `@SceneStorage` and the
+        // WindowGroup URL binding hydrate normally; only the body
+        // underneath swaps.
+        Color.clear
+          .background(BootWindowHider())
+      }
     }
+    // Wire the launch-time dispatcher install + URL receipt. We
+    // attach this to every doc window because macOS 26 does not
+    // reliably mount the `Window("welcome")` scene when state
+    // restoration produces doc windows; whichever scene mounts
+    // wires the app up. Idempotent — see modifier docs.
+    .bootstrapDispatch()
   }
 
   @ViewBuilder
@@ -90,14 +99,16 @@ struct ContentView: View {
           {
             host.addTabbedWindow(window, ordered: .above)
           }
-          // Neutralize the AppKit tab bar's "+" button — see
-          // `NoNewTabAction.install(on:)`. The "+" sends
+          // Hook the AppKit tab bar's "+" button — see
+          // `NewTabAction.install(on:)`. The "+" sends
           // `newWindowForTab:` into a `WindowGroup<URL>` that has
-          // no default value, and SwiftUI tears down the current
-          // window instead of spawning a new tab. Tabs themselves
-          // (programmatic via `addTabbedWindow`, user via Window
-          // menu's Move/Merge) keep working — only the "+" no-ops.
-          NoNewTabAction.install(on: window)
+          // no default value, and SwiftUI's default tears down the
+          // current window instead of spawning a new tab. We
+          // intercept that selector and dispatch to the static
+          // `handler` (configured by `ViewerApp`) so "+" runs the
+          // Open panel and merges picks as tabs onto the source
+          // window — the Safari/Preview pattern.
+          NewTabAction.install(on: window)
           dispatcher.registerWindow(
             window,
             initialURL: fileURL

@@ -2,72 +2,42 @@ import AppKit
 import GalleyCoreKit
 import SwiftUI
 
-/// Always-alive bootstrap scene for the Viewer.
+/// Bootstrap scene for the Viewer — when it mounts.
 ///
 /// SwiftUI's `WindowGroup(for: URL.self)` does not auto-spawn a
 /// window when there's no URL, and `applicationShouldOpenUntitledFile`
 /// is not bridged for value-driven window groups. That breaks the
-/// cold-launch path: with no view alive, no `@Environment(\.openWindow)`
-/// is captured, the `ViewerAppDelegate.launchBuffer` never drains,
-/// and Finder-dispatched URLs never become document windows.
+/// truly empty cold-launch path: no view alive means no
+/// `@Environment(\.openWindow)` to capture, queued URLs never
+/// drain, the FTUE Open panel never appears.
 ///
-/// `Window("welcome")` (singular scene) auto-spawns at launch and is
-/// restored by SwiftUI across sessions. `WelcomeView` is its content;
-/// it captures `openWindow`, hands it to the delegate via `install()`,
-/// and runs the FTUE Open panel if the launch had nothing queued.
+/// `Window("welcome")` is the singular anchor scene that solves
+/// that case. The window is configured to be invisible and
+/// non-interactive (alpha=0, ignores mouse events, excluded from
+/// the Window menu, no chrome).
 ///
-/// The window itself is configured to be invisible and
-/// non-interactive (alpha=0, off-screen, ignores mouse events,
-/// excluded from the Window menu, no chrome). Users never see it.
-/// It exists only as the always-on adapter between AppKit's
-/// process-level events and SwiftUI's view-bound APIs.
+/// On macOS 26, SwiftUI does NOT reliably mount this scene when
+/// state restoration produces doc windows, so the launch-time
+/// dispatch wiring (capture `openWindow`, host `.onOpenURL`)
+/// lives in `BootstrapDispatchModifier` and is also attached to
+/// every doc window. Welcome retains exclusive ownership of the
+/// FTUE Open panel — when it does mount (truly empty launch),
+/// it's the only scene that can run that flow.
 struct WelcomeView: View {
   @Environment(AppBoot.self) private var boot
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
-  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     Color.clear
       .frame(width: 1, height: 1)
       .background(WindowAccessor(onAttach: configureHidden))
       .task(id: boot.model != nil) {
-        // Re-fires when boot.model flips from nil to non-nil. Bail
-        // until ready; then run once. install() is idempotent on
-        // the dispatcher side (subsequent calls overwrite the
-        // openHandler with the latest captured action), so even if
-        // SwiftUI invalidates and re-fires this task with a fresh
-        // closure, we recapture openWindow rather than getting
-        // stuck with a stale handler.
         guard boot.model != nil else { return }
-        await runLaunchTask()
+        await runFTUEIfNeeded()
       }
-      .onOpenURL { url in
-        // Catches Finder dispatches, NSWorkspace.open(_:),
-        // galley:// URL scheme handlers, and dock-icon drops.
-        // Welcome is always alive, so this always has a chance to
-        // fire — replaces the AppDelegate's
-        // application(_:open:) hook.
-        //
-        // `galley://settings` works even when no document window is
-        // open: the dispatcher hands the openSettings outcome back
-        // to us via `onSettingsRequested`, and we activate the app
-        // (otherwise the Settings window would open behind whatever
-        // app the user clicked from, e.g. the Server menu bar).
-        dispatcher.handleOpenURLs([url]) {
-          NSApp.activate(ignoringOtherApps: true)
-          openSettings()
-        }
-        // Keep the recents list in sync. recents.openRecent goes
-        // through dispatcher.handleOpenURLs again, so we record
-        // directly to avoid double-dispatch.
-        switch URLNormalizer.normalize(url) {
-        case .openSettings: break
-        case .document(let fileURL, _): recents.record(fileURL)
-        case .unparseable(let original): recents.record(original)
-        }
-      }
+      .bootstrapDispatch()
   }
 
   // MARK: - Hidden-window configuration
@@ -131,45 +101,25 @@ struct WelcomeView: View {
     }
   }
 
-  // MARK: - Bootstrap
+  // MARK: - FTUE
 
-  /// Runs once after the welcome window mounts. Installs the
-  /// `openWindow` action with the AppDelegate so any queued URLs
-  /// drain immediately and any future `application(_:open:)`
-  /// dispatches can spawn document windows.
+  /// Runs once after the welcome window mounts. The dispatch wiring
+  /// (install + URL receipt) lives in `BootstrapDispatchModifier`;
+  /// this method only owns the FTUE Open panel for the cold-launch
+  /// path where nothing else opens a window.
   ///
-  /// If nothing was queued and no document windows are alive (cold
-  /// launch with no Finder URL, no state restoration), runs the
-  /// FTUE Open panel so the user has a way to open something.
-  private func runLaunchTask() async {
-    guard boot.model != nil else { return }
-
-    // Capture openWindow for the dispatcher. install() returns
-    // true when the launch buffer had pending URLs (Finder
-    // dispatched before any view existed); each gets replayed
-    // through openWindow(value:) here, spawning real document
-    // windows.
-    let action = openWindow
-    let flushed = dispatcher.install { url in
-      action(value: url)
-    }
-
-    if flushed { return }
-
-    // Settle: state restoration brings back WindowGroup<URL>
-    // windows during launch; give them a beat to register so the
-    // FTUE picker doesn't run on top of restored docs. Boot is
-    // already complete by this point (we got here from
-    // `task(id: boot.model != nil)` flipping to true), so a
-    // fixed sleep is enough.
+  /// State restoration brings back `WindowGroup<URL>` windows during
+  /// launch; we let them settle for 250ms before deciding whether
+  /// the user genuinely arrived with no documents. If there's any
+  /// doc window already, FTUE bows out.
+  private func runFTUEIfNeeded() async {
     try? await Task.sleep(for: .milliseconds(250))
     if Task.isCancelled { return }
-
     if dispatcher.hasAnyDocumentWindow() { return }
 
-    // Truly empty launch — present the FTUE Open panel.
     let picks = await recents.runOpenPanel()
     if Task.isCancelled { return }
+    let action = openWindow
     for url in picks {
       recents.record(url)
       action(value: url)

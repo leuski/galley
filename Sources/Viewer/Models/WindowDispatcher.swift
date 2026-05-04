@@ -181,6 +181,27 @@ final class WindowDispatcher {
     pendingTabHosts.isEmpty ? nil : pendingTabHosts.removeFirst()
   }
 
+  /// Open URLs as new tabs onto a specific host window. Used by the
+  /// AppKit tab bar "+" button: the user's intent is unambiguous
+  /// ("new tab here"), so we bypass `Defaults.shared.openBehavior`
+  /// and the router's deduplication / focus-existing logic.
+  func openAsTabs(_ urls: [URL], onto host: NSWindow) {
+    guard let openHandler else { return }
+    for url in urls {
+      switch URLNormalizer.normalize(url) {
+      case .openSettings:
+        continue
+      case .document(let fileURL, let line):
+        if let line { pendingScrolls.stash(line, for: fileURL) }
+        pendingTabHosts.append(host)
+        openHandler(fileURL)
+      case .unparseable(let original):
+        pendingTabHosts.append(host)
+        openHandler(original)
+      }
+    }
+  }
+
   /// True when at least one document window is registered.
   func hasAnyDocumentWindow() -> Bool {
     !registry.isEmpty
