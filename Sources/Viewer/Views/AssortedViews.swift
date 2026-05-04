@@ -30,9 +30,8 @@ func templateMenu(
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
-  let title = Defaults.shared.enablePerDocumentOverrides
-  && documentModel != nil
-  ? title : (globalTitle ?? title)
+  let title = (Defaults.shared.enablePerDocumentOverrides
+               && documentModel == nil ? globalTitle : nil) ?? title
   if let documentModel, let templates = documentModel.templates,
      Defaults.shared.enablePerDocumentOverrides {
     TemplateMenu(title: title, model: templates)
@@ -48,9 +47,8 @@ func processorMenu(
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
-  let title = Defaults.shared.enablePerDocumentOverrides
-  && documentModel != nil
-  ? title : (globalTitle ?? title)
+  let title = (Defaults.shared.enablePerDocumentOverrides
+               && documentModel == nil ? globalTitle : nil) ?? title
   if let documentModel, let processors = documentModel.processors,
      Defaults.shared.enablePerDocumentOverrides {
     ProcessorMenu(title: title, model: processors)

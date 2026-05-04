@@ -59,6 +59,19 @@ struct SettingsView: View {
   @ViewBuilder
   private var detailFields: some View {
     switch appModel.editors.selected {
+    case .preset(.bbedit):
+      LabeledContent {
+        Button("Install scripts…") {
+          ScriptInstaller.installScripts(context: [
+            "__LOCATION__": Defaults.shared
+              .host.galleyPreview.absoluteString
+          ])
+        }
+        .padding(.top, 4)
+      } label: {
+        Text("")
+      }
+
     case .preset:
       EmptyView()
 
@@ -169,17 +182,14 @@ struct SettingsView: View {
 
       Section {
         editorPicker
-        if appModel.editors.selected == .preset(.bbedit) {
-          LabeledContent {
-            Button("Install scripts…") {
-              ScriptInstaller.installScripts(context: [
-                "__LOCATION__": Defaults.shared
-                  .host.galleyPreview.absoluteString
-              ])
-            }
-          } label: {
-            Text("Integration")
+
+        LabeledContent {
+          HStack {
+            templatePicker
+            revealTemplatesButton
           }
+        } label: {
+          Text("Template")
         }
 
         LabeledContent {
@@ -189,15 +199,6 @@ struct SettingsView: View {
           }
         } label: {
           Text("Processor")
-        }
-
-        LabeledContent {
-          HStack {
-            templatePicker
-            revealTemplatesButton
-          }
-        } label: {
-          Text("Template")
         }
       }
 
