@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		62564F322FA857A400FF0F84 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62564F312FA857A400FF0F84 /* Quartz.framework */; };
+		62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 62564F302FA857A400FF0F84 /* Quicklook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62CC3C6E2FA7BA440018F091 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62CC3C6F2FA7BA440018F091 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5DED32FA43D7900CADD72 /* Scripts in Resources */ = {isa = PBXBuildFile; fileRef = 62D5C88E2F9FBD0000CADD72 /* Scripts */; };
@@ -31,6 +34,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		62564F3C2FA857A400FF0F84 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 62564F2F2FA857A400FF0F84;
+			remoteInfo = Quicklook;
+		};
+		62564F462FA857C400FF0F84 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 62D5E4322FA5D93700CADD72;
+			remoteInfo = GalleyCoreKit;
+		};
 		62CC3C652FA7B8F90018F091 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
@@ -76,6 +93,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		62564F432FA857A400FF0F84 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		62CC3C722FA7BA440018F091 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -123,6 +151,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		62564F302FA857A400FF0F84 /* Quicklook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Quicklook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		62564F312FA857A400FF0F84 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
 		626E8D4F2F9DD1C700BD51F9 /* Markdown Preview Server.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Markdown Preview Server.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		62CC3C5F2FA7B8F90018F091 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -134,6 +164,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		62564F3F2FA857A400FF0F84 /* Exceptions for "Quicklook" folder in "Quicklook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 62564F2F2FA857A400FF0F84 /* Quicklook */;
+		};
 		62D5D5552FA1844000CADD72 /* Exceptions for "Viewer" folder in "Viewer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -152,6 +189,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		62564F332FA857A400FF0F84 /* Quicklook */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				62564F3F2FA857A400FF0F84 /* Exceptions for "Quicklook" folder in "Quicklook" target */,
+			);
+			path = Quicklook;
+			sourceTree = "<group>";
+		};
 		62CC3C602FA7B8F90018F091 /* UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = UITests;
@@ -196,6 +241,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		62564F2D2FA857A400FF0F84 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */,
+				62564F322FA857A400FF0F84 /* Quartz.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		626E8D4C2F9DD1C700BD51F9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -278,6 +332,7 @@
 				62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */,
 				62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */,
 				62CC3C5F2FA7B8F90018F091 /* UITests.xctest */,
+				62564F302FA857A400FF0F84 /* Quicklook.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -298,6 +353,7 @@
 				62D5E4562FA5D99A00CADD72 /* GalleyServerKit */,
 				62D5D5292FA1673B00CADD72 /* Server */,
 				62D5D5432FA1674A00CADD72 /* Viewer */,
+				62564F332FA857A400FF0F84 /* Quicklook */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -305,6 +361,7 @@
 		62D5E0FF2FA5C53400CADD72 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				62564F312FA857A400FF0F84 /* Quartz.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -329,6 +386,29 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		62564F2F2FA857A400FF0F84 /* Quicklook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 62564F402FA857A400FF0F84 /* Build configuration list for PBXNativeTarget "Quicklook" */;
+			buildPhases = (
+				62564F2C2FA857A400FF0F84 /* Sources */,
+				62564F2D2FA857A400FF0F84 /* Frameworks */,
+				62564F2E2FA857A400FF0F84 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				62564F472FA857C400FF0F84 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				62564F332FA857A400FF0F84 /* Quicklook */,
+			);
+			name = Quicklook;
+			packageProductDependencies = (
+			);
+			productName = Quicklook;
+			productReference = 62564F302FA857A400FF0F84 /* Quicklook.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		626E8D4E2F9DD1C700BD51F9 /* Server */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 626E8D702F9DD1C800BD51F9 /* Build configuration list for PBXNativeTarget "Server" */;
@@ -413,11 +493,13 @@
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
 				62FA000600000000CADD7300 /* Copy Launch Agent Plist */,
 				62D5E1102FA5C60500CADD72 /* Install Release */,
+				62564F432FA857A400FF0F84 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				62D5E7692FA5E20100CADD72 /* PBXTargetDependency */,
+				62564F3D2FA857A400FF0F84 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				62D5D5432FA1674A00CADD72 /* Viewer */,
@@ -496,6 +578,9 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					62564F2F2FA857A400FF0F84 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					626E8D4E2F9DD1C700BD51F9 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
@@ -544,11 +629,19 @@
 				62D5CA182FA048F000CADD72 /* Viewer */,
 				626E8D5B2F9DD1C800BD51F9 /* Tests */,
 				62CC3C5E2FA7B8F90018F091 /* UITests */,
+				62564F2F2FA857A400FF0F84 /* Quicklook */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		62564F2E2FA857A400FF0F84 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		626E8D4D2F9DD1C700BD51F9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -637,6 +730,13 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		62564F2C2FA857A400FF0F84 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		626E8D4B2F9DD1C700BD51F9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -682,6 +782,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		62564F3D2FA857A400FF0F84 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 62564F2F2FA857A400FF0F84 /* Quicklook */;
+			targetProxy = 62564F3C2FA857A400FF0F84 /* PBXContainerItemProxy */;
+		};
+		62564F472FA857C400FF0F84 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
+			targetProxy = 62564F462FA857C400FF0F84 /* PBXContainerItemProxy */;
+		};
 		62CC3C662FA7B8F90018F091 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 62D5CA182FA048F000CADD72 /* Viewer */;
@@ -731,6 +841,82 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		62564F412FA857A400FF0F84 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				CODE_SIGN_ENTITLEMENTS = Sources/Quicklook/Quicklook.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/Quicklook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Quicklook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley.Quicklook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+			};
+			name = Debug;
+		};
+		62564F422FA857A400FF0F84 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				CODE_SIGN_ENTITLEMENTS = Sources/Quicklook/Quicklook.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/Quicklook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Quicklook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley.Quicklook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+			};
+			name = Release;
+		};
 		626E8D6E2F9DD1C800BD51F9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1182,6 +1368,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		62564F402FA857A400FF0F84 /* Build configuration list for PBXNativeTarget "Quicklook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				62564F412FA857A400FF0F84 /* Debug */,
+				62564F422FA857A400FF0F84 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		626E8D4A2F9DD1C700BD51F9 /* Build configuration list for PBXProject "MarkdownPreviewer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
