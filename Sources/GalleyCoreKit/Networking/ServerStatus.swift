@@ -11,6 +11,12 @@ public enum ServerStatus: Equatable, Sendable {
   /// The user has the toggle off; we are not probing.
   case disabled
 
+  /// The probe just started and the server has not yet answered;
+  /// `.stopped`/`.notResponding` during this initial grace window are
+  /// reported as `.starting` so the UI doesn't flash a red "Not
+  /// running" state during normal launch.
+  case starting
+
   /// `GET /` returned a 2xx response. The associated URL is the host
   /// that responded, suitable for "Running on :8089"-style display.
   case running(URL)

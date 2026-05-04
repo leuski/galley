@@ -1,39 +1,55 @@
 import Foundation
 import GalleyCoreKit
 
-/// Drives the Settings-pane status pill. Polls `ServerProbe` while a
-/// caller-owned `Task` is alive (typically scoped via `.task(id:)`),
-/// updates `status` on the main actor, and stops as soon as the task
-/// is cancelled.
+/// Drives the Settings-pane status pill. Iterates a `ServerProbe`
+/// async sequence while a caller-owned `Task` is alive (typically
+/// scoped via `.task(id:)`), updates `status` on the main actor,
+/// and stops as soon as the task is cancelled.
+///
+/// Owns the startup-grace lifecycle: each call to `run(host:)`
+/// resets `graceRemaining` to `startupGraceCount`, so every fresh
+/// invocation (i.e. every toggle-on event from `.task(id:)`) gets
+/// its own grace budget. The grace itself is applied via the pure
+/// `applyStartupGrace(_:graceRemaining:)` helper from
+/// `GalleyCoreKit`.
 @MainActor @Observable
 final class ServerStatusModel {
   private(set) var status: ServerStatus = .unknown
 
-  @ObservationIgnored private let probe: ServerProbe
+  @ObservationIgnored private let timeout: TimeInterval
   @ObservationIgnored private let pollInterval: Duration
+  @ObservationIgnored private let startupGraceCount: Int
 
   init(
-    probe: ServerProbe = ServerProbe(timeout: 1.0),
-    pollInterval: Duration = .seconds(2))
+    timeout: TimeInterval = 1.0,
+    pollInterval: Duration = .seconds(2),
+    startupGraceCount: Int = 2)
   {
-    self.probe = probe
+    self.timeout = timeout
     self.pollInterval = pollInterval
+    self.startupGraceCount = startupGraceCount
   }
 
   /// When `host` is nil, sets `.disabled` and returns. Otherwise loops
-  /// until the surrounding task is cancelled, probing on every tick.
-  /// The first probe runs immediately so the pill updates within
-  /// `timeout`, not `pollInterval`.
+  /// over a fresh `ServerProbe` sequence until the surrounding task is
+  /// cancelled. Resets to `.unknown` and refreshes the grace budget
+  /// first so the pill clears any stale value from a previous run and
+  /// the first two `.stopped`/`.notResponding` results read as
+  /// `.starting`.
   func run(host: URL?) async {
     guard let host else {
       status = .disabled
       return
     }
-    while !Task.isCancelled {
-      let next = await probe.probe(host: host)
+    status = .unknown
+    var graceRemaining = startupGraceCount
+    let probe = ServerProbe(
+      host: host,
+      timeout: timeout,
+      pollInterval: pollInterval)
+    for await raw in probe {
       if Task.isCancelled { return }
-      status = next
-      try? await Task.sleep(for: pollInterval)
+      status = applyStartupGrace(raw, graceRemaining: &graceRemaining)
     }
   }
 }

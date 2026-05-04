@@ -10,13 +10,13 @@ struct ServerStatusPill: View {
 
   var body: some View {
     HStack(spacing: 6) {
-      Circle()
-        .fill(tintColor)
-        .frame(width: 8, height: 8)
       Text(label)
         .font(.callout)
         .foregroundStyle(.secondary)
         .monospacedDigit()
+      Circle()
+        .fill(tintColor)
+        .frame(width: 8, height: 8)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Server status: \(label)")
@@ -26,6 +26,7 @@ struct ServerStatusPill: View {
     switch status {
     case .unknown:        return "Checking…"
     case .disabled:       return "Disabled"
+    case .starting:       return "Starting…"
     case .running(let url): return "Running on :\(url.port ?? 0)"
     case .stopped:        return "Not running"
     case .notResponding:  return "Not responding"
@@ -36,6 +37,7 @@ struct ServerStatusPill: View {
     switch status {
     case .unknown:        return .gray
     case .disabled:       return Color.gray.opacity(0.5)
+    case .starting:       return .yellow
     case .running:        return .green
     case .stopped:        return .red
     case .notResponding:  return .orange
@@ -48,6 +50,7 @@ struct ServerStatusPill: View {
     let url: URL = "http://127.0.0.1:8089"
     ServerStatusPill(status: .unknown)
     ServerStatusPill(status: .disabled)
+    ServerStatusPill(status: .starting)
     ServerStatusPill(status: .running(url))
     ServerStatusPill(status: .stopped)
     ServerStatusPill(status: .notResponding)
