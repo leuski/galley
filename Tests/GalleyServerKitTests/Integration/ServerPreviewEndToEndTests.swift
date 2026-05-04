@@ -97,7 +97,7 @@ struct ServerPreviewEndToEndTests {
     guard let controller = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
 
-    let previewURL = Self.host.appendingPreviewPath(file.path)
+    let previewURL = Self.host.appendingPreview(file)
     let (status, body) = try await get(previewURL)
 
     #expect(status == 200, "Body was: \(body.prefix(500))")
@@ -117,7 +117,7 @@ struct ServerPreviewEndToEndTests {
     defer { Task { @MainActor in await cleanup(controller) } }
 
     let bogus = "/tmp/galley-e2e-does-not-exist-\(UUID().uuidString).md"
-    let previewURL = Self.host.appendingPreviewPath(bogus)
+    let previewURL = Self.host.appendingPreview(URL(fileURLWithPath: bogus))
     let (status, body) = try await get(previewURL)
 
     #expect(status == 404)
@@ -140,7 +140,7 @@ struct ServerPreviewEndToEndTests {
     guard let controller = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
 
-    let previewURL = Self.host.appendingPreviewPath(file.path)
+    let previewURL = Self.host.appendingPreview(file)
     let (status, body) = try await get(previewURL)
 
     #expect(status == 200, "Body was: \(body.prefix(500))")

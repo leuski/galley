@@ -63,6 +63,6 @@ struct MenuBarContent: View {
       let base = server.serverURL
     else { return }
 
-    NSWorkspace.shared.open(base.appendingPreviewPath(url.path))
+    NSWorkspace.shared.open(base.appendingPreview(url))
   }
 }

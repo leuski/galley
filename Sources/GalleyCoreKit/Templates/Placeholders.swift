@@ -27,8 +27,7 @@ public struct PlaceholderContext: Sendable {
   }()
 
   public func substitute(into template: String, now: Date = Date()) -> String {
-    let docDirPath = documentURL.parent.path
-    let baseHref = origin.appendingPreviewPath(docDirPath)
+    let baseHref = origin.appendingPreview(documentURL.parent)
       .absoluteString.appendingSlash
 
     let fileName = documentURL.lastPathComponent

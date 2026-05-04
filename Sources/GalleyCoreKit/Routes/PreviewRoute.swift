@@ -3,8 +3,8 @@ import Foundation
 /// One of the well-known asset routes shared between the live HTTP
 /// server and the in-process URL scheme handler.
 ///
-/// `URL.appendingTemplatePath(id:file:)` and
-/// `URL.appendingPreviewPath(_:)` (in `String+URL.swift`) build these
+/// `URL.appendingTemplate(id:file:)` and
+/// `URL.appendingPreview(_:)` (in `String+URL.swift`) build these
 /// routes; this enum parses them back. Keeping construction and
 /// parsing next to each other prevents the two route shapes from
 /// drifting between the renderer side (`UserTemplate.Rewriter`) and

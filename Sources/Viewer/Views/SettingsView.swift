@@ -174,7 +174,7 @@ struct SettingsView: View {
             Button("Install scripts…") {
               ScriptInstaller.installScripts(context: [
                 "__LOCATION__": Defaults.shared
-                  .host.appendingPreviewPath().absoluteString
+                  .host.galleyPreview.absoluteString
               ])
             }
           } label: {

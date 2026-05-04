@@ -12,10 +12,16 @@ import ALFoundation
 /// notifications — `UserDefaults.didChangeNotification` is
 /// process-local.
 public protocol GalleyDefaults: AnyObject {
+  @MainActor static var shared: Self { get }
+}
+
+public protocol GalleyNetworkDefaults: GalleyDefaults {
   var port: UInt16 { get set }
+}
+
+public protocol GalleyRenderDefaults: GalleyDefaults {
   var rendererPersistent: String? { get set }
   var templatePersistent: String? { get set }
-  @MainActor static var shared: Self { get }
 }
 
 public let bundleIdentifier = Bundle.main.bundleIdentifier
@@ -52,7 +58,7 @@ nonisolated private func hostURL(port: UInt16) -> URL {
   return url
 }
 
-public extension GalleyDefaults {
+public extension GalleyNetworkDefaults {
   var host: URL {
     hostURL(port: port)
   }

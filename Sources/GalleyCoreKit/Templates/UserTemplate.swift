@@ -24,9 +24,10 @@ public struct UserTemplate: TemplateProtocol {
     let absolutePrefix: String
 
     init(id: String, origin: URL) {
-      self.templatePrefix =
-        origin.appendingTemplatePath(id: id).absoluteString.appendingSlash
-      self.absolutePrefix = origin.appendingPreviewPath().absoluteString
+      self.templatePrefix = origin.galleyTemplate(id: id)
+        .absoluteString.appendingSlash
+      self.absolutePrefix = origin.galleyPreview
+        .absoluteString
     }
 
     func rewriteAssets(in html: String) -> String {

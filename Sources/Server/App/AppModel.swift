@@ -18,7 +18,7 @@ private let defaultsLog = Logger(
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyDefaults {
+final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
   @DefaultsKey var rendererPersistent: String?
   @DefaultsKey var templatePersistent: String?

@@ -15,20 +15,26 @@ extension URL {
   }
 
   public var safe: URL {
-    standardizedFileURL.resolvingSymlinksInPath()
+    isFileURL ? standardizedFileURL.resolvingSymlinksInPath() : self
+  }
+
+  public var galleyPreview: URL {
+    appending(path: RouteNames.preview)
+  }
+
+  public func galleyTemplate(id: String) -> URL {
+    appending(path: RouteNames.template).appending(path: id)
   }
 
   /// `<self>/preview` — the route prefix for previewed documents.
   /// Pass `documentPath` to point at a specific document.
-  public func appendingPreviewPath(_ documentPath: String? = nil) -> URL {
-    let base = appending(path: RouteNames.preview)
-    return documentPath.map { base.appending(path: $0) } ?? base
+  public func appendingPreview(_ documentURL: URL) -> URL {
+    galleyPreview.appending(path: documentURL.safe.path)
   }
 
   /// `<self>/template/<id>` — the route prefix for template assets.
   /// Pass `file` to point at a specific asset.
-  public func appendingTemplatePath(id: String, file: String? = nil) -> URL {
-    let base = appending(path: RouteNames.template).appending(path: id)
-    return file.map { base.appending(path: $0) } ?? base
+  public func appendingTemplate(id: String, file documentURL: URL) -> URL {
+    galleyTemplate(id: id).appending(path: documentURL.safe.path)
   }
 }

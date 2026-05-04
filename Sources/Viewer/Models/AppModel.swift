@@ -25,7 +25,7 @@ private let defaultsLog = Logger(
 /// notification) because `UserDefaults.didChangeNotification` is
 /// process-local.
 @ObservableDefaults(limitToInstance: false)
-final class Defaults: GalleyDefaults {
+final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
   @DefaultsKey var rendererPersistent: String?
   @DefaultsKey var templatePersistent: String?
