@@ -15,7 +15,12 @@ public struct SwiftMarkdownRenderer: MarkdownRenderer {
 
   public func render(_ source: String, baseURL: URL) async throws -> String {
     let document = Document(parsing: source)
-    var visitor = HTMLVisitor(annotatesSourceLines: true)
+    var visitor = HTMLVisitor(
+      annotatesSourceLines: true,
+      sourceLines: source.split(
+        separator: "\n", omittingEmptySubsequences: false
+      ).map(String.init)
+    )
     visitor.visit(document)
     return visitor.html
   }
@@ -25,6 +30,7 @@ private struct HTMLVisitor: MarkupVisitor {
   typealias Result = Void
 
   let annotatesSourceLines: Bool
+  let sourceLines: [String]
   var html = ""
 
   mutating func defaultVisit(_ markup: any Markup) {
@@ -104,8 +110,52 @@ private struct HTMLVisitor: MarkupVisitor {
       let attr = checked == .checked ? " checked" : ""
       html += "<input type=\"checkbox\" disabled\(attr)> "
     }
-    visitChildren(of: listItem)
+    let tight = listItem.parent.map(isTightList) ?? false
+    for child in listItem.children {
+      if tight, let paragraph = child as? Paragraph {
+        visitChildren(of: paragraph)
+      } else {
+        visit(child)
+      }
+    }
     html += "</li>\n"
+  }
+
+  // CommonMark: a list is tight iff no blank lines separate its items and
+  // no item contains internal blank lines. swift-markdown doesn't expose
+  // the cmark `tight` flag, so we infer it from source ranges.
+  private func isTightList(_ list: any Markup) -> Bool {
+    let items = list.children.compactMap { $0 as? ListItem }
+    guard !items.isEmpty else { return true }
+    for (prev, next) in zip(items, items.dropFirst()) {
+      if hasBlankLine(between: prev, and: next) { return false }
+    }
+    for item in items {
+      let blocks = Array(item.children)
+      if blocks.filter({ $0 is Paragraph }).count > 1 { return false }
+      for (prev, next) in zip(blocks, blocks.dropFirst()) {
+        if hasBlankLine(between: prev, and: next) { return false }
+      }
+    }
+    return true
+  }
+
+  private func hasBlankLine(between prev: any Markup, and next: any Markup)
+    -> Bool
+  {
+    guard let prevStart = prev.range?.lowerBound.line,
+      let nextStart = next.range?.lowerBound.line,
+      nextStart > prevStart + 1
+    else { return false }
+    // cmark may extend a block's source range through trailing blank lines,
+    // so range.upperBound is unreliable. Scan the original source between
+    // prev's start and next's start for an empty line.
+    for line in (prevStart + 1)..<nextStart {
+      let index = line - 1
+      guard index >= 0, index < sourceLines.count else { continue }
+      if sourceLines[index].allSatisfy(\.isWhitespace) { return true }
+    }
+    return false
   }
 
   mutating func visitTable(_ table: Table) {
