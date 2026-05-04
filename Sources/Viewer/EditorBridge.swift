@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import WebKit
 import os
+import GalleyCoreKit
 
 /// Receives `{ "line": <Int> }` messages from the rendered preview and
 /// opens the current document in BBEdit at that line. The bridge has no

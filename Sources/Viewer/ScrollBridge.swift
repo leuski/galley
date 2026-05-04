@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 import os
+import GalleyCoreKit
 
 /// Receives `{ "y": <Double> }` messages from a debounced scroll
 /// listener in the rendered preview, so the owning DocumentModel can

@@ -5,7 +5,7 @@ import GalleyServerKit
 import os
 
 private let defaultsLog = Logger(
-  subsystem: "net.leuski.galley", category: "Defaults")
+  subsystem: bundleIdentifier, category: "Defaults")
 
 /// App-wide state for the Server. Port, processor, and template come
 /// from the `net.leuski.galley` suite — the same plist the Viewer

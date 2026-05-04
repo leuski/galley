@@ -4,7 +4,6 @@ import WebKit
 import os
 import ALFoundation
 
-let bundleIdentifier = Bundle.main.bundleIdentifier ?? "net.leuski.galley"
 let keyPrefix = bundleIdentifier
 
 /// Custom URL scheme that lets the Viewer's WebView load template

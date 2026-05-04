@@ -4,7 +4,7 @@ import SwiftUI
 import os
 
 private let defaultsLog = Logger(
-  subsystem: "net.leuski.galley", category: "Defaults")
+  subsystem: bundleIdentifier, category: "Defaults")
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
 /// (catalog discovery + persisted ID), template store, server config,

@@ -18,6 +18,9 @@ public protocol GalleyDefaults: AnyObject {
   @MainActor static var shared: Self { get }
 }
 
+public let bundleIdentifier = Bundle.main.bundleIdentifier
+?? GalleyConstants.suiteName
+
 public enum GalleyConstants {
   public static let defaultHost: String = "127.0.0.1"
   public static let defaultPort: UInt16 = 8089

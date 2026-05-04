@@ -10,7 +10,7 @@ import ALFoundation
 import os
 
 private let log = Logger(
-  subsystem: "net.leuski.galley", category: "Defaults")
+  subsystem: bundleIdentifier, category: "Defaults")
 
 public protocol ChoiceValueProtocol: CustomStringConvertible, Sendable {
   associatedtype PersistentID: Hashable, Codable

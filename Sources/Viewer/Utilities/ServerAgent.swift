@@ -1,6 +1,7 @@
 import Foundation
 import ServiceManagement
 import os
+import GalleyCoreKit
 
 /// Wraps `SMAppService.agent` so the rest of the Viewer can ask
 /// whether the Markdown Preview Server is registered to launch

@@ -2,7 +2,7 @@ import Foundation
 import os
 
 private let log = Logger(
-  subsystem: "net.leuski.galley", category: "Defaults")
+  subsystem: bundleIdentifier, category: "Defaults")
 
 /// Cross-process bridge for the shared preferences suite.
 /// `UserDefaults.didChangeNotification` is process-local (Apple:
