@@ -39,11 +39,15 @@ enum ServerAgent {
         }
       }
     } catch {
-      logger.error("""
-        Failed to \(enabled ? "register" : "unregister") \
-        server agent: \(error.localizedDescription)
-        """)
+      logToggleFailed(enabled: enabled, error: error)
     }
     return isEnabled
+  }
+
+  private static func logToggleFailed(enabled: Bool, error: any Error) {
+    logger.error("""
+      Failed to \(enabled ? "register" : "unregister") \
+      server agent: \(error.localizedDescription)
+      """)
   }
 }

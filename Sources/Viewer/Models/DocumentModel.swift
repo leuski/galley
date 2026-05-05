@@ -155,7 +155,7 @@ final class DocumentModel {
   /// emits no source positions.
   func openInEditor(line: Int? = nil) async {
     guard let url = documentURL else {
-      logger.warning("openInEditor ignored: no document URL bound")
+      logOpenInEditorWithoutDocument()
       return
     }
     let resolvedLine: Int?
@@ -444,7 +444,7 @@ final class DocumentModel {
 
     bindGeneration &+= 1
     let myGeneration = bindGeneration
-    logger.debug("Binding to document: \(url.path, privacy: .public)")
+    logBinding(to: url)
     documentURL = url
     bridge.documentURL = url
     linkBridge.documentURL = url
@@ -462,7 +462,7 @@ final class DocumentModel {
 
   private func renderCurrent(preserveScroll: Bool) async {
     guard let url = documentURL else {
-      logger.warning("renderCurrent() called with no documentURL")
+      logRenderWithoutDocument()
       return
     }
     let renderer = resolvedRenderer()
@@ -490,7 +490,7 @@ final class DocumentModel {
       let substituted = context.substitute(into: templateHTML)
       let rewritten = template.rewriteAssets(in: substituted, origin: origin)
       let html = injectZoomStyle(into: rewritten)
-      logger.debug("Loading rendered HTML (\(html.count) bytes)")
+      logLoadingHTML(byteCount: html.count)
       do {
         for try await _ in page.load(html: html, baseURL: origin) {}
         lastError = nil
@@ -510,17 +510,43 @@ final class DocumentModel {
           await restoreScrollY(savedScrollY)
         }
       } catch {
-        logger.error("""
-          Navigation failed: \(error.localizedDescription, privacy: .public)
-          """)
+        logNavigationFailed(error)
         lastError = error.localizedDescription
       }
     } catch {
-      logger.error("""
-        render failed: \(error.localizedDescription, privacy: .public)
-        """)
+      logRenderFailed(error)
       lastError = error.localizedDescription
     }
+  }
+
+  // MARK: - Logging helpers
+
+  private func logOpenInEditorWithoutDocument() {
+    logger.warning("openInEditor ignored: no document URL bound")
+  }
+
+  private func logBinding(to url: URL) {
+    logger.debug("Binding to document: \(url.path, privacy: .public)")
+  }
+
+  private func logRenderWithoutDocument() {
+    logger.warning("renderCurrent() called with no documentURL")
+  }
+
+  private func logLoadingHTML(byteCount: Int) {
+    logger.debug("Loading rendered HTML (\(byteCount) bytes)")
+  }
+
+  private func logNavigationFailed(_ error: any Error) {
+    logger.error("""
+      Navigation failed: \(error.localizedDescription, privacy: .public)
+      """)
+  }
+
+  private func logRenderFailed(_ error: any Error) {
+    logger.error("""
+      render failed: \(error.localizedDescription, privacy: .public)
+      """)
   }
 
   /// Resolve the renderer for the next render. When the per-document

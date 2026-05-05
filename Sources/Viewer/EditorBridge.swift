@@ -86,12 +86,16 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
     guard let body = message.body as? [String: Any],
           let line = body["line"] as? Int
     else {
-      logger.warning("""
-        Ignoring malformed editor message: \
-        \(String(describing: message.body), privacy: .public)
-        """)
+      logMalformedMessage(message.body)
       return
     }
     onEditorClick?(line)
+  }
+
+  private func logMalformedMessage(_ body: Any) {
+    logger.warning("""
+      Ignoring malformed editor message: \
+      \(String(describing: body), privacy: .public)
+      """)
   }
 }

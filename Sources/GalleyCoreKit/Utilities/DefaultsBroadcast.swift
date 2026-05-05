@@ -39,8 +39,7 @@ public enum DefaultsBroadcast {
   public static func startListening() {
     guard !didStart else { return }
     didStart = true
-    let pid = ProcessInfo.processInfo.processIdentifier
-    log.notice("DefaultsBroadcast.startListening pid=\(pid)")
+    logStartListening()
     let center = CFNotificationCenterGetDarwinNotifyCenter()
     let name = CFNotificationName(
       rawValue: darwinNotificationName as CFString)
@@ -51,8 +50,7 @@ public enum DefaultsBroadcast {
         // Hop to the main queue: ObservableDefaults schedules its
         // observer on `.main`, and the @Observable host is main-
         // actor isolated.
-        let pid = ProcessInfo.processInfo.processIdentifier
-        log.debug("DefaultsBroadcast received pid=\(pid)")
+        logBroadcastReceived()
         DispatchQueue.main.async {
           NotificationCenter.default.post(
             name: UserDefaults.didChangeNotification, object: nil)
@@ -68,8 +66,7 @@ public enum DefaultsBroadcast {
   /// preference has changed. Call this immediately after a write to
   /// the shared suite.
   public static func post() {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    log.debug("DefaultsBroadcast.post pid=\(pid)")
+    logPost()
     let center = CFNotificationCenterGetDarwinNotifyCenter()
     let name = CFNotificationName(
       rawValue: darwinNotificationName as CFString)
@@ -78,4 +75,21 @@ public enum DefaultsBroadcast {
   }
 
   @MainActor private static var didStart = false
+
+  private static func logStartListening() {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    log.notice("DefaultsBroadcast.startListening pid=\(pid)")
+  }
+
+  private static func logPost() {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    log.debug("DefaultsBroadcast.post pid=\(pid)")
+  }
+}
+
+/// Free function so the `@convention(c)` Darwin-notification callback
+/// can reach it without capturing context.
+private func logBroadcastReceived() {
+  let pid = ProcessInfo.processInfo.processIdentifier
+  log.debug("DefaultsBroadcast received pid=\(pid)")
 }

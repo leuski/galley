@@ -265,14 +265,8 @@ where Element: RestorableChoiceValue
   public var values: [Element] { Element.values(from: source) }
   public var selected: Element {
     didSet {
-      let pid = ProcessInfo.processInfo.processIdentifier
-      let from = oldValue.name
-      let next = self.selected.name
-      log.debug(
-        """
-        Choice.selected pid=\(pid) \
-        \(from, privacy: .public) → \(next, privacy: .public)
-        """)
+      logSelectedChange(
+        from: oldValue.name, next: self.selected.name)
     }
   }
   /// See the protocol doc on `ChoiceModel.persistent`. The getter
@@ -284,15 +278,7 @@ where Element: RestorableChoiceValue
   public var persistent: String? {
     get { pendingPersistent ?? selected.persist() }
     set {
-      let pid = ProcessInfo.processInfo.processIdentifier
-      let incoming = newValue ?? "nil"
-      let current = self.selected.name
-      log.debug(
-        """
-        Choice.persistent set pid=\(pid) \
-        incoming=\(incoming, privacy: .public) \
-        current=\(current, privacy: .public)
-        """)
+      logPersistentSet(incoming: newValue, current: self.selected.name)
       guard let newValue else {
         pendingPersistent = nil
         let dflt = Element.defaultElement(from: source)
@@ -380,6 +366,23 @@ where Element: RestorableChoiceValue
     selected = Element.defaultElement(from: source)
     return displaced
   }
+
+  private func logSelectedChange(from: String, next: String) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    log.debug("""
+      Choice.selected pid=\(pid) \
+      \(from, privacy: .public) → \(next, privacy: .public)
+      """)
+  }
+
+  private func logPersistentSet(incoming: String?, current: String) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    log.debug("""
+      Choice.persistent set pid=\(pid) \
+      incoming=\(incoming ?? "nil", privacy: .public) \
+      current=\(current, privacy: .public)
+      """)
+  }
 }
 
 extension Choice: ChoiceModelEnvelope
@@ -421,31 +424,20 @@ public func bindPersistent<Choice>(
 ) -> [Cancelable]
 where Choice: ChoiceModel & AnyObject
 {
-  let pid = ProcessInfo.processInfo.processIdentifier
-  log.debug(
-    """
-    bindPersistent[\(label, privacy: .public)] install pid=\(pid) \
-    initial=\(choice.persistent ?? "nil", privacy: .public) \
-    stored=\(read() ?? "nil", privacy: .public)
-    """)
+  logBindInstall(
+    label: label,
+    initial: choice.persistent,
+    stored: read())
   let outbound = onObservedChange(
     track: { [weak choice] in _ = choice?.persistent },
     onChange: { [weak choice] in
       guard let value = choice?.persistent else { return }
-      let stored = read() ?? "nil"
+      let stored = read()
       if stored != value {
-        log.debug(
-          """
-          bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) \
-          write \(stored, privacy: .public) → \(value, privacy: .public)
-          """)
+        logBindOutboundWrite(label: label, stored: stored, value: value)
         write(value)
       } else {
-        log.debug(
-          """
-          bindPersistent[\(label, privacy: .public)] OUT pid=\(pid) \
-          skip (\(value, privacy: .public))
-          """)
+        logBindOutboundSkip(label: label, value: value)
       }
     })
   let inbound = onObservedChange(
@@ -453,28 +445,70 @@ where Choice: ChoiceModel & AnyObject
     onChange: { [weak choice] in
       guard let choice else { return }
       let incoming = read()
-      let incomingDesc = incoming ?? "nil"
-      let before = choice.persistent ?? "nil"
-      log.debug(
-        """
-        bindPersistent[\(label, privacy: .public)] IN pid=\(pid) \
-        incoming=\(incomingDesc, privacy: .public) \
-        current=\(before, privacy: .public)
-        """)
+      logBindInboundIncoming(
+        label: label,
+        incoming: incoming,
+        current: choice.persistent)
       if choice.persistent != incoming { choice.persistent = incoming }
       let settled = choice.persistent
       if settled != incoming {
-        let settledDesc = settled ?? "nil"
-        log.debug(
-          """
-          bindPersistent[\(label, privacy: .public)] IN pid=\(pid) \
-          settled→stored \(incomingDesc, privacy: .public) \
-          → \(settledDesc, privacy: .public)
-          """)
+        logBindInboundSettled(
+          label: label, incoming: incoming, settled: settled)
         write(settled)
       }
     })
   return [outbound, inbound]
+}
+
+private var currentPID: Int32 {
+  ProcessInfo.processInfo.processIdentifier
+}
+
+private func logBindInstall(
+  label: String, initial: String?, stored: String?
+) {
+  log.debug("""
+    bindPersistent[\(label, privacy: .public)] install pid=\(currentPID) \
+    initial=\(initial ?? "nil", privacy: .public) \
+    stored=\(stored ?? "nil", privacy: .public)
+    """)
+}
+
+private func logBindOutboundWrite(
+  label: String, stored: String?, value: String
+) {
+  log.debug("""
+    bindPersistent[\(label, privacy: .public)] OUT pid=\(currentPID) \
+    write \(stored ?? "nil", privacy: .public) \
+    → \(value, privacy: .public)
+    """)
+}
+
+private func logBindOutboundSkip(label: String, value: String) {
+  log.debug("""
+    bindPersistent[\(label, privacy: .public)] OUT pid=\(currentPID) \
+    skip (\(value, privacy: .public))
+    """)
+}
+
+private func logBindInboundIncoming(
+  label: String, incoming: String?, current: String?
+) {
+  log.debug("""
+    bindPersistent[\(label, privacy: .public)] IN pid=\(currentPID) \
+    incoming=\(incoming ?? "nil", privacy: .public) \
+    current=\(current ?? "nil", privacy: .public)
+    """)
+}
+
+private func logBindInboundSettled(
+  label: String, incoming: String?, settled: String?
+) {
+  log.debug("""
+    bindPersistent[\(label, privacy: .public)] IN pid=\(currentPID) \
+    settled→stored \(incoming ?? "nil", privacy: .public) \
+    → \(settled ?? "nil", privacy: .public)
+    """)
 }
 
 // MARK: - Concrete flavor

@@ -39,16 +39,10 @@ final class AppModel {
   nonisolated static let defaultHost: String = "127.0.0.1"
 
   init() {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    let bid = Bundle.main.bundleIdentifier ?? "?"
-    let renderer = Defaults.shared.renderer ?? "nil"
-    let template = Defaults.shared.template ?? "nil"
-    defaultsLog.notice(
-      """
-      Server AppModel init pid=\(pid) bundle=\(bid, privacy: .public) \
-      renderer=\(renderer, privacy: .public) \
-      template=\(template, privacy: .public)
-      """)
+    Self.logInit(
+      bundle: Bundle.main.bundleIdentifier,
+      renderer: Defaults.shared.renderer,
+      template: Defaults.shared.template)
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
       persistent: Defaults.shared.template) { name in
@@ -102,14 +96,9 @@ final class AppModel {
       queue: .main
     ) { _ in
       MainActor.assumeIsolated {
-        let renderer = Defaults.shared.renderer ?? "nil"
-        let template = Defaults.shared.template ?? "nil"
-        defaultsLog.debug(
-          """
-          Server didChange pid=\(pid) \
-          renderer=\(renderer, privacy: .public) \
-          template=\(template, privacy: .public)
-          """)
+        Self.logDidChange(
+          renderer: Defaults.shared.renderer,
+          template: Defaults.shared.template)
       }
     }
 
@@ -121,6 +110,29 @@ final class AppModel {
     _ kind: DisplacementNotifier.Kind, _ name: String)
   {
     DisplacementNotifier.post(kind: kind, displaced: name)
+  }
+
+  private static func logInit(
+    bundle: String?, renderer: String?, template: String?
+  ) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    defaultsLog.notice("""
+      Server AppModel init pid=\(pid) \
+      bundle=\(bundle ?? "?", privacy: .public) \
+      renderer=\(renderer ?? "nil", privacy: .public) \
+      template=\(template ?? "nil", privacy: .public)
+      """)
+  }
+
+  private static func logDidChange(
+    renderer: String?, template: String?
+  ) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    defaultsLog.debug("""
+      Server didChange pid=\(pid) \
+      renderer=\(renderer ?? "nil", privacy: .public) \
+      template=\(template ?? "nil", privacy: .public)
+      """)
   }
 
   private func startServer() {

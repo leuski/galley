@@ -61,12 +61,16 @@ final class ScrollBridge: NSObject, WKScriptMessageHandler {
       value = nil
     }
     guard let y = value else {
-      logger.warning("""
-        Ignoring malformed scroll message: \
-        \(String(describing: message.body), privacy: .public)
-        """)
+      logMalformedMessage(message.body)
       return
     }
     onScroll?(y)
+  }
+
+  private func logMalformedMessage(_ body: Any) {
+    logger.warning("""
+      Ignoring malformed scroll message: \
+      \(String(describing: body), privacy: .public)
+      """)
   }
 }

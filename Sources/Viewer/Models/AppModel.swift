@@ -54,13 +54,10 @@ final class AppModel {
   /// in both directions — Server writes propagate here automatically
   /// via `limitToInstance: false`.
   init() {
-    defaultsLog.notice(
-      """
-      Viewer AppModel init pid=\(ProcessInfo.processInfo.processIdentifier) \
-      bundle=\(Bundle.main.bundleIdentifier ?? "?", privacy: .public) \
-      renderer=\(Defaults.shared.renderer ?? "nil", privacy: .public) \
-      template=\(Defaults.shared.template ?? "nil", privacy: .public)
-      """)
+    Self.logInit(
+      bundle: Bundle.main.bundleIdentifier,
+      renderer: Defaults.shared.renderer,
+      template: Defaults.shared.template)
     self.editors = EditorChoice()
 
     self.templates = TemplateChoice(
@@ -111,12 +108,9 @@ final class AppModel {
       queue: .main
     ) { _ in
       MainActor.assumeIsolated {
-        defaultsLog.debug(
-          """
-          Viewer didChange pid=\(ProcessInfo.processInfo.processIdentifier) \
-          renderer=\(Defaults.shared.renderer ?? "nil", privacy: .public) \
-          template=\(Defaults.shared.template ?? "nil", privacy: .public)
-          """)
+        Self.logDidChange(
+          renderer: Defaults.shared.renderer,
+          template: Defaults.shared.template)
       }
     }
   }
@@ -125,6 +119,29 @@ final class AppModel {
     _ kind: DisplacementNotifier.Kind, _ name: String)
   {
     DisplacementNotifier.post(kind: kind, displaced: name)
+  }
+
+  private static func logInit(
+    bundle: String?, renderer: String?, template: String?
+  ) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    defaultsLog.notice("""
+      Viewer AppModel init pid=\(pid) \
+      bundle=\(bundle ?? "?", privacy: .public) \
+      renderer=\(renderer ?? "nil", privacy: .public) \
+      template=\(template ?? "nil", privacy: .public)
+      """)
+  }
+
+  private static func logDidChange(
+    renderer: String?, template: String?
+  ) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    defaultsLog.debug("""
+      Viewer didChange pid=\(pid) \
+      renderer=\(renderer ?? "nil", privacy: .public) \
+      template=\(template ?? "nil", privacy: .public)
+      """)
   }
 }
 

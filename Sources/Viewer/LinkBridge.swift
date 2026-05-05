@@ -35,8 +35,7 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     guard let body = message.body as? [String: Any],
           let href = body["href"] as? String
     else {
-      logger.warning(
-        "Ignoring malformed link message: \(String(describing: message.body))")
+      logMalformedMessage(message.body)
       return
     }
     handle(href: href)
@@ -44,10 +43,10 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
 
   private func handle(href: String) {
     guard let target = resolve(href: href) else {
-      logger.warning("Could not resolve link href: \(href, privacy: .public)")
+      logUnresolvableHref(href)
       return
     }
-    logger.notice("Opening link: \(target.absoluteString, privacy: .public)")
+    logOpeningLink(target)
 
     if target.isFileURL,
        MarkdownFileTypes.extensions.contains(
@@ -62,12 +61,9 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
         NSDocumentController.shared.openDocument(
           withContentsOf: target,
           display: true
-        ) { [logger] _, _, error in
+        ) { [weak self] _, _, error in
           if let error {
-            logger.error("""
-              openDocument failed for \(target.path, privacy: .public): \
-              \(error.localizedDescription, privacy: .public)
-              """)
+            self?.logOpenDocumentFailed(target: target, error: error)
           }
         }
       }
@@ -76,12 +72,36 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
       // pick the right app.
       let opened = NSWorkspace.shared.open(target)
       if !opened {
-        logger.error("""
-          NSWorkspace.open returned false for \
-          \(target.absoluteString, privacy: .public)
-          """)
+        logWorkspaceOpenFailed(target)
       }
     }
+  }
+
+  private func logMalformedMessage(_ body: Any) {
+    logger.warning(
+      "Ignoring malformed link message: \(String(describing: body))")
+  }
+
+  private func logUnresolvableHref(_ href: String) {
+    logger.warning("Could not resolve link href: \(href, privacy: .public)")
+  }
+
+  private func logOpeningLink(_ target: URL) {
+    logger.notice("Opening link: \(target.absoluteString, privacy: .public)")
+  }
+
+  private func logOpenDocumentFailed(target: URL, error: any Error) {
+    logger.error("""
+      openDocument failed for \(target.path, privacy: .public): \
+      \(error.localizedDescription, privacy: .public)
+      """)
+  }
+
+  private func logWorkspaceOpenFailed(_ target: URL) {
+    logger.error("""
+      NSWorkspace.open returned false for \
+      \(target.absoluteString, privacy: .public)
+      """)
   }
 
   /// Resolve an `href` from the document against `documentURL`'s

@@ -226,7 +226,7 @@ func openFileInEditor(
 
   case .appBundle(let appURL):
     guard let appURL else {
-      logger?.warning("openFileInEditor: appBundle URL is nil")
+      logMissingAppBundle(logger)
       return
     }
     let configuration = NSWorkspace.OpenConfiguration()
@@ -235,11 +235,8 @@ func openFileInEditor(
         [fileURL], withApplicationAt: appURL,
         configuration: configuration)
     } catch {
-      logger?.error("""
-        Failed to open \(fileURL.path, privacy: .public) in \
-        \(appURL.path, privacy: .public): \
-        \(error.localizedDescription, privacy: .public)
-        """)
+      logAppBundleOpenFailed(
+        fileURL: fileURL, appURL: appURL, error: error, logger: logger)
     }
   }
 }
@@ -247,14 +244,36 @@ func openFileInEditor(
 @MainActor
 private func openURL(_ string: String, logger: Logger?) {
   guard let url = URL(string: string) else {
-    logger?.error("""
-      Editor URL is not a valid URL: \(string, privacy: .public)
-      """)
+    logInvalidEditorURL(string, logger: logger)
     return
   }
   if !NSWorkspace.shared.open(url) {
-    logger?.error("""
-      No handler accepted editor URL: \(string, privacy: .public)
-      """)
+    logEditorURLRejected(string, logger: logger)
   }
+}
+
+private func logMissingAppBundle(_ logger: Logger?) {
+  logger?.warning("openFileInEditor: appBundle URL is nil")
+}
+
+private func logAppBundleOpenFailed(
+  fileURL: URL, appURL: URL, error: any Error, logger: Logger?
+) {
+  logger?.error("""
+    Failed to open \(fileURL.path, privacy: .public) in \
+    \(appURL.path, privacy: .public): \
+    \(error.localizedDescription, privacy: .public)
+    """)
+}
+
+private func logInvalidEditorURL(_ string: String, logger: Logger?) {
+  logger?.error("""
+    Editor URL is not a valid URL: \(string, privacy: .public)
+    """)
+}
+
+private func logEditorURLRejected(_ string: String, logger: Logger?) {
+  logger?.error("""
+    No handler accepted editor URL: \(string, privacy: .public)
+    """)
 }

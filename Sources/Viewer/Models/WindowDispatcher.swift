@@ -83,13 +83,17 @@ final class WindowDispatcher {
         }
         dispatch(fileURL)
       case .unparseable(let original):
-        logger.warning("""
-          Could not parse inbound URL: \
-          \(original.absoluteString, privacy: .public)
-          """)
+        logUnparseableURL(original)
         dispatch(original)
       }
     }
+  }
+
+  private func logUnparseableURL(_ url: URL) {
+    logger.warning("""
+      Could not parse inbound URL: \
+      \(url.absoluteString, privacy: .public)
+      """)
   }
 
   /// Take and clear the pending scroll-to-line for `url`, if any.

@@ -53,15 +53,21 @@ struct PreviewSchemeHandler: URLSchemeHandler {
           continuation.yield(.data(data))
           continuation.finish()
         } catch {
-          Self.logger.warning("""
-            asset load failed for \
-            \(request.url?.absoluteString ?? "?", privacy: .public): \
-            \(error.localizedDescription, privacy: .public)
-            """)
+          Self.logAssetLoadFailed(request: request, error: error)
           continuation.finish(throwing: error)
         }
       }
       continuation.onTermination = { _ in task.cancel() }
     }
+  }
+
+  private static func logAssetLoadFailed(
+    request: URLRequest, error: any Error
+  ) {
+    logger.warning("""
+      asset load failed for \
+      \(request.url?.absoluteString ?? "?", privacy: .public): \
+      \(error.localizedDescription, privacy: .public)
+      """)
   }
 }

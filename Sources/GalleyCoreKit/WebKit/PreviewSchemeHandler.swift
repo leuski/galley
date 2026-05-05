@@ -95,11 +95,8 @@ public final class ClassicPreviewSchemeHandler:
       urlSchemeTask.didReceive(data)
       urlSchemeTask.didFinish()
     } catch {
-      Self.logger.warning("""
-        asset load failed for \
-        \(urlSchemeTask.request.url?.absoluteString ?? "?", privacy: .public): \
-        \(error.localizedDescription, privacy: .public)
-        """)
+      Self.logAssetLoadFailed(
+        request: urlSchemeTask.request, error: error)
       urlSchemeTask.didFailWithError(error)
     }
   }
@@ -108,5 +105,15 @@ public final class ClassicPreviewSchemeHandler:
     _ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask
   ) {
     // No async work to cancel — resolve runs synchronously.
+  }
+
+  private static func logAssetLoadFailed(
+    request: URLRequest, error: any Error
+  ) {
+    logger.warning("""
+      asset load failed for \
+      \(request.url?.absoluteString ?? "?", privacy: .public): \
+      \(error.localizedDescription, privacy: .public)
+      """)
   }
 }

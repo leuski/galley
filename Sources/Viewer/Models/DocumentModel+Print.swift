@@ -50,11 +50,15 @@ extension DocumentModel {
       }
       lastError = nil
     } catch {
-      logger.error("""
-        print failed: \(error.localizedDescription, privacy: .public)
-        """)
+      logPrintFailed(error)
       lastError = error.localizedDescription
     }
+  }
+
+  private func logPrintFailed(_ error: any Error) {
+    logger.error("""
+      print failed: \(error.localizedDescription, privacy: .public)
+      """)
   }
 
   /// Show the system Page Setup sheet on `window` (app-modal fallback
