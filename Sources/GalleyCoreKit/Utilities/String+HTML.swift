@@ -1,4 +1,5 @@
 import Foundation
+import ALFoundation
 
 extension String {
   public var htmlEscaped: String {
@@ -29,5 +30,17 @@ extension String {
       }
     }
     return out
+  }
+}
+
+extension StringProtocol {
+  public func substituting(
+    substitutions: KeyValuePairs<String, String>) -> String
+  {
+    var string = asString()
+    for (key, value) in substitutions {
+      string = string.replacingOccurrences(of: key, with: value)
+    }
+    return string
   }
 }

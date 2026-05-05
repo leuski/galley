@@ -18,10 +18,11 @@ enum HTTPResponses {
   static func errorPage(
     title: String, detail: String, source: String) -> HTTPResponse
   {
-    let html = errorPageTemplate
-      .replacingOccurrences(of: "#TITLE#", with: title.htmlEscaped)
-      .replacingOccurrences(of: "#DETAIL#", with: detail.htmlEscaped)
-      .replacingOccurrences(of: "#SOURCE#", with: source.htmlEscaped)
+    let html = errorPageTemplate.substituting(substitutions: [
+      "#TITLE#": title.htmlEscaped,
+      "#DETAIL#": detail.htmlEscaped,
+      "#SOURCE#": source.htmlEscaped
+    ])
     return HTTPResponse(
       statusCode: .internalServerError,
       headers: [.contentType: "text/html; charset=utf-8"],

@@ -19,11 +19,11 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
 
   var displayName: String {
     switch self {
-    case .bbedit:   return "BBEdit"
-    case .textmate: return "TextMate"
-    case .vscode:   return "Visual Studio Code"
-    case .sublime:  return "Sublime Text"
-    case .zed:      return "Zed"
+    case .bbedit:   "BBEdit"
+    case .textmate: "TextMate"
+    case .vscode:   "Visual Studio Code"
+    case .sublime:  "Sublime Text"
+    case .zed:      "Zed"
     }
   }
 
@@ -33,11 +33,11 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   /// integer line number, or empty when unknown.
   var template: String {
     switch self {
-    case .bbedit:   return "x-bbedit://open?url={url}&line={line}"
-    case .textmate: return "txmt://open?url={url}&line={line}"
-    case .vscode:   return "vscode://file{path}:{line}"
-    case .sublime:  return "subl://open?url={url}&line={line}"
-    case .zed:      return "zed://file{path}:{line}"
+    case .bbedit:   "x-bbedit://open?url={url}&line={line}"
+    case .textmate: "txmt://open?url={url}&line={line}"
+    case .vscode:   "vscode://file{path}:{line}"
+    case .sublime:  "subl://open?url={url}&line={line}"
+    case .zed:      "zed://file{path}:{line}"
     }
   }
 }
@@ -189,17 +189,15 @@ func substituteEditorTemplate(
 ) -> String {
   let allowed = CharacterSet.urlQueryAllowed
     .subtracting(CharacterSet(charactersIn: "&=+?#"))
-  let urlEncoded = fileURL.absoluteString
-    .addingPercentEncoding(withAllowedCharacters: allowed)
-  ?? fileURL.absoluteString
-  let pathEncoded = fileURL.path
-    .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-  ?? fileURL.path
-  let lineStr = line.map(String.init) ?? ""
-  return template
-    .replacingOccurrences(of: "{url}", with: urlEncoded)
-    .replacingOccurrences(of: "{path}", with: pathEncoded)
-    .replacingOccurrences(of: "{line}", with: lineStr)
+  return template.substituding(substitutions: [
+    "{url}": fileURL.absoluteString
+      .addingPercentEncoding(withAllowedCharacters: allowed)
+    ?? fileURL.absoluteString,
+    "{path}": fileURL.path
+      .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+    ?? fileURL.path,
+    "{line}": line.map(String.init) ?? ""
+  ])
 }
 
 /// Open `fileURL` in the user's chosen editor, optionally jumping to

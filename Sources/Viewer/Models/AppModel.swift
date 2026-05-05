@@ -153,7 +153,3 @@ final class AppBoot {
     }
   }
 }
-
-// `OpenBehavior` lives in GalleyCoreKit/Routing/ now so the routing
-// layer is platform-agnostic and unit-testable. Re-exported via the
-// `import GalleyCoreKit` above.

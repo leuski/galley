@@ -54,13 +54,13 @@ public enum ScriptInstaller {
   }
 
   private static func installFile(
-    from source: URL, to target: URL, context: [String: String]
+    from source: URL, to target: URL, context: KeyValuePairs<String, String>
   ) throws {
     try target.parent.createDirectory()
 
     if isShellScript(source) {
       let original = try String(contentsOf: source, encoding: .utf8)
-      let customized = customize(script: original, context: context)
+      let customized = original.substituting(substitutions: context)
       try? target.remove()
       try customized.write(to: target, atomically: true, encoding: .utf8)
       try target.setPosixPermissions(0o755)
@@ -71,16 +71,6 @@ public enum ScriptInstaller {
 
   private static func isShellScript(_ url: URL) -> Bool {
     ["sh", "bash", "zsh", "command"].contains(url.pathExtension.lowercased())
-  }
-
-  /// Replaces the loopback host:port literal embedded in bundled scripts so
-  /// the installed copy targets the user's currently configured port.
-  static func customize(script: String, context: [String: String]) -> String {
-    var script = script
-    for (key, value) in context {
-      script = script.replacingOccurrences(of: key, with: value)
-    }
-    return script
   }
 
   @MainActor
