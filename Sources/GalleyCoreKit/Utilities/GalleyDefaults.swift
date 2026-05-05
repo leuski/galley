@@ -32,6 +32,20 @@ public enum GalleyConstants {
   public static let defaultPort: UInt16 = 8089
   public static let settingsURL: URL = "galley://settings"
 
+  /// Build a `galley://settings` URL aimed at a specific Settings tab.
+  /// `nil` returns the bare `settingsURL` (no tab preference).
+  public static func settingsURL(tab: SettingsTab?) -> URL {
+    guard let tab else { return settingsURL }
+    var components = URLComponents()
+    components.scheme = "galley"
+    components.host = "settings"
+    components.queryItems = [URLQueryItem(name: "tab", value: tab.rawValue)]
+    guard let url = components.url else {
+      preconditionFailure("settingsURL components produced no URL")
+    }
+    return url
+  }
+
   /// Bundle id of the Viewer app, which doubles as the shared
   /// `UserDefaults` suite identifier (the Server opens it explicitly,
   /// the Viewer reaches it as `.standard`) and the shared Application

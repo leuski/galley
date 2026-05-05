@@ -20,13 +20,17 @@ struct MenuBarContent: View {
 
       Divider()
 
+      Button("Open Galley") { openGalley() }
+        .accessibilityIdentifier(ServerA11yID.MenuBar.openGalley)
+
       Button("Open File…") { openFile() }
         .accessibilityIdentifier(ServerA11yID.MenuBar.openFile)
 
       Divider()
 
       Button("Settings…") {
-        NSWorkspace.shared.open(GalleyConstants.settingsURL)
+        NSWorkspace.shared.open(
+          GalleyConstants.settingsURL(tab: .server))
       }
       .accessibilityIdentifier(ServerA11yID.MenuBar.settings)
     }
@@ -45,6 +49,19 @@ struct MenuBarContent: View {
       }
     }
     .accessibilityIdentifier(ServerA11yID.MenuBar.statusItem)
+  }
+
+  /// Bring the Galley document app to the front, launching it first
+  /// if it isn't running. Resolves the Viewer by its bundle id (which
+  /// `GalleyConstants.suiteName` doubles as) so the Server doesn't
+  /// hardcode a path.
+  private func openGalley() {
+    guard let appURL = NSWorkspace.shared.urlForApplication(
+      withBundleIdentifier: GalleyConstants.suiteName)
+    else { return }
+    NSWorkspace.shared.openApplication(
+      at: appURL,
+      configuration: NSWorkspace.OpenConfiguration())
   }
 
   private func openFile() {

@@ -29,6 +29,7 @@ import SwiftUI
 struct BootstrapDispatchModifier: ViewModifier {
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
+  @Environment(AppBoot.self) private var boot
   @Environment(\.openWindow) private var openWindow
   @Environment(\.openSettings) private var openSettings
 
@@ -42,13 +43,22 @@ struct BootstrapDispatchModifier: ViewModifier {
       }
       .onOpenURL { url in
         // Settings via galley:// scheme: the dispatcher hands the
-        // outcome back via `onSettingsRequested` — we activate the
-        // app first so the Settings window doesn't open behind
-        // whatever app the user clicked from (e.g. the Server
-        // menu bar).
-        dispatcher.handleOpenURLs([url]) {
+        // outcome back via `onSettingsRequested`. `NSApp.activate`
+        // is async on macOS 14+, so if we open Settings first the
+        // previously-key doc window resurfaces on top of it once
+        // activation completes. Activate, then open Settings, then
+        // raise the Settings window on the next run-loop turn so it
+        // wins over whatever activation brought forward.
+        dispatcher.handleOpenURLs([url]) { tab in
+          if let tab { boot.model?.selectedSettingsTab = tab }
           NSApp.activate(ignoringOtherApps: true)
           openSettings()
+          Task { @MainActor in
+            NSApp.windows
+              .first { $0.identifier?.rawValue
+                .lowercased().contains("settings") == true }?
+              .makeKeyAndOrderFront(nil)
+          }
         }
         switch url.galleyAction {
         case .openSettings:

@@ -1,29 +1,33 @@
+import GalleyCoreKit
 import SwiftUI
 
 struct SettingsView: View {
   @Bindable var appModel: AppModel
 
   var body: some View {
-    TabView {
+    TabView(selection: $appModel.selectedSettingsTab) {
       GeneralSettingsView()
         .settingsPane()
         .tabItem {
           Label("General", systemImage: "gearshape")
         }
+        .tag(SettingsTab.general)
 
       MarkdownSettingsView(appModel: appModel)
         .settingsPane()
         .tabItem {
           Label("Markdown", systemImage: "doc.text")
         }
+        .tag(SettingsTab.markdown)
 
       ServerSettingsView()
         .settingsPane()
         .tabItem {
           Label("Server", systemImage: "server.rack")
         }
+        .tag(SettingsTab.server)
     }
-    .frame(minWidth: 580, maxWidth: 580, minHeight: 360)
+    .frame(minHeight: 360)
   }
 }
 

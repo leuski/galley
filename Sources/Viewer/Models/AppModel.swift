@@ -46,6 +46,13 @@ final class AppModel {
   @ObservationIgnored let editors: EditorChoice
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
+  /// Tab the Settings scene should display. The bootstrap modifier
+  /// writes here when a `galley://settings?tab=<id>` URL arrives, just
+  /// before invoking `openSettings()`. `SettingsView` binds its
+  /// `TabView` selection to this property so external deep links can
+  /// land on the right pane.
+  var selectedSettingsTab: SettingsTab = .general
+
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
   /// expected to have run async catalog discovery
   /// (`await processorStore.discover()`) before invoking this so the

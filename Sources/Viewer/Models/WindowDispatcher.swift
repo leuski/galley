@@ -69,14 +69,15 @@ final class WindowDispatcher {
   /// `galley://settings` URLs pass through to the caller via
   /// `onSettingsRequested` — the caller (ViewerApp's WindowGroup
   /// root) is responsible for invoking SwiftUI's `openSettings()`.
+  /// The optional `SettingsTab` carries any `?tab=<id>` from the URL.
   func handleOpenURLs(
     _ urls: [URL],
-    onSettingsRequested: () -> Void = {}
+    onSettingsRequested: (SettingsTab?) -> Void = { _ in }
   ) {
     for url in urls {
       switch url.galleyAction {
-      case .openSettings:
-        onSettingsRequested()
+      case .openSettings(let tab):
+        onSettingsRequested(tab)
       case .document(let fileURL, let line):
         if let line {
           pendingScrolls.stash(line, for: fileURL)

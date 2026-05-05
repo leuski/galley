@@ -84,9 +84,10 @@ struct ViewerApp: App {
       } else {
         ProgressView("Starting…")
           .padding()
-          .frame(minWidth: 320, minHeight: 200)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
+    .defaultSize(width: 580, height: 360)
   }
 
   private func configureRouting() {

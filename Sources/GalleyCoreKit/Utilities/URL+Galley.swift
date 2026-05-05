@@ -1,9 +1,20 @@
 import Foundation
 
+/// Tabs of the Viewer's Settings scene. Carried on inbound
+/// `galley://settings?tab=<id>` URLs so external callers (e.g. the
+/// Server app's menu bar) can deep-link into a specific pane.
+public enum SettingsTab: String, Sendable, CaseIterable {
+  case general
+  case markdown
+  case server
+}
+
 /// Outcome of normalizing a single inbound URL.
 public enum GalleyURLAction: Sendable, Equatable {
-  /// `galley://settings` — caller should invoke `openSettings()`.
-  case openSettings
+  /// `galley://settings[?tab=<id>]` — caller should invoke
+  /// `openSettings()` and, if `tab` is non-nil, switch the Settings
+  /// scene to that pane.
+  case openSettings(SettingsTab?)
   /// Plain document open. `scrollLine` carries any `?line=N` from
   /// the source `galley://path?line=N` URL; nil for non-galley
   /// inbound URLs.
@@ -27,13 +38,17 @@ public extension URL {
     guard scheme == "galley" else {
       return .document(self, scrollLine: nil)
     }
-    if host?.lowercased() == "settings" {
-      return .openSettings
-    }
-    guard let components = URLComponents(
+    let components = URLComponents(
       url: self,
       resolvingAgainstBaseURL: false)
-    else {
+    if host?.lowercased() == "settings" {
+      let tab = components?.queryItems?
+        .first(where: { $0.name == "tab" })
+        .flatMap { $0.value }
+        .flatMap { SettingsTab(rawValue: $0.lowercased()) }
+      return .openSettings(tab)
+    }
+    guard let components else {
       return .unparseable(self)
     }
     let path = components.path

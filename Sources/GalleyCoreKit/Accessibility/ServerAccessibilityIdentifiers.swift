@@ -10,6 +10,7 @@ public enum ServerA11yID {
   public enum MenuBar {
     public static let statusItem = "server.menubar.status"
     public static let openFile = "server.menubar.openFile"
+    public static let openGalley = "server.menubar.openGalley"
     public static let settings = "server.menubar.settings"
     public static let processorMenu = "server.menubar.processor.menu"
     public static let processorItem = "server.menubar.processor.item"

@@ -11,10 +11,30 @@ struct GalleyActionTests {
     #expect(outcome == .document(url, scrollLine: nil))
   }
 
-  @Test("galley://settings becomes openSettings")
+  @Test("galley://settings becomes openSettings with no tab")
   func settingsURL() {
     let url = URL(string: "galley://settings")!
-    #expect(url.galleyAction == .openSettings)
+    #expect(url.galleyAction == .openSettings(nil))
+  }
+
+  @Test("galley://settings?tab=<id> carries the tab")
+  func settingsTabExtracted() {
+    for tab in SettingsTab.allCases {
+      let url = URL(string: "galley://settings?tab=\(tab.rawValue)")!
+      #expect(url.galleyAction == .openSettings(tab))
+    }
+  }
+
+  @Test("Settings tab value is case-insensitive")
+  func settingsTabCaseInsensitive() {
+    let url = URL(string: "galley://settings?tab=SERVER")!
+    #expect(url.galleyAction == .openSettings(.server))
+  }
+
+  @Test("Unknown settings tab is dropped")
+  func settingsTabUnknownDropped() {
+    let url = URL(string: "galley://settings?tab=bogus")!
+    #expect(url.galleyAction == .openSettings(nil))
   }
 
   @Test("galley:// scheme is case-insensitive")
@@ -32,7 +52,7 @@ struct GalleyActionTests {
   @Test("settings host is case-insensitive")
   func settingsHostCaseInsensitive() {
     let upper = URL(string: "galley://Settings")!
-    #expect(upper.galleyAction == .openSettings)
+    #expect(upper.galleyAction == .openSettings(nil))
   }
 
   @Test("galley://path?line=N stashes scroll line")
