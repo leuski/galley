@@ -132,7 +132,7 @@ final class EditorChoice: ChoiceModel {
       if let index = values.firstIndex(where: { $0.kind == resolved.kind }) {
         values[index] = resolved
       }
-      Defaults.shared.editorChoice = storedSelected
+      Defaults.shared.editor = storedSelected
     }
   }
 
@@ -148,7 +148,7 @@ final class EditorChoice: ChoiceModel {
     initial.append(.customURL(template: EditorPreset.bbedit.template))
     initial.append(.appBundle(nil))
 
-    let loaded = Defaults.shared.editorChoice
+    let loaded = Defaults.shared.editor
     if let index = initial.firstIndex(where: { $0.kind == loaded.kind }) {
       initial[index] = loaded
     }

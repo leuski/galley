@@ -20,8 +20,8 @@ private let defaultsLog = Logger(
   limitToInstance: false)
 final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
-  @DefaultsKey var rendererPersistent: String?
-  @DefaultsKey var templatePersistent: String?
+  @DefaultsKey var renderer: String?
+  @DefaultsKey var template: String?
 
   @MainActor static let shared = Defaults()
 }
@@ -41,8 +41,8 @@ final class AppModel {
   init() {
     let pid = ProcessInfo.processInfo.processIdentifier
     let bid = Bundle.main.bundleIdentifier ?? "?"
-    let renderer = Defaults.shared.rendererPersistent ?? "nil"
-    let template = Defaults.shared.templatePersistent ?? "nil"
+    let renderer = Defaults.shared.renderer ?? "nil"
+    let template = Defaults.shared.template ?? "nil"
     defaultsLog.notice(
       """
       Server AppModel init pid=\(pid) bundle=\(bid, privacy: .public) \
@@ -51,13 +51,13 @@ final class AppModel {
       """)
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
-      persistent: Defaults.shared.templatePersistent) { name in
+      persistent: Defaults.shared.template) { name in
         Self.notify(.template, name)
       }
 
     self.processors = ProcessorChoice(
       source: ProcessorStore.shared,
-      persistent: Defaults.shared.rendererPersistent) { name in
+      persistent: Defaults.shared.renderer) { name in
         Self.notify(.processor, name)
       }
 
@@ -82,17 +82,17 @@ final class AppModel {
     persistenceTokens = bindPersistent(
       templates,
       label: "Server.template",
-      read: { Defaults.shared.templatePersistent },
+      read: { Defaults.shared.template },
       write: {
-        Defaults.shared.templatePersistent = $0
+        Defaults.shared.template = $0
         DefaultsBroadcast.post()
       })
     + bindPersistent(
       processors,
       label: "Server.processor",
-      read: { Defaults.shared.rendererPersistent },
+      read: { Defaults.shared.renderer },
       write: {
-        Defaults.shared.rendererPersistent = $0
+        Defaults.shared.renderer = $0
         DefaultsBroadcast.post()
       })
 
@@ -102,8 +102,8 @@ final class AppModel {
       queue: .main
     ) { _ in
       MainActor.assumeIsolated {
-        let renderer = Defaults.shared.rendererPersistent ?? "nil"
-        let template = Defaults.shared.templatePersistent ?? "nil"
+        let renderer = Defaults.shared.renderer ?? "nil"
+        let template = Defaults.shared.template ?? "nil"
         defaultsLog.debug(
           """
           Server didChange pid=\(pid) \

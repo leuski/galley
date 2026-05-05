@@ -422,13 +422,11 @@ public func bindPersistent<Choice>(
 where Choice: ChoiceModel & AnyObject
 {
   let pid = ProcessInfo.processInfo.processIdentifier
-  let initial = choice.persistent ?? "nil"
-  let stored0 = read() ?? "nil"
   log.debug(
     """
     bindPersistent[\(label, privacy: .public)] install pid=\(pid) \
-    initial=\(initial, privacy: .public) \
-    stored=\(stored0, privacy: .public)
+    initial=\(choice.persistent ?? "nil", privacy: .public) \
+    stored=\(read() ?? "nil", privacy: .public)
     """)
   let outbound = onObservedChange(
     track: { [weak choice] in _ = choice?.persistent },

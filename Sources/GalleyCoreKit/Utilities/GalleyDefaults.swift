@@ -20,8 +20,8 @@ public protocol GalleyNetworkDefaults: GalleyDefaults {
 }
 
 public protocol GalleyRenderDefaults: GalleyDefaults {
-  var rendererPersistent: String? { get set }
-  var templatePersistent: String? { get set }
+  var renderer: String? { get set }
+  var template: String? { get set }
 }
 
 public let bundleIdentifier = Bundle.main.bundleIdentifier

@@ -27,11 +27,11 @@ private let defaultsLog = Logger(
 @ObservableDefaults(limitToInstance: false)
 final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
-  @DefaultsKey var rendererPersistent: String?
-  @DefaultsKey var templatePersistent: String?
+  @DefaultsKey var renderer: String?
+  @DefaultsKey var template: String?
   @DefaultsKey var enablePerDocumentOverrides: Bool = false
   @DefaultsKey var openBehavior: OpenBehavior = .newWindow
-  @DefaultsKey var editorChoice: EditorChoice.Element = .preset(.bbedit)
+  @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
   @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
 
   @MainActor static let shared = Defaults()
@@ -54,27 +54,24 @@ final class AppModel {
   /// in both directions — Server writes propagate here automatically
   /// via `limitToInstance: false`.
   init() {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    let bid = Bundle.main.bundleIdentifier ?? "?"
-    let renderer = Defaults.shared.rendererPersistent ?? "nil"
-    let template = Defaults.shared.templatePersistent ?? "nil"
     defaultsLog.notice(
       """
-      Viewer AppModel init pid=\(pid) bundle=\(bid, privacy: .public) \
-      renderer=\(renderer, privacy: .public) \
-      template=\(template, privacy: .public)
+      Viewer AppModel init pid=\(ProcessInfo.processInfo.processIdentifier) \
+      bundle=\(Bundle.main.bundleIdentifier ?? "?", privacy: .public) \
+      renderer=\(Defaults.shared.renderer ?? "nil", privacy: .public) \
+      template=\(Defaults.shared.template ?? "nil", privacy: .public)
       """)
     self.editors = EditorChoice()
 
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
-      persistent: Defaults.shared.templatePersistent) { name in
+      persistent: Defaults.shared.template) { name in
         Self.notify(.template, name)
       }
 
     self.processors = ProcessorChoice(
       source: ProcessorStore.shared,
-      persistent: Defaults.shared.rendererPersistent) { name in
+      persistent: Defaults.shared.renderer) { name in
         Self.notify(.processor, name)
       }
 
@@ -90,17 +87,17 @@ final class AppModel {
     persistenceTokens = bindPersistent(
       templates,
       label: "Viewer.template",
-      read: { Defaults.shared.templatePersistent },
+      read: { Defaults.shared.template },
       write: {
-        Defaults.shared.templatePersistent = $0
+        Defaults.shared.template = $0
         DefaultsBroadcast.post()
       })
     + bindPersistent(
       processors,
       label: "Viewer.processor",
-      read: { Defaults.shared.rendererPersistent },
+      read: { Defaults.shared.renderer },
       write: {
-        Defaults.shared.rendererPersistent = $0
+        Defaults.shared.renderer = $0
         DefaultsBroadcast.post()
       })
 
@@ -114,13 +111,11 @@ final class AppModel {
       queue: .main
     ) { _ in
       MainActor.assumeIsolated {
-        let renderer = Defaults.shared.rendererPersistent ?? "nil"
-        let template = Defaults.shared.templatePersistent ?? "nil"
         defaultsLog.debug(
           """
-          Viewer didChange pid=\(pid) \
-          renderer=\(renderer, privacy: .public) \
-          template=\(template, privacy: .public)
+          Viewer didChange pid=\(ProcessInfo.processInfo.processIdentifier) \
+          renderer=\(Defaults.shared.renderer ?? "nil", privacy: .public) \
+          template=\(Defaults.shared.template ?? "nil", privacy: .public)
           """)
       }
     }
