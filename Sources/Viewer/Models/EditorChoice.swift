@@ -189,7 +189,7 @@ func substituteEditorTemplate(
 ) -> String {
   let allowed = CharacterSet.urlQueryAllowed
     .subtracting(CharacterSet(charactersIn: "&=+?#"))
-  return template.substituding(substitutions: [
+  return template.substituting(substitutions: [
     "{url}": fileURL.absoluteString
       .addingPercentEncoding(withAllowedCharacters: allowed)
     ?? fileURL.absoluteString,

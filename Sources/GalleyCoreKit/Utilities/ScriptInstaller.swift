@@ -31,7 +31,9 @@ public enum ScriptInstaller {
   /// Copies the bundled Scripts folder into `destination`, customizing the
   /// hardcoded loopback port in shell scripts to match the running server.
   /// Files at the destination with the same relative path are overwritten.
-  static func install(to destination: URL, context: [String: String]) throws {
+  static func install(
+    to destination: URL, context: KeyValuePairs<String, String>) throws
+  {
     guard let source = bundledSourceURL, source.itemExists else {
       throw InstallError.sourceMissing
     }
@@ -74,7 +76,9 @@ public enum ScriptInstaller {
   }
 
   @MainActor
-  static public func installScripts(context: [String: String] = [:]) {
+  static public func installScripts(
+    context: KeyValuePairs<String, String> = [:])
+  {
     let panel = NSOpenPanel()
     panel.identifier = .init(rawValue: "install-scripts")
     panel.canChooseFiles = false
