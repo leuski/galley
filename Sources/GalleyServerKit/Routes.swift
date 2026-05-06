@@ -70,18 +70,18 @@ enum Routes {
     guard let documentURL = decodeFilePath(
       from: request.path, prefix: "/\(RouteNames.preview)")
     else {
-      return HTTPResponses.badRequest("Invalid path")
+      return HTTPResponses.badRequest(String(localized: "Invalid path"))
     }
 
     let ext = documentURL.pathExtension.lowercased()
     if MarkdownFileTypes.extensions.contains(ext) {
       guard let renderer else {
         return HTTPResponses.errorPage(
-          title: "No markdown processor configured",
-          detail: """
+          title: String(localized: "No markdown processor configured"),
+          detail: String(localized: """
             Install a supported processor (e.g. multimarkdown via Homebrew) \
             and pick it in Settings.
-            """,
+            """),
           source: "")
       }
       return await renderPreview(
@@ -94,7 +94,8 @@ enum Routes {
     if assetExtensions.contains(ext) {
       return serveFile(at: documentURL)
     }
-    return HTTPResponses.notFound("Unsupported extension: .\(ext)")
+    return HTTPResponses.notFound(
+      String(localized: "Unsupported extension: .\(ext)"))
   }
 
   private static func renderPreview(
@@ -105,7 +106,8 @@ enum Routes {
     renderer: any MarkdownRenderer
   ) async -> HTTPResponse {
     guard FileManager.default.isReadableFile(atPath: documentURL.path) else {
-      return HTTPResponses.notFound("Cannot read \(documentURL.path)")
+      return HTTPResponses.notFound(
+        String(localized: "Cannot read \(documentURL.path)"))
     }
 
     let source: String
@@ -113,7 +115,9 @@ enum Routes {
       source = try String(contentsOf: documentURL, encoding: .utf8)
     } catch {
       return HTTPResponses.notFound(
-        "Cannot read \(documentURL.path): \(error.localizedDescription)")
+        String(
+          localized:
+            "Cannot read \(documentURL.path): \(error.localizedDescription)"))
     }
 
     let renderedBody: String
@@ -121,7 +125,7 @@ enum Routes {
       renderedBody = try await renderer.render(source, baseURL: documentURL)
     } catch {
       return HTTPResponses.errorPage(
-        title: "Render error",
+        title: String(localized: "Render error"),
         detail: error.localizedDescription,
         source: source)
     }
@@ -131,11 +135,11 @@ enum Routes {
       templateHTML = try template.loadHTML()
     } catch {
       return HTTPResponses.errorPage(
-        title: "Template error",
-        detail: """
+        title: String(localized: "Template error"),
+        detail: String(localized: """
           Cannot load template '\(template.name)': \
           \(error.localizedDescription)
-          """,
+          """),
         source: renderedBody)
     }
 
@@ -159,7 +163,8 @@ enum Routes {
 
   private static func serveFile(at url: URL) -> HTTPResponse {
     guard FileManager.default.isReadableFile(atPath: url.path) else {
-      return HTTPResponses.notFound("File not found: \(url.path)")
+      return HTTPResponses.notFound(
+        String(localized: "File not found: \(url.path)"))
     }
     let data: Data
     do {
@@ -191,16 +196,20 @@ enum Routes {
     guard case .templateAsset(let templateID, let file)
       = PreviewRoute(path: request.path)
     else {
-      return HTTPResponses.badRequest("Invalid template asset path")
+      return HTTPResponses.badRequest(
+        String(localized: "Invalid template asset path"))
     }
     guard let template = await TemplateStore.shared
       .existingTemplate(forID: templateID)
     else {
-      return HTTPResponses.notFound("Template not found: \(templateID)")
+      return HTTPResponses.notFound(
+        String(localized: "Template not found: \(templateID)"))
     }
     guard let assetURL = template.resolveAsset(file: file) else {
       return HTTPResponses.notFound(
-        "No such asset in template '\(template.name)': \(file)")
+        String(
+          localized:
+            "No such asset in template '\(template.name)': \(file)"))
     }
     return serveFile(at: assetURL)
   }
@@ -217,7 +226,8 @@ enum Routes {
       MarkdownFileTypes.extensions.contains(
         documentURL.pathExtension.lowercased())
     else {
-      return HTTPResponses.badRequest("Invalid event path")
+      return HTTPResponses.badRequest(
+        String(localized: "Invalid event path"))
     }
 
     let bodyStream = AsyncStream<Data> { continuation in
@@ -303,11 +313,13 @@ enum Routes {
     let expectedPort = hostURL.port ?? 80
     let hostHeader = request.headers[.host] ?? ""
     if !isHostAllowed(hostHeader, expectedPort: expectedPort) {
-      return HTTPResponses.forbidden("Host header not allowed")
+      return HTTPResponses.forbidden(
+        String(localized: "Host header not allowed"))
     }
     if let site = request.headers[HTTPHeader("Sec-Fetch-Site")]?.lowercased(),
        site != "same-origin", site != "none" {
-      return HTTPResponses.forbidden("Cross-site request rejected")
+      return HTTPResponses.forbidden(
+        String(localized: "Cross-site request rejected"))
     }
     return nil
   }

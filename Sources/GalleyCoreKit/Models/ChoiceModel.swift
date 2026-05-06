@@ -73,7 +73,17 @@ enum AnyChoiceValueDecodingError: LocalizedError {
 
 @MainActor
 public protocol ChoiceValue: Hashable {
-  var name: String { get }
+  /// User-visible label for menus / pickers / toggles. Returning
+  /// `LocalizedStringResource` (Apple's recommended pattern for
+  /// domain types — see `CustomLocalizedStringResourceConvertible`)
+  /// lets the catalog pick up translatable phrases via the literal
+  /// init, while data values (filenames, processor binary names)
+  /// flow through `LocalizationValue("\(runtimeString)")` so they
+  /// resolve verbatim without becoming spurious translator entries.
+  ///
+  /// View call sites: `Text(value.name)`.
+  /// Diagnostic / displacement call sites: `String(localized: value.name)`.
+  var name: LocalizedStringResource { get }
 }
 
 @MainActor
@@ -90,7 +100,16 @@ public protocol ChoiceValueEnvelopeProtocol<Value>: ChoiceValue
 }
 
 extension ChoiceValueEnvelopeProtocol {
-  public var name: String { value.description }
+  /// Default: wrap the inner value's `description` (which is data —
+  /// processor binary name, template filename) as a runtime
+  /// `LocalizationValue` so it resolves verbatim and isn't extracted
+  /// into the translator catalog. Concrete envelopes whose inner type
+  /// has a localizable name (e.g. `TemplateChoiceValue`, where
+  /// `BuiltInTemplate` carries "Default") override this to delegate
+  /// to the inner type's `LocalizedStringResource`.
+  public var name: LocalizedStringResource {
+    LocalizedStringResource(String.LocalizationValue("\(value.description)"))
+  }
   nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.value.persistentID == rhs.value.persistentID
   }
@@ -265,8 +284,7 @@ where Element: RestorableChoiceValue
   public var values: [Element] { Element.values(from: source) }
   public var selected: Element {
     didSet {
-      logSelectedChange(
-        from: oldValue.name, next: self.selected.name)
+      logSelectedChange(from: oldValue.name, next: self.selected.name)
     }
   }
   /// See the protocol doc on `ChoiceModel.persistent`. The getter
@@ -350,37 +368,51 @@ where Element: RestorableChoiceValue
     }
 
     if !selected.isResident(in: source) {
-      let displaced = selected.name
+      let displaced = String(localized: selected.name)
       selected = Element.defaultElement(from: source)
       notifier(displaced)
     }
   }
 
   /// Manual heal entry point for callers that don't track or want to
-  /// force a check. Returns the displaced display name, or nil when
-  /// the current selection is still resident.
+  /// force a check. Returns the displaced display name (resolved
+  /// through the current locale), or nil when the current selection
+  /// is still resident.
   @discardableResult
   public func healIfDisplaced() -> String? {
     if selected.isResident(in: source) { return nil }
-    let displaced = selected.name
+    let displaced = String(localized: selected.name)
     selected = Element.defaultElement(from: source)
     return displaced
   }
 
-  private func logSelectedChange(from: String, next: String) {
+  /// Logging helpers take `LocalizedStringResource` and resolve to
+  /// `String` internally — the os_log substitution machinery only
+  /// understands `String`, but every caller in `Choice` already has
+  /// the resource in hand. Keeping the boundary inside the helper
+  /// means call sites stay one line and don't repeat
+  /// `String(localized:)` in a hot path.
+  private func logSelectedChange(
+    from: LocalizedStringResource, next: LocalizedStringResource
+  ) {
     let pid = ProcessInfo.processInfo.processIdentifier
+    let fromString = String(localized: from)
+    let nextString = String(localized: next)
     log.debug("""
       Choice.selected pid=\(pid) \
-      \(from, privacy: .public) → \(next, privacy: .public)
+      \(fromString, privacy: .public) → \(nextString, privacy: .public)
       """)
   }
 
-  private func logPersistentSet(incoming: String?, current: String) {
+  private func logPersistentSet(
+    incoming: String?, current: LocalizedStringResource
+  ) {
     let pid = ProcessInfo.processInfo.processIdentifier
+    let currentString = String(localized: current)
     log.debug("""
       Choice.persistent set pid=\(pid) \
       incoming=\(incoming ?? "nil", privacy: .public) \
-      current=\(current, privacy: .public)
+      current=\(currentString, privacy: .public)
       """)
   }
 }
@@ -549,12 +581,17 @@ where Choice: ChoiceModel & Equatable & Hashable
     }
   }
 
-  public var name: String {
+  public var name: LocalizedStringResource {
     switch self {
     case .local(let value):
       return value.name
     case .global(let value):
-      return "Global (\(value.selected.name))"
+      // The "Global (…)" wrapper is a localizable phrase; the inner
+      // selection name is data (resolve it now and substitute in via
+      // `String.LocalizationValue` interpolation, which the catalog
+      // captures as a single "Global (%@)" key).
+      let inner = String(localized: value.selected.name)
+      return LocalizedStringResource("Global (\(inner))")
     }
   }
 }

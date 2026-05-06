@@ -3,7 +3,6 @@ import Foundation
 import GalleyCoreKit
 import Observation
 import os
-import UniformTypeIdentifiers
 
 /// A built-in editor whose URL scheme + line-jump format we know.
 enum EditorPreset: String, Codable, CaseIterable, Identifiable,
@@ -74,15 +73,24 @@ final class EditorChoice: ChoiceModel {
       }
     }
 
-    var name: String {
+    /// User-visible label. Translatable phrases ("Custom URL
+    /// Scheme…", "Other Application…") use the literal init so Xcode
+    /// extracts them; product / brand names ("BBEdit", "TextMate")
+    /// and picked-app filenames go through a runtime
+    /// `LocalizationValue` so they stay out of the catalog and
+    /// resolve to themselves at lookup time.
+    var name: LocalizedStringResource {
       switch self {
       case .preset(let preset):
-        return preset.displayName
+        return LocalizedStringResource(
+          String.LocalizationValue("\(preset.displayName)"))
       case .customURL:
         return "Custom URL Scheme…"
       case .appBundle(let url):
         if let url {
-          return url.deletingPathExtension().lastPathComponent
+          let basename = url.deletingPathExtension().lastPathComponent
+          return LocalizedStringResource(
+            String.LocalizationValue("\(basename)"))
         }
         return "Other Application…"
       }
@@ -110,40 +118,22 @@ final class EditorChoice: ChoiceModel {
       return storedSelected
     }
     set {
-      let resolved: Element
-      switch newValue {
-      case .appBundle(nil):
-        // Re-use whichever URL the appBundle slot already has if it
-        // has one; otherwise prompt. A cancelled prompt refuses the
-        // assignment so the previous selection stays put.
-        if let existing = currentAppBundleURL {
-          resolved = .appBundle(existing)
-        } else if let picked = pickAppBundle() {
-          resolved = .appBundle(picked)
-        } else {
-          return
-        }
-      default:
-        resolved = newValue
-      }
+      // Refuse to land on `.appBundle(nil)`: there is no URL to open
+      // a file with. Callers (the settings view) present the picker
+      // first, then assign `.appBundle(picked)` only on success.
+      if case .appBundle(nil) = newValue { return }
+
       withMutation(keyPath: \.selected) {
-        storedSelected = resolved
+        storedSelected = newValue
       }
-      if let index = values.firstIndex(where: { $0.kind == resolved.kind }) {
-        values[index] = resolved
+      if let index = values.firstIndex(where: { $0.kind == newValue.kind }) {
+        values[index] = newValue
       }
       Defaults.shared.editor = storedSelected
     }
   }
 
-  @ObservationIgnored private let pickAppBundle: @MainActor () -> URL?
-
-  init(
-    pickAppBundle: @escaping @MainActor () -> URL? = EditorChoice
-      .defaultPickAppBundle
-  ) {
-    self.pickAppBundle = pickAppBundle
-
+  init() {
     var initial: [Element] = EditorPreset.allCases.map { .preset($0) }
     initial.append(.customURL(template: EditorPreset.bbedit.template))
     initial.append(.appBundle(nil))
@@ -156,25 +146,15 @@ final class EditorChoice: ChoiceModel {
     self.storedSelected = loaded
   }
 
-  private var currentAppBundleURL: URL? {
+  /// URL stored in the `.appBundle` slot, if any. The settings view
+  /// reads this to decide whether picking the "Other Application…"
+  /// row needs a file picker (slot empty) or can just re-select the
+  /// remembered bundle.
+  var appBundleURL: URL? {
     for value in values {
       if case .appBundle(let url) = value, let url { return url }
     }
     return nil
-  }
-
-  /// Default app-bundle picker — runs `NSOpenPanel` filtered to
-  /// `.app` bundles. Returns nil if the user cancels.
-  static func defaultPickAppBundle() -> URL? {
-    let panel = NSOpenPanel()
-    panel.identifier = .init(rawValue: "pick-editor.panel")
-    panel.allowsMultipleSelection = false
-    panel.canChooseDirectories = false
-    panel.canChooseFiles = true
-    panel.allowedContentTypes = [.applicationBundle]
-    panel.directoryURL = URL(fileURLWithPath: "/Applications")
-    guard panel.runModal() == .OK, let url = panel.url else { return nil }
-    return url
   }
 }
 

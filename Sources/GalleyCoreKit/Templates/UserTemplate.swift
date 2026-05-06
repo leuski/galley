@@ -2,15 +2,24 @@ import Foundation
 
 public struct UserTemplate: TemplateProtocol {
   public let id: String
-  public let name: String
+  /// Filename from disk — data, not translatable.
+  public let nameString: String
   public let directoryURL: URL
   public let htmlURL: URL
+
+  /// `LocalizedStringResource` wrapper for the disk-derived
+  /// `nameString`. Built from a runtime `LocalizationValue`, so
+  /// Xcode's catalog extraction skips it; lookup falls back to the
+  /// raw filename, which is what the user sees.
+  public var name: LocalizedStringResource {
+    LocalizedStringResource(String.LocalizationValue("\(nameString)"))
+  }
 
   public init(
     id: String, name: String, directoryURL: URL, htmlURL: URL
   ) {
     self.id = id
-    self.name = name
+    self.nameString = name
     self.directoryURL = directoryURL
     self.htmlURL = htmlURL
   }

@@ -54,8 +54,12 @@ public final class TemplateStore {
       options: [.skipsHiddenFiles])) ?? []
 
     let discovered: [Template] = contents.compactMap(makeTemplate(at:))
-      .sorted { $0.name.localizedCaseInsensitiveCompare($1.name)
-        == .orderedAscending }
+      .sorted {
+        // Sort by the resolved display name in the current locale —
+        // matches the order the user will see in the menu.
+        String(localized: $0.name).localizedCaseInsensitiveCompare(
+          String(localized: $1.name)) == .orderedAscending
+      }
 
     let combined: [Template] = [.default] + discovered
     if combined.map(\.id) != templates.map(\.id) {

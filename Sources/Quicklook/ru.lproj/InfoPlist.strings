@@ -1,0 +1,8 @@
+/* User-visible bundle display name for the Quick Look extension.
+   Set in build settings via INFOPLIST_KEY_CFBundleDisplayName;
+   localized here so other regions can override per-locale. */
+"CFBundleDisplayName" = "Быстрый просмотр";
+
+/* Human-readable copyright shown in Finder's Get Info pane.
+   Localized here so other regions can override the wording. */
+"NSHumanReadableCopyright" = "© Антон Леуский, 2026. Все права защищены.";

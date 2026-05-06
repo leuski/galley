@@ -16,7 +16,12 @@ public enum OpenBehavior: String, CaseIterable, Identifiable, Sendable {
 
   public var id: String { rawValue }
 
-  public var displayName: String {
+  /// Localized label for the case, exposed as
+  /// `LocalizedStringResource` so the routing layer stays free of
+  /// any UI framework dependency. Call sites resolve via
+  /// `Text(behavior.displayName)` (SwiftUI) or
+  /// `String(localized: behavior.displayName)` (everywhere else).
+  public var displayName: LocalizedStringResource {
     switch self {
     case .newWindow: return "New Window"
     case .newTab: return "New Tab in Frontmost Window"

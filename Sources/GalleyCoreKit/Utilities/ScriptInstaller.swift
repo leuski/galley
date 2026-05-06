@@ -1,13 +1,12 @@
 import Foundation
 import ALFoundation
-import SwiftUI
 
 public enum ScriptInstaller {
-  enum InstallError: LocalizedError {
+  public enum InstallError: LocalizedError {
     case sourceMissing
     case copyFailed(URL, any Error)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
       switch self {
       case .sourceMissing:
         "The bundled Scripts folder is missing from the application."
@@ -24,14 +23,33 @@ public enum ScriptInstaller {
     Bundle.main.url(forResource: "Scripts", withExtension: nil)
   }
 
-  static var defaultBBEditDestination: URL {
+  /// `~/Library/Application Support/BBEdit/Scripts`. Used to seed the
+  /// folder picker so the user lands on BBEdit's scripts directory by
+  /// default. The path may not exist yet — callers should pair it
+  /// with `nearestExistingDirectory(for:)` for the file dialog.
+  public static var defaultBBEditDestination: URL {
     URL.applicationSupportDirectory/"BBEdit"/"Scripts"
+  }
+
+  /// Walks up `url` until it finds a directory that exists on disk.
+  /// `NSOpenPanel` and SwiftUI's `fileDialogDefaultDirectory` both
+  /// silently ignore non-existent URLs, so we land on the deepest
+  /// ancestor that does exist instead of dropping back to the home
+  /// folder.
+  public static func nearestExistingDirectory(for url: URL) -> URL {
+    var current = url
+    while !current.itemExists {
+      let parent = current.parent
+      if parent == current { break }
+      current = parent
+    }
+    return current
   }
 
   /// Copies the bundled Scripts folder into `destination`, customizing the
   /// hardcoded loopback port in shell scripts to match the running server.
   /// Files at the destination with the same relative path are overwritten.
-  static func install(
+  public static func install(
     to destination: URL, context: KeyValuePairs<String, String>) throws
   {
     guard let source = bundledSourceURL, source.itemExists else {
@@ -75,45 +93,4 @@ public enum ScriptInstaller {
     ["sh", "bash", "zsh", "command"].contains(url.pathExtension.lowercased())
   }
 
-  @MainActor
-  static public func installScripts(
-    context: KeyValuePairs<String, String> = [:])
-  {
-    let panel = NSOpenPanel()
-    panel.identifier = .init(rawValue: "install-scripts")
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.canCreateDirectories = true
-    panel.allowsMultipleSelection = false
-    panel.prompt = "Install"
-    panel.title = "Install BBEdit Scripts"
-    panel.message = """
-      Choose the destination folder. Defaults to BBEdit's Scripts folder.
-      """
-
-    let defaultDestination = ScriptInstaller.defaultBBEditDestination
-    panel.directoryURL = nearestExistingDirectory(for: defaultDestination)
-
-    NSApp.activate(ignoringOtherApps: true)
-    guard panel.runModal() == .OK, let destination = panel.url else { return }
-
-    do {
-      try ScriptInstaller.install(to: destination, context: context)
-      NSWorkspace.shared.activateFileViewerSelecting([destination])
-    } catch {
-      let alert = NSAlert(error: error)
-      alert.messageText = "Could not install scripts"
-      alert.runModal()
-    }
-  }
-
-  private static func nearestExistingDirectory(for url: URL) -> URL {
-    var current = url
-    while !current.itemExists {
-      let parent = current.parent
-      if parent == current { break }
-      current = parent
-    }
-    return current
-  }
 }

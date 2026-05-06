@@ -2,11 +2,13 @@ import Foundation
 
 public struct BuiltInTemplate: TemplateProtocol {
   public static let id = "__builtin__"
-  public static let name = "Default"
   public static let shared = BuiltInTemplate()
 
   public var id: String { Self.id }
-  public var name: String { Self.name }
+  /// "Default" is a translatable label; the literal
+  /// `LocalizedStringResource` init lets Xcode lift it into the
+  /// strings catalog on build.
+  public var name: LocalizedStringResource { "Default" }
 
   public func loadHTML() throws -> String { Self.html }
 

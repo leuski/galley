@@ -2,7 +2,15 @@ import Foundation
 
 public protocol TemplateProtocol: Identifiable, Sendable {
   var id: String { get }
-  var name: String { get }
+  /// User-visible label for menus / pickers. Returning
+  /// `LocalizedStringResource` follows Apple's pattern for
+  /// domain types (see `CustomLocalizedStringResourceConvertible`)
+  /// and decouples the kit from SwiftUI. Translatable cases
+  /// (`BuiltInTemplate`'s "Default") use a literal init so the
+  /// catalog picks them up; user-defined templates use a runtime
+  /// `LocalizationValue` so their filenames don't pollute the
+  /// strings catalog.
+  var name: LocalizedStringResource { get }
   func loadHTML() throws -> String
   func rewriteAssets(in html: String, origin: URL) -> String
   func resolveAsset(file: String) -> URL?
@@ -12,7 +20,11 @@ public enum Template: TemplateProtocol, CustomStringConvertible {
   case builtIn(BuiltInTemplate)
   case userDefined(UserTemplate)
 
-  public var description: String { name }
+  /// `CustomStringConvertible` resolves the localizable name through
+  /// the current locale. Used for diagnostic logs and the
+  /// `PersistentChoiceValue` envelope's `name` field — neither cares
+  /// which locale won.
+  public var description: String { String(localized: name) }
 
   public var id: String {
     switch self {
@@ -21,7 +33,7 @@ public enum Template: TemplateProtocol, CustomStringConvertible {
     }
   }
 
-  public var name: String {
+  public var name: LocalizedStringResource {
     switch self {
     case .builtIn(let value): value.name
     case .userDefined(let value): value.name

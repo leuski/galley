@@ -46,7 +46,9 @@ public final class PreviewServerController {
     guard let components = URLComponents(
       url: url, resolvingAgainstBaseURL: false)
     else {
-      state = .failed(message: "Cannot resolve url: \(url)")
+      state = .failed(
+        message: String(
+          localized: "Cannot resolve url: \(url.absoluteString)"))
       return
     }
 
@@ -60,7 +62,9 @@ public final class PreviewServerController {
     fullComponents.port = Int(port)
 
     guard let fullURL = components.url else {
-      state = .failed(message: "Cannot resolve url: \(components)")
+      state = .failed(
+        message: String(
+          localized: "Cannot resolve url: \(String(describing: components))"))
       return
     }
 
@@ -68,9 +72,9 @@ public final class PreviewServerController {
     do {
       address = try sockaddr_in.inet(ip4: host, port: port)
     } catch {
-      state = .failed(message: """
+      state = .failed(message: String(localized: """
         Cannot create loopback address: \(error.localizedDescription)
-        """)
+        """))
       return
     }
     let server = HTTPServer(address: address)

@@ -1,0 +1,9 @@
+/* Description for the Markdown UTI declared in Info.plist. The
+   key is the UTI itself; macOS resolves UTTypeDescription per
+   locale via this lookup. */
+"net.daringfireball.markdown" = "Документ Markdown";
+
+/* Human-readable copyright shown in the About box and Finder's
+   Get Info pane. Localized here so other regions can override
+   the wording (e.g. "Tous droits réservés"). */
+"NSHumanReadableCopyright" = "© Антон Леуский, 2026. Все права защищены.";

@@ -1,7 +1,6 @@
 import AppKit
 import GalleyCoreKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// File menu — Open and Open Recent. SwiftUI's `WindowGroup` does not
 /// install a system Open Recent menu (that's `NSDocument`-driven),
@@ -10,6 +9,7 @@ struct FileCommands: Commands {
   @Bindable var recents: RecentDocumentsModel
   @FocusedValue(\.documentModel) private var model
   @FocusedValue(\.viewerRenameContext) private var renameContext
+  @FocusedValue(\.viewerExportPDFContext) private var exportPDFContext
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
@@ -39,8 +39,7 @@ struct FileCommands: Commands {
 
     CommandGroup(after: .saveItem) {
       Button("Rename…", systemImage: "pencil") {
-        guard let model, let context = renameContext else { return }
-        runRenamePopup(currentURL: context.url, model: model, context: context)
+        renameContext?.request()
       }
       .disabled(renameContext == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
@@ -56,11 +55,10 @@ struct FileCommands: Commands {
       Divider()
 
       Button("Export as PDF…", systemImage: "arrow.up.document") {
-        guard let model else { return }
-        runExportPDFPanel(model: model)
+        exportPDFContext?.request()
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
-      .disabled(model == nil)
+      .disabled(exportPDFContext == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.exportPDF)
     }
 
@@ -81,72 +79,6 @@ struct FileCommands: Commands {
       .keyboardShortcut("p", modifiers: .command)
       .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.print)
-    }
-  }
-}
-
-@MainActor
-private func runRenamePopup(
-  currentURL: URL,
-  model: DocumentModel,
-  context: RenameContext
-) {
-  let alert = NSAlert()
-  alert.messageText = "Rename Document"
-  alert.informativeText = "Enter a new file name for this document."
-  alert.alertStyle = .informational
-  alert.addButton(withTitle: "Rename")
-  alert.addButton(withTitle: "Cancel")
-
-  let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-  field.stringValue = currentURL.lastPathComponent
-  field.placeholderString = currentURL.lastPathComponent
-  alert.accessoryView = field
-  alert.window.initialFirstResponder = field
-
-  guard alert.runModal() == .alertFirstButtonReturn else { return }
-  let newName = field.stringValue
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-  guard !newName.isEmpty, newName != currentURL.lastPathComponent
-  else { return }
-
-  Task { @MainActor in
-    do {
-      let newURL = try await model.renameCurrentDocument(toName: newName)
-      context.apply(newURL)
-    } catch {
-      NSSound.beep()
-    }
-  }
-}
-
-/// Run a save panel and export the rendered document to PDF. Engages
-/// print-media CSS in `DocumentModel.exportPDF` so template `@page`
-/// rules style page breaks and margins.
-@MainActor
-private func runExportPDFPanel(model: DocumentModel) {
-  let url = model.documentURL
-
-  let panel = NSSavePanel()
-  panel.identifier = .init(rawValue: "export-pdf")
-  panel.title = "Export as PDF"
-  panel.allowedContentTypes = [.pdf]
-  panel.nameFieldStringValue =
-    url.deletingPathExtension().lastPathComponent + ".pdf"
-  panel.directoryURL = url.deletingLastPathComponent()
-
-  guard panel.runModal() == .OK, let destination = panel.url else { return }
-
-  let window = NSApp.keyWindow
-  Task { @MainActor in
-    do {
-      try await model.exportPDF(to: destination, on: window)
-    } catch {
-      let alert = NSAlert()
-      alert.messageText = "Couldn’t export PDF"
-      alert.informativeText = error.localizedDescription
-      alert.alertStyle = .warning
-      alert.runModal()
     }
   }
 }

@@ -5,7 +5,7 @@
 //  Created by Anton Leuski on 4/29/26.
 //
 
-import SwiftUI
+import Foundation
 
 extension Template: ChoiceValueProtocol {
   public typealias PersistentID = String
@@ -18,6 +18,13 @@ public struct TemplateChoiceValue: ChoiceValueEnvelopeProtocol<Template> {
   public init(_ value: Value) {
     self.value = value
   }
+
+  /// Override the envelope's default `name` (which would wrap the
+  /// inner value's `description` as a runtime `LocalizationValue`,
+  /// losing catalog extraction) and forward to `Template.name` so
+  /// `BuiltInTemplate`'s literal "Default" lands in the catalog and
+  /// user-defined templates stay out of it.
+  public var name: LocalizedStringResource { value.name }
 }
 
 extension TemplateChoiceValue: SectionedChoiceValue {

@@ -81,8 +81,10 @@ where Model: ChoiceModel, Model.Element: SectionedChoiceValue
       .sorted { $0.key < $1.key }
       .map { $0.value }
     DividedSections(sections: values, id: \.self) { value in
-      Toggle(value.name, isOn: model.isSelectedBinding(value))
-        .disabled(!value.isAvailable)
+      Toggle(isOn: model.isSelectedBinding(value)) {
+        Text(value.name)
+      }
+      .disabled(!value.isAvailable)
     }
   }
 }

@@ -10,7 +10,7 @@ struct ServerStatusPill: View {
 
   var body: some View {
     HStack(spacing: 6) {
-      Text(label)
+      labelText
         .font(.callout)
         .foregroundStyle(.secondary)
         .monospacedDigit()
@@ -19,17 +19,27 @@ struct ServerStatusPill: View {
         .frame(width: 8, height: 8)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("Server status: \(label)")
+    .accessibilityLabel(Text("Server status: \(labelText)"))
   }
 
-  private var label: String {
+  /// Per-case localized label. Returning `Text` (rather than a
+  /// `String`) keeps the strings in the catalog without forcing a
+  /// boundary `String(localized:)` resolution. The visible body
+  /// renders this directly; the accessibility label concatenates it
+  /// with a "Server status: " prefix using `Text`'s `+` operator,
+  /// which gives translators two separate strings to work with.
+  private var labelText: Text {
     switch status {
-    case .unknown:        return "Checking…"
-    case .disabled:       return "Disabled"
-    case .starting:       return "Starting…"
-    case .running(let url): return "Running on :\(url.port ?? 0)"
-    case .stopped:        return "Not running"
-    case .notResponding:  return "Not responding"
+    case .unknown:        return Text("Checking…")
+    case .disabled:       return Text("Disabled")
+    case .starting:       return Text("Starting…")
+    case .running(let url):
+      // `.grouping(.never)` defeats the locale-default thousands
+      // separator; port numbers are identifiers, not quantities.
+      return Text(
+        "Running on :\(url.port ?? 0, format: .number.grouping(.never))")
+    case .stopped:        return Text("Not running")
+    case .notResponding:  return Text("Not responding")
     }
   }
 

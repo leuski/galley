@@ -1,6 +1,7 @@
 import AppKit
 import GalleyCoreKit
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 /// The viewer surface for a single document window. Mounted by
@@ -16,6 +17,17 @@ struct DocumentView: View {
   @State private var model: DocumentModel
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
+
+  /// Drives the SwiftUI rename alert. The File ▸ Rename… menu item
+  /// triggers this through the focused `RenameContext.request`
+  /// closure published below.
+  @State private var renameRequested = false
+  @State private var renameInput = ""
+
+  /// Non-nil while the SwiftUI "Couldn't export PDF" alert is up.
+  /// Set by the export flow on failure; cleared when the alert is
+  /// dismissed.
+  @State private var exportPDFError: String?
 
   /// Constructs the model with the WindowGroup's bound URL plus the
   /// per-file persisted choice IDs so `documentURL`, `templates`, and
@@ -108,10 +120,33 @@ struct DocumentView: View {
         model: model,
         renameContext: RenameContext(
           url: model.documentURL,
-          apply: { newURL in
-            recents.record(newURL)
-            if fileURL != newURL { fileURL = newURL }
-          })))
+          request: {
+            renameInput = model.documentURL.lastPathComponent
+            renameRequested = true
+          }),
+        exportPDFContext: ExportPDFContext(
+          url: model.documentURL,
+          request: { performExportPDF() })))
+      .alert(
+        "Rename Document",
+        isPresented: $renameRequested
+      ) {
+        TextField(
+          model.documentURL.lastPathComponent, text: $renameInput)
+        Button("Rename") { performRename() }
+        Button("Cancel", role: .cancel) { }
+      } message: {
+        Text("Enter a new file name for this document.")
+      }
+      .alert(
+        "Couldn’t export PDF",
+        isPresented: exportPDFErrorPresented,
+        presenting: exportPDFError
+      ) { _ in
+        Button("OK") { exportPDFError = nil }
+      } message: { message in
+        Text(message)
+      }
       .navigationTitle(model.documentURL.lastPathComponent)
       // No `id:` — `replaceDocument` drives in-window URL changes
       // directly through `model.bind(to:)`, so re-firing on every
@@ -199,6 +234,71 @@ struct DocumentView: View {
   private func mirrorPerFileShowsTOC(_ value: Bool) {
     Defaults.shared.perFileStateStore[model.documentURL]
       .showsTOC = value ? true : nil
+  }
+
+  /// Run the destination save panel and the export pipeline. Called
+  /// by the File ▸ Export as PDF… menu item via the focused
+  /// `ExportPDFContext.request` closure.
+  ///
+  /// The save panel stays AppKit because SwiftUI's `.fileExporter` is
+  /// data-first and our pipeline is destination-first
+  /// (`runPrintOperation` writes paginated bytes directly to a
+  /// `jobSavingURL`). Routing the panel's title through
+  /// `String(localized:)` is enough to keep it in the strings table.
+  /// The failure surface is the SwiftUI `.alert` driven by
+  /// `exportPDFError`.
+  private func performExportPDF() {
+    let url = model.documentURL
+    let panel = NSSavePanel()
+    panel.identifier = .init(rawValue: "export-pdf")
+    panel.title = String(localized: "Export as PDF")
+    panel.allowedContentTypes = [.pdf]
+    panel.nameFieldStringValue =
+      url.deletingPathExtension().lastPathComponent + ".pdf"
+    panel.directoryURL = url.deletingLastPathComponent()
+
+    guard panel.runModal() == .OK, let destination = panel.url
+    else { return }
+
+    let window = hostWindow
+    Task { @MainActor in
+      do {
+        try await model.exportPDF(to: destination, on: window)
+      } catch {
+        exportPDFError = error.localizedDescription
+      }
+    }
+  }
+
+  /// Bridges the optional error string to the boolean the
+  /// `.alert(... isPresented:)` modifier expects: clearing the error
+  /// dismisses the alert and vice versa.
+  private var exportPDFErrorPresented: Binding<Bool> {
+    Binding(
+      get: { exportPDFError != nil },
+      set: { if !$0 { exportPDFError = nil } })
+  }
+
+  /// Run the rename triggered by the SwiftUI alert's "Rename" button.
+  /// Trims whitespace, no-ops on empty / unchanged input, beeps on
+  /// failure (matches the prior NSAlert flow), and on success records
+  /// the renamed URL with Open Recent and follows the WindowGroup
+  /// binding to the new path.
+  private func performRename() {
+    let trimmed = renameInput
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let currentURL = model.documentURL
+    guard !trimmed.isEmpty, trimmed != currentURL.lastPathComponent
+    else { return }
+    Task { @MainActor in
+      do {
+        let newURL = try await model.renameCurrentDocument(toName: trimmed)
+        recents.record(newURL)
+        if fileURL != newURL { fileURL = newURL }
+      } catch {
+        NSSound.beep()
+      }
+    }
   }
 
   /// Swap this window's bound document for `newURL` in place. Used by
@@ -421,11 +521,13 @@ private struct ChangeHandlers: ViewModifier {
 private struct SceneValuesModifier: ViewModifier {
   let model: DocumentModel
   let renameContext: RenameContext
+  let exportPDFContext: ExportPDFContext
 
   func body(content: Content) -> some View {
     content
       .focusedSceneValue(\.documentModel, model)
       .focusedSceneValue(\.viewerRenameContext, renameContext)
+      .focusedSceneValue(\.viewerExportPDFContext, exportPDFContext)
   }
 }
 

@@ -1,10 +1,26 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import GalleyCoreKit
 
 struct MarkdownSettingsView: View {
   @Bindable var appModel: AppModel
   @Bindable var defaults = Defaults.shared
+
+  /// Drives the SwiftUI `.fileImporter` for the "Other Application…"
+  /// editor row and the "Choose Application…" detail button. The
+  /// picker is a single instance attached to `editorPicker`; both
+  /// entry points just flip this state.
+  @State private var showAppPicker = false
+
+  /// Drives the BBEdit-script-folder picker behind the
+  /// "Install scripts…" button.
+  @State private var showScriptPicker = false
+
+  /// Non-nil while the install-scripts failure alert is showing.
+  /// SwiftUI presents the alert when this is non-nil and clears it on
+  /// dismissal.
+  @State private var scriptInstallError: String?
 
   var body: some View {
     Section {
@@ -33,11 +49,11 @@ struct MarkdownSettingsView: View {
       Toggle(
         "Allow per-window processor and template overrides",
         isOn: $defaults.enablePerDocumentOverrides)
-      Text(
-        "Adds a Format menu section that lets each window pin its own "
-        + "Markdown processor or template, overriding the global "
-        + "selection."
-      )
+      Text("""
+        Adds a Format menu section that lets each window pin its own \
+        Markdown processor or template, overriding the global \
+        selection.
+        """)
       .subtitle()
     }
   }
@@ -46,14 +62,48 @@ struct MarkdownSettingsView: View {
   private var editorPicker: some View {
     VStack(alignment: .leading, spacing: 8) {
       LabeledContent {
-        Menu(appModel.editors.selected.name) {
-          EditorMenuCore(model: appModel.editors)
+        Menu {
+          EditorMenuCore(
+            model: appModel.editors,
+            onRequestAppPicker: { showAppPicker = true })
+        } label: {
+          Text(appModel.editors.selected.name)
         }
         .fixedSize()
       } label: {
-        Text("Еditor")
+        Text("Editor")
       }
       detailFields
+    }
+    .modifier(AppBundlePickerModifier(
+      isPresented: $showAppPicker,
+      onCompletion: handlePickedAppBundle))
+    .modifier(InstallScriptsPickerModifier(
+      isPresented: $showScriptPicker,
+      errorMessage: $scriptInstallError,
+      onCompletion: handlePickedScriptDestination))
+  }
+
+  private func handlePickedAppBundle(
+    _ result: Result<[URL], any Error>
+  ) {
+    guard case .success(let urls) = result, let url = urls.first
+    else { return }
+    appModel.editors.selected = .appBundle(url)
+  }
+
+  private func handlePickedScriptDestination(
+    _ result: Result<[URL], any Error>
+  ) {
+    guard case .success(let urls) = result, let destination = urls.first
+    else { return }
+    do {
+      try ScriptInstaller.install(to: destination, context: [
+        "__LOCATION__": Defaults.shared.host.galleyPreview.absoluteString
+      ])
+      NSWorkspace.shared.activateFileViewerSelecting([destination])
+    } catch {
+      scriptInstallError = error.localizedDescription
     }
   }
 
@@ -62,13 +112,8 @@ struct MarkdownSettingsView: View {
     switch appModel.editors.selected {
     case .preset(.bbedit):
       LabeledContent {
-        Button("Install scripts…") {
-          ScriptInstaller.installScripts(context: [
-            "__LOCATION__": Defaults.shared
-              .host.galleyPreview.absoluteString
-          ])
-        }
-        .padding(.top, 4)
+        Button("Install scripts…") { showScriptPicker = true }
+          .padding(.top, 4)
       } label: {
         Text("")
       }
@@ -98,7 +143,7 @@ struct MarkdownSettingsView: View {
           )
           .subtitle()
           Spacer()
-          Button("Choose Application…") { pickAppBundle() }
+          Button("Choose Application…") { showAppPicker = true }
         }
       }
     }
@@ -166,20 +211,89 @@ struct MarkdownSettingsView: View {
     )
   }
 
-  /// "Choose Application…" — pick a fresh bundle URL even when one is
-  /// already set. Goes through `selected.set` so the appBundle slot
-  /// in `values` updates too.
-  private func pickAppBundle() {
-    guard let url = EditorChoice.defaultPickAppBundle() else { return }
-    appModel.editors.selected = .appBundle(url)
+}
+
+/// Wraps the app-bundle `.fileImporter` and its `.fileDialog*`
+/// configuration as a single modifier so the chain doesn't fight
+/// the install-scripts chain when both are attached to the same
+/// `editorPicker` VStack. Each modifier owns its `isPresented`
+/// binding and the dialog's per-purpose configuration.
+private struct AppBundlePickerModifier: ViewModifier {
+  @Binding var isPresented: Bool
+  let onCompletion: (Result<[URL], any Error>) -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .fileImporter(
+        isPresented: $isPresented,
+        allowedContentTypes: [.applicationBundle],
+        allowsMultipleSelection: false,
+        onCompletion: onCompletion)
+      .fileDialogDefaultDirectory(URL(fileURLWithPath: "/Applications"))
+      .fileDialogConfirmationLabel("Choose")
+      .fileDialogCustomizationID("editor.app-bundle")
+  }
+}
+
+/// Wraps the BBEdit-script-folder `.fileImporter`, its
+/// `.fileDialog*` config, and the failure `.alert` as a single
+/// modifier. Lives at the `editorPicker` VStack level rather than
+/// on the inner `Button` because deeply-nested `.fileImporter`
+/// modifiers (Button → LabeledContent → switch case) failed to
+/// present.
+private struct InstallScriptsPickerModifier: ViewModifier {
+  @Binding var isPresented: Bool
+  @Binding var errorMessage: String?
+  let onCompletion: (Result<[URL], any Error>) -> Void
+
+  /// Bridges the optional error to the `.alert(isPresented:)` Bool;
+  /// dismissing the alert clears the error.
+  private var errorPresented: Binding<Bool> {
+    Binding(
+      get: { errorMessage != nil },
+      set: { if !$0 { errorMessage = nil } })
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .fileImporter(
+        isPresented: $isPresented,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false,
+        onCompletion: onCompletion)
+      .fileDialogDefaultDirectory(
+        ScriptInstaller.nearestExistingDirectory(
+          for: ScriptInstaller.defaultBBEditDestination))
+      .fileDialogConfirmationLabel("Install")
+      .fileDialogMessage("""
+        Choose the destination folder. Defaults to BBEdit's \
+        Scripts folder.
+        """)
+      .fileDialogCustomizationID("install-scripts")
+      .alert(
+        "Could not install scripts",
+        isPresented: errorPresented,
+        presenting: errorMessage
+      ) { _ in
+        Button("OK") { errorMessage = nil }
+      } message: { message in
+        Text(message)
+      }
   }
 }
 
 /// Menu rows for the editor picker. Sectioned by kind so presets
-/// sit above customURL/appBundle. Driven by `selectedBinding(_:)`
-/// like every other choice menu in the app.
+/// sit above customURL/appBundle.
+///
+/// Most rows use the default selection binding. The `.appBundle` row
+/// is special-cased: if the slot already has a remembered URL, the
+/// row just re-selects it; if not, the row asks the host view to
+/// present its `.fileImporter` so the user can pick an app first.
+/// The model never receives `.appBundle(nil)` — it only sees
+/// `.appBundle(picked)` after a successful pick.
 struct EditorMenuCore: View {
   let model: EditorChoice
+  let onRequestAppPicker: () -> Void
 
   var body: some View {
     let values = model.values
@@ -192,8 +306,28 @@ struct EditorMenuCore: View {
         }
       }
     ], id: \.kind) { value in
-      Toggle(value.name, isOn: model.isSelectedBinding(value))
+      Toggle(isOn: binding(for: value)) {
+        Text(value.name)
+      }
     }
+  }
+
+  private func binding(for value: EditorChoice.Element) -> Binding<Bool> {
+    Binding(
+      get: { model.selected.kind == value.kind },
+      set: { newValue in
+        guard newValue else { return }
+        if case .appBundle = value {
+          if let url = model.appBundleURL {
+            model.selected = .appBundle(url)
+          } else {
+            onRequestAppPicker()
+          }
+        } else {
+          model.selected = value
+        }
+      }
+    )
   }
 }
 

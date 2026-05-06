@@ -43,11 +43,11 @@ struct ServerSettingsView: View {
       .task(id: probeKey) {
         await serverStatus.run(host: probeHost)
       }
-      Text(
-        "When on, a background server makes documents available in any "
-        + "browser. Registered as a login item so it restarts after "
-        + "logout."
-      )
+      Text("""
+        When on, a background server makes documents available in any \
+        browser. Registered as a login item so it restarts after \
+        logout.
+        """)
       .subtitle()
 
       LabeledContent {
