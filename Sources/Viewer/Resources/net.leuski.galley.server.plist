@@ -5,7 +5,7 @@
 	<key>Label</key>
 	<string>net.leuski.galley.server</string>
 	<key>BundleProgram</key>
-	<string>Contents/Resources/Markdown Preview Server.app/Contents/MacOS/Markdown Preview Server</string>
+	<string>Contents/Resources/Galley Server.app/Contents/MacOS/Galley Server</string>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>KeepAlive</key>
