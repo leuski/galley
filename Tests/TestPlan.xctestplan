@@ -10,7 +10,7 @@
   ],
   "defaultOptions" : {
     "targetForVariableExpansion" : {
-      "containerPath" : "container:MarkdownPreviewer.xcodeproj",
+      "containerPath" : "container:Galley.xcodeproj",
       "identifier" : "626E8D5B2F9DD1C800BD51F9",
       "name" : "Tests"
     }

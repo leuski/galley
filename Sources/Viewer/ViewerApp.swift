@@ -2,6 +2,7 @@ import AppKit
 import GalleyCoreKit
 import SwiftUI
 import UniformTypeIdentifiers
+import ALFoundation
 
 @main
 struct ViewerApp: App {
@@ -10,7 +11,21 @@ struct ViewerApp: App {
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()
 
+  private static func createApplicationSupportDirectory() {
+    let localized = GalleyConstants
+      .applicationSupportDirectory / ".localized" / "en.strings"
+    guard !localized.itemExists else { return }
+    try? localized.parent.createDirectory()
+    let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+    ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
+    ?? ProcessInfo.processInfo.processName
+    try? """
+    "\(GalleyConstants.suiteName)" = "\(appName)";
+    """.write(to: localized, atomically: true, encoding: .utf8)
+  }
+
   init() {
+    Self.createApplicationSupportDirectory()
     let args = LaunchArguments.fromProcess()
     let dispatcher = WindowDispatcher()
     if let seed = args.seedFile {

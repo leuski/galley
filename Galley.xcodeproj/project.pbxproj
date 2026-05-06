@@ -429,7 +429,7 @@
 			name = Server;
 			packageProductDependencies = (
 			);
-			productName = MarkdownPreviewer;
+			productName = "Galley Server";
 			productReference = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -453,7 +453,7 @@
 			packageProductDependencies = (
 				62FE000400000000CADD7201 /* ALFoundation */,
 			);
-			productName = MarkdownPreviewerTests;
+			productName = GalleyTests;
 			productReference = 626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
@@ -508,7 +508,7 @@
 			packageProductDependencies = (
 				62D5E4B52FA5DB9200CADD72 /* ALFoundation */,
 			);
-			productName = "Markdown Eye";
+			productName = Galley;
 			productReference = 62D5CA192FA048F000CADD72 /* Galley.app */;
 			productType = "com.apple.product-type.application";
 		};

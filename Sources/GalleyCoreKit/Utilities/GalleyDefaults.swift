@@ -57,7 +57,7 @@ public enum GalleyConstants {
   /// on-disk state live in one place regardless of which process is
   /// running.
   public static var applicationSupportDirectory: URL {
-    URL.applicationSupportDirectory / suiteName
+    URL.applicationSupportDirectory / "\(suiteName).localized"
   }
 }
 

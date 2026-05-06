@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Two macOS apps and a Quick Look extension sharing one rendering engine:
 
-- **Galley** ("Markdown Eye", bundle id `net.leuski.galley`, target `Viewer`, product `Galley`) — native document viewer. `WindowGroup(for: URL.self)` over a `WebPage`-backed `WebView`. Custom URL schemes: `x-galley://local` (internal `WKURLSchemeHandler` for template/document asset resolution) and `galley://<path>?line=N` (LaunchServices entry from BBEdit's `Preview Markdown… → in Galley` script). Cmd-click any rendered block to jump to the source line in the user's chosen editor.
+- **Galley** (bundle id `net.leuski.galley`, target `Viewer`, product `Galley`) — native document viewer. `WindowGroup(for: URL.self)` over a `WebPage`-backed `WebView`. Custom URL schemes: `x-galley://local` (internal `WKURLSchemeHandler` for template/document asset resolution) and `galley://<path>?line=N` (LaunchServices entry from BBEdit's `Preview Markdown… → in Galley` script). Cmd-click any rendered block to jump to the source line in the user's chosen editor.
 - **Galley Server** (bundle id `net.leuski.galley.server`, target `Server`) — `MenuBarExtra`-only app that runs an HTTP server in-process so any browser (or BBEdit's preview pane) can view the same documents Galley would render. Owns server lifecycle, port, launch-at-login, and the BBEdit helper-script installer.
 - **Quicklook** (target `Quicklook`, product `Quicklook.appex`) — `QLPreviewingController` extension. Tries the running Galley Server first so the user's chosen processor and template are honored; falls back to an in-process render with the built-in Swift renderer and bundled template when the server is unreachable.
 

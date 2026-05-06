@@ -90,7 +90,7 @@ Output is wrapped in an HTML template. A built-in template is always
 available; custom templates live in:
 
 ```
-~/Library/Application Support/MarkdownPreviewer/Templates/
+~/Library/Application Support/Galley/Templates/
 ```
 
 Two layouts are recognized:
@@ -160,7 +160,7 @@ Any other editor that can shell out to a URL works the same way.
 
 ## Building
 
-Open `MarkdownPreviewer.xcodeproj` in Xcode. Two app schemes:
+Open `Galley.xcodeproj` in Xcode. Two app schemes:
 
 - **Viewer** — Galley.
 - **Server** — Markdown Preview Server.
@@ -171,11 +171,11 @@ Two framework schemes (mostly for direct iteration):
 - **GalleyServerKit** — the FlyingFox-backed HTTP server.
 
 ```bash
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer build
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Server build
+xcodebuild -project Galley.xcodeproj -scheme Viewer build
+xcodebuild -project Galley.xcodeproj -scheme Server build
 
 # Tests (Swift Testing for logic, XCUITest for UI)
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer test
+xcodebuild -project Galley.xcodeproj -scheme Viewer test
 ```
 
 The project uses Swift's structured concurrency throughout (`@Observable`,
