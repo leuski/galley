@@ -3,12 +3,14 @@ import Foundation
 public struct BuiltInTemplate: TemplateProtocol {
   public static let id = "__builtin__"
   public static let shared = BuiltInTemplate()
+  public static let name = LocalizedStringResource(
+    "Default", bundle: .galleyCoreKit)
 
   public var id: String { Self.id }
   /// "Default" is a translatable label; the literal
   /// `LocalizedStringResource` init lets Xcode lift it into the
   /// strings catalog on build.
-  public var name: LocalizedStringResource { "Default" }
+  public var name: LocalizedStringResource { Self.name }
 
   public func loadHTML() throws -> String { Self.html }
 

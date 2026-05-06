@@ -584,14 +584,15 @@ where Choice: ChoiceModel & Equatable & Hashable
   public var name: LocalizedStringResource {
     switch self {
     case .local(let value):
-      return value.name
+      value.name
     case .global(let value):
       // The "Global (…)" wrapper is a localizable phrase; the inner
       // selection name is data (resolve it now and substitute in via
       // `String.LocalizationValue` interpolation, which the catalog
       // captures as a single "Global (%@)" key).
-      let inner = String(localized: value.selected.name)
-      return LocalizedStringResource("Global (\(inner))")
+      LocalizedStringResource(
+        "Global (\(String(localized: value.selected.name)))",
+        bundle: .galleyCoreKit)
     }
   }
 }

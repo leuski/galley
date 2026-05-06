@@ -4,13 +4,14 @@ public struct TemplateMenu<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,
       Model.Element: SectionedChoiceValue
 {
-  let title: String
+  let title: LocalizedStringResource
   let model: Model
 
   public init(
-    title: String = "Template", model: Model)
+    title: LocalizedStringResource? = nil, model: Model)
   {
-    self.title = title
+    self.title = title ?? LocalizedStringResource(
+      "Template", bundle: .galleyCoreKit)
     self.model = model
   }
 
@@ -18,9 +19,12 @@ where Model: ChoiceModel & AnyObject & Observable,
     Menu(title, systemImage: "doc.richtext") {
       MenuCore(model: model)
       Divider()
-      Button("Reveal Templates Folder", systemImage: "folder") {
-        TemplateStore.shared.revealFolder()
-      }
+      Button(
+        LocalizedStringResource(
+          "Reveal Templates Folder", bundle: .galleyCoreKit),
+        systemImage: "folder") {
+          TemplateStore.shared.revealFolder()
+        }
     }
   }
 }

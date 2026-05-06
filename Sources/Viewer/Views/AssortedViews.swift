@@ -25,8 +25,8 @@ extension View {
 
 @ViewBuilder @MainActor
 func templateMenu(
-  title: String = "Template",
-  globalTitle: String? = nil,
+  title: LocalizedStringResource? = nil,
+  globalTitle: LocalizedStringResource? = nil,
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
@@ -42,8 +42,8 @@ func templateMenu(
 
 @ViewBuilder @MainActor
 func processorMenu(
-  title: String = "Template",
-  globalTitle: String? = nil,
+  title: LocalizedStringResource? = nil,
+  globalTitle: LocalizedStringResource? = nil,
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {

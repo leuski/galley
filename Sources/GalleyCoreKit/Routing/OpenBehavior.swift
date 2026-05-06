@@ -23,9 +23,12 @@ public enum OpenBehavior: String, CaseIterable, Identifiable, Sendable {
   /// `String(localized: behavior.displayName)` (everywhere else).
   public var displayName: LocalizedStringResource {
     switch self {
-    case .newWindow: return "New Window"
-    case .newTab: return "New Tab in Frontmost Window"
-    case .replaceCurrent: return "Replace Frontmost Document"
+    case .newWindow: LocalizedStringResource(
+      "New Window", bundle: .galleyCoreKit)
+    case .newTab: LocalizedStringResource(
+      "New Tab in Frontmost Window", bundle: .galleyCoreKit)
+    case .replaceCurrent: LocalizedStringResource(
+      "Replace Frontmost Document", bundle: .galleyCoreKit)
     }
   }
 }

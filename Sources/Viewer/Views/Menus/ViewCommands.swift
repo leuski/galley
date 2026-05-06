@@ -36,7 +36,7 @@ struct ViewCommands: Commands {
   /// "Show…" so the keyboard shortcut still appears in the menu.
   @ViewBuilder
   private var tocToggle: some View {
-    let title = (model?.showsTOC ?? false)
+    let title: LocalizedStringResource = (model?.showsTOC ?? false)
       ? "Hide Table of Contents"
       : "Show Table of Contents"
     Button {

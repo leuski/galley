@@ -4,13 +4,14 @@ public struct ProcessorMenu<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,
       Model.Element: SectionedChoiceValue
 {
-  let title: String
+  let title: LocalizedStringResource
   let model: Model
 
   public init(
-    title: String = "Processor", model: Model)
+    title: LocalizedStringResource? = nil, model: Model)
   {
-    self.title = title
+    self.title = title ?? LocalizedStringResource(
+      "Processor", bundle: .galleyCoreKit)
     self.model = model
   }
 
@@ -19,11 +20,11 @@ where Model: ChoiceModel & AnyObject & Observable,
       MenuCore(model: model)
       Divider()
       Button(
-        "Rescan Installed Processors",
-        systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
-      {
-        ProcessorStore.shared.rediscover()
-      }
+        LocalizedStringResource(
+          "Rescan Installed Processors", bundle: .galleyCoreKit),
+        systemImage: "arrow.trianglehead.2.clockwise.rotate.90") {
+          ProcessorStore.shared.rediscover()
+        }
     }
   }
 }

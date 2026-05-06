@@ -33,8 +33,10 @@ public enum DisplacementNotifier {
     /// `UNNotificationContent.title` boundary.
     public var title: LocalizedStringResource {
       switch self {
-      case .processor: return "Markdown processor unavailable"
-      case .template: return "Template unavailable"
+      case .processor: LocalizedStringResource(
+        "Markdown processor unavailable", bundle: .galleyCoreKit)
+      case .template: LocalizedStringResource(
+        "Template unavailable", bundle: .galleyCoreKit)
       }
     }
   }
@@ -59,7 +61,8 @@ public enum DisplacementNotifier {
     content.title = String(localized: kind.title)
     content.body = String(
       localized:
-        "\(displaced) is no longer available — switched to the default.")
+        "\(displaced) is no longer available — switched to the default.",
+      bundle: .galleyCoreKit)
     let request = UNNotificationRequest(
       identifier: UUID().uuidString,
       content: content,
