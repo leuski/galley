@@ -46,15 +46,19 @@ struct MarkdownSettingsView: View {
     }
 
     Section {
-      Toggle(
-        "Allow per-window processor and template overrides",
-        isOn: $defaults.enablePerDocumentOverrides)
-      Text("""
-        Adds a Format menu section that lets each window pin its own \
-        Markdown processor or template, overriding the global \
-        selection.
-        """)
-      .subtitle()
+      LabeledContent {
+        Toggle("", isOn: $defaults.enablePerDocumentOverrides)
+          .labelsHidden()
+          .toggleStyle(.switch)
+      } label: {
+        Text(
+          "Allow per-window processor and template overrides")
+        Text("""
+          Adds a Format menu section that lets each window pin its own \
+          Markdown processor or template, overriding the global \
+          selection.
+          """)
+      }
     }
   }
 
@@ -73,15 +77,15 @@ struct MarkdownSettingsView: View {
       } label: {
         Text("Editor")
       }
+      .modifier(InstallScriptsPickerModifier(
+        isPresented: $showScriptPicker,
+        errorMessage: $scriptInstallError,
+        onCompletion: handlePickedScriptDestination))
       detailFields
+        .modifier(AppBundlePickerModifier(
+          isPresented: $showAppPicker,
+          onCompletion: handlePickedAppBundle))
     }
-    .modifier(AppBundlePickerModifier(
-      isPresented: $showAppPicker,
-      onCompletion: handlePickedAppBundle))
-    .modifier(InstallScriptsPickerModifier(
-      isPresented: $showScriptPicker,
-      errorMessage: $scriptInstallError,
-      onCompletion: handlePickedScriptDestination))
   }
 
   private func handlePickedAppBundle(
@@ -214,10 +218,12 @@ struct MarkdownSettingsView: View {
 }
 
 /// Wraps the app-bundle `.fileImporter` and its `.fileDialog*`
-/// configuration as a single modifier so the chain doesn't fight
-/// the install-scripts chain when both are attached to the same
-/// `editorPicker` VStack. Each modifier owns its `isPresented`
-/// binding and the dialog's per-purpose configuration.
+/// configuration. Attached to the Menu's `LabeledContent` rather
+/// than the outer `editorPicker` VStack — two `.fileImporter`
+/// modifiers on the same host view conflict and only one ends up
+/// presentable. Pairing each with a distinct host view (this one
+/// on the Menu container, `InstallScriptsPickerModifier` on the
+/// VStack) keeps both reachable.
 private struct AppBundlePickerModifier: ViewModifier {
   @Binding var isPresented: Bool
   let onCompletion: (Result<[URL], any Error>) -> Void

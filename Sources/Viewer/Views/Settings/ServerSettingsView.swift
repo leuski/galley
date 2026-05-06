@@ -34,24 +34,18 @@ struct ServerSettingsView: View {
     Section {
       LabeledContent {
         ServerStatusPill(status: serverStatus.status)
-        Toggle("Run server", isOn: serverEnabledBinding)
+        Toggle("Server", isOn: serverEnabledBinding)
           .toggleStyle(.switch)
           .labelsHidden()
       } label: {
-        Text("Run server")
+        Text("Server")
       }
       .task(id: probeKey) {
         await serverStatus.run(host: probeHost)
       }
-      Text("""
-        When on, a background server makes documents available in any \
-        browser. Registered as a login item so it restarts after \
-        logout.
-        """)
-      .subtitle()
 
       LabeledContent {
-        TextField("", text: $portString)
+        TextField("Port", text: $portString)
           .labelsHidden()
           .onSubmit { commitPort() }
           .frame(width: 80)
@@ -60,12 +54,13 @@ struct ServerSettingsView: View {
           }
       } label: {
         Text("Port")
-        Text("""
-              Default: \(String(GalleyConstants.defaultPort)). \
-              The server binds to 127.0.0.1 only.
-              """)
-        .fixedSize(horizontal: true, vertical: false)
       }
+    } footer: {
+      Text("""
+          When on, the background server makes documents available in any \
+          browser. Registered as a login item so it restarts after \
+          logout. The server binds to 127.0.0.1 only.
+          """)
     }
   }
 
