@@ -12,7 +12,9 @@ import os
 private let log = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
 
-public protocol ChoiceValueProtocol: CustomStringConvertible, Sendable {
+public protocol ChoiceValueProtocol: CustomLocalizedStringResourceConvertible,
+                                     Sendable
+{
   associatedtype PersistentID: Hashable, Codable
   var persistentID: PersistentID { get }
 }
@@ -54,7 +56,8 @@ extension ChoiceValueProtocol {
   var persisted: String {
     get throws {
       try PersistentChoiceValue<Self>(
-        id: persistentID, name: description).encoded
+        id: persistentID, name: String(localized: localizedStringResource))
+      .encoded
     }
   }
 }
@@ -108,7 +111,7 @@ extension ChoiceValueEnvelopeProtocol {
   /// `BuiltInTemplate` carries "Default") override this to delegate
   /// to the inner type's `LocalizedStringResource`.
   public var name: LocalizedStringResource {
-    LocalizedStringResource(String.LocalizationValue("\(value.description)"))
+    value.localizedStringResource
   }
   nonisolated public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.value.persistentID == rhs.value.persistentID

@@ -16,7 +16,9 @@ public protocol TemplateProtocol: Identifiable, Sendable {
   func resolveAsset(file: String) -> URL?
 }
 
-public enum Template: TemplateProtocol, CustomStringConvertible {
+public enum Template: TemplateProtocol,
+                      CustomLocalizedStringResourceConvertible
+{
   case builtIn(BuiltInTemplate)
   case userDefined(UserTemplate)
 
@@ -24,7 +26,9 @@ public enum Template: TemplateProtocol, CustomStringConvertible {
   /// the current locale. Used for diagnostic logs and the
   /// `PersistentChoiceValue` envelope's `name` field — neither cares
   /// which locale won.
-  public var description: String { String(localized: name) }
+  public var localizedStringResource: LocalizedStringResource {
+    name
+  }
 
   public var id: String {
     switch self {

@@ -4,16 +4,18 @@ import Observation
 /// One row in the BBEdit-style processor picker. The `renderer` is `nil`
 /// when the underlying tool is not installed; the row is still shown so
 /// the user can see what is available and how to install it.
-public struct Processor: Sendable, Identifiable, CustomStringConvertible {
+public struct Processor: Sendable, Identifiable,
+                         CustomLocalizedStringResourceConvertible
+{
   public let id: String
-  public let name: String
+  public let name: LocalizedStringResource
   public let installHint: String?
   public let renderer: (any MarkdownRenderer)?
-  public var description: String { name }
+  public var localizedStringResource: LocalizedStringResource { name }
 
   public init(
     id: String,
-    name: String,
+    name: LocalizedStringResource,
     installHint: String?,
     renderer: (any MarkdownRenderer)?
   ) {
@@ -32,7 +34,7 @@ public struct Processor: Sendable, Identifiable, CustomStringConvertible {
   /// `ProcessorChoice.selected` non-optional.
   public static let builtIn = Processor(
     id: "swift-markdown",
-    name: "Built-in",
+    name: LocalizedStringResource("Built-in", bundle: .galleyCoreKit),
     installHint: nil,
     renderer: SwiftMarkdownRenderer())
 }
@@ -75,11 +77,6 @@ public final class ProcessorStore {
   /// first so the app has a working default before any external tool
   /// is found.
   private static let specs: [Spec] = [
-    Spec(
-      id: "swift-markdown",
-      name: "Built-in",
-      installHint: nil,
-      discover: { SwiftMarkdownRenderer() }),
     Spec(
       id: "multimarkdown",
       name: "MultiMarkdown",
@@ -141,13 +138,13 @@ public final class ProcessorStore {
   ]
 
   private static func discoverAll() async -> [Processor] {
-    var entries: [Processor] = []
+    var entries: [Processor] = [.builtIn]
     entries.reserveCapacity(specs.count)
     for spec in specs {
       let renderer = await spec.discover()
       entries.append(Processor(
         id: spec.id,
-        name: spec.name,
+        name: LocalizedStringResource(String.LocalizationValue("\(spec.name)")),
         installHint: spec.installHint,
         renderer: renderer))
     }
