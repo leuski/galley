@@ -26,3 +26,15 @@ struct PerFileState: Codable, Equatable, Sendable {
     url.safe.path()
   }
 }
+
+/// Narrow URL-keyed view over the underlying `[String: PerFileState]`
+/// dictionary. Lets call sites write `store[url].pageZoom = z` instead
+/// of routing through the `PerFileState.key(for:)` helper at every
+/// access. The on-disk shape stays a plist-friendly string-keyed
+/// dictionary — the conversion happens here.
+extension Dictionary where Key == String, Value == PerFileState {
+  subscript(url: URL) -> PerFileState {
+    get { self[PerFileState.key(for: url), default: .init()] }
+    set { self[PerFileState.key(for: url)] = newValue }
+  }
+}

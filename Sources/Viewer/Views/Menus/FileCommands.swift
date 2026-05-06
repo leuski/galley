@@ -39,11 +39,10 @@ struct FileCommands: Commands {
 
     CommandGroup(after: .saveItem) {
       Button("Rename…", systemImage: "pencil") {
-        guard let model, let context = renameContext, let url = context.url
-        else { return }
-        runRenamePopup(currentURL: url, model: model, context: context)
+        guard let model, let context = renameContext else { return }
+        runRenamePopup(currentURL: context.url, model: model, context: context)
       }
-      .disabled(renameContext?.url == nil)
+      .disabled(renameContext == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 
       Button("Open in Editor", systemImage: "arrow.up.forward.app") {
@@ -51,7 +50,7 @@ struct FileCommands: Commands {
         Task { await model.openInEditor(line: nil) }
       }
       .keyboardShortcut("e", modifiers: .command)
-      .disabled(model?.documentURL == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.openInEditor)
 
       Divider()
@@ -61,7 +60,7 @@ struct FileCommands: Commands {
         runExportPDFPanel(model: model)
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
-      .disabled(model?.documentURL == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.exportPDF)
     }
 
@@ -71,7 +70,7 @@ struct FileCommands: Commands {
         model.runPageSetup(on: NSApp.keyWindow)
       }
       .keyboardShortcut("p", modifiers: [.command, .shift])
-      .disabled(model?.documentURL == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.pageSetup)
 
       Button("Print…", systemImage: "printer") {
@@ -80,7 +79,7 @@ struct FileCommands: Commands {
         Task { await model.runPrintPanel(on: window) }
       }
       .keyboardShortcut("p", modifiers: .command)
-      .disabled(model?.documentURL == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.print)
     }
   }
@@ -126,7 +125,7 @@ private func runRenamePopup(
 /// rules style page breaks and margins.
 @MainActor
 private func runExportPDFPanel(model: DocumentModel) {
-  guard let url = model.documentURL else { return }
+  let url = model.documentURL
 
   let panel = NSSavePanel()
   panel.identifier = .init(rawValue: "export-pdf")

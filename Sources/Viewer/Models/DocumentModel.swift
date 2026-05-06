@@ -33,8 +33,20 @@ final class DocumentModel {
   var templates: SceneTemplateChoice?
   var processors: SceneProcessorChoice?
 
-  private(set) var documentURL: URL?
+  /// The URL the model is currently bound to. Set at construction
+  /// from the WindowGroup's URL and updated synchronously at the
+  /// start of every `rebindCurrent` (in-window navigation, restore,
+  /// rename, reload). Render-state visibility is tracked separately
+  /// by `didFirstBind`.
+  private(set) var documentURL: URL
   var lastError: String?
+
+  /// Set to `true` at the start of the first `rebindCurrent` call.
+  /// Distinguishes "model exists, has a URL, but render hasn't been
+  /// triggered yet" from "render has begun." DocumentView uses this
+  /// to gate window-reveal alpha and to short-circuit duplicate
+  /// `.task(id:)` fires from triggering re-binds.
+  private(set) var didFirstBind: Bool = false
 
   /// Page zoom factor for the rendered preview. Applied via a CSS
   /// `zoom` rule injected into the document head; updated live via JS
@@ -102,7 +114,11 @@ final class DocumentModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
-  init() {
+  init(initialURL: URL) {
+    self.documentURL = initialURL
+    self.history = [initialURL]
+    self.currentIndex = 0
+
     var configuration = WebPage.Configuration()
     let controller = configuration.userContentController
     controller.add(bridge, name: EditorBridge.messageName)
@@ -181,10 +197,7 @@ final class DocumentModel {
   /// back to opening at the file with no line if the active renderer
   /// emits no source positions.
   func openInEditor(line: Int? = nil) async {
-    guard let url = documentURL else {
-      logOpenInEditorWithoutDocument()
-      return
-    }
+    let url = documentURL
     let resolvedLine: Int?
     if let line {
       resolvedLine = line
@@ -437,9 +450,7 @@ final class DocumentModel {
   /// caller is expected to revert the title binding in that case).
   @discardableResult
   func renameCurrentDocument(toName newName: String) async throws -> URL {
-    guard let oldURL = documentURL else {
-      throw CocoaError(.fileNoSuchFile)
-    }
+    let oldURL = documentURL
     let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty,
           !trimmed.contains("/"),
@@ -477,6 +488,7 @@ final class DocumentModel {
     let myGeneration = bindGeneration
     logBinding(to: url)
     documentURL = url
+    didFirstBind = true
     bridge.documentURL = url
     linkBridge.documentURL = url
     // Drop the old document's TOC entries so the sidebar doesn't
@@ -496,10 +508,7 @@ final class DocumentModel {
   }
 
   private func renderCurrent(preserveScroll: Bool) async {
-    guard let url = documentURL else {
-      logRenderWithoutDocument()
-      return
-    }
+    let url = documentURL
     let renderer = resolvedRenderer()
     let template = resolvedTemplate()
     // Keep the scheme handler's template pointer current — the user
@@ -556,16 +565,8 @@ final class DocumentModel {
 
   // MARK: - Logging helpers
 
-  private func logOpenInEditorWithoutDocument() {
-    logger.warning("openInEditor ignored: no document URL bound")
-  }
-
   private func logBinding(to url: URL) {
     logger.debug("Binding to document: \(url.path, privacy: .public)")
-  }
-
-  private func logRenderWithoutDocument() {
-    logger.warning("renderCurrent() called with no documentURL")
   }
 
   private func logLoadingHTML(byteCount: Int) {
@@ -730,4 +731,10 @@ final class TemplateBox {
 struct HistorySnapshot: Codable, Sendable, Equatable {
   let urls: [URL]
   let currentIndex: Int
+
+  /// The URL the snapshot says the window was last viewing, or `nil`
+  /// when `currentIndex` is out of range (corrupted store).
+  var currentURL: URL? {
+    urls.indices.contains(currentIndex) ? urls[currentIndex] : nil
+  }
 }

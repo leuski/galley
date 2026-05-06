@@ -5,7 +5,7 @@ import SwiftUI
 /// the window record the new URL with the system Open Recent list
 /// and update its WindowGroup presentation value.
 struct RenameContext: Equatable {
-  let url: URL?
+  let url: URL
   let apply: @MainActor (URL) -> Void
 
   static func == (lhs: RenameContext, rhs: RenameContext) -> Bool {

@@ -22,7 +22,7 @@ extension DocumentModel {
   /// not suitable for this path.
   func exportPDF(to destination: URL, on window: NSWindow?) async throws {
     try await runPrintOperation(
-      jobTitle: documentURL?.lastPathComponent ?? "Markdown Document",
+      jobTitle: documentURL.lastPathComponent,
       on: window
     ) { operation, _ in
       let info = operation.printInfo
@@ -42,7 +42,7 @@ extension DocumentModel {
   func runPrintPanel(on window: NSWindow?) async {
     do {
       try await runPrintOperation(
-        jobTitle: documentURL?.lastPathComponent ?? "Markdown Document",
+        jobTitle: documentURL.lastPathComponent,
         on: window
       ) { operation, _ in
         operation.showsPrintPanel = true
@@ -182,9 +182,7 @@ extension DocumentModel {
   /// pipeline `renderCurrent` uses, minus the live-zoom style. Print
   /// renders at 100 % regardless of the on-screen zoom factor.
   private func buildRenderedHTML() async throws -> String {
-    guard let url = documentURL else {
-      throw CocoaError(.fileNoSuchFile)
-    }
+    let url = documentURL
     let renderer = resolvedRenderer()
     let template = resolvedTemplate()
     let source = try String(contentsOf: url, encoding: .utf8)
