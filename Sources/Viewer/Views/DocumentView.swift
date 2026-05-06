@@ -17,16 +17,26 @@ struct DocumentView: View {
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
 
-  /// Constructs the model with the WindowGroup's bound URL so
-  /// `documentURL` is set synchronously at view-identity creation.
+  /// Constructs the model with the WindowGroup's bound URL plus the
+  /// per-file persisted choice IDs so `documentURL`, `templates`, and
+  /// `processors` are all set synchronously at view-identity creation.
   /// `didFirstBind` is still false until `.task` triggers the first
   /// render — that's the signal `WindowAccessor` and `ChangeHandlers`
   /// use for window-reveal alpha and history persistence.
+  ///
+  /// State-restored windows that come back to a different URL than
+  /// the WindowGroup's binding will have their persistent IDs updated
+  /// in `launchTask` once the snapshot is decoded.
   init(fileURL: Binding<URL>, appModel: AppModel) {
     self._fileURL = fileURL
     self.appModel = appModel
-    self._model = State(
-      wrappedValue: DocumentModel(initialURL: fileURL.wrappedValue))
+    let url = fileURL.wrappedValue
+    let stored = Defaults.shared.perFileStateStore[url]
+    self._model = State(wrappedValue: DocumentModel(
+      initialURL: url,
+      appModel: appModel,
+      templatePersistent: stored.templatePersistent,
+      processorPersistent: stored.rendererPersistent))
   }
 
   /// Per-window persisted back/forward stack. SwiftUI's `@SceneStorage`
@@ -103,7 +113,11 @@ struct DocumentView: View {
             if fileURL != newURL { fileURL = newURL }
           })))
       .navigationTitle(model.documentURL.lastPathComponent)
-      .task(id: fileURL) { await launchTask() }
+      // No `id:` — `replaceDocument` drives in-window URL changes
+      // directly through `model.bind(to:)`, so re-firing on every
+      // `fileURL` write would be wasted work that the early-return
+      // in `launchTask` already short-circuits.
+      .task { await launchTask() }
       .modifier(ChangeHandlers(
         model: model,
         appModel: appModel,
@@ -227,25 +241,28 @@ struct DocumentView: View {
   private func launchTask() async {
     // The URL we're about to display: the snapshot's current entry
     // for a state-restored window, or the WindowGroup-bound URL for
-    // a fresh open. `PerFileStateStore` is the single source of
-    // truth for everything keyed by file path (zoom / scroll /
-    // overrides / TOC) — read once, hand pieces off to the model.
+    // a fresh open. The model was already constructed with
+    // fileURL's per-file state at view-init; restoration to a
+    // different URL needs us to re-key the per-file lookup.
     let snapshot = !didRestore ? decodeHistory(historyJSON) : nil
-    let initialURL = snapshot?.currentURL ?? fileURL
-    let stored = perFileState(for: initialURL)
+    let restoreURL = snapshot?.currentURL
+    let storedURL = restoreURL ?? fileURL
+    let stored = perFileState(for: storedURL)
 
     // `setZoom` only updates a JS rule on the live page; the next
     // render reads `model.pageZoom` to inject the matching CSS so
     // the first frame comes up at the right size.
     model.setZoom(stored.pageZoom ?? 1.0)
-    model.bindSettings(
-      appModel,
-      templatePersistent: stored.templatePersistent,
-      processorPersistent: stored.rendererPersistent)
 
-    // SwiftUI fires `.task(id:)` more than once even when the id
-    // is stable (the modifier is recreated on body re-eval). Once
-    // the first rebind has run, every subsequent fire is a no-op.
+    // Restoration may bring back a different URL than fileURL —
+    // override the choice IDs the model was constructed with.
+    if let restoreURL, restoreURL != fileURL {
+      model.templates.persistent = stored.templatePersistent
+      model.processors.persistent = stored.rendererPersistent
+    }
+
+    // The first rebind sets `didFirstBind`; every subsequent
+    // re-fire of `.task` is a no-op.
     if model.didFirstBind { return }
 
     // Restore a saved session (back/forward stack) for this scene.
@@ -386,11 +403,11 @@ private struct ChangeHandlers: ViewModifier {
       .onChange(of: appModel.processors.selected) { reload() }
       .onChange(of: appModel.templates.selected) { reload() }
       .onChange(of: Defaults.shared.enablePerDocumentOverrides) { reload() }
-      .onChange(of: model.templates?.persistent) { _, new in
+      .onChange(of: model.templates.persistent) { _, new in
         onTemplatePersistent(new)
         reload()
       }
-      .onChange(of: model.processors?.persistent) { _, new in
+      .onChange(of: model.processors.persistent) { _, new in
         onRendererPersistent(new)
         reload()
       }

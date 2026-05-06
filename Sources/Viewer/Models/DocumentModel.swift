@@ -24,14 +24,16 @@ final class DocumentModel {
   @ObservationIgnored private let linkBridge = LinkBridge()
   @ObservationIgnored private let scrollBridge = ScrollBridge()
   @ObservationIgnored private let tocBridge = TOCBridge()
-  @ObservationIgnored private weak var appModel: AppModel?
+  @ObservationIgnored private let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
 
   /// Per-window template / processor choices. Reference types so
   /// SwiftUI's Observation tracks `selected` for menus that bind to
-  /// them. `nil` until `bindSettings(_:)` runs.
-  var templates: SceneTemplateChoice?
-  var processors: SceneProcessorChoice?
+  /// them. Constructed at init with the per-file persisted IDs (or
+  /// `nil` for "use the global selection"); the `persistent` setter
+  /// later picks up overrides discovered during state restoration.
+  let templates: SceneTemplateChoice
+  let processors: SceneProcessorChoice
 
   /// The URL the model is currently bound to. Set at construction
   /// from the WindowGroup's URL and updated synchronously at the
@@ -114,10 +116,28 @@ final class DocumentModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
-  init(initialURL: URL) {
+  init(
+    initialURL: URL,
+    appModel: AppModel,
+    templatePersistent: String?,
+    processorPersistent: String?
+  ) {
     self.documentURL = initialURL
     self.history = [initialURL]
     self.currentIndex = 0
+    self.appModel = appModel
+    self.templates = SceneTemplateChoice(
+      source: appModel.templates,
+      persistent: templatePersistent
+    ) { name in
+      DisplacementNotifier.post(kind: .template, displaced: name)
+    }
+    self.processors = SceneProcessorChoice(
+      source: appModel.processors,
+      persistent: processorPersistent
+    ) { name in
+      DisplacementNotifier.post(kind: .processor, displaced: name)
+    }
 
     var configuration = WebPage.Configuration()
     let controller = configuration.userContentController
@@ -149,8 +169,8 @@ final class DocumentModel {
 
     // Custom URL scheme so template-bundled assets (CSS, fonts,
     // images) resolve from disk through the SwiftUI WebView. Reads
-    // the active template at request time via `templateBox`, which
-    // is populated by `bindSettings(_:)`.
+    // the active template at request time via `templateBox`, kept
+    // current by `renderCurrent` on every render.
     let box = TemplateBox()
     self.templateBox = box
     let handler = PreviewSchemeHandler(
@@ -158,6 +178,11 @@ final class DocumentModel {
     configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
 
     self.page = WebPage(configuration: configuration)
+
+    // Seed the scheme handler's template pointer. `renderCurrent`
+    // updates it again on every render — this seed only matters for
+    // asset requests that might fire before the first render.
+    self.templateBox.template = resolvedTemplate()
 
     // Browser-style navigation: clicking a markdown link in the
     // rendered preview pushes onto our history and rebinds this same
@@ -204,9 +229,11 @@ final class DocumentModel {
     } else {
       resolvedLine = await topmostVisibleSourceLine()
     }
-    let value = appModel?.editors.selected ?? .default
     await openFileInEditor(
-      value, fileURL: url, line: resolvedLine, logger: logger)
+      appModel.editors.selected,
+      fileURL: url,
+      line: resolvedLine,
+      logger: logger)
   }
 
   /// Find the smallest source line of any block currently in (or
@@ -254,31 +281,7 @@ final class DocumentModel {
 
   // MARK: - Public entry points
 
-  /// Inject the shared rendering appModel. Called by ContentView
-  /// before the first bind. The persistent strings come from the
-  /// view's `@SceneStorage` slots, so calling `bindSettings` again
-  /// with new values lets state restoration drive a re-hydrate.
-  /// Returns the displaced names (template, processor) when the
-  /// scene-stored persistent string can't be decoded against the
-  /// current catalog — caller posts the user notification.
-  func bindSettings(
-    _ appModel: AppModel,
-    templatePersistent: String?,
-    processorPersistent: String?
-  ) {
-    self.appModel = appModel
-    self.templates = SceneTemplateChoice(
-      source: appModel.templates,
-      persistent: templatePersistent) { name in DisplacementNotifier.post(
-        kind: .template, displaced: name) }
-    self.processors = SceneProcessorChoice(
-      source: appModel.processors,
-      persistent: processorPersistent) { name in DisplacementNotifier.post(
-        kind: .processor, displaced: name) }
-    templateBox.template = resolvedTemplate()
-  }
-
-  /// Initial bind (called from ContentView's `.task(id: fileURL)`).
+  /// Initial bind (called from DocumentView's `.task`).
   /// Resets history; this URL becomes the only entry on the stack.
   ///
   /// `scrollToLine` is the source line the rendered preview should
@@ -591,24 +594,20 @@ final class DocumentModel {
   /// always use the global selection.
   func resolvedRenderer() -> any MarkdownRenderer {
     if Defaults.shared.enablePerDocumentOverrides == true,
-       let processors,
        let renderer = processors.selected.value.renderer
     {
       return renderer
     }
 
-    return appModel?.processors.selected.value.renderer
+    return appModel.processors.selected.value.renderer
     ?? SwiftMarkdownRenderer()
   }
 
   func resolvedTemplate() -> Template {
-    if Defaults.shared.enablePerDocumentOverrides == true,
-       let templates
-    {
+    if Defaults.shared.enablePerDocumentOverrides == true {
       return templates.selected.value
     }
-
-    return appModel?.templates.selected.value ?? .default
+    return appModel.templates.selected.value
   }
 
   private func currentScrollY() async -> Double? {
