@@ -70,18 +70,23 @@ enum Routes {
     guard let documentURL = decodeFilePath(
       from: request.path, prefix: "/\(RouteNames.preview)")
     else {
-      return HTTPResponses.badRequest(String(localized: "Invalid path"))
+      return HTTPResponses.badRequest(
+        String(localized: "Invalid path", bundle: .galleyServerKit))
     }
 
     let ext = documentURL.pathExtension.lowercased()
     if MarkdownFileTypes.extensions.contains(ext) {
       guard let renderer else {
         return HTTPResponses.errorPage(
-          title: String(localized: "No markdown processor configured"),
-          detail: String(localized: """
-            Install a supported processor (e.g. multimarkdown via Homebrew) \
-            and pick it in Settings.
-            """),
+          title: String(
+            localized: "No markdown processor configured",
+            bundle: .galleyServerKit),
+          detail: String(
+            localized: """
+              Install a supported processor (e.g. multimarkdown via Homebrew) \
+              and pick it in Settings.
+              """,
+            bundle: .galleyServerKit),
           source: "")
       }
       return await renderPreview(
@@ -95,7 +100,9 @@ enum Routes {
       return serveFile(at: documentURL)
     }
     return HTTPResponses.notFound(
-      String(localized: "Unsupported extension: .\(ext)"))
+      String(
+        localized: "Unsupported extension: .\(ext)",
+        bundle: .galleyServerKit))
   }
 
   private static func renderPreview(
@@ -107,7 +114,9 @@ enum Routes {
   ) async -> HTTPResponse {
     guard FileManager.default.isReadableFile(atPath: documentURL.path) else {
       return HTTPResponses.notFound(
-        String(localized: "Cannot read \(documentURL.path)"))
+        String(
+          localized: "Cannot read \(documentURL.path)",
+          bundle: .galleyServerKit))
     }
 
     let source: String
@@ -117,7 +126,8 @@ enum Routes {
       return HTTPResponses.notFound(
         String(
           localized:
-            "Cannot read \(documentURL.path): \(error.localizedDescription)"))
+            "Cannot read \(documentURL.path): \(error.localizedDescription)",
+          bundle: .galleyServerKit))
     }
 
     let renderedBody: String
@@ -125,7 +135,7 @@ enum Routes {
       renderedBody = try await renderer.render(source, baseURL: documentURL)
     } catch {
       return HTTPResponses.errorPage(
-        title: String(localized: "Render error"),
+        title: String(localized: "Render error", bundle: .galleyServerKit),
         detail: error.localizedDescription,
         source: source)
     }
@@ -135,11 +145,13 @@ enum Routes {
       templateHTML = try template.loadHTML()
     } catch {
       return HTTPResponses.errorPage(
-        title: String(localized: "Template error"),
-        detail: String(localized: """
-          Cannot load template '\(template.name)': \
-          \(error.localizedDescription)
-          """),
+        title: String(localized: "Template error", bundle: .galleyServerKit),
+        detail: String(
+          localized: """
+            Cannot load template '\(template.name)': \
+            \(error.localizedDescription)
+            """,
+          bundle: .galleyServerKit),
         source: renderedBody)
     }
 
@@ -164,7 +176,9 @@ enum Routes {
   private static func serveFile(at url: URL) -> HTTPResponse {
     guard FileManager.default.isReadableFile(atPath: url.path) else {
       return HTTPResponses.notFound(
-        String(localized: "File not found: \(url.path)"))
+        String(
+          localized: "File not found: \(url.path)",
+          bundle: .galleyServerKit))
     }
     let data: Data
     do {
@@ -197,19 +211,24 @@ enum Routes {
       = PreviewRoute(path: request.path)
     else {
       return HTTPResponses.badRequest(
-        String(localized: "Invalid template asset path"))
+        String(
+          localized: "Invalid template asset path",
+          bundle: .galleyServerKit))
     }
     guard let template = await TemplateStore.shared
       .existingTemplate(forID: templateID)
     else {
       return HTTPResponses.notFound(
-        String(localized: "Template not found: \(templateID)"))
+        String(
+          localized: "Template not found: \(templateID)",
+          bundle: .galleyServerKit))
     }
     guard let assetURL = template.resolveAsset(file: file) else {
       return HTTPResponses.notFound(
         String(
           localized:
-            "No such asset in template '\(template.name)': \(file)"))
+            "No such asset in template '\(template.name)': \(file)",
+          bundle: .galleyServerKit))
     }
     return serveFile(at: assetURL)
   }
@@ -227,7 +246,7 @@ enum Routes {
         documentURL.pathExtension.lowercased())
     else {
       return HTTPResponses.badRequest(
-        String(localized: "Invalid event path"))
+        String(localized: "Invalid event path", bundle: .galleyServerKit))
     }
 
     let bodyStream = AsyncStream<Data> { continuation in
@@ -314,12 +333,14 @@ enum Routes {
     let hostHeader = request.headers[.host] ?? ""
     if !isHostAllowed(hostHeader, expectedPort: expectedPort) {
       return HTTPResponses.forbidden(
-        String(localized: "Host header not allowed"))
+        String(localized: "Host header not allowed", bundle: .galleyServerKit))
     }
     if let site = request.headers[HTTPHeader("Sec-Fetch-Site")]?.lowercased(),
        site != "same-origin", site != "none" {
       return HTTPResponses.forbidden(
-        String(localized: "Cross-site request rejected"))
+        String(
+          localized: "Cross-site request rejected",
+          bundle: .galleyServerKit))
     }
     return nil
   }

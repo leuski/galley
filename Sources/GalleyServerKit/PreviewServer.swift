@@ -25,9 +25,6 @@ public final class PreviewServerController {
   @ObservationIgnored private let rendererProvider: @Sendable ()
   async -> (any MarkdownRenderer)?
 
-  public static let defaultHost: String = "127.0.0.1"
-  public static let defaultPort: UInt16 = 8089
-
   public init(
     selectedTemplateProvider: @escaping @Sendable () async -> Template,
     rendererProvider: @escaping @Sendable () async -> (any MarkdownRenderer)?
@@ -48,13 +45,14 @@ public final class PreviewServerController {
     else {
       state = .failed(
         message: String(
-          localized: "Cannot resolve url: \(url.absoluteString)"))
+          localized: "Cannot resolve url: \(url.absoluteString)",
+          bundle: .galleyServerKit))
       return
     }
 
-    let host = components.host ?? Self.defaultHost
+    let host = components.host ?? GalleyConstants.defaultHost
     let port = components.port.map { port in UInt16(port) }
-    ?? Self.defaultPort
+    ?? GalleyConstants.defaultPort
 
     var fullComponents = URLComponents()
     fullComponents.scheme = "http"
@@ -64,7 +62,8 @@ public final class PreviewServerController {
     guard let fullURL = components.url else {
       state = .failed(
         message: String(
-          localized: "Cannot resolve url: \(String(describing: components))"))
+          localized: "Cannot resolve url: \(String(describing: components))",
+          bundle: .galleyServerKit))
       return
     }
 
@@ -72,9 +71,11 @@ public final class PreviewServerController {
     do {
       address = try sockaddr_in.inet(ip4: host, port: port)
     } catch {
-      state = .failed(message: String(localized: """
-        Cannot create loopback address: \(error.localizedDescription)
-        """))
+      state = .failed(message: String(
+        localized: """
+          Cannot create loopback address: \(error.localizedDescription)
+          """,
+        bundle: .galleyServerKit))
       return
     }
     let server = HTTPServer(address: address)
