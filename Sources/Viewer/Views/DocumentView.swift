@@ -14,6 +14,7 @@ struct DocumentView: View {
   let appModel: AppModel
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var model: DocumentModel
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
@@ -176,7 +177,12 @@ struct DocumentView: View {
     NavigationSplitView(columnVisibility: Binding(
       get: { model.showsTOC ? .all : .detailOnly },
       set: { newValue in
-        withAnimation { model.showsTOC = (newValue != .detailOnly) }
+        let next = newValue != .detailOnly
+        if reduceMotion {
+          model.showsTOC = next
+        } else {
+          withAnimation { model.showsTOC = next }
+        }
       }
     )) {
       TOCSidebar(model: model)

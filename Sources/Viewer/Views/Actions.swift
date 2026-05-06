@@ -68,6 +68,7 @@ struct Action {
     }
     .disabled(!(model.map { isEnabled($0) } ?? false))
     .help(helpLabel)
+    .accessibilityLabel(Text(title))
     .accessibilityIdentifier(accessibilityID)
   }
 

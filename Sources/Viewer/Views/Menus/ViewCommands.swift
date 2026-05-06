@@ -7,6 +7,7 @@ import SwiftUI
 /// the Viewer doesn't use).
 struct ViewCommands: Commands {
   @FocusedValue(\.documentModel) private var model
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some Commands {
     CommandGroup(before: .toolbar) {
@@ -40,7 +41,11 @@ struct ViewCommands: Commands {
       : "Show Table of Contents"
     Button {
       guard let model else { return }
-      withAnimation { model.showsTOC.toggle() }
+      if reduceMotion {
+        model.showsTOC.toggle()
+      } else {
+        withAnimation { model.showsTOC.toggle() }
+      }
     } label: {
       Label(title, systemImage: "sidebar.left")
     }

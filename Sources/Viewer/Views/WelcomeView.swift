@@ -32,6 +32,7 @@ struct WelcomeView: View {
   var body: some View {
     Color.clear
       .frame(width: 1, height: 1)
+      .accessibilityHidden(true)
       .background(WindowAccessor(onAttach: configureHidden))
       .task(id: boot.model != nil) {
         guard boot.model != nil else { return }

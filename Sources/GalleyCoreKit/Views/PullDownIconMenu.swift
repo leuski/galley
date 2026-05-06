@@ -15,15 +15,18 @@ public enum PullDownEntry {
 /// instead of only opening on click release.
 public struct PullDownIconButton: View {
   let systemImage: String
+  let accessibilityLabel: LocalizedStringResource
   let entries: () -> [PullDownEntry]
 
   @State private var anchor = MenuAnchor()
 
   public init(
     systemImage: String,
+    accessibilityLabel: LocalizedStringResource,
     entries: @escaping () -> [PullDownEntry])
   {
     self.systemImage = systemImage
+    self.accessibilityLabel = accessibilityLabel
     self.entries = entries
   }
 
@@ -33,9 +36,10 @@ public struct PullDownIconButton: View {
         Image(systemName: systemImage)
         Image(systemName: "chevron.down")
           .imageScale(.small)
-          .font(.system(size: 9, weight: .semibold))
+          .font(.caption2.weight(.semibold))
       }
     }
+    .accessibilityLabel(Text(accessibilityLabel))
     .background(MenuAnchorView(anchor: anchor))
   }
 

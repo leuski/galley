@@ -42,10 +42,14 @@ struct MenuBarContent: View {
       switch server.state {
       case .running(let url):
         Text("Listening on \(url.hostAndPort)")
+          .accessibilityLabel(Text(
+            "Server status: listening on \(url.hostAndPort)"))
       case .stopped:
         Text("Server stopped")
+          .accessibilityLabel(Text("Server status: stopped"))
       case .failed(let message):
         Text("Server error: \(message)")
+          .accessibilityLabel(Text("Server status: error, \(message)"))
       }
     }
     .accessibilityIdentifier(ServerA11yID.MenuBar.statusItem)
