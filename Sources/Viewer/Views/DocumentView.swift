@@ -170,39 +170,33 @@ struct DocumentView: View {
     Task { await model.reload() }
   }
 
-  /// Persist a change to `PerFileStateStore` keyed by the model's
-  /// current document URL. Each writer nils the field for the field's
-  /// default value so the dictionary doesn't accumulate dead entries.
+  /// Persist changes to `PerFileStateStore` keyed by the model's
+  /// current document URL. Each writer nils the field for that
+  /// field's default value so the dictionary doesn't accumulate dead
+  /// entries.
   private func mirrorPerFileZoom(_ value: Double) {
-    writePerFileState { $0.pageZoom = value == 1.0 ? nil : value }
+    Defaults.shared.perFileStateStore[model.documentURL]
+      .pageZoom = value == 1.0 ? nil : value
   }
 
   private func mirrorPerFileScrollY(_ value: Double) {
-    writePerFileState { $0.scrollY = value == 0 ? nil : value }
+    Defaults.shared.perFileStateStore[model.documentURL]
+      .scrollY = value == 0 ? nil : value
   }
 
   private func mirrorPerFileTemplate(_ value: String?) {
-    writePerFileState { $0.templatePersistent = value }
+    Defaults.shared.perFileStateStore[model.documentURL]
+      .templatePersistent = value
   }
 
   private func mirrorPerFileRenderer(_ value: String?) {
-    writePerFileState { $0.rendererPersistent = value }
+    Defaults.shared.perFileStateStore[model.documentURL]
+      .rendererPersistent = value
   }
 
   private func mirrorPerFileShowsTOC(_ value: Bool) {
-    writePerFileState { $0.showsTOC = value ? true : nil }
-  }
-
-  private func writePerFileState(
-    _ mutation: (inout PerFileState) -> Void
-  ) {
-    mutation(&Defaults.shared.perFileStateStore[model.documentURL])
-  }
-
-  /// Read the `PerFileState` slot for `url`, returning an empty
-  /// record when there is no stored entry yet.
-  private func perFileState(for url: URL) -> PerFileState {
-    Defaults.shared.perFileStateStore[url]
+    Defaults.shared.perFileStateStore[model.documentURL]
+      .showsTOC = value ? true : nil
   }
 
   /// Swap this window's bound document for `newURL` in place. Used by
@@ -217,8 +211,8 @@ struct DocumentView: View {
     // navigation, so re-seed the TOC sidebar from the destination's
     // own per-file pref rather than inheriting the previous doc's
     // live setting.
-    let stored = perFileState(for: newURL)
-    let initialShowsTOC = stored.showsTOC ?? false
+    let initialShowsTOC = Defaults.shared.perFileStateStore[newURL]
+      .showsTOC ?? false
     Task {
       // Same URL re-dispatch (e.g. BBEdit's preview script firing
       // again on a file already showing): just scroll, don't tear
@@ -246,8 +240,8 @@ struct DocumentView: View {
     // different URL needs us to re-key the per-file lookup.
     let snapshot = !didRestore ? decodeHistory(historyJSON) : nil
     let restoreURL = snapshot?.currentURL
-    let storedURL = restoreURL ?? fileURL
-    let stored = perFileState(for: storedURL)
+    let stored = Defaults.shared
+      .perFileStateStore[restoreURL ?? fileURL]
 
     // `setZoom` only updates a JS rule on the live page; the next
     // render reads `model.pageZoom` to inject the matching CSS so
