@@ -12,12 +12,14 @@ struct PerFileState: Codable, Equatable, Sendable {
   var scrollY: Double?
   var rendererPersistent: String?
   var templatePersistent: String?
+  var showsTOC: Bool?
 
   var isEmpty: Bool {
     pageZoom == nil
       && scrollY == nil
       && rendererPersistent == nil
       && templatePersistent == nil
+      && showsTOC == nil
   }
 
   static func key(for url: URL) -> String {

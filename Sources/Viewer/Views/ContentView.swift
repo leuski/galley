@@ -36,6 +36,14 @@ struct ContentView: View {
   /// `model` at first bind / restore.
   @SceneStorage("\(keyPrefix).scrollY") private var scrollYStored: Double = 0
 
+  /// Per-window TOC sidebar visibility. Mirrored from `model.showsTOC`
+  /// on every toggle. Inheritance during in-window link navigation
+  /// happens on the model side — the sidebar pref a user picks on a
+  /// parent doc carries to the child without touching the child's
+  /// per-file persisted value.
+  @SceneStorage("\(keyPrefix).showsTOC")
+  private var showsTOCStored: Bool = false
+
   var body: some View {
     Group {
       if let appModel = boot.model {
@@ -67,7 +75,7 @@ struct ContentView: View {
     // SwiftUI API constraint. If a stray nil ever surfaces during
     // a transient SwiftUI binding state, WebView renders an empty
     // page for the few milliseconds until the URL settles.
-    WebView(model.page)
+    splitView
       .overlay(alignment: .bottom) {
         if let error = model.lastError {
           Text(error)
@@ -141,8 +149,29 @@ struct ContentView: View {
         onRendererPersistent: mirrorPerFileRenderer,
         onZoom: mirrorPerFileZoom,
         onScrollY: mirrorPerFileScrollY,
+        onShowsTOC: mirrorPerFileShowsTOC,
         reload: reloadModel))
       .navigationDocument(model.documentURL ?? URL.homeDirectory)
+  }
+
+  /// The window's main split: TOC sidebar (column-visibility bound to
+  /// `model.showsTOC`) and the rendered preview. Hoisted to a
+  /// `NavigationSplitView` so AppKit's tab bar spans only the detail
+  /// column — a sidebar nested inside an `HStack` would render with
+  /// the tab bar bisecting it.
+  @ViewBuilder
+  private var splitView: some View {
+    NavigationSplitView(columnVisibility: Binding(
+      get: { model.showsTOC ? .all : .detailOnly },
+      set: { model.showsTOC = ($0 != .detailOnly) }
+    )) {
+      TOCSidebar(model: model)
+        .navigationSplitViewColumnWidth(
+          min: 180, ideal: 220, max: 320)
+    } detail: {
+      WebView(model.page)
+    }
+    .navigationSplitViewStyle(.balanced)
   }
 
   /// First time content is bound (whether via initial bind, restore,
@@ -185,6 +214,9 @@ struct ContentView: View {
     {
       overrideRendererPersistent = renderer
     }
+    if !showsTOCStored, let value = stored.showsTOC {
+      showsTOCStored = value
+    }
   }
 
   /// Persist the new value to both `@SceneStorage` (for restoration
@@ -212,6 +244,11 @@ struct ContentView: View {
     writePerFileState { $0.rendererPersistent = value }
   }
 
+  private func mirrorPerFileShowsTOC(_ value: Bool) {
+    showsTOCStored = value
+    writePerFileState { $0.showsTOC = value ? true : nil }
+  }
+
   private func writePerFileState(
     _ mutation: (inout PerFileState) -> Void
   ) {
@@ -229,6 +266,13 @@ struct ContentView: View {
     recents.record(newURL)
     if fileURL != newURL { fileURL = newURL }
     let line = dispatcher.consumePendingScrollLine(for: newURL)
+    // Replace-current is a fresh-doc switch, not a parent→child
+    // navigation, so re-seed the TOC sidebar from the destination's
+    // own per-file pref rather than inheriting the previous doc's
+    // live setting.
+    let stored = Defaults.shared
+      .perFileStateStore[PerFileState.key(for: newURL), default: .init()]
+    let initialShowsTOC = stored.showsTOC ?? false
     Task {
       // Same URL re-dispatch (e.g. BBEdit's preview script firing
       // again on a file already showing): just scroll, don't tear
@@ -236,7 +280,10 @@ struct ContentView: View {
       if model.documentURL == newURL, let line {
         await model.scrollToSourceLine(line)
       } else {
-        await model.bind(to: newURL, scrollToLine: line)
+        await model.bind(
+          to: newURL,
+          scrollToLine: line,
+          initialShowsTOC: initialShowsTOC)
       }
     }
   }
@@ -282,7 +329,8 @@ struct ContentView: View {
       didRestore = true
       await model.restore(
         snapshot: snapshot,
-        initialScrollY: scrollYStored > 0 ? scrollYStored : nil)
+        initialScrollY: scrollYStored > 0 ? scrollYStored : nil,
+        initialShowsTOC: showsTOCStored)
       if let current = model.documentURL { recents.record(current) }
       return
     }
@@ -294,7 +342,8 @@ struct ContentView: View {
       await model.bind(
         to: fileURL,
         scrollToLine: line,
-        initialScrollY: scrollYStored > 0 ? scrollYStored : nil)
+        initialScrollY: scrollYStored > 0 ? scrollYStored : nil,
+        initialShowsTOC: showsTOCStored)
     }
   }
 
@@ -399,6 +448,7 @@ private struct ChangeHandlers: ViewModifier {
   let onRendererPersistent: (String?) -> Void
   let onZoom: (Double) -> Void
   let onScrollY: (Double) -> Void
+  let onShowsTOC: (Bool) -> Void
   let reload: () -> Void
 
   func body(content: Content) -> some View {
@@ -417,6 +467,7 @@ private struct ChangeHandlers: ViewModifier {
       }
       .onChange(of: model.pageZoom) { _, new in onZoom(new) }
       .onChange(of: model.currentScrollY) { _, new in onScrollY(new) }
+      .onChange(of: model.showsTOC) { _, new in onShowsTOC(new) }
   }
 }
 

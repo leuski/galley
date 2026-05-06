@@ -31,19 +31,19 @@ Status legend: ✅ done · 🟡 partial · ⬜ not started · 🚫 will not do
 
   Template `@page { margin: 0.75in; }` and the `@media print` overrides now actually apply.
 - 🚫 **Export to .docx** via pandoc.
-- ⬜ **Copy as rich text.**
+- ✅ **Copy as rich text.** Stock WKWebView behavior: ⌘A selects the rendered document, ⌘C writes both HTML and plain-text flavors to the pasteboard as one item. Mail / Pages / Word get formatting; Terminal / Xcode get plain. No app-side code needed.
 - 🚫 **Drag rendered output** out of the window as RTF/PDF.
 - 🚫 **Export to standalone HTML** with template assets inlined.
 
 ## OS integration
 
-- ⬜ **Quick Look provider** for `.md`. Gated on the unification described in [Architecture](#architecture); the planned approach is a thin `WKWebView`-based extension that fetches `http://127.0.0.1:<port>/preview/<path>` from the always-running host process. Trades sandbox-imposed limits (no filesystem access, no subprocess renderers) for full template/processor coverage by routing through the existing engine instead of reimplementing it.
+- ✅ **Quick Look provider** for `.md`. Thin `WKWebView`-based extension fetches `http://127.0.0.1:<port>/preview/<path>` from the always-running Server; sandboxed (no filesystem, no subprocess renderers) but gets full template/processor coverage by routing through the existing engine.
 - ✅ **Custom URL schemes.** `galley://<path>?line=N` is the LaunchServices entry point for cross-app launching (BBEdit script, future deep links). `x-galley://local/...` is the internal `WKURLSchemeHandler` for template/document asset resolution inside the WebView. Two layers, two names — keeps the dispatch unambiguous.
 - ✅ **Native window tabs** — `OpenBehavior` includes `.newTab` (`addTabbedWindow`); also `.replaceCurrent` and `.newWindow`, settable in preferences.
 - ✅ **Activation-policy switching** — gated on `AppModel.serverEnabled`. With the server **disabled** (the FTUE / pure-doc-viewer mode), the app stays `.regular` always — it's a normal doc app, like Preview.app, with conventional ⌘Q-exits semantics. With the server **enabled**, `ViewerAppDelegate.updateActivationPolicy()` flips the running app between `.regular` (Dock icon + Cmd+Tab + full menu) when any document window is bound and `.accessory` (menu-bar only, no Dock icon) when none is. The HTTP server runs across both. The last applied policy is persisted (`lastActivationPolicy` default) and re-applied in `applicationWillFinishLaunching` before state restoration runs, so a session that quit in `.accessory` mode resumes without flashing a Dock icon. With no windows up, `applicationShouldHandleReopen` presents the open panel — the only "give me UI" path while in accessory mode.
 - ✅ **Soft quit** — while the server is running, ⌘Q closes all windows and drops to `.accessory` instead of terminating, so the user keeps the always-on preview behavior Server.app used to provide. The menu-bar "Quit Galley" item is the real exit (bypasses the soft-quit via `reallyQuit()`). System shutdown / restart / log-out also bypasses, detected by the Apple Event quit-reason. With the server disabled, ⌘Q exits normally.
 - ⬜ **Outline/TOC sidebar.**
-- ⬜ **System dark/light mode follow-through** (template variant auto-selection).
+- ✅ **System dark/light mode follow-through.** Handled entirely by WebKit: with no app-side `NSAppearance` / `backgroundColor` / `underPageBackgroundColor` overrides, the WebView inherits `effectiveAppearance` from window → app → system, and templates that declare `:root { color-scheme: light dark; }` (built-in, github-markdown.css, etc.) pick up the dark UA palette and `prefers-color-scheme` updates live. Print/Export forces light via `@media print { :root { color-scheme: light; } }` in the template. Out of scope: auto-selecting different template *files* per appearance — covered by templates that opt into dark mode in CSS.
 - ✅ **Recent files menu and document-app behaviors** — `NSDocumentController.recentDocumentURLs`, File > Open Recent, ⌘O open panel, window state restoration via `@SceneStorage` (zoom, history, scroll, overrides).
 
 ## Will not do

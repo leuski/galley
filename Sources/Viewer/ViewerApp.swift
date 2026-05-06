@@ -68,7 +68,7 @@ struct ViewerApp: App {
         .environment(recents)
     }
     .defaultSize(width: 700, height: 900)
-    .windowToolbarStyle(.unifiedCompact)
+    .windowToolbarStyle(.unified)
     .commands {
       FileCommands(recents: recents)
       ToolbarCommands()

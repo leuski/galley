@@ -32,6 +32,7 @@ public enum ViewerA11yID {
     public static let zoomIn = "viewer.view.zoomIn"
     public static let zoomOut = "viewer.view.zoomOut"
     public static let actualSize = "viewer.view.actualSize"
+    public static let toggleTOC = "viewer.view.toggleTOC"
   }
 
   // MARK: Rendering menu / toolbar

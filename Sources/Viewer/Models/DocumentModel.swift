@@ -23,6 +23,7 @@ final class DocumentModel {
   @ObservationIgnored private let bridge = EditorBridge()
   @ObservationIgnored private let linkBridge = LinkBridge()
   @ObservationIgnored private let scrollBridge = ScrollBridge()
+  @ObservationIgnored private let tocBridge = TOCBridge()
   @ObservationIgnored private weak var appModel: AppModel?
   @ObservationIgnored private let templateBox: TemplateBox
 
@@ -85,6 +86,19 @@ final class DocumentModel {
   /// `@SceneStorage` so the next session can hydrate `pendingScrollY`.
   private(set) var currentScrollY: Double = 0
 
+  /// Whether the table-of-contents sidebar is visible in the window
+  /// hosting this model. Per-document live state — preserved across
+  /// in-window link navigation so a child doc inherits the parent's
+  /// pick. Cold opens / Replace-current rebinds reset this from the
+  /// destination URL's `PerFileStateStore` entry instead.
+  var showsTOC: Bool = false
+
+  /// Headings extracted from the rendered DOM after each load. The
+  /// `TOCBridge` user script walks `<h1>…<h6>`, assigns synthetic ids
+  /// to any heading without one, and posts the flat list. The
+  /// sidebar reads this and indents by `level`.
+  private(set) var headings: [TOCEntry] = []
+
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
@@ -94,6 +108,7 @@ final class DocumentModel {
     controller.add(bridge, name: EditorBridge.messageName)
     controller.add(linkBridge, name: LinkBridge.messageName)
     controller.add(scrollBridge, name: ScrollBridge.messageName)
+    controller.add(tocBridge, name: TOCBridge.messageName)
     // One script handles both cmd-click → editor and plain click →
     // in-window nav, so we don't depend on capture-phase ordering
     // between two listeners — which appears to drop the editor
@@ -106,6 +121,13 @@ final class DocumentModel {
     // ContentView can persist the resting position via `@SceneStorage`.
     controller.addUserScript(WKUserScript(
       source: ScrollBridge.userScript,
+      injectionTime: .atDocumentEnd,
+      forMainFrameOnly: true))
+    // Heading extraction. Runs once per load, assigns synthetic ids
+    // to headings that lack one, and posts the list back. Renderer-
+    // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
+    controller.addUserScript(WKUserScript(
+      source: TOCBridge.userScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
 
@@ -143,6 +165,11 @@ final class DocumentModel {
     scrollBridge.onScroll = { [weak self] y in
       guard let self else { return }
       currentScrollY = y
+    }
+
+    tocBridge.onHeadings = { [weak self] items in
+      guard let self else { return }
+      headings = items
     }
   }
 
@@ -252,12 +279,14 @@ final class DocumentModel {
   func bind(
     to url: URL,
     scrollToLine: Int? = nil,
-    initialScrollY: Double? = nil
+    initialScrollY: Double? = nil,
+    initialShowsTOC: Bool? = nil
   ) async {
     history = [url]
     currentIndex = 0
     pendingScrollLine = scrollToLine
     pendingScrollY = initialScrollY
+    if let initialShowsTOC { showsTOC = initialShowsTOC }
     await rebindCurrent()
   }
 
@@ -268,7 +297,8 @@ final class DocumentModel {
   /// way `bind` does.
   func restore(
     snapshot: HistorySnapshot,
-    initialScrollY: Double? = nil
+    initialScrollY: Double? = nil,
+    initialShowsTOC: Bool? = nil
   ) async {
     guard !snapshot.urls.isEmpty,
           snapshot.currentIndex >= 0,
@@ -277,6 +307,7 @@ final class DocumentModel {
     history = snapshot.urls
     currentIndex = snapshot.currentIndex
     pendingScrollY = initialScrollY
+    if let initialShowsTOC { showsTOC = initialShowsTOC }
     await rebindCurrent()
   }
 
@@ -448,6 +479,10 @@ final class DocumentModel {
     documentURL = url
     bridge.documentURL = url
     linkBridge.documentURL = url
+    // Drop the old document's TOC entries so the sidebar doesn't
+    // flash stale headings during the reload window. The TOCBridge
+    // user script repopulates within milliseconds of `page.load`.
+    headings = []
 
     await renderCurrent(preserveScroll: false)
 
@@ -588,6 +623,23 @@ final class DocumentModel {
 
   private func restoreScrollY(_ yPos: Double) async {
     _ = try? await page.callJavaScript("window.scrollTo(0, \(yPos));")
+  }
+
+  /// Scroll the rendered preview to the heading identified by `id`.
+  /// The TOC sidebar's row taps call this; the id is whatever the
+  /// `TOCBridge` user script reported back — either the renderer-
+  /// supplied anchor or our slugified fallback.
+  func scrollToHeading(id: String) async {
+    let escaped = jsStringLiteral(id)
+    let script = """
+      (function() {
+        var node = document.getElementById(\(escaped));
+        if (node) {
+          node.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }
+      })();
+      """
+    _ = try? await page.callJavaScript(script)
   }
 
   /// Find the rendered block whose source line is closest to (but not
