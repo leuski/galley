@@ -39,18 +39,18 @@ fi
 MARKETING_VERSION="${TAG#v}"
 BUILD_NUMBER="$(git rev-list --count HEAD)"
 
-SCHEME="MarkdownPreviewer"
-APP_NAME="Markdown Preview Server.app"
+SCHEME="Galley"
+APP_NAME="Galley.app"
 BUILD_DIR="$PROJECT_ROOT/build/release"
-ARCHIVE_PATH="$BUILD_DIR/MarkdownPreviewer.xcarchive"
-ZIP_PATH="$BUILD_DIR/MarkdownPreviewer-$TAG.zip"
+ARCHIVE_PATH="$BUILD_DIR/Galley.xcarchive"
+ZIP_PATH="$BUILD_DIR/Galley-$TAG.zip"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 echo "==> Archiving $SCHEME ($TAG, build $BUILD_NUMBER)"
 xcodebuild \
-  -project MarkdownPreviewer.xcodeproj \
+  -project Galley.xcodeproj \
   -scheme "$SCHEME" \
   -configuration Release \
   -archivePath "$ARCHIVE_PATH" \
@@ -98,10 +98,10 @@ cat > "$NOTES_FILE" <<EOF
 download until you remove the quarantine attribute.
 
 \`\`\`
-unzip MarkdownPreviewer-$TAG.zip
-mv "Markdown Preview Server.app" /Applications/
-xattr -dr com.apple.quarantine "/Applications/Markdown Preview Server.app"
-open "/Applications/Markdown Preview Server.app"
+unzip Galley-$TAG.zip
+mv "Galley.app" /Applications/
+xattr -dr com.apple.quarantine "/Applications/Galley.app"
+open "/Applications/Galley.app"
 \`\`\`
 EOF
 

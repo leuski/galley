@@ -1,6 +1,6 @@
 //
 //  AssortedViews.swift
-//  MarkdownPreviewer
+//  Galley
 //
 //  Created by Anton Leuski on 4/28/26.
 //

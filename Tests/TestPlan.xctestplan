@@ -18,14 +18,14 @@
   "testTargets" : [
     {
       "target" : {
-        "containerPath" : "container:MarkdownPreviewer.xcodeproj",
+        "containerPath" : "container:Galley.xcodeproj",
         "identifier" : "626E8D5B2F9DD1C800BD51F9",
         "name" : "Tests"
       }
     },
     {
       "target" : {
-        "containerPath" : "container:MarkdownPreviewer.xcodeproj",
+        "containerPath" : "container:Galley.xcodeproj",
         "identifier" : "62CC3C5E2FA7B8F90018F091",
         "name" : "UITests"
       }

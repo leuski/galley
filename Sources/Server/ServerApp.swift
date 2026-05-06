@@ -1,6 +1,6 @@
 //
-//  MarkdownPreviewerApp.swift
-//  MarkdownPreviewer
+//  GalleyApp.swift
+//  Galley
 //
 //  Created by Anton Leuski on 4/25/26.
 //
@@ -10,7 +10,7 @@ import GalleyCoreKit
 import GalleyServerKit
 
 @main
-struct MarkdownPreviewerApp: App {
+struct ServerApp: App {
   @State private var boot = AppBoot()
 
   var body: some Scene {

@@ -1,6 +1,6 @@
 //
 //  SceneProcessorModel.swift
-//  MarkdownPreviewer
+//  Galley
 //
 
 import GalleyCoreKit

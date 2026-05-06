@@ -1,6 +1,6 @@
 //
 //  SceneTemplateModel.swift
-//  MarkdownPreviewer
+//  Galley
 //
 //  Created by Anton Leuski on 4/29/26.
 //

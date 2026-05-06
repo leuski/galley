@@ -29,8 +29,8 @@ jobs:
     timeout-minutes: 30
 
     env:
-      SCHEME: MarkdownPreviewer
-      APP_NAME: Markdown Preview Server.app
+      SCHEME: Galley
+      APP_NAME: Galley.app
 
     steps:
       - uses: actions/checkout@v4
@@ -78,10 +78,10 @@ jobs:
       - name: Archive
         run: |
           xcodebuild \
-            -project MarkdownPreviewer.xcodeproj \
+            -project Galley.xcodeproj \
             -scheme "$SCHEME" \
             -configuration Release \
-            -archivePath build/MarkdownPreviewer.xcarchive \
+            -archivePath build/Galley.xcarchive \
             -destination "generic/platform=macOS" \
             MARKETING_VERSION="${{ steps.tag.outputs.marketing_version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.tag.outputs.build_number }}" \
@@ -91,7 +91,7 @@ jobs:
         run: |
           xcodebuild \
             -exportArchive \
-            -archivePath build/MarkdownPreviewer.xcarchive \
+            -archivePath build/Galley.xcarchive \
             -exportOptionsPlist scripts/ExportOptions.plist \
             -exportPath build/export
 
@@ -115,7 +115,7 @@ jobs:
         id: pkg
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          OUT="build/MarkdownPreviewer-$TAG.zip"
+          OUT="build/Galley-$TAG.zip"
           ditto -c -k --keepParent --sequesterRsrc "build/export/$APP_NAME" "$OUT"
           echo "zip=$OUT" >> "$GITHUB_OUTPUT"
 

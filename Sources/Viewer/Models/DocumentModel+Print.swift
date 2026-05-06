@@ -1,6 +1,6 @@
 //
 //  DocumentModel+Print.swift
-//  MarkdownPreviewer
+//  Galley
 //
 //  Created by Anton Leuski on 5/2/26.
 //

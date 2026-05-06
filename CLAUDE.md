@@ -4,22 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Two macOS apps sharing one rendering engine:
+Two macOS apps and a Quick Look extension sharing one rendering engine:
 
 - **Galley** ("Markdown Eye", bundle id `net.leuski.galley`, target `Viewer`, product `Galley`) — native document viewer. `WindowGroup(for: URL.self)` over a `WebPage`-backed `WebView`. Custom URL schemes: `x-galley://local` (internal `WKURLSchemeHandler` for template/document asset resolution) and `galley://<path>?line=N` (LaunchServices entry from BBEdit's `Preview Markdown… → in Galley` script). Cmd-click any rendered block to jump to the source line in the user's chosen editor.
-- **Markdown Preview Server** (bundle id `net.leuski.galley.server`, target `Server`) — `MenuBarExtra`-only app that runs an HTTP server in-process so any browser (or BBEdit's preview pane) can view the same documents Galley would render. Owns server lifecycle, port, launch-at-login, and the BBEdit helper-script installer.
+- **Galley Server** (bundle id `net.leuski.galley.server`, target `Server`) — `MenuBarExtra`-only app that runs an HTTP server in-process so any browser (or BBEdit's preview pane) can view the same documents Galley would render. Owns server lifecycle, port, launch-at-login, and the BBEdit helper-script installer.
+- **Quicklook** (target `Quicklook`, product `Quicklook.appex`) — `QLPreviewingController` extension. Tries the running Galley Server first so the user's chosen processor and template are honored; falls back to an in-process render with the built-in Swift renderer and bundled template when the server is unreachable.
 
-The shared engine ships as two Xcode framework targets: `GalleyCoreKit` (rendering / templates / models / watch / scripts) and `GalleyServerKit` (FlyingFox-backed HTTP server). Both apps link the kits; `Viewer` links only `GalleyCoreKit`, `Server` links both.
+The shared engine ships as two Xcode framework targets: `GalleyCoreKit` (rendering / templates / models / watch / scripts) and `GalleyServerKit` (FlyingFox-backed HTTP server). Both apps link the kits; `Viewer` links only `GalleyCoreKit`, `Server` links both, `Quicklook` links only `GalleyCoreKit`.
+
+Localized strings live in `Localizable.xcstrings` per target (Viewer, Server, GalleyCoreKit, GalleyServerKit) and in `en.lproj` / `ru.lproj` directories for the Quicklook extension and Viewer resources. English and Russian are shipped.
 
 See `README.md` for HTTP routes, template placeholders, and BBEdit integration.
 
 ## Layout
 
 ```
-MarkdownPreviewer.xcodeproj   # 6 targets: Viewer, Server, GalleyCoreKit, GalleyServerKit, Tests, UITests
+Galley.xcodeproj              # 7 targets: Viewer, Server, Quicklook, GalleyCoreKit, GalleyServerKit, Tests, UITests
 Sources/
   GalleyCoreKit/              # framework — rendering, templates, watch, scripts, shared models, routing
     Accessibility/              # ViewerA11yID, ServerA11yID — UI-test identifier catalogs
+    Localizable.xcstrings       # localized strings owned by the kit
     Models/                     # ChoiceModel, ProcessorModel, TemplateModel
     Render/                     # MarkdownRenderer, SwiftMarkdownRenderer,
                                 # ExternalProcessRenderer, ProcessorStore
@@ -40,10 +44,12 @@ Sources/
   GalleyServerKit/            # framework — HTTP server (FlyingFox), routes, SSE
     PreviewServer.swift         # PreviewServerController (lifecycle + state)
     Routes.swift, SSE.swift, HTTPResponses.swift
+    Localizable.xcstrings
   Viewer/                     # the Galley document app — pure SwiftUI, no AppDelegate
     ViewerApp.swift           @main — Window("welcome") + WindowGroup<URL> + Settings
     EditorBridge.swift, LinkBridge.swift, ScrollBridge.swift
     PreviewSchemeHandler.swift
+    Localizable.xcstrings
     Models/                     # AppModel (global doc state), DocumentModel (per-window),
                                 # WindowDispatcher (routing/registry), RecentDocumentsModel,
                                 # PerFileStateStore, SceneProcessorModel,
@@ -53,12 +59,17 @@ Sources/
                                 # SettingsView, AssortedViews, Actions, FocusedValues
     Views/Menus/                # FileCommands, ViewCommands, RenderingCommands,
                                 # ProcessorMenu, TemplateMenu
-    Resources/                  # AppIcon, Assets.xcassets
-  Server/                     # the Markdown Preview Server menu-bar app
-    MarkdownPreviewerApp.swift  @main — MenuBarExtra + Settings
+    Resources/                  # AppIcon, Assets.xcassets, en.lproj, ru.lproj
+  Server/                     # the Galley Server menu-bar app
+    ServerApp.swift             @main — MenuBarExtra + Settings
     App/                        # AppModel (server-owning), LoginItem
     Menu/                       # MenuBarContent, SettingsView
+    Localizable.xcstrings
     Resources/                  # AppIcon, Assets.xcassets, MenuBarIcon
+  Quicklook/                  # Quick Look preview extension (.appex)
+    PreviewViewController.swift # QLPreviewingController — server-first, fallback to built-in
+    Info.plist, Quicklook.entitlements
+    en.lproj, ru.lproj
 Tests/                        # Swift Testing — kit + app-logic unit tests
   GalleyCoreKitTests/           # PlaceholderContext, BuiltInTemplate, UserTemplateRewriter,
                                 # URLPathHelpers, SwiftMarkdownRenderer,
@@ -70,7 +81,7 @@ UITests/                      # XCUITest bundle — testTargetName: Viewer
                                 # UITests.swift, UITestsLaunchTests.swift, AppLauncher.swift
 Resources/Scripts/            # bundled BBEdit helper scripts (Galley + browser variants)
 Scripts/                      # release.sh
-docs/                         # branch handoff notes, native-viewer-ideas, test-framework
+docs/                         # test-framework
 ```
 
 ## Build & test
@@ -79,15 +90,16 @@ Pure Xcode project — **no `Package.swift` anywhere**. Frameworks build inside 
 
 - **Viewer** — the Galley document app
 - **Server** — the menu-bar previewer
-- **GalleyCoreKit**, **GalleyServerKit** — framework schemes (mostly for direct iteration / testing)
+- **Quicklook** — the Quick Look preview extension
+- **GalleyCoreKit** — framework scheme (mostly for direct iteration / testing)
 
 ```bash
 # Build the apps
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer build
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Server build
+xcodebuild -project Galley.xcodeproj -scheme Viewer build
+xcodebuild -project Galley.xcodeproj -scheme Server build
 
 # Tests — one Xcode test bundle named `Tests` covering both kits
-xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer test
+xcodebuild -project Galley.xcodeproj -scheme Viewer test
 # (Or run from Xcode's Test navigator.)
 ```
 
@@ -105,13 +117,13 @@ SwiftLint runs as a `Lint` shell-script build phase (no separate scheme/target).
 
 ## Release
 
-`Scripts/release.sh <vX.Y.Z>` archives the Release config, ad-hoc signs the `.app`, installs it to `/Applications`, zips it, tags the commit, and creates a GitHub release via `gh`. Use `--dry-run` to skip tag + publish. Build number is `git rev-list --count HEAD`; marketing version is the tag minus the leading `v`. Note: `SCHEME=MarkdownPreviewer` in the script is stale — needs updating to whichever scheme (`Viewer` or `Server`) the release targets.
+`Scripts/release.sh <vX.Y.Z>` archives the Release config, ad-hoc signs the `.app`, installs it to `/Applications`, zips it, tags the commit, and creates a GitHub release via `gh`. Use `--dry-run` to skip tag + publish. Build number is `git rev-list --count HEAD`; marketing version is the tag minus the leading `v`. Confirm the script's `SCHEME` matches whichever scheme (`Viewer` or `Server`) the release targets before tagging.
 
 `.github/workflows/release.yml` is the (currently disabled) signed + notarized CI path. Triggered manually (`workflow_dispatch`); requires repo secrets listed in the file header.
 
 ## Dependencies
 
-Resolved by Xcode against package references in `MarkdownPreviewer.xcodeproj`:
+Resolved by Xcode against package references in `Galley.xcodeproj`:
 
 - **FlyingFox / FlyingSocks** (`github.com/swhitty/FlyingFox`) — HTTP server. `GalleyServerKit` only.
 - **swift-markdown** (`github.com/swiftlang/swift-markdown`) — bundled "Default" renderer.
@@ -126,7 +138,7 @@ External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdo
 
 **`GalleyCoreKit`** — pure rendering and platform-agnostic primitives, no networking:
 - `Render/` — `MarkdownRenderer` protocol; `SwiftMarkdownRenderer` (with optional `annotatesSourceLines` that emits `data-source-line="N"` on every block, used by the Viewer for cmd-click→editor); `ExternalProcessRenderer` (shells out via `Process`); `ProcessorStore` exposes the ordered list of `Processor` rows (each with `installHint` and either a live `MarkdownRenderer` or `nil` if unavailable). The Viewer's cmd-click bridge also accepts pandoc's `data-pos` and cmark-gfm's `data-sourcepos` so source-line jumps work across renderers.
-- `Templates/` — `Template` protocol; `BuiltInTemplate` (compiled-in `DefaultTemplate.html`) and `UserTemplate`; `TemplateStore` watches `~/Library/Application Support/MarkdownPreviewer/Templates/` and accepts **two shapes** — a folder containing `Template.html`/`template.html` (Galley convention), or a top-level `*.html`/`*.htm` file with sibling assets (BBEdit preview-template convention). `Placeholders.swift` does `#TOKEN#` substitution (`#TITLE#`, `#DOCUMENT_CONTENT#`, `#BASE#`, `#FILE#`, `#BASENAME#`, `#FILE_EXTENSION#`, `#DATE#`, `#TIME#` — token names match BBEdit's). `UserTemplate.Rewriter` rewrites template-relative paths through `/template/<id>/...` and absolute filesystem paths through `/preview/<absolute-path>` (also a BBEdit convention) so the resulting URLs resolve in either the HTTP server or the Viewer's scheme handler.
+- `Templates/` — `Template` protocol; `BuiltInTemplate` (compiled-in `DefaultTemplate.html`) and `UserTemplate`; `TemplateStore` watches `~/Library/Application Support/net.leuski.galley/Templates/` and accepts **two shapes** — a folder containing `Template.html`/`template.html` (Galley convention), or a top-level `*.html`/`*.htm` file with sibling assets (BBEdit preview-template convention). `Placeholders.swift` does `#TOKEN#` substitution (`#TITLE#`, `#DOCUMENT_CONTENT#`, `#BASE#`, `#FILE#`, `#BASENAME#`, `#FILE_EXTENSION#`, `#DATE#`, `#TIME#` — token names match BBEdit's). `UserTemplate.Rewriter` rewrites template-relative paths through `/template/<id>/...` and absolute filesystem paths through `/preview/<absolute-path>` (also a BBEdit convention) so the resulting URLs resolve in either the HTTP server or the Viewer's scheme handler.
 - `Models/` — `ChoiceValueProtocol` / `ChoiceValueEnvelopeProtocol` plus `ProcessorChoiceValue` and `TemplateChoiceValue`. A small generic layer for "pick one of N" UIs that also persist their selection by stable `persistentID`.
 - `Routing/` — pure value types for the Viewer's URL routing. `OpenBehavior` (`.newWindow` / `.newTab` / `.replaceCurrent`); `WindowID` + `WindowIDAllocator` (counter-based opaque identity, intentionally *not* `ObjectIdentifier(NSWindow)` — see comment in source for why); `WindowRegistry` + `WindowRecord` (records of open document windows, keyed by `WindowID`); `LaunchURLBuffer` (FIFO buffer for URLs that arrive before the SwiftUI `openWindow` action is captured); `PendingScrollLines` (`galley://...?line=N` scroll-line cache, keyed by standardized file path); `URLNormalizer` (turns `galley://path?line=N` into a `(URL, scrollLine)` pair, recognizes `galley://settings` as a separate `Outcome` case); `OpenURLRouter` + `DispatchAction` (pure decision function — given the URL, behavior, registry, returns `.queue` / `.openNew` / `.rebind(WindowID)` / `.tabOnto(WindowID)` / `.focusExisting(WindowID)`); `LaunchArguments` parser. The Viewer's `WindowDispatcher` is the AppKit interpreter that holds the live `NSWindow` references and applies the router's actions.
 - `Accessibility/` — `ViewerA11yID` and `ServerA11yID` enum-of-string-constants catalogs. Single source of truth for every UITest-visible accessibility identifier; both apps and the UITests target import these. Note: SwiftUI's `.accessibilityIdentifier(...)` does *not* propagate to `NSMenuItem` from `.commands { ... }` blocks (AX dump shows synthetic `menuAction:` placeholders) — menu tests fall back to title-based queries; toolbar / inline-view surfaces use the catalog identifiers.
@@ -143,9 +155,9 @@ External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdo
 - `Routes.swift` — `/preview/<path>` (Markdown→HTML, with placeholders + live-reload script injection; non-Markdown extensions fall through to static asset serving from the document's directory), `/template/<id>/<file>`, `/events/<path>` (SSE stream from `SSE.swift`).
 - `rendererProvider` and `templateStore` are passed in as `@Sendable` closures so each request reads the current selection without server-side state.
 
-### `Sources/Server/` — Markdown Preview Server menu-bar app
+### `Sources/Server/` — Galley Server menu-bar app
 
-- **`MarkdownPreviewerApp`** — `@main`, two Scenes: `MenuBarExtra` (with `MenuBarContent`) and `Settings`. The `MenuBarLabel` flips state-tinted icons based on `PreviewServerController.State` (running / stopped / failed). Hydration is gated on `AppBoot` so the menu bar shows "Starting…" until catalog discovery finishes.
+- **`ServerApp`** (in `ServerApp.swift`) — `@main`, two Scenes: `MenuBarExtra` (with `MenuBarContent`) and `Settings`. The `MenuBarLabel` flips state-tinted icons based on `PreviewServerController.State` (running / stopped / failed). Hydration is gated on `AppBoot` so the menu bar shows "Starting…" until catalog discovery finishes.
 - **`App/AppModel`** — `@Observable @MainActor`. Owns the persisted port, the `TemplateStore`, the `ProcessorStore`, the `templates` and `processors` `Choice` envelopes, the `PreviewServerController`, and `launchAtLogin` (via `LoginItem`). Server start/stop reads renderer + template selection at request time via `@Sendable` closures, so switching processor/template in the menu takes effect on the next request without server restart. Port changes restart the server.
 - **`App/LoginItem`** — wraps `SMAppService.mainApp` so the rest of the app can ask "is the server set to launch at login?" without importing ServiceManagement.
 - **`Menu/MenuBarContent`** — surfaces server state, port, the processor + template quick-switchers, BBEdit script installer entry, Settings, and Quit.
@@ -185,8 +197,6 @@ The Viewer is **pure SwiftUI** — there is no `NSApplicationDelegateAdaptor`. R
 
 ## Reference
 
-- `docs/handoff-galleykit.md` — phase-by-phase notes on the `refactor/galleykit` branch (Kit extraction, editor coupling, cross-document navigation, WindowGroup migration, state restoration).
-- `docs/native-viewer-ideas.md` — running list of features the native Viewer could offer beyond what a generic browser does, with status (done / partial / not started / will-not-do) and rationale for the rejections.
 - `docs/test-framework.md` — the test pyramid (routing logic / app logic / snapshot / UI / integration), where each kind of test goes, the launch-arg conventions for tests.
 
 ## Architecture decisions

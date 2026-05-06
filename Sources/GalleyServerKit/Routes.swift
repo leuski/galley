@@ -55,7 +55,7 @@ enum Routes {
       return HTTPResponse(
         statusCode: .ok,
         headers: [.contentType: "text/plain; charset=utf-8"],
-        body: Data("MarkdownPreviewer is running.\n".utf8))
+        body: Data("Galley Server is running.\n".utf8))
     }
   }
 

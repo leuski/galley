@@ -1,6 +1,6 @@
 //
 //  SelectableCollection.swift
-//  MarkdownPreviewer
+//  Galley
 //
 //  Created by Anton Leuski on 5/3/26.
 //

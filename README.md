@@ -1,36 +1,74 @@
-# Markdown Preview Server
+# Galley
 
-A small macOS menu bar app that serves a live, browser-based preview of Markdown
-files from your editor. Point it at a `.md` file and it renders the document
-through your chosen processor, wraps it in a styleable HTML template, and
-auto-reloads the page whenever the file changes on disk.
+A native macOS Markdown viewer. Open a `.md` file and Galley renders it through
+your chosen processor, wraps it in a styleable HTML template, and reloads when
+the file changes on disk. Cmd-click any rendered block to jump straight back to
+the source line in your editor.
 
-It ships with helper scripts for **BBEdit** that open the preview from the
-Scripts menu, but the preview URL is a plain HTTP endpoint, so any editor that
-can open a URL works.
+<!-- TODO: screenshot — main viewer window with a document open -->
 
-## How it works
+The same rendering engine also powers a companion menu-bar app, **Markdown
+Preview Server**, which serves the preview over HTTP so any browser (or
+BBEdit's preview pane) can view it.
 
-The app runs an HTTP server bound to `127.0.0.1` (default port `8089`). It
-exposes a few routes:
+## Galley — the viewer
+
+A document app, not a browser. One window walks through linked documents:
+click an `.md` link in the rendered output and the same window navigates to
+it, back/forward history included. External links open in your default
+browser; non-Markdown local files open in the right app.
+
+### Highlights
+
+- **Cmd-click to editor** — any rendered block carries a source-line
+  annotation. Cmd-click and Galley opens that line in your editor. Works with
+  swift-markdown, Pandoc (`data-pos`), and cmark-gfm (`data-sourcepos`).
+- **BBEdit integration** — install the bundled `Preview Markdown… in Galley`
+  script and previewing from BBEdit focuses an existing Galley window for
+  that document or opens a new one, scrolled to the current line.
+- **Editor of choice** — built-in presets for BBEdit, TextMate, VS Code,
+  Sublime Text, and Zed; a custom URL template with `{url}`/`{path}`/`{line}`
+  placeholders; or any `.app` bundle.
+- **Processors and templates** — same picker as the Server (see below).
+  Per-document overrides are optional and persist across launches.
+- **Print, Page Setup, Export as PDF** — full pipeline through a real
+  `WKWebView` so the printed output matches what you see.
+- **Per-document state** — zoom, scroll position, and processor/template
+  overrides are remembered per file across launches.
+
+<!-- TODO: screenshot — cmd-click jumping back to BBEdit at the right line -->
+
+### `galley://` URL scheme
+
+Galley registers `galley://<absolute-path>?line=N`. Dropping that URL into a
+script or `open(1)` focuses Galley on that document at that line. The
+bundled BBEdit script uses this to drive previews from the editor.
+
+## Markdown Preview Server — the menu-bar app
+
+A `MenuBarExtra`-only app that runs an HTTP server in-process. Same renderers,
+same templates — served at `http://127.0.0.1:<port>/preview/<absolute path>`
+so any browser works.
+
+<!-- TODO: screenshot — menu bar dropdown with processor/template pickers -->
+
+### Routes
 
 - `GET /preview/<absolute file path>` — renders a Markdown file as HTML.
-- `GET /preview/<absolute file path>` for non-Markdown extensions — serves
-  static assets (images, CSS, fonts, etc.) sitting next to the document.
+  Non-Markdown extensions fall through to static-asset serving from the
+  document's directory (images, CSS, fonts).
 - `GET /template/<template-id>/<file>` — serves assets bundled with the
-  selected HTML template.
-- `GET /events/<absolute file path>` — Server-Sent Events stream the page
-  subscribes to for live reload. The injected client refreshes on each event.
+  selected template.
+- `GET /events/<absolute file path>` — Server-Sent Events for live reload. A
+  small client script is injected into every preview and refreshes the page
+  on each event.
 
-When you visit `http://127.0.0.1:8089/preview/Users/you/notes/example.md`, the
-server reads the file, hands it to the active renderer, substitutes
-placeholders into the template, injects a small live-reload script, and
-returns the result. A file watcher pushes a reload event whenever the document
-or any of its sibling assets change.
+A file watcher pushes a reload event whenever the document or any sibling
+asset changes.
 
 ## Markdown processors
 
-The app discovers and presents a BBEdit-style picker of supported processors:
+Both apps share a BBEdit-style picker of supported processors:
 
 | Processor | Install |
 |---|---|
@@ -41,25 +79,31 @@ The app discovers and presents a BBEdit-style picker of supported processors:
 | cmark-gfm | `brew install cmark-gfm` |
 | Classic (Markdown.pl) | place `Markdown.pl` on `PATH` |
 
-Unavailable processors stay visible in the menu so you can see what would be
-selectable after installing the underlying tool. Your preference persists even
-when the tool is missing, so reinstalling it brings the selection back without
-further input.
+Unavailable processors stay visible so you can see what would be selectable
+after installing the underlying tool. Your preference persists even when the
+tool is missing — reinstalling it brings the selection back without further
+input.
 
 ## Templates
 
-Output is wrapped in an HTML template. A built-in template is always available;
-custom templates live in:
+Output is wrapped in an HTML template. A built-in template is always
+available; custom templates live in:
 
 ```
 ~/Library/Application Support/MarkdownPreviewer/Templates/
 ```
 
-Each subdirectory there is a template. Drop in `template.html` plus any CSS,
-JS, fonts, or images alongside it. The template store watches the directory
-and picks up additions and edits without restarting the app.
+Two layouts are recognized:
 
-Templates may use these placeholders, which are substituted on every render:
+- a folder containing `Template.html` (or `template.html`) plus its assets
+  (Galley convention), or
+- a top-level `*.html` / `*.htm` file with sibling assets (BBEdit
+  preview-template convention).
+
+The template store watches the directory and picks up additions and edits
+without restarting either app.
+
+Templates may use these placeholders, substituted on every render:
 
 | Placeholder | Replaced with |
 |---|---|
@@ -73,75 +117,69 @@ Templates may use these placeholders, which are substituted on every render:
 | `#TIME#` | Current time |
 
 Asset references inside the template (e.g. `<link href="style.css">`) are
-rewritten to point at `/template/<id>/...` so they load through the same
-server.
+rewritten to point at `/template/<id>/...` so they resolve in either app —
+HTTP for the Server, the `x-galley://local` scheme handler for Galley.
 
-## BBEdit integration
+## BBEdit scripts
 
-The app bundles two helper scripts that open the preview URL for the document
-currently being edited in BBEdit:
-
-- `Preview Markdown… in Safari.sh`
-- `Preview Markdown… in Google Chrome.sh`
-
-Use the **Install BBEdit Scripts** in the Settings (or copy the scripts
-manually) into:
+Both apps install the same family of helper scripts into:
 
 ```
 ~/Library/Application Support/BBEdit/Scripts/
 ```
 
-The installer rewrites the hardcoded server URL in each script to match the
-running server's host and port. Run the script from BBEdit (Scripts menu, or
-bind a key) and the previewer focuses an existing tab pointed at the local
-server, or opens a new one if there isn't one.
+- **Galley** — `Preview Markdown… in Galley.sh`. Sends a `galley://` URL with
+  the current line.
+- **Server** — `Preview Markdown… in Safari.sh`,
+  `Preview Markdown… in Google Chrome.sh`. Open the preview URL on the running
+  server in the chosen browser.
 
-Any other editor that can shell out to a URL on save can drive the preview the
-same way — the server doesn't care who opens the page.
+The installer rewrites the hardcoded server URL in the browser scripts to
+match the running server's host and port. Run the script from BBEdit
+(Scripts menu, or bind a key) and the previewer focuses an existing tab/window
+or opens a new one.
+
+Any other editor that can shell out to a URL works the same way.
 
 ## Settings
 
-Available from the menu bar item:
+### Galley
 
-- **Port** — TCP port the server binds to (default `8089`). Restarting on
-  change happens automatically if the server is running.
-- **Markdown processor** — picker described above.
-- **Template** — picker built from the templates directory.
+- **Markdown processor** and **Template** pickers (with optional
+  per-document overrides).
+- **Editor** — preset, custom URL, or `.app` bundle.
+- **Open behavior** for incoming URLs — new window, new tab, or replace
+  current.
+
+### Markdown Preview Server
+
+- **Port** — TCP port the server binds to (default `8089`). The server
+  restarts automatically when changed.
+- **Markdown processor** and **Template** pickers.
 - **Launch at login** — registered via `SMAppService`.
 
 ## Building
 
-Open `MarkdownPreviewer.xcodeproj` in Xcode and run. The project targets macOS
-and uses Swift's structured concurrency throughout (`@Observable`, actors,
-typed `async`/`await`).
+Open `MarkdownPreviewer.xcodeproj` in Xcode. Two app schemes:
 
-Tests use the **Swift Testing** framework:
+- **Viewer** — Galley.
+- **Server** — Markdown Preview Server.
 
+Two framework schemes (mostly for direct iteration):
+
+- **GalleyCoreKit** — rendering, templates, file watching, routing, scripts.
+- **GalleyServerKit** — the FlyingFox-backed HTTP server.
+
+```bash
+xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer build
+xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Server build
+
+# Tests (Swift Testing for logic, XCUITest for UI)
+xcodebuild -project MarkdownPreviewer.xcodeproj -scheme Viewer test
 ```
-swift test
-```
 
-or run the test target from Xcode.
-
-## Project layout
-
-```
-Sources/
-├── App/             AppModel, login-item registration
-├── Menu/            Menu bar UI and Settings window
-├── Render/          Renderer protocol + built-in and external-process renderers
-├── Server/          HTTP server (FlyingFox), routes, SSE
-├── Templates/       Built-in template, user-template store, placeholders
-├── Watch/           File system watcher for live reload
-├── Scripts/         BBEdit script installer
-└── Utilities/       Small extensions
-
-Resources/
-├── Bundled/         App icon and assets
-└── Scripts/         Bundled BBEdit helper scripts
-
-Tests/               Swift Testing test suite
-```
+The project uses Swift's structured concurrency throughout (`@Observable`,
+actors, typed `async`/`await`) with Swift 6 strict concurrency enabled.
 
 ## License
 
