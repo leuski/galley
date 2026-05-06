@@ -28,28 +28,24 @@ struct ViewCommands: Commands {
     }
   }
 
-  /// The TOC sidebar toggle. Rendered as a `Toggle` so the menu shows
-  /// a checkmark while the sidebar is on. When no document window is
-  /// focused, falls back to a disabled placeholder so the keyboard
-  /// shortcut still appears in the menu.
+  /// The TOC sidebar toggle. Rendered as a `Button` whose title flips
+  /// between "Show" and "Hide" — the standard macOS show/hide pattern
+  /// (matches Finder's "Show Sidebar" / "Hide Sidebar" affordance).
+  /// When no document window is focused, falls back to a disabled
+  /// "Show…" so the keyboard shortcut still appears in the menu.
   @ViewBuilder
   private var tocToggle: some View {
-    if let model {
-      Toggle(isOn: Binding(
-        get: { model.showsTOC },
-        set: { model.showsTOC = $0 }
-      )) {
-        Label("Table of Contents", systemImage: "sidebar.left")
-      }
-      .keyboardShortcut("1", modifiers: [.command, .control])
-      .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
-    } else {
-      Toggle(isOn: .constant(false)) {
-        Label("Table of Contents", systemImage: "sidebar.left")
-      }
-      .disabled(true)
-      .keyboardShortcut("1", modifiers: [.command, .control])
-      .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
+    let title = (model?.showsTOC ?? false)
+      ? "Hide Table of Contents"
+      : "Show Table of Contents"
+    Button {
+      guard let model else { return }
+      withAnimation { model.showsTOC.toggle() }
+    } label: {
+      Label(title, systemImage: "sidebar.left")
     }
+    .disabled(model == nil)
+    .keyboardShortcut("1", modifiers: [.command, .control])
+    .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
   }
 }

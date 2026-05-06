@@ -140,7 +140,9 @@ struct DocumentView: View {
   private var splitView: some View {
     NavigationSplitView(columnVisibility: Binding(
       get: { model.showsTOC ? .all : .detailOnly },
-      set: { model.showsTOC = ($0 != .detailOnly) }
+      set: { newValue in
+        withAnimation { model.showsTOC = (newValue != .detailOnly) }
+      }
     )) {
       TOCSidebar(model: model)
         .navigationSplitViewColumnWidth(
@@ -433,7 +435,9 @@ private struct SceneValuesModifier: ViewModifier {
 /// get dropped at the bridge — only `.scaleEffect` survives because it
 /// runs at the SwiftUI compositor before AppKit sees the rendered
 /// layer. Hit-testing keeps the original frame, which is fine.
-private let toolbarMenuIconScale: CGFloat = 0.8
+/// This is only needed (0.8) for unifiedCompact toolbar style. .unified
+/// style works correctly with scale set to 1.
+private let toolbarMenuIconScale: CGFloat = 1.0
 
 private struct RendererToolbarPicker: View {
   @Bindable var appModel: AppModel
