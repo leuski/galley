@@ -100,8 +100,8 @@ extension DocumentModel {
     on window: NSWindow?,
     configure: (NSPrintOperation, NSPrintInfo) -> Void
   ) async throws {
-    let html = try await buildRenderedHTML()
     let template = resolvedTemplate()
+    let composed = try await buildComposedPreview(template: template)
 
     // Fresh print info per operation — `runModal` tucks per-op
     // state into the dict (jobDisposition, savingURL) and we don't
@@ -120,7 +120,9 @@ extension DocumentModel {
     baseInfo.isHorizontallyCentered = false
 
     let webView = await loadOffscreenWebView(
-      html: html, template: template, paperSize: baseInfo.paperSize)
+      composed: composed,
+      template: template,
+      paperSize: baseInfo.paperSize)
 
     let operation = webView.printOperation(with: baseInfo)
     operation.view?.frame = NSRect(
@@ -149,7 +151,7 @@ extension DocumentModel {
   /// Sized to the print paper so layout matches what the print
   /// pipeline will paginate.
   private func loadOffscreenWebView(
-    html: String,
+    composed: ComposedPreview,
     template: Template,
     paperSize: NSSize
   ) async -> WKWebView {
@@ -174,27 +176,25 @@ extension DocumentModel {
         }
         continuation.resume(returning: webView)
       }
-      webView.loadHTMLString(html, baseURL: PreviewSchemeHandler.originURL)
+      webView.loadHTMLString(composed.html, baseURL: composed.baseURL)
     }
   }
 
-  /// Build the rendered HTML the print/export web view loads — same
-  /// pipeline `renderCurrent` uses, minus the live-zoom style. Print
-  /// renders at 100 % regardless of the on-screen zoom factor.
-  private func buildRenderedHTML() async throws -> String {
+  /// Build the preview the print/export web view loads — same
+  /// `composeHTML` pipeline `renderCurrent` uses, minus the live-zoom
+  /// style. Print renders at 100 % regardless of the on-screen zoom
+  /// factor.
+  private func buildComposedPreview(
+    template: Template
+  ) async throws -> ComposedPreview {
     let url = documentURL
     let renderer = resolvedRenderer()
-    let template = resolvedTemplate()
     let source = try String(contentsOf: url, encoding: .utf8)
     let body = try await renderer.render(source, baseURL: url)
-    let templateHTML = try template.loadHTML()
-    let origin = PreviewSchemeHandler.originURL
-    let context = PlaceholderContext(
+    return try template.composeHTML(
       documentContent: body,
       documentURL: url,
-      origin: origin)
-    let substituted = context.substitute(into: templateHTML)
-    return template.rewriteAssets(in: substituted, origin: origin)
+      origin: PreviewSchemeHandler.originURL)
   }
 
   /// Last-resort host window for `runModal(for:)` when no other

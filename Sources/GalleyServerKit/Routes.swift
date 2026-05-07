@@ -140,13 +140,12 @@ enum Routes {
         source: source)
     }
 
-    let origin = hostURL
-    let substituted: String
+    let composed: ComposedPreview
     do {
-      substituted = try template.composeHTML(
+      composed = try template.composeHTML(
         documentContent: renderedBody,
         documentURL: documentURL,
-        origin: origin)
+        origin: hostURL)
     } catch {
       return HTTPResponses.errorPage(
         title: String(localized: "Template error", bundle: .galleyServerKit),
@@ -158,6 +157,7 @@ enum Routes {
           bundle: .galleyServerKit),
         source: renderedBody)
     }
+    let substituted = composed.html
     let nonce = generateNonce()
     let withReload = injectReloadScript(
       into: substituted, documentURL: documentURL, nonce: nonce)

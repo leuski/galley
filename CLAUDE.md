@@ -93,10 +93,11 @@ Pure Xcode project — **no `Package.swift` anywhere**. Frameworks build inside 
 - **Quicklook** — the Quick Look preview extension
 - **GalleyCoreKit** — framework scheme (mostly for direct iteration / testing)
 
+**Only build the Viewer scheme.** It depends on Server and Quicklook (both apps link the kits, the Viewer scheme's build action includes Server and Quicklook), so building Viewer builds everything. Building all three schemes separately is pure waste — same compile work, three times the wall-clock cost. The same applies to `test` — the `Viewer` scheme's test action runs the unified `Tests` bundle that covers both kits.
+
 ```bash
-# Build the apps
+# Build everything (Viewer + Server + Quicklook + both kits)
 xcodebuild -project Galley.xcodeproj -scheme Viewer build
-xcodebuild -project Galley.xcodeproj -scheme Server build
 
 # Tests — one Xcode test bundle named `Tests` covering both kits
 xcodebuild -project Galley.xcodeproj -scheme Viewer test

@@ -13,9 +13,14 @@ let keyPrefix = bundleIdentifier
 /// `ClassicPreviewSchemeHandler`.
 ///
 /// Origin is `PreviewScheme.originURL` (`x-galley://local`). The
-/// Viewer sets the WebPage's `baseURL` to the same origin so any
-/// unrewritten relative URLs (e.g. those in inline `<img>` markup the
-/// document author wrote) flow through the handler as well.
+/// Viewer sets the WebPage's `baseURL` to the document's
+/// `/preview/<absolute-path>` URL under that origin so unrewritten
+/// relative references in the rendered body (e.g. an `image.png`
+/// sibling of the document) resolve through the handler's
+/// `documentAsset` route. Templates that include
+/// `<base href="#BASE#">` override this with the same value via
+/// `PlaceholderContext.substitute`; templates without it fall back
+/// to the page baseURL and end up at the same place.
 @MainActor
 struct PreviewSchemeHandler: URLSchemeHandler {
   static let scheme = URLScheme(PreviewScheme.name)

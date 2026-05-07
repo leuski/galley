@@ -72,16 +72,16 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
   @MainActor
   private func loadInProcess(file: URL) async throws {
-    let html = try await renderInProcess(file: file)
+    let composed = try await renderInProcess(file: file)
     try await navProxy.run {
-      self.webView.loadHTMLString(html, baseURL: PreviewScheme.originURL)
+      self.webView.loadHTMLString(composed.html, baseURL: composed.baseURL)
     }
   }
 
   /// Uses the shared `TemplateProtocol.composeHTML` recipe with
   /// `origin` = `PreviewScheme.originURL` so all asset URLs flow
   /// through `ClassicPreviewSchemeHandler` instead of an HTTP server.
-  private func renderInProcess(file: URL) async throws -> String {
+  private func renderInProcess(file: URL) async throws -> ComposedPreview {
     let source = try String(contentsOf: file, encoding: .utf8)
     let body = try await SwiftMarkdownRenderer().render(source, baseURL: file)
     let template: Template = .builtIn(.shared)

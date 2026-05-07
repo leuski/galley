@@ -528,15 +528,14 @@ final class DocumentModel {
     do {
       let source = try String(contentsOf: url, encoding: .utf8)
       let body = try await renderer.render(source, baseURL: url)
-      let origin = PreviewSchemeHandler.originURL
       let composed = try template.composeHTML(
         documentContent: body,
         documentURL: url,
-        origin: origin)
-      let html = injectZoomStyle(into: composed)
+        origin: PreviewSchemeHandler.originURL)
+      let html = injectZoomStyle(into: composed.html)
       logLoadingHTML(byteCount: html.count)
       do {
-        for try await _ in page.load(html: html, baseURL: origin) {}
+        for try await _ in page.load(html: html, baseURL: composed.baseURL) {}
         lastError = nil
         if let line = pendingScrollLine {
           // One-shot — consume before the JS call so an in-flight

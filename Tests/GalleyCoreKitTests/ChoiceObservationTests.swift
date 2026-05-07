@@ -9,11 +9,16 @@ internal import ALFoundation
 
 /// Minimal `ChoiceValueProtocol` that doesn't depend on the real
 /// catalogs so we can drive the source's values directly.
-private struct TestValue: ChoiceValueProtocol {
+private struct TestValue: ChoiceValueProtocol,
+                          CustomLocalizedStringResourceConvertible
+{
   let id: String
   let label: String
   var persistentID: String { id }
   var description: String { label }
+  var localizedStringResource: LocalizedStringResource {
+    LocalizedStringResource(String.LocalizationValue("\(label)"))
+  }
 }
 
 /// Envelope around `TestValue`. Picks up the default `persist`,
