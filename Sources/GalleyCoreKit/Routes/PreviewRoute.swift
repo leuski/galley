@@ -7,7 +7,7 @@ import Foundation
 /// `URL.appendingPreview(_:)` (in `String+URL.swift`) build these
 /// routes; this enum parses them back. Keeping construction and
 /// parsing next to each other prevents the two route shapes from
-/// drifting between the renderer side (`UserTemplate.Rewriter`) and
+/// drifting between the renderer side (`TemplateAssetRewriter`) and
 /// the resolver side (the Viewer's scheme handler / the server's
 /// route table).
 public enum PreviewRoute: Sendable, Equatable {

@@ -30,7 +30,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   /// fully wired up. `loadView()` would otherwise run too late.
   private lazy var webView: WKWebView = {
     let configuration = WKWebViewConfiguration()
-    let handler = ClassicPreviewSchemeHandler { .builtIn(.shared) }
+    let handler = ClassicPreviewSchemeHandler { .bundledDefault }
     configuration.setURLSchemeHandler(
       handler, forURLScheme: PreviewScheme.name)
     let web = WKWebView(frame: .zero, configuration: configuration)
@@ -78,13 +78,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
   }
 
-  /// Uses the shared `TemplateProtocol.composeHTML` recipe with
+  /// Uses the shared `Template.composeHTML` recipe with
   /// `origin` = `PreviewScheme.originURL` so all asset URLs flow
   /// through `ClassicPreviewSchemeHandler` instead of an HTTP server.
   private func renderInProcess(file: URL) async throws -> ComposedPreview {
     let source = try String(contentsOf: file, encoding: .utf8)
     let body = try await SwiftMarkdownRenderer().render(source, baseURL: file)
-    let template: Template = .builtIn(.shared)
+    let template: Template = .bundledDefault
     return try template.composeHTML(
       documentContent: body,
       documentURL: file,

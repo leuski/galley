@@ -101,15 +101,15 @@ struct TemplateStoreObservationTests {
   func reloadPicksUpNewTemplate() throws {
     let tmp = makeTempDir()
     defer { try? FileManager.default.removeItem(at: tmp) }
-    let store = TemplateStore(directoryURL: tmp)
+    let store = TemplateStore(directoryURLs: [tmp])
 
-    #expect(store.templates.count == 1)  // .default only
+    #expect(store.templates.isEmpty)
 
     try writeFolderTemplate(at: tmp, name: "MyTheme")
     store.reload()
 
-    #expect(store.templates.count == 2)
-    #expect(store.templates.contains(where: { $0.id == "MyTheme" }))
+    #expect(store.templates.count == 1)
+    #expect(store.templates.contains(where: { $0.id == "0.MyTheme" }))
   }
 
   @Test("reload() drops a deleted folder template")
@@ -117,13 +117,29 @@ struct TemplateStoreObservationTests {
     let tmp = makeTempDir()
     defer { try? FileManager.default.removeItem(at: tmp) }
     try writeFolderTemplate(at: tmp, name: "Doomed")
-    let store = TemplateStore(directoryURL: tmp)
-    #expect(store.templates.count == 2)
+    let store = TemplateStore(directoryURLs: [tmp])
+    #expect(store.templates.count == 1)
 
     try FileManager.default.removeItem(at: tmp.appending(path: "Doomed"))
     store.reload()
 
-    #expect(store.templates.count == 1)
+    #expect(store.templates.isEmpty)
+  }
+
+  @Test("multi-source: bundled and user templates with same name coexist")
+  func multiSourceNoCollision() throws {
+    let bundleSim = makeTempDir()
+    let userSim = makeTempDir()
+    defer {
+      try? FileManager.default.removeItem(at: bundleSim)
+      try? FileManager.default.removeItem(at: userSim)
+    }
+    try writeFolderTemplate(at: bundleSim, name: "Default")
+    try writeFolderTemplate(at: userSim, name: "Default")
+    let store = TemplateStore(directoryURLs: [bundleSim, userSim])
+
+    let ids = store.templates.map(\.id).sorted()
+    #expect(ids == ["0.Default", "1.Default"])
   }
 
   // Note: an FSEvents-driven watcher integration test is intentionally

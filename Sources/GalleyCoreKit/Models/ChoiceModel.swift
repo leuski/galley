@@ -107,9 +107,10 @@ extension ChoiceValueEnvelopeProtocol {
   /// processor binary name, template filename) as a runtime
   /// `LocalizationValue` so it resolves verbatim and isn't extracted
   /// into the translator catalog. Concrete envelopes whose inner type
-  /// has a localizable name (e.g. `TemplateChoiceValue`, where
-  /// `BuiltInTemplate` carries "Default") override this to delegate
-  /// to the inner type's `LocalizedStringResource`.
+  /// has a localizable name (e.g. `TemplateChoiceValue`, where the
+  /// bundled `Default` template carries a literal
+  /// `LocalizedStringResource`) override this to delegate to the inner
+  /// type's `LocalizedStringResource`.
   public var name: LocalizedStringResource {
     value.localizedStringResource
   }

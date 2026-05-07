@@ -1,73 +1,95 @@
 import Foundation
+import ALFoundation
 
-public protocol TemplateProtocol: Identifiable, Sendable {
-  var id: String { get }
-  /// User-visible label for menus / pickers. Returning
-  /// `LocalizedStringResource` follows Apple's pattern for
-  /// domain types (see `CustomLocalizedStringResourceConvertible`)
-  /// and decouples the kit from SwiftUI. Translatable cases
-  /// (`BuiltInTemplate`'s "Default") use a literal init so the
-  /// catalog picks them up; user-defined templates use a runtime
-  /// `LocalizationValue` so their filenames don't pollute the
-  /// strings catalog.
-  var name: LocalizedStringResource { get }
-  func loadHTML() throws -> String
-  func rewriteAssets(in html: String, origin: URL) -> String
-  func resolveAsset(file: String) -> URL?
-}
-
-public enum Template: TemplateProtocol,
-                      CustomLocalizedStringResourceConvertible
+/// One template — bundled or user-installed, file-shape or folder-shape,
+/// they all collapse to the same struct. The kit ships a `Default`
+/// template inside its bundle; users drop additional folders/files into
+/// `~/Library/Application Support/.../Templates/`. `TemplateStore` scans
+/// an ordered list of source directories and stamps each entry's `id`
+/// with `<source-index>.<name>` so collisions across sources never happen
+/// (a user template named "Default" coexists with the bundled "Default"
+/// because their source indices differ).
+public struct Template: Sendable, Identifiable,
+                        CustomLocalizedStringResourceConvertible
 {
-  case builtIn(BuiltInTemplate)
-  case userDefined(UserTemplate)
+  public let id: String
+  /// User-visible label. Bundled templates get a literal
+  /// `LocalizedStringResource` so Xcode's catalog extraction picks the
+  /// label up; user templates wrap their filename in a runtime
+  /// `LocalizationValue` so filenames stay out of the strings catalog.
+  public let name: LocalizedStringResource
+  /// Where to resolve sibling assets from. For folder templates this is
+  /// the template's own folder; for file templates (BBEdit convention)
+  /// this is the *parent* directory the file sits in, which is shared
+  /// with sibling templates in the same source.
+  public let directoryURL: URL
+  /// The HTML file itself.
+  public let htmlURL: URL
+  /// Index of the source directory this template came from, in
+  /// `TemplateStore.directoryURLs`. Used for menu sectioning so
+  /// bundled and user templates render in distinct groups without the
+  /// store having to expose source identity any other way.
+  public let sourceIndex: Int
 
-  /// `CustomStringConvertible` resolves the localizable name through
-  /// the current locale. Used for diagnostic logs and the
-  /// `PersistentChoiceValue` envelope's `name` field — neither cares
-  /// which locale won.
-  public var localizedStringResource: LocalizedStringResource {
-    name
+  public init(
+    id: String,
+    name: LocalizedStringResource,
+    directoryURL: URL,
+    htmlURL: URL,
+    sourceIndex: Int
+  ) {
+    self.id = id
+    self.name = name
+    self.directoryURL = directoryURL
+    self.htmlURL = htmlURL
+    self.sourceIndex = sourceIndex
   }
 
-  public var id: String {
-    switch self {
-    case .builtIn(let value): value.id
-    case .userDefined(let value): value.id
-    }
-  }
-
-  public var name: LocalizedStringResource {
-    switch self {
-    case .builtIn(let value): value.name
-    case .userDefined(let value): value.name
-    }
-  }
+  public var localizedStringResource: LocalizedStringResource { name }
 
   public func loadHTML() throws -> String {
-    switch self {
-    case .builtIn(let value): try value.loadHTML()
-    case .userDefined(let value): try value.loadHTML()
-    }
+    try String(contentsOf: htmlURL, encoding: .utf8)
   }
 
   public func rewriteAssets(in html: String, origin: URL) -> String {
-    switch self {
-    case .builtIn(let value): value.rewriteAssets(in: html, origin: origin)
-    case .userDefined(let value): value.rewriteAssets(in: html, origin: origin)
-    }
+    TemplateAssetRewriter(id: id, origin: origin).rewriteAssets(in: html)
   }
 
   public func resolveAsset(file: String) -> URL? {
-    switch self {
-    case .builtIn(let value): value.resolveAsset(file: file)
-    case .userDefined(let value): value.resolveAsset(file: file)
-    }
+    let directoryURL = self.directoryURL.safe
+    let candidate = directoryURL.appendingPathComponent(file).safe
+    return candidate.path.hasPrefix(directoryURL.path.appendingSlash)
+      ? candidate : nil
   }
 }
 
 public extension Template {
-  static var `default`: Template { .builtIn(.shared) }
+  /// Fallback for callers that need a known-good template without a
+  /// store handy (e.g. the Server's renderer-provider closure when
+  /// the template choice has been GC'd). Resolves the bundled
+  /// "Default" entry directly off the kit's bundle resources.
+  static let bundledDefault: Template = {
+    guard let template = Template(
+      sourceURL: TemplateStore.bundleTemplatesDirectoryURL,
+      sourceIndex: TemplateStore.bundleSourceIndex,
+      name: "Default",
+      nameResource: LocalizedStringResource(
+        "Default", bundle: .galleyCoreKit))
+    else {
+      fatalError("GalleyCoreKit bundle missing Templates.bundle/Default")
+    }
+    return template
+  }()
+
+  /// Convenience used by callers that previously wrote `.default`.
+  /// Resolves to `bundledDefault` so the static fallback still works
+  /// without depending on `TemplateStore`.
+  static var `default`: Template { .bundledDefault }
+}
+
+extension Template: ChoiceValueProtocol {
+  public typealias PersistentID = String
+  public var persistentID: String { id }
 }
 
 /// Result of composing a preview page. Pairs the final HTML with the
@@ -80,7 +102,7 @@ public struct ComposedPreview: Sendable {
   public let baseURL: URL
 }
 
-public extension TemplateProtocol {
+public extension Template {
   /// Canonical recipe for producing a preview page, shared by the
   /// Viewer's live page, its print/export pipeline, and Quick Look's
   /// in-process fallback.

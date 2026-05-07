@@ -56,9 +56,42 @@
             }
             h1, h2, h3, h4, h5, h6 { break-after: avoid; }
         }
+
+        .mermaid { display: block; margin: 1rem auto; text-align: center; }
+        @media print { .mermaid svg { max-width: 100%; height: auto; } }
     </style>
 </head>
 <body>
 #DOCUMENT_CONTENT#
+<script>
+  // Promote `<pre><code class="language-mermaid">…</code></pre>` blocks to
+  // `<div class="mermaid">…</div>` so Mermaid's auto-detect picks them up
+  // regardless of which Markdown processor produced them. Pandoc emits
+  // `<pre class="mermaid">`; swift-markdown / cmark-gfm emit
+  // `<pre><code class="language-mermaid">`. Handle both.
+  (function () {
+    document.querySelectorAll('pre > code.language-mermaid').forEach(function (code) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    document.querySelectorAll('pre.mermaid').forEach(function (pre) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = pre.textContent;
+      pre.replaceWith(div);
+    });
+  })();
+</script>
+<script src="mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    window.mermaid.initialize({
+      startOnLoad: true,
+      theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
+    });
+  }
+</script>
 </body>
 </html>
