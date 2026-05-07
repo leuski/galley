@@ -26,6 +26,12 @@ struct ViewerApp: App {
 
   init() {
     Self.createApplicationSupportDirectory()
+    // If the active server-agent backend persists an absolute path
+    // to the helper, the user moving `Galley.app` would leave that
+    // record pointing at a stale location. Detect and repair before
+    // any UI reflects stale state. No-op when nothing is installed.
+    // Fire-and-forget: scenes don't need to wait on it.
+    Task { await ActiveServerAgent.validateAndRepair() }
     let args = LaunchArguments.fromProcess()
     let dispatcher = WindowDispatcher()
     if let seed = args.seedFile {

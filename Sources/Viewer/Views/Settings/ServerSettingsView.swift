@@ -7,13 +7,15 @@ struct ServerSettingsView: View {
   @State private var portString: String = String(Defaults.shared.port)
   @State private var serverStatus = ServerStatusModel()
 
-  /// Mirrors `ServerAgent.isEnabled` as @State so SwiftUI tracks
-  /// changes. `ServerAgent.isEnabled` reads `SMAppService.status`,
-  /// which is *not* an Observable source — without this @State,
-  /// flipping the toggle wouldn't re-evaluate `probeKey` and the
-  /// `.task(id:)` loop wouldn't restart, leaving the pill stuck at
-  /// "Disabled".
-  @State private var serverEnabled: Bool = ServerAgent.isEnabled
+  /// Mirrors `ActiveServerAgent.isEnabled` as @State so SwiftUI
+  /// tracks changes. The agents are static enums (not Observable
+  /// sources) — without this @State, flipping the toggle wouldn't
+  /// re-evaluate `probeKey` and the `.task(id:)` loop wouldn't
+  /// restart, leaving the pill stuck at "Disabled".
+  ///
+  /// Initialised to `false`; the real value is loaded async in
+  /// `body`'s `.task` because `ActiveServerAgent.isEnabled` is async.
+  @State private var serverEnabled: Bool = false
 
   /// Stable id for `.task(id:)` — restarts the probe loop only when
   /// the toggle flips or the port changes.
@@ -43,6 +45,12 @@ struct ServerSettingsView: View {
       .task(id: probeKey) {
         await serverStatus.run(host: probeHost)
       }
+      .task {
+        // Load the real agent state once on appear. Subsequent
+        // changes flow through `serverEnabledBinding` so we don't
+        // need to re-poll.
+        serverEnabled = await ActiveServerAgent.isEnabled
+      }
 
       LabeledContent {
         TextField("Port", text: $portString)
@@ -69,12 +77,15 @@ struct ServerSettingsView: View {
       get: { serverEnabled },
       set: { newValue in
         // Optimistic flip so the pill starts probing immediately for
-        // the requested state. setEnabled returns the post-call status
-        // — if it disagrees (registration failed), reconcile.
+        // the requested state. setEnabled is async; reconcile when
+        // it returns. If the registration failed the post-call state
+        // disagrees and we revert the toggle.
         serverEnabled = newValue
-        let actual = ServerAgent.setEnabled(newValue)
-        if actual != newValue {
-          serverEnabled = actual
+        Task {
+          let actual = await ActiveServerAgent.setEnabled(newValue)
+          if actual != newValue {
+            serverEnabled = actual
+          }
         }
       }
     )

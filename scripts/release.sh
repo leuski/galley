@@ -94,10 +94,15 @@ resign_adhoc() {
   # are no entitlements; the empty-file check below handles that.
   codesign -d --entitlements "$ent_file" --xml "$target" 2>/dev/null || true
 
+  # codesign drops launch constraints by default when re-signing
+  # without --preserve-metadata=launch-constraints, so we don't pass
+  # any constraint flags and rely on that behavior.
+  local sign_args=(--force --sign -)
+
   if [[ -s "$ent_file" ]]; then
-    codesign --force --sign - --entitlements "$ent_file" "$target"
+    codesign "${sign_args[@]}" --entitlements "$ent_file" "$target"
   else
-    codesign --force --sign - "$target"
+    codesign "${sign_args[@]}" "$target"
   fi
 }
 
@@ -130,32 +135,41 @@ ad_hoc_resign_bundle() {
   resign_adhoc "$app"
 }
 
-echo "==> Stripping provenance attrs and ad-hoc re-signing"
-ad_hoc_resign_bundle "$APP_SRC"
-codesign --verify --deep --strict --verbose=2 "$APP_SRC"
-
-echo "==> Refreshing /Applications copy (overwrites the build phase's intermediate copy)"
+echo "==> Refreshing /Applications copy with Xcode-signed bundle"
+# Install the Xcode-signed bundle as-is (preserves the developer cert
+# chain). This matters for SMAppService LaunchAgents: macOS Sonoma+
+# AMFI enforces that helpers launched via SMAppService have a
+# recognized cert chain, and rejects ad-hoc binaries with
+# OS_REASON_CODESIGNING / Launch Constraint Violation. Keeping the
+# Xcode signature lets the embedded server agent actually launch.
 INSTALLED="/Applications/$APP_NAME"
 if [[ -d "$INSTALLED" ]]; then rm -rf "$INSTALLED"; fi
 ditto "$APP_SRC" "$INSTALLED"
-ad_hoc_resign_bundle "$INSTALLED"
 codesign --verify --deep --strict --verbose=2 "$INSTALLED"
 
-# Ad-hoc re-signing changes the bundle's code-signature hash on every
-# run, which invalidates any existing SMAppService LaunchAgent
-# registration: launchd's `copy_bundle_path` lookup against the BTM
-# database returns nothing, so the agent fails to spawn with EX_CONFIG.
-# Bootout the user-domain registration if it exists; the user can
-# re-toggle the setting in Galley to re-register against the new
-# bundle. (Idempotent — `bootout` exits 3 when the service isn't
-# registered.)
+# /Applications now has a fresh on-disk bundle; existing SMAppService
+# registrations key off the previous bundle's code-signature hash and
+# will fail to spawn. Bootout so the next toggle in Galley creates a
+# fresh BTM record. Idempotent.
 echo "==> Resetting SMAppService registration for net.leuski.galley.server"
 launchctl bootout "gui/$(id -u)/net.leuski.galley.server" 2>/dev/null \
   && echo "    booted out previous registration" \
   || echo "    no previous registration to remove"
 
+# For the redistributable zip we DO ad-hoc re-sign — the Apple Dev
+# cert is bound to provisioned devices and won't validate on other
+# machines. The trade-off: SMAppService features won't work on the
+# zip-distributed copy until we move to Developer ID + notarization.
+echo "==> Preparing redistributable copy (ad-hoc re-signed)"
+DIST_DIR="$BUILD_DIR/dist"
+rm -rf "$DIST_DIR"
+mkdir -p "$DIST_DIR"
+ditto "$APP_SRC" "$DIST_DIR/$APP_NAME"
+ad_hoc_resign_bundle "$DIST_DIR/$APP_NAME"
+codesign --verify --deep --strict --verbose=2 "$DIST_DIR/$APP_NAME"
+
 echo "==> Zipping $APP_NAME"
-ditto -c -k --keepParent --sequesterRsrc "$APP_SRC" "$ZIP_PATH"
+ditto -c -k --keepParent --sequesterRsrc "$DIST_DIR/$APP_NAME" "$ZIP_PATH"
 
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "==> Dry run complete (no tag, no publish): $ZIP_PATH"
@@ -181,15 +195,20 @@ xattr -dr com.apple.quarantine "/Applications/Galley.app"
 open "/Applications/Galley.app"
 \`\`\`
 
+### Known limitation: server agent
+
+Because this build is ad-hoc signed (no Apple Developer cert chain),
+macOS's AMFI will refuse to launch the embedded server agent via
+SMAppService with a "Launch Constraint Violation" error. The Galley
+app itself works; the menu-bar Settings toggle to run the server in
+the background does not. Run \`Galley Server.app\` (inside
+\`Galley.app/Contents/Resources\`) directly if you need the HTTP
+server, or wait for a Developer ID notarized release.
+
 ### Updating from a previous release
 
-Because the build is ad-hoc signed (no stable Team ID), each release
-produces a new code-signature hash. macOS's Background Task Manager
-treats it as a different app, so any previously-enabled
-"Run Markdown Preview Server in background" toggle stops launching.
-
-After replacing the app, open Galley → Settings → Server, then toggle
-the server enable off and on once to refresh the registration.
+Replace the \`/Applications/Galley.app\` bundle, then re-do the
+\`xattr -dr com.apple.quarantine\` step.
 EOF
 
 gh release create "$TAG" "$ZIP_PATH" \
