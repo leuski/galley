@@ -140,9 +140,13 @@ enum Routes {
         source: source)
     }
 
-    let templateHTML: String
+    let origin = hostURL
+    let substituted: String
     do {
-      templateHTML = try template.loadHTML()
+      substituted = try template.composeHTML(
+        documentContent: renderedBody,
+        documentURL: documentURL,
+        origin: origin)
     } catch {
       return HTTPResponses.errorPage(
         title: String(localized: "Template error", bundle: .galleyServerKit),
@@ -154,15 +158,6 @@ enum Routes {
           bundle: .galleyServerKit),
         source: renderedBody)
     }
-
-    let origin = hostURL
-    let processedTemplate = template.rewriteAssets(
-      in: templateHTML, origin: origin)
-    let context = PlaceholderContext(
-      documentContent: renderedBody,
-      documentURL: documentURL,
-      origin: origin)
-    let substituted = context.substitute(into: processedTemplate)
     let nonce = generateNonce()
     let withReload = injectReloadScript(
       into: substituted, documentURL: documentURL, nonce: nonce)

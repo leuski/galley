@@ -528,15 +528,12 @@ final class DocumentModel {
     do {
       let source = try String(contentsOf: url, encoding: .utf8)
       let body = try await renderer.render(source, baseURL: url)
-      let templateHTML = try template.loadHTML()
       let origin = PreviewSchemeHandler.originURL
-      let context = PlaceholderContext(
+      let composed = try template.composeHTML(
         documentContent: body,
         documentURL: url,
         origin: origin)
-      let substituted = context.substitute(into: templateHTML)
-      let rewritten = template.rewriteAssets(in: substituted, origin: origin)
-      let html = injectZoomStyle(into: rewritten)
+      let html = injectZoomStyle(into: composed)
       logLoadingHTML(byteCount: html.count)
       do {
         for try await _ in page.load(html: html, baseURL: origin) {}

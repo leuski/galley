@@ -78,22 +78,17 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
   }
 
-  /// Same recipe the server uses in
-  /// `GalleyServerKit.Routes.renderPreview`, with `origin` =
-  /// `PreviewScheme.originURL` so all asset URLs flow through
-  /// `ClassicPreviewSchemeHandler` instead of an HTTP server.
+  /// Uses the shared `TemplateProtocol.composeHTML` recipe with
+  /// `origin` = `PreviewScheme.originURL` so all asset URLs flow
+  /// through `ClassicPreviewSchemeHandler` instead of an HTTP server.
   private func renderInProcess(file: URL) async throws -> String {
     let source = try String(contentsOf: file, encoding: .utf8)
     let body = try await SwiftMarkdownRenderer().render(source, baseURL: file)
     let template: Template = .builtIn(.shared)
-    let templateHTML = try template.loadHTML()
-    let origin = PreviewScheme.originURL
-    let processed = template.rewriteAssets(in: templateHTML, origin: origin)
-    let context = PlaceholderContext(
+    return try template.composeHTML(
       documentContent: body,
       documentURL: file,
-      origin: origin)
-    return context.substitute(into: processed)
+      origin: PreviewScheme.originURL)
   }
 }
 

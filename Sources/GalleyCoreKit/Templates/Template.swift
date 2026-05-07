@@ -69,3 +69,29 @@ public enum Template: TemplateProtocol,
 public extension Template {
   static var `default`: Template { .builtIn(.shared) }
 }
+
+public extension TemplateProtocol {
+  /// Canonical recipe for producing final preview HTML, shared by the
+  /// Viewer, Server, and Quick Look. Loads the template, rewrites its
+  /// asset references through `origin`, then substitutes placeholders
+  /// with the document content.
+  ///
+  /// Asset rewriting must run *before* placeholder substitution so the
+  /// rewriter only touches template-authored URLs and leaves URLs in
+  /// the rendered document body alone. Reversing the order routes
+  /// document-relative `<img>`/`<link>` references through the
+  /// `/template/<id>/` namespace and breaks them.
+  func composeHTML(
+    documentContent: String,
+    documentURL: URL,
+    origin: URL
+  ) throws -> String {
+    let templateHTML = try loadHTML()
+    let processed = rewriteAssets(in: templateHTML, origin: origin)
+    let context = PlaceholderContext(
+      documentContent: documentContent,
+      documentURL: documentURL,
+      origin: origin)
+    return context.substitute(into: processed)
+  }
+}
