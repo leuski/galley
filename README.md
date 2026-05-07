@@ -5,7 +5,7 @@ your chosen processor, wraps it in a styleable HTML template, and reloads when
 the file changes on disk. Cmd-click any rendered block to jump straight back to
 the source line in your editor.
 
-<!-- TODO: screenshot — main viewer window with a document open -->
+![Screenshot](./Galley1.png)
 
 The same rendering engine also powers a companion menu-bar app, **Galley
 Server**, which serves the preview over HTTP so any browser (or BBEdit's
