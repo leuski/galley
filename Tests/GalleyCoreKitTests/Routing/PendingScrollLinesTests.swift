@@ -58,4 +58,53 @@ struct PendingScrollLinesTests {
     let url = URL(fileURLWithPath: "/tmp/missing.md")
     #expect(lines.consume(for: url) == nil)
   }
+
+  /// Peek MUST be idempotent — the production caller (`ContentView`)
+  /// uses peek for diagnostics and consume for one-shot apply. A
+  /// silently-consuming peek would steal the line from the bind site.
+  @Test("Peek is idempotent — repeated peeks return the same value")
+  func peekIdempotent() {
+    var lines = PendingScrollLines()
+    let url = URL(fileURLWithPath: "/tmp/a.md")
+    lines.stash(7, for: url)
+    #expect(lines.peek(for: url) == 7)
+    #expect(lines.peek(for: url) == 7)
+    #expect(lines.peek(for: url) == 7)
+    #expect(!lines.isEmpty)
+  }
+
+  @Test("Value semantics — copies are independent")
+  func valueSemantics() {
+    var original = PendingScrollLines()
+    let url = URL(fileURLWithPath: "/tmp/a.md")
+    original.stash(1, for: url)
+    var copy = original
+    copy.stash(2, for: url)
+    #expect(original.consume(for: url) == 1)
+    #expect(copy.consume(for: url) == 2)
+  }
+
+  @Test("Equatable across distinct stash sequences with same end state")
+  func equatable() {
+    var first = PendingScrollLines()
+    var second = PendingScrollLines()
+    let url = URL(fileURLWithPath: "/tmp/a.md")
+    first.stash(99, for: url)
+    second.stash(1, for: url)
+    second.stash(99, for: url)
+    #expect(first == second)
+  }
+
+  /// Negative and zero lines are accepted at this layer (the value
+  /// type is dumb storage). The `galleyAction` parser is what drops
+  /// non-positive values before they reach us. Pin that contract.
+  @Test("Stash accepts any Int — caller is responsible for positivity")
+  func storesAnyInt() {
+    var lines = PendingScrollLines()
+    let url = URL(fileURLWithPath: "/tmp/a.md")
+    lines.stash(0, for: url)
+    #expect(lines.consume(for: url) == 0)
+    lines.stash(-7, for: url)
+    #expect(lines.consume(for: url) == -7)
+  }
 }

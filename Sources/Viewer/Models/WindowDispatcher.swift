@@ -166,6 +166,52 @@ final class WindowDispatcher {
 
   // MARK: - Window registry
 
+  /// Adopt a freshly-resolved `NSWindow` into the routing system.
+  /// Symmetric counterpart of the multi-step ceremony that used to
+  /// live inline in `DocumentView`'s `WindowAccessor.onAttach`.
+  /// Performs:
+  ///
+  ///   1. Reveal — the window stays at `alphaValue = 0` until the
+  ///      model has bound at least once. State restoration applies
+  ///      the URL ~half a second after a view mounts, so we can't
+  ///      predict the order of NSWindow resolve vs. `.task` firing.
+  ///      If a previous fire already bound content, unhide right
+  ///      away.
+  ///   2. Tab merge — if this open came in under the `newTab`
+  ///      open-behavior, the dispatcher queued the host window when
+  ///      it asked SwiftUI to spawn this one. Match by URL so a
+  ///      stale queue entry from a deduped `openWindow(value:)` or
+  ///      fan-out `.onOpenURL` doesn't poison an unrelated open —
+  ///      see `consumePendingTabHost(for:)`.
+  ///   3. Tab "+" hook — `NewTabAction.install(on:)` patches the
+  ///      AppKit selector that SwiftUI's `WindowGroup<URL>` mishandles,
+  ///      so the user's "+" click runs the Open panel and merges
+  ///      picks as tabs. Idempotent at the class level.
+  ///   4. Register — wire up the rebind closure that the routing
+  ///      adapter will call for `replaceCurrent` and `focusExisting`
+  ///      paths, and install the `willCloseNotification` cleanup.
+  ///
+  /// Detach is the asymmetric one-liner `unregisterWindow(_:)`. The
+  /// `willCloseNotification` observer installed during `register`
+  /// auto-fires `unregisterWindow` on tab close — `unregisterWindow`
+  /// is safe to call twice (registry treats unknown ids as no-ops).
+  func adopt(
+    _ window: NSWindow,
+    fileURL: URL,
+    didFirstBind: Bool,
+    rebind: @escaping @MainActor (URL) -> Void
+  ) {
+    window.alphaValue = didFirstBind ? 1 : 0
+    if let host = consumePendingTabHost(for: fileURL),
+       host !== window,
+       host.isVisible
+    {
+      host.addTabbedWindow(window, ordered: .above)
+    }
+    NewTabAction.install(on: window)
+    registerWindow(window, initialURL: fileURL, rebind: rebind)
+  }
+
   /// Called by every `ContentView` once its `NSWindow` resolves. The
   /// `rebind` closure swaps the window's WindowGroup binding and the
   /// underlying `DocumentModel` to a new URL.

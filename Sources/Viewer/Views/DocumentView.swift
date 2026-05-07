@@ -85,38 +85,13 @@ struct DocumentView: View {
           // reopened tab into a floating, toolbar-less window.
           guard let window, window !== hostWindow else { return }
           hostWindow = window
-          // Every window opens hidden until content is bound. State
-          // restoration applies the URL ~half a second after a view
-          // mounts, and a fresh placeholder sits empty until the
-          // open panel returns. We can't predict the order of this
-          // resolve vs. .task firing — if a previous fire already
-          // bound content (e.g. openWindow(value:) → immediate
-          // bind), unhide right away.
-          window.alphaValue = model.didFirstBind ? 1 : 0
-          // Merge into the queued host's tab group if this open came
-          // in under the `newTab` behavior. Match by URL so a stale
-          // queue entry (left behind by a deduped `openWindow(value:)`
-          // or fan-out `.onOpenURL`) doesn't poison the merge for an
-          // unrelated URL — see `consumePendingTabHost(for:)`.
-          if let host = dispatcher.consumePendingTabHost(for: fileURL),
-             host !== window,
-             host.isVisible
-          {
-            host.addTabbedWindow(window, ordered: .above)
-          }
-          // Hook the AppKit tab bar's "+" button — see
-          // `NewTabAction.install(on:)`. The "+" sends
-          // `newWindowForTab:` into a `WindowGroup<URL>` that has
-          // no default value, and SwiftUI's default tears down the
-          // current window instead of spawning a new tab. We
-          // intercept that selector and dispatch to the static
-          // `handler` (configured by `ViewerApp`) so "+" runs the
-          // Open panel and merges picks as tabs onto the source
-          // window — the Safari/Preview pattern.
-          NewTabAction.install(on: window)
-          dispatcher.registerWindow(
+          // The window-adoption ceremony (alpha unhide, tab merge,
+          // tab "+" hook, registry insert) lives on the dispatcher
+          // so it stays unit-testable. See `WindowDispatcher.adopt`.
+          dispatcher.adopt(
             window,
-            initialURL: fileURL
+            fileURL: fileURL,
+            didFirstBind: model.didFirstBind
           ) { newURL in
             replaceDocument(with: newURL)
           }
@@ -367,74 +342,54 @@ struct DocumentView: View {
   /// `boot.model` is non-nil, so by the time this fires processor
   /// discovery has completed and the persisted pick has been decoded
   /// against the live catalog.
+  ///
+  /// The pure decision lives in `BindPlan.decide(...)`; this method
+  /// is its interpreter — applies zoom / choice overrides, then
+  /// dispatches to `model.restore` or `model.bind` (or returns when
+  /// the model is already bound).
   private func launchTask() async {
-    // The URL we're about to display: the snapshot's current entry
-    // for a state-restored window, or the WindowGroup-bound URL for
-    // a fresh open. The model was already constructed with
-    // fileURL's per-file state at view-init; restoration to a
-    // different URL needs us to re-key the per-file lookup.
-    let snapshot = !didRestore ? decodeHistory(historyJSON) : nil
-    let restoreURL = snapshot?.currentURL
-    let stored = Defaults.shared
-      .perFileStateStore[restoreURL ?? fileURL]
+    let plan = BindPlan.decide(
+      fileURL: fileURL,
+      didFirstBind: model.didFirstBind,
+      didRestore: didRestore,
+      historyJSON: historyJSON,
+      perFileState: { Defaults.shared.perFileStateStore[$0] })
 
     // `setZoom` only updates a JS rule on the live page; the next
     // render reads `model.pageZoom` to inject the matching CSS so
     // the first frame comes up at the right size.
-    model.setZoom(stored.pageZoom ?? 1.0)
+    model.setZoom(plan.zoom)
 
-    // Restoration may bring back a different URL than fileURL —
-    // override the choice IDs the model was constructed with.
-    if let restoreURL, restoreURL != fileURL {
-      model.templates.persistent = stored.templatePersistent
-      model.processors.persistent = stored.rendererPersistent
+    if plan.applyChoiceOverrides {
+      model.templates.persistent = plan.templateOverride
+      model.processors.persistent = plan.rendererOverride
     }
 
-    // The first rebind sets `didFirstBind`; every subsequent
-    // re-fire of `.task` is a no-op.
-    if model.didFirstBind { return }
+    switch plan.action {
+    case .alreadyBound:
+      return
 
-    // Restore a saved session (back/forward stack) for this scene.
-    if !didRestore, let snapshot {
+    case .restore(let snapshot, let scrollY, let showsTOC):
       didRestore = true
       await model.restore(
         snapshot: snapshot,
-        initialScrollY: stored.scrollY,
-        initialShowsTOC: stored.showsTOC ?? false)
+        initialScrollY: scrollY,
+        initialShowsTOC: showsTOC)
       recents.record(model.documentURL)
-      return
-    }
 
-    // Initial bind for a freshly-opened URL.
-    recents.record(fileURL)
-    let line = dispatcher.consumePendingScrollLine(for: fileURL)
-    await model.bind(
-      to: fileURL,
-      scrollToLine: line,
-      initialScrollY: stored.scrollY,
-      initialShowsTOC: stored.showsTOC ?? false)
+    case .initialBind(let url, let scrollY, let showsTOC):
+      recents.record(url)
+      let line = dispatcher.consumePendingScrollLine(for: url)
+      await model.bind(
+        to: url,
+        scrollToLine: line,
+        initialScrollY: scrollY,
+        initialShowsTOC: showsTOC)
+    }
   }
 
   private func saveHistory() {
-    guard let snapshot = model.historySnapshot else {
-      historyJSON = ""
-      return
-    }
-    if let data = try? JSONEncoder().encode(snapshot),
-       let text = String(data: data, encoding: .utf8)
-    {
-      historyJSON = text
-    }
-  }
-
-  private func decodeHistory(_ text: String) -> HistorySnapshot? {
-    guard !text.isEmpty,
-          let data = text.data(using: .utf8),
-          let snapshot = try? JSONDecoder().decode(
-            HistorySnapshot.self, from: data),
-          !snapshot.urls.isEmpty
-    else { return nil }
-    return snapshot
+    historyJSON = model.historySnapshot?.encodedAsJSON() ?? ""
   }
 
   @ToolbarContentBuilder
