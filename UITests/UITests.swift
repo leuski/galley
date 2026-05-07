@@ -280,6 +280,23 @@ final class UITests: XCTestCase {
       phase1,
       "Seeded doc window should be visible in phase 1 before quit")
 
+    // Phase 1 may also restore unrelated windows from the user's
+    // pre-test saved state (the test runner shares the user's
+    // talagentd container — there's no sandboxed test profile for
+    // SwiftUI state restoration). Close every window other than the
+    // seeded one so phase 2's saved state contains only `Persistent`.
+    // Without this, stale prior URLs win over the seeded URL and
+    // phase 2 restores the wrong window.
+    closeOtherDocumentWindows(in: app1, keepTitleContaining: "Persistent")
+
+    // Give SwiftUI/AppKit time to register the seeded window's URL
+    // with talagentd before we terminate. `WindowGroup<URL>` writes
+    // restorable state asynchronously after the scene presents its
+    // content; terminating ~100ms after the window first becomes
+    // hittable races that write and leaves the seeded URL out of
+    // saved state, so phase 2 restores only stale prior entries.
+    Thread.sleep(forTimeInterval: 3.0)
+
     // Quit gracefully so AppKit/SwiftUI hand the open URL to
     // talagentd. `terminate()` sends a normal terminate request,
     // which triggers the app's normal termination path including
@@ -292,6 +309,14 @@ final class UITests: XCTestCase {
     XCTAssertEqual(
       app1.state, .notRunning,
       "Phase 1 app should fully terminate before phase 2 launches")
+
+    // talagentd writes its container store asynchronously, batched.
+    // `terminate()` reaching `.notRunning` only proves the process is
+    // gone — not that talagentd has flushed the new restorable state
+    // to disk. Without this settle, phase 2 launches against the
+    // pre-phase-1 saved state and restores a stale window instead of
+    // the one phase 1 just opened.
+    Thread.sleep(forTimeInterval: 3.0)
 
     // Phase 2 — launch fresh with state restoration enabled.
     // No --seed-file. No -ApplePersistenceIgnoreState.
@@ -371,6 +396,47 @@ final class UITests: XCTestCase {
   }
 
   // MARK: - Helpers
+
+  /// Close every document window in `app` whose title does NOT
+  /// contain `keep`. Used by the state-restoration test to evict
+  /// stale windows the user's pre-test saved state may have brought
+  /// back, so phase 1 saves only the seeded URL. Closes via the
+  /// title-bar close button to avoid clicking the document area
+  /// (which can hit a hyperlink or focusable control).
+  @MainActor
+  private func closeOtherDocumentWindows(
+    in app: XCUIApplication,
+    keepTitleContaining keep: String
+  ) {
+    for _ in 0..<8 {
+      var victim: XCUIElement?
+      for index in 0..<app.windows.count {
+        let window = app.windows.element(boundBy: index)
+        let title = window.title
+        if !title.isEmpty,
+           !title.localizedCaseInsensitiveContains(keep) {
+          victim = window
+          break
+        }
+      }
+      guard let target = victim, target.exists else { return }
+      // The standard window controls live as buttons inside the
+      // window. AppKit names the red close button "Close".
+      let closeButton = target.buttons["_XCUI:CloseWindow"].exists
+        ? target.buttons["_XCUI:CloseWindow"]
+        : target.buttons["Close"]
+      if closeButton.exists {
+        closeButton.click()
+      } else {
+        // Fallback: tap the title bar via static text, then Cmd-W.
+        // Window titles are accessible as static text children.
+        let titleText = target.staticTexts.firstMatch
+        if titleText.exists { titleText.click() }
+        app.typeKey("w", modifierFlags: [.command])
+      }
+      Thread.sleep(forTimeInterval: 0.3)
+    }
+  }
 
   /// Launch with a seeded markdown file and wait for its window to
   /// be visible. Used by menu-related tests so they run against a
