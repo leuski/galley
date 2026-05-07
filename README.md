@@ -7,9 +7,9 @@ the source line in your editor.
 
 <!-- TODO: screenshot — main viewer window with a document open -->
 
-The same rendering engine also powers a companion menu-bar app, **Markdown
-Preview Server**, which serves the preview over HTTP so any browser (or
-BBEdit's preview pane) can view it.
+The same rendering engine also powers a companion menu-bar app, **Galley
+Server**, which serves the preview over HTTP so any browser (or BBEdit's
+preview pane) can view it.
 
 ## Galley — the viewer
 
@@ -44,7 +44,7 @@ Galley registers `galley://<absolute-path>?line=N`. Dropping that URL into a
 script or `open(1)` focuses Galley on that document at that line. The
 bundled BBEdit script uses this to drive previews from the editor.
 
-## Markdown Preview Server — the menu-bar app
+## Galley Server — the menu-bar app
 
 A `MenuBarExtra`-only app that runs an HTTP server in-process. Same renderers,
 same templates — served at `http://127.0.0.1:<port>/preview/<absolute path>`
@@ -151,7 +151,7 @@ Any other editor that can shell out to a URL works the same way.
 - **Open behavior** for incoming URLs — new window, new tab, or replace
   current.
 
-### Markdown Preview Server
+### Galley Server
 
 - **Port** — TCP port the server binds to (default `8089`). The server
   restarts automatically when changed.
@@ -163,7 +163,7 @@ Any other editor that can shell out to a URL works the same way.
 Open `Galley.xcodeproj` in Xcode. Two app schemes:
 
 - **Viewer** — Galley.
-- **Server** — Markdown Preview Server.
+- **Server** — Galley Server.
 
 Two framework schemes (mostly for direct iteration):
 
