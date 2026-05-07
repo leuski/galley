@@ -149,6 +149,15 @@ struct DocumentView: View {
         Text(message)
       }
       .navigationTitle(model.documentURL.lastPathComponent)
+      // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
+      // toolbar under the identifier `com.apple.SwiftUI.navigationSplitView.
+      // toggleSidebar`. Combined with `.toolbar(id: "viewer.main")`'s
+      // customization persistence, that identifier ends up both auto-injected
+      // and restored from defaults on the next launch — NSToolbar then
+      // throws because the same identifier appears twice. Suppress the
+      // auto-injected one and provide our own non-customizable toggle in
+      // `navigationToolbarItems` instead.
+      .toolbar(removing: .sidebarToggle)
       // No `id:` — `replaceDocument` drives in-window URL changes
       // directly through `model.bind(to:)`, so re-firing on every
       // `fileURL` write would be wasted work that the early-return
@@ -423,6 +432,27 @@ struct DocumentView: View {
 
   @ToolbarContentBuilder
   private var navigationToolbarItems: some CustomizableToolbarContent {
+    // Replacement for SwiftUI's auto-injected NavigationSplitView toggle —
+    // see the `.toolbar(removing: .sidebarToggle)` comment in `body`.
+    // `.customizationBehavior(.disabled)` keeps this item out of the
+    // customization config so it can't ever round-trip through defaults
+    // and trigger the duplicate-identifier crash.
+    ToolbarItem(id: "toggleTOC", placement: .navigation) {
+      Button {
+        if reduceMotion {
+          model.showsTOC.toggle()
+        } else {
+          withAnimation { model.showsTOC.toggle() }
+        }
+      } label: {
+        Label("Toggle Table of Contents", systemImage: "sidebar.left")
+      }
+      .help("Toggle Table of Contents")
+      .accessibilityLabel(Text("Toggle Table of Contents"))
+      .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
+    }
+    .customizationBehavior(.disabled)
+
     ToolbarItem(id: "back", placement: .navigation) {
       Action.back.toolbarItem(model: model)
     }
