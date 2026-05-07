@@ -46,13 +46,30 @@ final class WindowDispatcher {
   @ObservationIgnored
   private var rebindClosures: [WindowID: @MainActor (URL) -> Void] = [:]
 
-  /// FIFO queue of hosts for the next `newTab` opens. Populated
-  /// immediately before calling `openHandler`; each new window's
-  /// `WindowAccessor` consumes one entry when it resolves an
-  /// `NSWindow`. A queue (rather than a single slot) handles the
-  /// multi-URL case where window creation is async w.r.t. the
-  /// dispatch loop.
-  @ObservationIgnored private var pendingTabHosts: [NSWindow] = []
+  /// `NSWindow.willCloseNotification` observers, keyed by window id,
+  /// so the dispatcher reliably unregisters a closed window even when
+  /// SwiftUI's `WindowGroup` keeps the underlying `NSWindow` alive
+  /// across close (`isReleasedWhenClosed = false` is the SwiftUI
+  /// default for managed windows). Without this hook, closing a tab
+  /// leaves a stale registration in the registry — the next reopen
+  /// of the same URL routes to `.focusExisting` on the hidden,
+  /// already-detached-from-its-tab-group window, which then surfaces
+  /// as a floating standalone window instead of merging as a tab.
+  @ObservationIgnored
+  private var closeObservers: [WindowID: NSObjectProtocol] = [:]
+
+  /// Pending `newTab` merges keyed by the URL that triggered them.
+  /// Populated immediately before calling `openHandler`; each new
+  /// window's `WindowAccessor` consumes the entry whose URL matches
+  /// its bound `fileURL`. URL-match (rather than FIFO) is what makes
+  /// merging robust against duplicate dispatches: when `.onOpenURL`
+  /// fan-out or rapid back-to-back opens push the host more times
+  /// than SwiftUI ends up creating windows (because `openWindow(
+  /// value:)` dedupes on the in-flight URL), the leftover entries
+  /// sit in the queue without poisoning the next legitimate open
+  /// onto a different URL.
+  @ObservationIgnored
+  private var pendingTabHosts: [(url: URL, host: NSWindow)] = []
 
   @ObservationIgnored
   private let logger = Logger(
@@ -136,7 +153,7 @@ final class WindowDispatcher {
 
     case .tabOnto(let id):
       if let host = windowsByID[id] {
-        pendingTabHosts.append(host)
+        pendingTabHosts.append((url: url, host: host))
       }
       openHandler?(url)
 
@@ -162,6 +179,22 @@ final class WindowDispatcher {
     windowsByID[id] = window
     rebindClosures[id] = rebind
     registry.register(WindowRecord(id: id, currentURL: initialURL))
+    // SwiftUI's `WindowGroup` leaves `isReleasedWhenClosed = false`
+    // on managed windows, so closing a tab does NOT trigger
+    // `viewWillMove(toWindow: nil)` on the contained subview — the
+    // `WindowAccessor.onDetach` path can't be relied on. Observe the
+    // notification directly so the registry stays in sync with the
+    // user's perception of "this window is gone."
+    let observer = NotificationCenter.default.addObserver(
+      forName: NSWindow.willCloseNotification,
+      object: window,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.unregisterWindow(window)
+      }
+    }
+    closeObservers[id] = observer
   }
 
   func unregisterWindow(_ window: NSWindow) {
@@ -170,6 +203,9 @@ final class WindowDispatcher {
     registry.unregister(id)
     windowsByID.removeValue(forKey: id)
     rebindClosures.removeValue(forKey: id)
+    if let observer = closeObservers.removeValue(forKey: id) {
+      NotificationCenter.default.removeObserver(observer)
+    }
   }
 
   /// Track the URL each window is currently bound to. ContentView
@@ -180,10 +216,19 @@ final class WindowDispatcher {
     registry.updateCurrentURL(id, url)
   }
 
-  /// Consume the oldest pending `newTab` host. The new window calls
-  /// this after attaching, then merges itself onto the returned host.
-  func consumePendingTabHost() -> NSWindow? {
-    pendingTabHosts.isEmpty ? nil : pendingTabHosts.removeFirst()
+  /// Consume the pending tab-merge host queued for `url`, if any.
+  /// The new window calls this after attaching, then merges itself
+  /// onto the returned host. Matching by URL (rather than FIFO order)
+  /// keeps the queue robust against SwiftUI deduplicating
+  /// `openWindow(value:)` calls or `.onOpenURL` fan-out producing
+  /// more queue entries than created windows — stale entries sit
+  /// there without poisoning unrelated opens.
+  func consumePendingTabHost(for url: URL) -> NSWindow? {
+    let target = url.standardizedFileURL.path
+    guard let index = pendingTabHosts.firstIndex(where: {
+      $0.url.standardizedFileURL.path == target
+    }) else { return nil }
+    return pendingTabHosts.remove(at: index).host
   }
 
   /// Open URLs as new tabs onto a specific host window. Used by the
@@ -198,10 +243,10 @@ final class WindowDispatcher {
         continue
       case .document(let fileURL, let line):
         if let line { pendingScrolls.stash(line, for: fileURL) }
-        pendingTabHosts.append(host)
+        pendingTabHosts.append((url: fileURL, host: host))
         openHandler(fileURL)
       case .unparseable(let original):
-        pendingTabHosts.append(host)
+        pendingTabHosts.append((url: original, host: host))
         openHandler(original)
       }
     }

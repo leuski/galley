@@ -74,43 +74,51 @@ struct DocumentView: View {
       }
       .background(WindowAccessor(
         onAttach: { window in
-          if hostWindow == nil {
-            hostWindow = window
-            // Every window opens hidden until content is bound. State
-            // restoration applies the URL ~half a second after a view
-            // mounts, and a fresh placeholder sits empty until the
-            // open panel returns. We can't predict the order of this
-            // resolve vs. .task firing — if a previous fire already
-            // bound content (e.g. openWindow(value:) → immediate
-            // bind), unhide right away.
-            window?.alphaValue = model.didFirstBind ? 1 : 0
+          // Re-run registration whenever the resolved NSWindow
+          // *changes identity* — but skip a no-op re-attach to the
+          // same host. SwiftUI caches scene `@State` for a freshly-
+          // closed `WindowGroup<URL>` window and reuses it when the
+          // same URL is reopened (the close-a-tab-and-reopen path),
+          // which leaves `hostWindow` pointing at the dead AppKit
+          // window. A simple `nil` guard here would skip the re-
+          // register + tab-merge for the new window — turning the
+          // reopened tab into a floating, toolbar-less window.
+          guard let window, window !== hostWindow else { return }
+          hostWindow = window
+          // Every window opens hidden until content is bound. State
+          // restoration applies the URL ~half a second after a view
+          // mounts, and a fresh placeholder sits empty until the
+          // open panel returns. We can't predict the order of this
+          // resolve vs. .task firing — if a previous fire already
+          // bound content (e.g. openWindow(value:) → immediate
+          // bind), unhide right away.
+          window.alphaValue = model.didFirstBind ? 1 : 0
+          // Merge into the queued host's tab group if this open came
+          // in under the `newTab` behavior. Match by URL so a stale
+          // queue entry (left behind by a deduped `openWindow(value:)`
+          // or fan-out `.onOpenURL`) doesn't poison the merge for an
+          // unrelated URL — see `consumePendingTabHost(for:)`.
+          if let host = dispatcher.consumePendingTabHost(for: fileURL),
+             host !== window,
+             host.isVisible
+          {
+            host.addTabbedWindow(window, ordered: .above)
           }
-          if let window {
-            // Merge into the frontmost window's tab group if this open
-            // came in under the `newTab` behavior. Has to happen as
-            // soon as the new window exists so the user never sees
-            // it as a separate floating window first.
-            if let host = dispatcher.consumePendingTabHost(),
-               host !== window
-            {
-              host.addTabbedWindow(window, ordered: .above)
-            }
-            // Hook the AppKit tab bar's "+" button — see
-            // `NewTabAction.install(on:)`. The "+" sends
-            // `newWindowForTab:` into a `WindowGroup<URL>` that has
-            // no default value, and SwiftUI's default tears down the
-            // current window instead of spawning a new tab. We
-            // intercept that selector and dispatch to the static
-            // `handler` (configured by `ViewerApp`) so "+" runs the
-            // Open panel and merges picks as tabs onto the source
-            // window — the Safari/Preview pattern.
-            NewTabAction.install(on: window)
-            dispatcher.registerWindow(
-              window,
-              initialURL: fileURL
-            ) { newURL in
-              replaceDocument(with: newURL)
-            }
+          // Hook the AppKit tab bar's "+" button — see
+          // `NewTabAction.install(on:)`. The "+" sends
+          // `newWindowForTab:` into a `WindowGroup<URL>` that has
+          // no default value, and SwiftUI's default tears down the
+          // current window instead of spawning a new tab. We
+          // intercept that selector and dispatch to the static
+          // `handler` (configured by `ViewerApp`) so "+" runs the
+          // Open panel and merges picks as tabs onto the source
+          // window — the Safari/Preview pattern.
+          NewTabAction.install(on: window)
+          dispatcher.registerWindow(
+            window,
+            initialURL: fileURL
+          ) { newURL in
+            replaceDocument(with: newURL)
           }
         },
         onDetach: { window in
@@ -188,6 +196,7 @@ struct DocumentView: View {
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
+//        .border(Color.blue, width: 1)
       // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
       // toolbar under the identifier `com.apple.SwiftUI.navigationSplitView.
       // toggleSidebar`. Combined with `.toolbar(id: "viewer.main")`'s
