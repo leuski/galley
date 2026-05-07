@@ -7,11 +7,10 @@ import SwiftUI
 /// the Viewer doesn't use).
 struct ViewCommands: Commands {
   @FocusedValue(\.documentModel) private var model
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some Commands {
     CommandGroup(before: .toolbar) {
-      tocToggle
+      Action.toggleTOC.menuItem(model: model)
 
       Divider()
 
@@ -27,30 +26,5 @@ struct ViewCommands: Commands {
 
       Divider()
     }
-  }
-
-  /// The TOC sidebar toggle. Rendered as a `Button` whose title flips
-  /// between "Show" and "Hide" — the standard macOS show/hide pattern
-  /// (matches Finder's "Show Sidebar" / "Hide Sidebar" affordance).
-  /// When no document window is focused, falls back to a disabled
-  /// "Show…" so the keyboard shortcut still appears in the menu.
-  @ViewBuilder
-  private var tocToggle: some View {
-    let title: LocalizedStringResource = (model?.showsTOC ?? false)
-      ? "Hide Table of Contents"
-      : "Show Table of Contents"
-    Button {
-      guard let model else { return }
-      if reduceMotion {
-        model.showsTOC.toggle()
-      } else {
-        withAnimation { model.showsTOC.toggle() }
-      }
-    } label: {
-      Label(title, systemImage: "sidebar.left")
-    }
-    .disabled(model == nil)
-    .keyboardShortcut("1", modifiers: [.command, .control])
-    .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
   }
 }

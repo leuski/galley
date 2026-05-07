@@ -59,11 +59,11 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-ApplePersistenceIgnoreState"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "YES"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

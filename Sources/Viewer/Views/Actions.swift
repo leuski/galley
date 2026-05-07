@@ -10,17 +10,73 @@ import SwiftUI
 
 @MainActor
 struct Action {
-  let title: LocalizedStringResource
+  let title: @MainActor (DocumentModel?) -> LocalizedStringResource
   let image: String
-  let action: @MainActor (DocumentModel) -> Void
+  /// The action receives the live `reduceMotion` env so toggles that
+  /// animate (e.g. sidebar reveal) can honor accessibility settings
+  /// from any call site without each call site re-implementing the
+  /// check.
+  let action: @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void
   let isEnabled: @MainActor (DocumentModel) -> Bool
   let shortcut: KeyboardShortcut?
   let accessibilityID: String
 
-  var helpLabel: String {
-    let titleString = String(localized: title)
-    guard let shortcut else { return titleString }
-    return "\(titleString) (\(Self.format(shortcut)))"
+  init(
+    title: @escaping @MainActor (DocumentModel?) -> LocalizedStringResource,
+    image: String,
+    action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
+    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    shortcut: KeyboardShortcut?,
+    accessibilityID: String
+  ) {
+    self.title = title
+    self.image = image
+    self.action = action
+    self.isEnabled = isEnabled
+    self.shortcut = shortcut
+    self.accessibilityID = accessibilityID
+  }
+
+  init(
+    title: LocalizedStringResource,
+    image: String,
+    action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
+    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    shortcut: KeyboardShortcut?,
+    accessibilityID: String
+  ) {
+    self.init(
+      title: { _ in title },
+      image: image,
+      action: action,
+      isEnabled: isEnabled,
+      shortcut: shortcut,
+      accessibilityID: accessibilityID
+    )
+  }
+
+  init(
+    title: LocalizedStringResource,
+    image: String,
+    action: @escaping @MainActor (DocumentModel) -> Void,
+    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    shortcut: KeyboardShortcut?,
+    accessibilityID: String
+  ) {
+    self.init(
+      title: { _ in title },
+      image: image,
+      action: { model, _ in action(model) },
+      isEnabled: isEnabled,
+      shortcut: shortcut,
+      accessibilityID: accessibilityID
+    )
+  }
+
+  func helpLabel(_ model: DocumentModel?) -> LocalizedStringResource {
+    let title = self.title(model)
+    guard let shortcut else { return title }
+    return "\(title) (\(Self.format(shortcut)))"
   }
 
   // Standard macOS glyph order: ⌃⌥⇧⌘ then key.
@@ -49,27 +105,12 @@ struct Action {
     }
   }
 
-  @ViewBuilder @MainActor
   func menuItem(model: DocumentModel?) -> some View {
-    Button(title, systemImage: image) {
-      guard let model else { return }
-      action(model)
-    }
-    .disabled(!(model.map { isEnabled($0) } ?? false))
-    .keyboardShortcut(shortcut)
-    .accessibilityIdentifier(accessibilityID)
+    ActionMenuButton(action: self, model: model)
   }
 
-  @ViewBuilder @MainActor
   func toolbarItem(model: DocumentModel?) -> some View {
-    Button(title, systemImage: image) {
-      guard let model else { return }
-      action(model)
-    }
-    .disabled(!(model.map { isEnabled($0) } ?? false))
-    .help(helpLabel)
-    .accessibilityLabel(Text(title))
-    .accessibilityIdentifier(accessibilityID)
+    ActionToolbarButton(action: self, model: model)
   }
 
   static let zoomIn = Action(
@@ -125,4 +166,69 @@ struct Action {
     shortcut: .init("r", modifiers: [.command]),
     accessibilityID: ViewerA11yID.ViewMenu.reload
   )
+
+  /// Sidebar / Table-of-Contents toggle. Single source of truth shared
+  /// by the View menu (via `menuItem`) and the document toolbar (via
+  /// `toolbarItem`). Title flips Show/Hide in the menu; the toolbar
+  /// uses the static "Toggle…" label as its tooltip / accessibility
+  /// label.
+  static let toggleTOC = Action(
+    title: { model in
+      (model?.showsTOC ?? false)
+        ? "Hide Table of Contents"
+        : "Show Table of Contents"
+    },
+    image: "sidebar.left",
+    action: { model, reduceMotion in
+      if reduceMotion {
+        model.showsTOC.toggle()
+      } else {
+        withAnimation { model.showsTOC.toggle() }
+      }
+    },
+    isEnabled: { _ in true },
+    shortcut: .init("1", modifiers: [.command, .control]),
+    accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
+  )
+}
+
+/// Menu rendering for an `Action`. Dedicated View so `@Environment` for
+/// reduce-motion can be threaded into the action closure without each
+/// call site repeating the env wiring.
+@MainActor
+private struct ActionMenuButton: View {
+  let action: Action
+  let model: DocumentModel?
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    Button(action.title(model), systemImage: action.image) {
+      guard let model else { return }
+      action.action(model, reduceMotion)
+    }
+    .disabled(!(model.map { action.isEnabled($0) } ?? false))
+    .keyboardShortcut(action.shortcut)
+    .accessibilityIdentifier(action.accessibilityID)
+  }
+}
+
+/// Toolbar rendering for an `Action`. Toolbar buttons keep the static
+/// `title` for tooltip/accessibility — flipping a tooltip with state
+/// looks erratic next to the static icon.
+@MainActor
+private struct ActionToolbarButton: View {
+  let action: Action
+  let model: DocumentModel?
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    Button(action.title(model), systemImage: action.image) {
+      guard let model else { return }
+      action.action(model, reduceMotion)
+    }
+    .disabled(!(model.map { action.isEnabled($0) } ?? false))
+    .help(action.helpLabel(model))
+    .accessibilityLabel(Text(action.title(model)))
+    .accessibilityIdentifier(action.accessibilityID)
+  }
 }

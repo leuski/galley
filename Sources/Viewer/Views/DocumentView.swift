@@ -116,7 +116,6 @@ struct DocumentView: View {
         onDetach: { window in
           if let window { dispatcher.unregisterWindow(window) }
         }))
-      .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
       .modifier(SceneValuesModifier(
         model: model,
         renameContext: RenameContext(
@@ -149,19 +148,10 @@ struct DocumentView: View {
         Text(message)
       }
       .navigationTitle(model.documentURL.lastPathComponent)
-      // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
-      // toolbar under the identifier `com.apple.SwiftUI.navigationSplitView.
-      // toggleSidebar`. Combined with `.toolbar(id: "viewer.main")`'s
-      // customization persistence, that identifier ends up both auto-injected
-      // and restored from defaults on the next launch — NSToolbar then
-      // throws because the same identifier appears twice. Suppress the
-      // auto-injected one and provide our own non-customizable toggle in
-      // `navigationToolbarItems` instead.
-      .toolbar(removing: .sidebarToggle)
-      // No `id:` — `replaceDocument` drives in-window URL changes
-      // directly through `model.bind(to:)`, so re-firing on every
-      // `fileURL` write would be wasted work that the early-return
-      // in `launchTask` already short-circuits.
+    // No `id:` — `replaceDocument` drives in-window URL changes
+    // directly through `model.bind(to:)`, so re-firing on every
+    // `fileURL` write would be wasted work that the early-return
+    // in `launchTask` already short-circuits.
       .task { await launchTask() }
       .modifier(ChangeHandlers(
         model: model,
@@ -195,10 +185,29 @@ struct DocumentView: View {
       }
     )) {
       TOCSidebar(model: model)
+        .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
+      // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
+      // toolbar under the identifier `com.apple.SwiftUI.navigationSplitView.
+      // toggleSidebar`. Combined with `.toolbar(id: "viewer.main")`'s
+      // customization persistence, that identifier ends up both auto-injected
+      // and restored from defaults on the next launch — NSToolbar then
+      // throws because the same identifier appears twice. Suppress the
+      // auto-injected one and provide our own non-customizable toggle in
+      // `navigationToolbarItems` instead.
+//        .toolbar(removing: .sidebarToggle)
+//        .toolbar {
+//          // Replacement for SwiftUI's auto-injected NavigationSplitView
+//          // toggle — see the `.toolbar(removing: .sidebarToggle)` comment in
+//          // `body`. `.customizationBehavior(.disabled)` keeps this item out
+//          // of the customization config so it can't ever round-trip through
+//          // defaults and trigger the duplicate-identifier crash.
+//          Action.toggleTOC.toolbarItem(model: model)
+//        }
     } detail: {
       WebView(model.page)
+        .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
     }
     .navigationSplitViewStyle(.balanced)
   }
@@ -269,7 +278,7 @@ struct DocumentView: View {
     panel.title = String(localized: "Export as PDF")
     panel.allowedContentTypes = [.pdf]
     panel.nameFieldStringValue =
-      url.deletingPathExtension().lastPathComponent + ".pdf"
+    url.deletingPathExtension().lastPathComponent + ".pdf"
     panel.directoryURL = url.deletingLastPathComponent()
 
     guard panel.runModal() == .OK, let destination = panel.url
@@ -424,35 +433,24 @@ struct DocumentView: View {
     appModel: AppModel
   ) -> some CustomizableToolbarContent {
     navigationToolbarItems
-    ToolbarSpacer(.flexible, placement: .automatic)
+    //    ToolbarSpacer(.flexible, placement: .automatic)
     mainToolbarItems(appModel: appModel)
     zoomToolbarItems
-    ToolbarSpacer(.fixed, placement: .automatic)
+    //    ToolbarSpacer(.fixed, placement: .automatic)
   }
 
   @ToolbarContentBuilder
   private var navigationToolbarItems: some CustomizableToolbarContent {
-    // Replacement for SwiftUI's auto-injected NavigationSplitView toggle —
-    // see the `.toolbar(removing: .sidebarToggle)` comment in `body`.
-    // `.customizationBehavior(.disabled)` keeps this item out of the
-    // customization config so it can't ever round-trip through defaults
-    // and trigger the duplicate-identifier crash.
-    ToolbarItem(id: "toggleTOC", placement: .navigation) {
-      Button {
-        if reduceMotion {
-          model.showsTOC.toggle()
-        } else {
-          withAnimation { model.showsTOC.toggle() }
-        }
-      } label: {
-        Label("Toggle Table of Contents", systemImage: "sidebar.left")
-      }
-      .help("Toggle Table of Contents")
-      .accessibilityLabel(Text("Toggle Table of Contents"))
-      .accessibilityIdentifier(ViewerA11yID.ViewMenu.toggleTOC)
-    }
-    .customizationBehavior(.disabled)
-
+    // Replacement for SwiftUI's auto-injected NavigationSplitView
+    // toggle — see the `.toolbar(removing: .sidebarToggle)` comment in
+    // `body`. `.customizationBehavior(.disabled)` keeps this item out
+    // of the customization config so it can't ever round-trip through
+    // defaults and trigger the duplicate-identifier crash.
+    //    ToolbarItem(id: "toggleTOC", placement: .navigation) {
+    //      Action.toggleTOC.toolbarItem(model: model)
+    //    }
+    //    .customizationBehavior(.disabled)
+    //
     ToolbarItem(id: "back", placement: .navigation) {
       Action.back.toolbarItem(model: model)
     }
@@ -524,12 +522,12 @@ private struct ChangeHandlers: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      // Two signals feed the same handler. `documentURL` covers
-      // every URL change after the first bind (in-window navigation,
-      // restore to a different URL, rename). `didFirstBind` covers
-      // the initial bind — necessary because `bind(to: initialURL)`
-      // assigns the same value `init(initialURL:)` already wrote, so
-      // `.onChange(of: documentURL)` doesn't fire on first run.
+    // Two signals feed the same handler. `documentURL` covers
+    // every URL change after the first bind (in-window navigation,
+    // restore to a different URL, rename). `didFirstBind` covers
+    // the initial bind — necessary because `bind(to: initialURL)`
+    // assigns the same value `init(initialURL:)` already wrote, so
+    // `.onChange(of: documentURL)` doesn't fire on first run.
       .onChange(of: model.documentURL) { _, _ in onBindStateChanged() }
       .onChange(of: model.didFirstBind) { _, _ in onBindStateChanged() }
       .onChange(of: appModel.processors.selected) { reload() }
