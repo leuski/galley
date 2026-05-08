@@ -3,20 +3,33 @@ import GalleyCoreKit
 import os
 import WebKit
 
-/// Receives `{ items: [{ id, level, text }, ...] }` messages from a
-/// user script that walks the rendered document's `<h1>…<h6>` tree
-/// after each load. The injected script also assigns synthetic ids
-/// to headings that lack one, so the sidebar can target every entry
-/// via `getElementById` regardless of which renderer produced the
-/// HTML (swift-markdown / pandoc / cmark-gfm / multimarkdown / etc.).
+/// Receives two kinds of messages from a user script that walks the
+/// rendered document's `<h1>…<h6>` tree after each load:
+///
+/// - `{ items: [{ id, level, text }, ...] }` — the heading list,
+///   posted once per load. The script assigns synthetic ids to
+///   headings that lack one, so the sidebar can target every entry
+///   via `getElementById` regardless of which renderer produced the
+///   HTML (swift-markdown / pandoc / cmark-gfm / multimarkdown / etc.).
+/// - `{ activeId: <String?> }` — the currently-active heading,
+///   recomputed on scroll. "Active" is the last heading whose top
+///   edge has scrolled past a threshold near the top of the
+///   viewport — the convention every doc site uses to track the
+///   reader's section without a cursor. `nil` means the user is
+///   scrolled above the first heading.
 @MainActor
 final class TOCBridge: NSObject, WKScriptMessageHandler {
   static let messageName = "toc"
 
+  /// Pixels from the top of the viewport that mark a heading as
+  /// "passed." 100px is a touch below the typical title-bar /
+  /// toolbar inset and matches what GitBook / MDN use.
+  private static let activeThresholdPx = 100
+
   /// Walk `<h1>…<h6>` once per load, slugify text into a unique id
-  /// for any heading without one, and post the flat list back. Pre-
-  /// seeds the slug-uniqueness set with every existing `id` on the
-  /// page so renderer-supplied anchors aren't shadowed by ours.
+  /// for any heading without one, post the flat list back, and then
+  /// install a rAF-throttled scroll listener that posts the active
+  /// heading id whenever it changes.
   static let userScript: String = """
     (function() {
       function slugify(text, used) {
@@ -40,6 +53,7 @@ final class TOCBridge: NSObject, WKScriptMessageHandler {
       });
       var nodes = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
       var items = [];
+      var headingEls = [];
       for (var i = 0; i < nodes.length; i++) {
         var node = nodes[i];
         var text = (node.textContent || '').replace(/\\s+/g, ' ').trim();
@@ -52,15 +66,50 @@ final class TOCBridge: NSObject, WKScriptMessageHandler {
           level: parseInt(node.tagName.substring(1), 10),
           text: text
         });
+        headingEls.push(node);
       }
       window.webkit.messageHandlers.\(messageName).postMessage(
         { items: items });
+
+      var threshold = \(activeThresholdPx);
+      var lastActive = undefined;
+      var ticking = false;
+      function recomputeActive() {
+        ticking = false;
+        var newActive = null;
+        for (var j = 0; j < headingEls.length; j++) {
+          var top = headingEls[j].getBoundingClientRect().top;
+          if (top <= threshold) {
+            newActive = headingEls[j].id;
+          } else {
+            break;
+          }
+        }
+        if (newActive !== lastActive) {
+          lastActive = newActive;
+          window.webkit.messageHandlers.\(messageName).postMessage(
+            { activeId: newActive });
+        }
+      }
+      function onScroll() {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(recomputeActive);
+        }
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      recomputeActive();
     })();
     """
 
   /// Set by the owning DocumentModel; receives the freshly-extracted
   /// heading list every time the page loads.
   var onHeadings: (([TOCEntry]) -> Void)?
+
+  /// Set by the owning DocumentModel; receives the active heading id
+  /// (or `nil` when the user is above all headings) on every change.
+  var onActiveHeading: ((String?) -> Void)?
 
   private let logger = Logger(
     subsystem: bundleIdentifier,
@@ -70,20 +119,27 @@ final class TOCBridge: NSObject, WKScriptMessageHandler {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    guard let body = message.body as? [String: Any],
-          let items = body["items"] as? [[String: Any]]
-    else {
+    guard let body = message.body as? [String: Any] else {
       logMalformedMessage(message.body)
       return
     }
-    let headings: [TOCEntry] = items.compactMap { entry in
-      guard let id = entry["id"] as? String,
-            let text = entry["text"] as? String,
-            let level = entry["level"] as? Int
-      else { return nil }
-      return TOCEntry(id: id, level: level, text: text)
+    if let items = body["items"] as? [[String: Any]] {
+      let headings: [TOCEntry] = items.compactMap { entry in
+        guard let id = entry["id"] as? String,
+              let text = entry["text"] as? String,
+              let level = entry["level"] as? Int
+        else { return nil }
+        return TOCEntry(id: id, level: level, text: text)
+      }
+      onHeadings?(headings)
+      return
     }
-    onHeadings?(headings)
+    if body.keys.contains("activeId") {
+      let id = body["activeId"] as? String
+      onActiveHeading?(id)
+      return
+    }
+    logMalformedMessage(message.body)
   }
 
   private func logMalformedMessage(_ body: Any) {

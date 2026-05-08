@@ -48,21 +48,33 @@ struct TOCSidebar: View {
   }
 
   private func row(for heading: TOCEntry) -> some View {
-    Button {
+    let isActive = model.activeHeadingID == heading.id
+    return Button {
       Task { await model.scrollToHeading(id: heading.id) }
     } label: {
       Text(heading.text)
         .font(font(for: heading.level))
-        .foregroundStyle(.primary)
+        .foregroundStyle(isActive ? Color.accentColor : .primary)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
         .padding(.leading, 16 + indent(for: heading.level))
         .padding(.trailing, 12)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rowBackground(isActive: isActive))
         .contentShape(.rect)
     }
     .buttonStyle(.plain)
+    .animation(.easeOut(duration: 0.12), value: isActive)
+  }
+
+  @ViewBuilder
+  private func rowBackground(isActive: Bool) -> some View {
+    if isActive {
+      Color.accentColor.opacity(0.15)
+    } else {
+      Color.clear
+    }
   }
 
   private var emptyState: some View {

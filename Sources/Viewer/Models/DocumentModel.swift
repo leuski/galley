@@ -113,6 +113,12 @@ final class DocumentModel {
   /// sidebar reads this and indents by `level`.
   private(set) var headings: [TOCEntry] = []
 
+  /// Id of the heading whose section the reader is currently in,
+  /// updated by `TOCBridge` on scroll. `nil` means the user is
+  /// scrolled above the first heading. The sidebar highlights the
+  /// matching row.
+  private(set) var activeHeadingID: String?
+
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
@@ -211,6 +217,11 @@ final class DocumentModel {
     tocBridge.onHeadings = { [weak self] items in
       guard let self else { return }
       headings = items
+    }
+
+    tocBridge.onActiveHeading = { [weak self] id in
+      guard let self else { return }
+      activeHeadingID = id
     }
   }
 
@@ -498,6 +509,7 @@ final class DocumentModel {
     // flash stale headings during the reload window. The TOCBridge
     // user script repopulates within milliseconds of `page.load`.
     headings = []
+    activeHeadingID = nil
 
     await renderCurrent(preserveScroll: false)
 
