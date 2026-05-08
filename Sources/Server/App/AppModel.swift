@@ -104,6 +104,38 @@ final class AppModel {
 
     startServer()
     startPortObservation()
+    publishGalleyAppHash()
+  }
+
+  /// Compute the SHA256 of the Galley.app bundle that contains this
+  /// Server.app and write it to the shared suite. The Viewer reads
+  /// this on its launch and compares with its own hash; on mismatch
+  /// it terminates and relaunches us so a stale Server doesn't
+  /// clobber the Viewer's choices through the bindPersistent
+  /// round-trip. (Server.app lives at
+  /// `<Galley.app>/Contents/Resources/Galley Server.app`, so the
+  /// containing app bundle is three levels up.)
+  private func publishGalleyAppHash() {
+    let serverBundle = Bundle.main.bundleURL
+    let galleyApp = serverBundle
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    Task.detached(priority: .userInitiated) {
+      do {
+        let hash = try await GalleyAppHash.compute(at: galleyApp)
+        await MainActor.run {
+          SharedSuiteDefaults.suite.set(
+            hash, forKey: SharedSuiteDefaults.serverGalleyHashKey)
+          DefaultsBroadcast.post()
+        }
+      } catch {
+        defaultsLog.error("""
+          Server publishGalleyAppHash failed: \
+          \(error.localizedDescription, privacy: .public)
+          """)
+      }
+    }
   }
 
   private static func notify(

@@ -144,6 +144,18 @@ public final class TemplateStore {
       case "Default":
         return LocalizedStringResource(
           "Default", bundle: .galleyCoreKit)
+      case "GitHub":
+        return LocalizedStringResource(
+          "GitHub", bundle: .galleyCoreKit)
+      case "Sepia":
+        return LocalizedStringResource(
+          "Sepia", bundle: .galleyCoreKit)
+      case "HighContrast":
+        return LocalizedStringResource(
+          "High Contrast", bundle: .galleyCoreKit)
+      case "Terminal":
+        return LocalizedStringResource(
+          "Terminal", bundle: .galleyCoreKit)
       default:
         return nil
       }

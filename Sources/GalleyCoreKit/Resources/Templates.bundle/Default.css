@@ -1,0 +1,56 @@
+html { font-size: 14px; }
+:root { color-scheme: light dark; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.35;
+    max-width: 48rem;
+    margin: 2rem auto;
+    padding: 0 1.25rem;
+}
+pre, code { font-family: ui-monospace, SF Mono, Menlo, monospace; }
+pre {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+code {
+    padding: 0.1em 0.3em; border-radius: 3px;
+    font-size: 0.9rem;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+pre code { padding: 0; background: transparent; }
+blockquote {
+    border-left: 3px solid color-mix(in srgb, currentColor 25%, transparent);
+    padding-left: 1rem;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+}
+img { max-width: 100%; }
+table { border-collapse: collapse; }
+th, td {
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    padding: 0.4rem 0.7rem;
+}
+
+/* Print / Export-as-PDF. The Viewer flips WebPage.mediaType to
+   .print before rendering, so this block governs paper output.
+   @page sets the printer-side page margin; the body overrides
+   below kill the screen-centered max-width column so the page
+   margin alone defines the text frame. */
+@page { margin: 0.75in; }
+@media print {
+    :root { color-scheme: light; }
+    body {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+    }
+    a { color: inherit; }
+    pre, blockquote, table, figure, img { break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+}
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+@media print { .mermaid svg { max-width: 100%; height: auto; } }

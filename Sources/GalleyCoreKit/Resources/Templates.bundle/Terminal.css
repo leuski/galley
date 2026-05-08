@@ -1,0 +1,119 @@
+/* Monospaced terminal aesthetic. Soft-green text on near-black,
+   monospace everywhere, tight rules. Single dark palette — does not
+   adapt to system light mode by design. */
+
+:root {
+    color-scheme: dark;
+
+    --term-bg: #0c0c0c;
+    --term-fg: #c5c8c6;
+    --term-dim: #888a85;
+    --term-rule: #2a2a2a;
+    --term-panel: #161616;
+    --term-accent: #b5bd68;
+    --term-link: #81a2be;
+    --term-strong: #f0c674;
+}
+
+html { font-size: 14px; }
+
+body {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    line-height: 1.55;
+    color: var(--term-fg);
+    background: var(--term-bg);
+    max-width: 52rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+}
+
+a { color: var(--term-link); text-decoration: underline; }
+a:hover { color: var(--term-strong); }
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--term-accent);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 1.6em;
+    margin-bottom: 0.5em;
+    letter-spacing: 0.01em;
+}
+h1::before { content: "# "; color: var(--term-dim); }
+h2::before { content: "## "; color: var(--term-dim); }
+h3::before { content: "### "; color: var(--term-dim); }
+h4::before { content: "#### "; color: var(--term-dim); }
+h5::before { content: "##### "; color: var(--term-dim); }
+h6::before { content: "###### "; color: var(--term-dim); }
+
+h1 { font-size: 1.6em; }
+h2 { font-size: 1.35em; }
+h3 { font-size: 1.15em; }
+h4, h5, h6 { font-size: 1em; }
+
+strong { color: var(--term-strong); }
+em { color: var(--term-link); font-style: normal; }
+
+p, ul, ol, blockquote, pre, table { margin: 0 0 1em; }
+
+pre, code { font-size: 0.95em; }
+code {
+    padding: 0.1em 0.4em;
+    background: var(--term-panel);
+    border-radius: 2px;
+}
+pre {
+    padding: 0.85rem 1rem;
+    background: var(--term-panel);
+    border-left: 2px solid var(--term-accent);
+    border-radius: 2px;
+    overflow-x: auto;
+    line-height: 1.45;
+}
+pre code { padding: 0; background: transparent; }
+
+blockquote {
+    border-left: 2px solid var(--term-dim);
+    padding: 0.1em 1em;
+    color: var(--term-dim);
+}
+
+img { max-width: 100%; }
+hr {
+    border: 0;
+    height: 1px;
+    background: var(--term-rule);
+    margin: 1.6em 0;
+}
+
+table { border-collapse: collapse; }
+th, td {
+    border: 1px solid var(--term-rule);
+    padding: 0.4rem 0.85rem;
+}
+th { background: var(--term-panel); color: var(--term-accent); }
+
+::selection { background: var(--term-accent); color: var(--term-bg); }
+
+@page { margin: 0.75in; }
+@media print {
+    :root { color-scheme: light; }
+    body {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+    }
+    a { color: inherit; }
+    h1, h2, h3, h4, h5, h6 { color: #000; }
+    h1::before, h2::before, h3::before,
+    h4::before, h5::before, h6::before { content: none; }
+    pre, code { background: #f4f4f4; color: #000; border: 0; }
+    pre { border-left: 2px solid #000; }
+    blockquote { color: #333; }
+    pre, blockquote, table, figure, img { break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+}
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+@media print { .mermaid svg { max-width: 100%; height: auto; } }

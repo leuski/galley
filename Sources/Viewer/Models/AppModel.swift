@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import GalleyCoreKit
 import SwiftUI
@@ -167,8 +168,85 @@ final class AppBoot {
     // responds. Fire it in parallel and let it resolve whenever.
     Task { await DisplacementNotifier.requestAuthorization() }
     Task { @MainActor in
+      await Self.restartServerIfStale()
       await ProcessorStore.shared.discover()
       self.model = AppModel()
+    }
+  }
+
+  /// Compare our Galley.app hash with whatever the running Server
+  /// published. If they disagree, terminate and relaunch the Server.
+  /// We do this *before* constructing `AppModel` so the bindPersistent
+  /// observers aren't installed during the kill window — the stale
+  /// Server can't get one last clobber in by reconciling defaults
+  /// against its (smaller) catalog.
+  ///
+  /// The "stale Server" failure mode is real: the Server is the
+  /// menu-bar process that owns its own `TemplateChoice`, hooked to
+  /// the same shared plist via `bindPersistent`. When its catalog
+  /// doesn't recognize a value the Viewer just wrote (e.g. a new
+  /// bundled template added in the Viewer build but not in the
+  /// running Server), reconcile() snaps the Server's selection back
+  /// to default and the inbound observer mirrors that back to
+  /// storage, undoing the Viewer's pick on every change.
+  private static func restartServerIfStale() async {
+    let bundleID = "net.leuski.galley.server"
+    let runningServers = NSRunningApplication
+      .runningApplications(withBundleIdentifier: bundleID)
+    guard let runningServer = runningServers.first else { return }
+
+    do {
+      let myHash = try await GalleyAppHash.compute(at: Bundle.main.bundleURL)
+      let theirHash = SharedSuiteDefaults.suite.string(
+        forKey: SharedSuiteDefaults.serverGalleyHashKey)
+      // Missing-hash case is the first launch after this validation
+      // shipped, where the running Server pre-dates the publish
+      // logic. Treat it the same as a mismatch: restart so the new
+      // Server can publish and we converge from then on.
+      if let theirHash, theirHash == myHash { return }
+
+      defaultsLog.notice("""
+        Galley.app hash mismatch with running Server (\
+        ours=\(myHash.prefix(8), privacy: .public)… \
+        theirs=\(theirHash?.prefix(8) ?? "nil", privacy: .public)…) — \
+        restarting Server
+        """)
+
+      // Drop the published hash before terminating so a re-read
+      // during the kill window doesn't re-trigger this branch.
+      SharedSuiteDefaults.suite.removeObject(
+        forKey: SharedSuiteDefaults.serverGalleyHashKey)
+
+      runningServer.terminate()
+      // Poll up to 5s for the process to exit. terminate() is
+      // asynchronous; we don't want to relaunch until the old PID
+      // is gone or NSWorkspace will treat it as a no-op activation.
+      for _ in 0..<50 {
+        if NSRunningApplication
+          .runningApplications(withBundleIdentifier: bundleID).isEmpty {
+          break
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+      }
+
+      let serverURL = Bundle.main.bundleURL
+        .appending(path: "Contents/Resources/Galley Server.app")
+      guard FileManager.default.fileExists(atPath: serverURL.path) else {
+        defaultsLog.error("""
+          Galley Server.app missing inside this Galley.app — \
+          cannot relaunch Server
+          """)
+        return
+      }
+      let configuration = NSWorkspace.OpenConfiguration()
+      configuration.activates = false
+      _ = try await NSWorkspace.shared.openApplication(
+        at: serverURL, configuration: configuration)
+    } catch {
+      defaultsLog.error("""
+        Server staleness check failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
     }
   }
 }

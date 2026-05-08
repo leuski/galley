@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>#TITLE#</title>
+    <base href="#BASE#">
+    <link rel="stylesheet" href="Default.css">
+</head>
+<body>
+#DOCUMENT_CONTENT#
+<script src="Common.js"></script>
+<script src="mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    window.mermaid.initialize({
+      startOnLoad: true,
+      theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
+    });
+  }
+</script>
+</body>
+</html>

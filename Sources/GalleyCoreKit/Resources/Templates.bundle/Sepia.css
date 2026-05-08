@@ -1,0 +1,100 @@
+/* Sepia / long-form reading mode. Single warm palette — does not
+   adapt to system dark mode by design. */
+
+:root {
+    color-scheme: light;
+
+    --sepia-bg: #f4ecd8;
+    --sepia-fg: #5b4636;
+    --sepia-muted: #8a6c4a;
+    --sepia-rule: #c9b88f;
+    --sepia-code-bg: #e8dcc4;
+    --sepia-link: #7a4f1f;
+}
+
+html { font-size: 17px; }
+
+body {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino,
+                 Georgia, serif;
+    line-height: 1.6;
+    color: var(--sepia-fg);
+    background: var(--sepia-bg);
+    max-width: 38rem;
+    margin: 3rem auto;
+    padding: 0 1.75rem;
+}
+
+a { color: var(--sepia-link); text-decoration: underline; }
+a:hover { text-decoration: none; }
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Optima", "Palatino", Georgia, serif;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #3f2e22;
+    margin-top: 1.6em;
+    margin-bottom: 0.5em;
+}
+h1 { font-size: 2.1em; }
+h2 { font-size: 1.55em; }
+h3 { font-size: 1.25em; }
+
+p, ul, ol, blockquote, pre, table { margin: 0 0 1.1em; }
+
+pre, code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+}
+code {
+    padding: 0.15em 0.4em;
+    background: var(--sepia-code-bg);
+    border-radius: 4px;
+}
+pre {
+    padding: 0.9rem 1.1rem;
+    background: var(--sepia-code-bg);
+    border-radius: 4px;
+    overflow-x: auto;
+    line-height: 1.45;
+}
+pre code { padding: 0; background: transparent; }
+
+blockquote {
+    border-left: 3px solid var(--sepia-rule);
+    padding: 0.1em 1.1em;
+    color: var(--sepia-muted);
+    font-style: italic;
+}
+
+img { max-width: 100%; }
+hr {
+    border: 0;
+    height: 1px;
+    background: var(--sepia-rule);
+    margin: 1.6em 0;
+}
+
+table { border-collapse: collapse; }
+th, td {
+    border: 1px solid var(--sepia-rule);
+    padding: 0.45rem 0.8rem;
+}
+th { background: var(--sepia-code-bg); }
+
+@page { margin: 0.85in; }
+@media print {
+    body {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+    }
+    a { color: inherit; }
+    pre, blockquote, table, figure, img { break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+}
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+@media print { .mermaid svg { max-width: 100%; height: auto; } }

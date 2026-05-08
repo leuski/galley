@@ -72,11 +72,11 @@ public extension Template {
     guard let template = Template(
       sourceURL: .bundleTemplatesDirectoryURL,
       sourceIndex: TemplateStore.bundleSourceIndex,
-      name: "Default",
+      name: "Default.html",
       nameResource: LocalizedStringResource(
         "Default", bundle: .galleyCoreKit))
     else {
-      fatalError("GalleyCoreKit bundle missing Templates.bundle/Default")
+      fatalError("GalleyCoreKit bundle missing Templates.bundle/Default.html")
     }
     return template
   }()
