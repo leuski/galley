@@ -25,6 +25,13 @@ struct ViewCommands: Commands {
       Action.reload.menuItem(model: model)
 
       Divider()
+
+      Action.find.menuItem(model: model)
+      Action.useSelectionForFind.menuItem(model: model)
+      Action.findNext.menuItem(model: model)
+      Action.findPrevious.menuItem(model: model)
+
+      Divider()
     }
   }
 }

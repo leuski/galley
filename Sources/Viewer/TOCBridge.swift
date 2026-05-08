@@ -21,87 +21,13 @@ import WebKit
 final class TOCBridge: NSObject, WKScriptMessageHandler {
   static let messageName = "toc"
 
-  /// Pixels from the top of the viewport that mark a heading as
-  /// "passed." 100px is a touch below the typical title-bar /
-  /// toolbar inset and matches what GitBook / MDN use.
-  private static let activeThresholdPx = 100
-
-  /// Walk `<h1>…<h6>` once per load, slugify text into a unique id
-  /// for any heading without one, post the flat list back, and then
-  /// install a rAF-throttled scroll listener that posts the active
-  /// heading id whenever it changes.
-  static let userScript: String = """
-    (function() {
-      function slugify(text, used) {
-        var base = text.trim().toLowerCase()
-          .replace(/[^a-z0-9\\s-]/g, '')
-          .replace(/\\s+/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '');
-        if (!base) base = 'section';
-        var id = base, counter = 1;
-        while (used.has(id)) {
-          counter += 1;
-          id = base + '-' + counter;
-        }
-        used.add(id);
-        return id;
-      }
-      var used = new Set();
-      document.querySelectorAll('[id]').forEach(function(el) {
-        used.add(el.id);
-      });
-      var nodes = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-      var items = [];
-      var headingEls = [];
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i];
-        var text = (node.textContent || '').replace(/\\s+/g, ' ').trim();
-        if (!text) continue;
-        if (!node.id) {
-          node.id = slugify(text, used);
-        }
-        items.push({
-          id: node.id,
-          level: parseInt(node.tagName.substring(1), 10),
-          text: text
-        });
-        headingEls.push(node);
-      }
-      window.webkit.messageHandlers.\(messageName).postMessage(
-        { items: items });
-
-      var threshold = \(activeThresholdPx);
-      var lastActive = undefined;
-      var ticking = false;
-      function recomputeActive() {
-        ticking = false;
-        var newActive = null;
-        for (var j = 0; j < headingEls.length; j++) {
-          var top = headingEls[j].getBoundingClientRect().top;
-          if (top <= threshold) {
-            newActive = headingEls[j].id;
-          } else {
-            break;
-          }
-        }
-        if (newActive !== lastActive) {
-          lastActive = newActive;
-          window.webkit.messageHandlers.\(messageName).postMessage(
-            { activeId: newActive });
-        }
-      }
-      function onScroll() {
-        if (!ticking) {
-          ticking = true;
-          requestAnimationFrame(recomputeActive);
-        }
-      }
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll, { passive: true });
-      recomputeActive();
-    })();
-    """
+  /// Heading extraction + active-section tracker. Source lives in
+  /// `Resources/Scripts/tocController.js`; the message name and the
+  /// 100px active-threshold (matches GitBook / MDN; a touch below the
+  /// typical title-bar / toolbar inset) are hardcoded there. Update
+  /// the JS file in lockstep with `messageName` here.
+  static let userScript: String = Bundle.main.requiredString(
+    forResource: "tocController", withExtension: "js")
 
   /// Set by the owning DocumentModel; receives the freshly-extracted
   /// heading list every time the page loads.

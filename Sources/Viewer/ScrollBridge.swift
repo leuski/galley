@@ -17,23 +17,11 @@ final class ScrollBridge: NSObject, WKScriptMessageHandler {
   /// `window.webkit.messageHandlers.scroll.postMessage({ y: ... })`.
   static let messageName = "scroll"
 
-  /// Debounced scroll listener. Trailing-edge — emits the resting
-  /// position once the user pauses scrolling. Injected at
-  /// `documentEnd` so `window.scrollY` is meaningful by the time it
-  /// runs.
-  static let userScript: String = """
-    (function () {
-      var timer = null;
-      window.addEventListener('scroll', function () {
-        if (timer !== null) clearTimeout(timer);
-        timer = setTimeout(function () {
-          timer = null;
-          window.webkit.messageHandlers.\(messageName).postMessage(
-            { y: window.scrollY });
-        }, 150);
-      }, { passive: true });
-    })();
-    """
+  /// Debounced scroll listener. Source lives in
+  /// `Resources/Scripts/scrollListener.js`; the message name is
+  /// hardcoded there and must match `messageName` here.
+  static let userScript: String = Bundle.main.requiredString(
+    forResource: "scrollListener", withExtension: "js")
 
   /// Set by the owning DocumentModel; receives the latest position.
   var onScroll: ((Double) -> Void)?

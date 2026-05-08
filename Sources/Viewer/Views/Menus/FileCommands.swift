@@ -48,7 +48,7 @@ struct FileCommands: Commands {
         guard let model else { return }
         Task { await model.openInEditor(line: nil) }
       }
-      .keyboardShortcut("e", modifiers: .command)
+      .keyboardShortcut("e", modifiers: [.command, .option])
       .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.openInEditor)
 

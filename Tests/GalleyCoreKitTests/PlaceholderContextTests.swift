@@ -38,4 +38,33 @@ struct PlaceholderContextTests {
     let out = context.substitute(into: "<main>#DOCUMENT_CONTENT#</main>")
     #expect(out == "<main><p>hi</p></main>")
   }
+
+  @Test("Placeholders inside body content are not re-substituted")
+  func bodyContentNotRescanned() {
+    // A user typing a metadata placeholder in their markdown — even in a
+    // code span — must see it as literal text, not as the substituted
+    // value. This guards against substitution running over the composed
+    // template+body string.
+    let context = PlaceholderContext(
+      documentContent: "<p><code>#TIME#</code> and <code>#TITLE#</code></p>",
+      documentURL: URL(fileURLWithPath: "/x/doc.md"),
+      origin: origin)
+    let out = context.substitute(into: "<main>#DOCUMENT_CONTENT#</main>")
+    #expect(out
+      == "<main><p><code>#TIME#</code> and <code>#TITLE#</code></p></main>")
+  }
+
+  @Test("#DOCUMENT_CONTENT# literal in body content is not re-injected")
+  func bodyContentDocumentContentTokenIsLiteral() {
+    // If a user writes the literal string "#DOCUMENT_CONTENT#" in their
+    // markdown, it should appear as text — not trigger another body
+    // injection (which would either be a no-op, recursion, or corruption
+    // depending on order).
+    let context = PlaceholderContext(
+      documentContent: "<p>see #DOCUMENT_CONTENT# token</p>",
+      documentURL: URL(fileURLWithPath: "/x/doc.md"),
+      origin: origin)
+    let out = context.substitute(into: "<main>#DOCUMENT_CONTENT#</main>")
+    #expect(out == "<main><p>see #DOCUMENT_CONTENT# token</p></main>")
+  }
 }

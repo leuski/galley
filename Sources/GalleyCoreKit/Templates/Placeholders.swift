@@ -34,8 +34,12 @@ public struct PlaceholderContext: Sendable {
     let baseName = documentURL.fileName
     let ext = documentURL.pathExtension
 
-    return template.substituting(substitutions: [
-      "#DOCUMENT_CONTENT#": documentContent,
+    // Substitute metadata placeholders in the template first, then inject
+    // the document body. Doing it the other way round would re-scan the
+    // body for `#TITLE#`, `#TIME#`, etc. — so a user writing those tokens
+    // in their markdown (even inside a code span) would get them
+    // template-substituted instead of rendered as literal text.
+    let withMetadata = template.substituting(substitutions: [
       "#TITLE#": baseName.htmlAttributeEscaped,
       "#BASE#": baseHref.htmlAttributeEscaped,
       "#FILE#": fileName.htmlAttributeEscaped,
@@ -44,5 +48,7 @@ public struct PlaceholderContext: Sendable {
       "#DATE#": Self.dateFormatter.string(from: now).htmlAttributeEscaped,
       "#TIME#": Self.timeFormatter.string(from: now).htmlAttributeEscaped
     ])
+    return withMetadata.replacingOccurrences(
+      of: "#DOCUMENT_CONTENT#", with: documentContent)
   }
 }

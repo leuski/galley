@@ -119,6 +119,40 @@ final class DocumentModel {
   /// matching row.
   private(set) var activeHeadingID: String?
 
+  /// Whether the find-text bar is showing in the window hosting this
+  /// model. Per-document; not persisted across launches.
+  var isFindVisible: Bool = false
+
+  /// Live find query. Edits trigger an immediate `performFind` from
+  /// the find bar's `.onChange`.
+  var findQuery: String = ""
+
+  /// Number of matches found by the latest `performFind` against the
+  /// rendered DOM. Drives the "n of N" count in the find bar.
+  var findMatchCount: Int = 0
+
+  /// Zero-based index of the currently-highlighted match, or `-1`
+  /// when there is nothing highlighted (empty query / no matches).
+  var findMatchIndex: Int = -1
+
+  /// When true, find matches are case-sensitive. Defaults off to
+  /// match Preview / Safari behavior — most users expect case-
+  /// insensitive find.
+  var findCaseSensitive: Bool = false
+
+  /// When true, find only matches whole words (regex `\b…\b`).
+  /// ASCII-boundary based — sufficient for the Latin-script content
+  /// the viewer most often renders.
+  var findWholeWord: Bool = false
+
+  /// Monotonic token bumped when an external surface (toolbar
+  /// `Action.toggleFind`, View menu) requests the find bar to dismiss.
+  /// `FindBar` observes this so it can drop focus before the slide-out
+  /// transition starts — otherwise the focus ring renders over content
+  /// the bar slides past. Direct `model.hideFind()` is the unanimated
+  /// path; this token is the animated, focus-aware path.
+  var findDismissalToken: Int = 0
+
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
@@ -145,9 +179,37 @@ final class DocumentModel {
       DisplacementNotifier.post(kind: .processor, displaced: name)
     }
 
+    let box = TemplateBox()
+    self.templateBox = box
+    self.page = WebPage(configuration: Self.makeConfiguration(
+      editorBridge: bridge,
+      linkBridge: linkBridge,
+      scrollBridge: scrollBridge,
+      tocBridge: tocBridge,
+      templateBox: box))
+    // Seed the scheme handler's template pointer. `renderCurrent`
+    // updates it again on every render — this seed only matters for
+    // asset requests that might fire before the first render.
+    self.templateBox.template = resolvedTemplate()
+
+    wireBridges()
+  }
+
+  /// Build the `WebPage.Configuration`: register every script-message
+  /// handler, inject the user scripts each bridge needs, and wire the
+  /// custom URL scheme that resolves template-bundled assets through
+  /// `templateBox`. Static so it can run before `self` is fully
+  /// initialized; pure plumbing — no closures capture the model.
+  private static func makeConfiguration(
+    editorBridge: EditorBridge,
+    linkBridge: LinkBridge,
+    scrollBridge: ScrollBridge,
+    tocBridge: TOCBridge,
+    templateBox: TemplateBox
+  ) -> WebPage.Configuration {
     var configuration = WebPage.Configuration()
     let controller = configuration.userContentController
-    controller.add(bridge, name: EditorBridge.messageName)
+    controller.add(editorBridge, name: EditorBridge.messageName)
     controller.add(linkBridge, name: LinkBridge.messageName)
     controller.add(scrollBridge, name: ScrollBridge.messageName)
     controller.add(tocBridge, name: TOCBridge.messageName)
@@ -172,24 +234,33 @@ final class DocumentModel {
       source: TOCBridge.userScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
-
+    // Find-text controller. The style script runs at document-start
+    // so the highlight CSS is in place before any match is wrapped;
+    // the controller script runs at document-end so `document.body`
+    // exists when `window.galleyFind` is wired up.
+    controller.addUserScript(WKUserScript(
+      source: FindBridge.styleScript,
+      injectionTime: .atDocumentStart,
+      forMainFrameOnly: true))
+    controller.addUserScript(WKUserScript(
+      source: FindBridge.userScript,
+      injectionTime: .atDocumentEnd,
+      forMainFrameOnly: true))
     // Custom URL scheme so template-bundled assets (CSS, fonts,
     // images) resolve from disk through the SwiftUI WebView. Reads
     // the active template at request time via `templateBox`, kept
     // current by `renderCurrent` on every render.
-    let box = TemplateBox()
-    self.templateBox = box
     let handler = PreviewSchemeHandler(
-      templateProvider: { box.template ?? .default })
+      templateProvider: { templateBox.template ?? .default })
     configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
+    return configuration
+  }
 
-    self.page = WebPage(configuration: configuration)
-
-    // Seed the scheme handler's template pointer. `renderCurrent`
-    // updates it again on every render — this seed only matters for
-    // asset requests that might fire before the first render.
-    self.templateBox.template = resolvedTemplate()
-
+  /// Attach `[weak self]` callbacks to each bridge. Lifted out of
+  /// `init` so the constructor stays under SwiftLint's body-length
+  /// budget; called once, immediately after `self` is fully
+  /// initialized.
+  private func wireBridges() {
     // Browser-style navigation: clicking a markdown link in the
     // rendered preview pushes onto our history and rebinds this same
     // model rather than opening a new document window.
@@ -197,31 +268,27 @@ final class DocumentModel {
       guard let self else { return }
       Task { await self.navigate(to: url) }
     }
-
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
     bridge.onEditorClick = { [weak self] line in
       guard let self else { return }
       Task { await self.openInEditor(line: line) }
     }
-
     // Latest debounced scroll position. `@ObservationIgnored` would
     // suppress the SwiftUI invalidation that lets ContentView mirror
     // this to `@SceneStorage`, so we leave it observed — the listener
     // fires at most every ~150 ms, well below per-frame cost.
-    scrollBridge.onScroll = { [weak self] y in
+    scrollBridge.onScroll = { [weak self] yPos in
       guard let self else { return }
-      currentScrollY = y
+      currentScrollY = yPos
     }
-
     tocBridge.onHeadings = { [weak self] items in
       guard let self else { return }
       headings = items
     }
-
-    tocBridge.onActiveHeading = { [weak self] id in
+    tocBridge.onActiveHeading = { [weak self] identifier in
       guard let self else { return }
-      activeHeadingID = id
+      activeHeadingID = identifier
     }
   }
 
@@ -564,6 +631,13 @@ final class DocumentModel {
         } else if savedScrollY > 0 {
           await restoreScrollY(savedScrollY)
         }
+        // Old marks died with the previous DOM, but the user's query
+        // and the visible find bar are per-window state we want to
+        // honor across file-watcher reloads — re-run the search so
+        // highlights and counts come back without user action.
+        if isFindVisible, !findQuery.isEmpty {
+          await performFind()
+        }
       } catch {
         logNavigationFailed(error)
         lastError = error.localizedDescription
@@ -700,7 +774,7 @@ final class DocumentModel {
 /// Escape a Swift string into a JavaScript double-quoted string
 /// literal. Only used for a CSS rule we control, but kept strict so
 /// future zoom-related callers can pass arbitrary text safely.
-private func jsStringLiteral(_ value: String) -> String {
+func jsStringLiteral(_ value: String) -> String {
   var out = "\""
   for scalar in value.unicodeScalars {
     switch scalar {

@@ -26,7 +26,7 @@ struct Action {
     image: String,
     action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
     isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
-    shortcut: KeyboardShortcut?,
+    shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.title = title
@@ -42,7 +42,7 @@ struct Action {
     image: String,
     action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
     isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
-    shortcut: KeyboardShortcut?,
+    shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.init(
@@ -60,7 +60,7 @@ struct Action {
     image: String,
     action: @escaping @MainActor (DocumentModel) -> Void,
     isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
-    shortcut: KeyboardShortcut?,
+    shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.init(
@@ -109,8 +109,10 @@ struct Action {
     ActionMenuButton(action: self, model: model)
   }
 
-  func toolbarItem(model: DocumentModel?) -> some View {
-    ActionToolbarButton(action: self, model: model)
+  func toolbarItem(
+    model: DocumentModel?, imageOnly: Bool = false) -> some View
+  {
+    ActionToolbarButton(action: self, model: model, imageOnly: imageOnly)
   }
 
   static let zoomIn = Action(
@@ -167,6 +169,52 @@ struct Action {
     accessibilityID: ViewerA11yID.ViewMenu.reload
   )
 
+  /// Toolbar variant that flips the bar in and out, mirroring the
+  /// show/hide affordance Safari and Preview surface in their
+  /// toolbars. Title flips so the tooltip and accessibility label
+  /// reflect the current state, just like `toggleTOC`.
+  static let find = Action(
+    title: { model in
+      (model?.isFindVisible ?? false) ? "Hide Find" : "Find…"
+    },
+    image: "magnifyingglass",
+    action: { model, reduceMotion in
+      model.toggleFind(reduceMotion: reduceMotion)
+    },
+    isEnabled: { _ in true },
+    shortcut: .init("f", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.find
+  )
+
+  static let useSelectionForFind = Action(
+    title: "Use Selection for Find",
+    image: "text.magnifyingglass",
+    action: { model, reduceMotion in
+      Task { await model.useSelectionForFind(reduceMotion: reduceMotion) }
+    },
+    isEnabled: { _ in true },
+    shortcut: .init("e", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.useSelectionForFind
+  )
+
+  static let findNext = Action(
+    title: "Find Next",
+    image: "chevron.down",
+    action: { model in Task { await model.findNext() } },
+    isEnabled: { $0.findMatchCount > 0 },
+    shortcut: .init("g", modifiers: [.command]),
+    accessibilityID: ViewerA11yID.ViewMenu.findNext
+  )
+
+  static let findPrevious = Action(
+    title: "Find Previous",
+    image: "chevron.up",
+    action: { model in Task { await model.findPrevious() } },
+    isEnabled: { $0.findMatchCount > 0 },
+    shortcut: .init("g", modifiers: [.command, .shift]),
+    accessibilityID: ViewerA11yID.ViewMenu.findPrevious
+  )
+
   /// Sidebar / Table-of-Contents toggle. Single source of truth shared
   /// by the View menu (via `menuItem`) and the document toolbar (via
   /// `toolbarItem`). Title flips Show/Hide in the menu; the toolbar
@@ -180,11 +228,7 @@ struct Action {
     },
     image: "sidebar.left",
     action: { model, reduceMotion in
-      if reduceMotion {
-        model.showsTOC.toggle()
-      } else {
-        withAnimation { model.showsTOC.toggle() }
-      }
+      withAnimationAsNeeded(reduceMotion) { model.showsTOC.toggle() }
     },
     isEnabled: { _ in true },
     shortcut: .init("1", modifiers: [.command, .control]),
@@ -219,16 +263,35 @@ private struct ActionMenuButton: View {
 private struct ActionToolbarButton: View {
   let action: Action
   let model: DocumentModel?
+  let imageOnly: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    Button(action.title(model), systemImage: action.image) {
+    Button {
       guard let model else { return }
       action.action(model, reduceMotion)
+    } label: {
+      if imageOnly {
+        Image(systemName: action.image)
+      } else {
+        Label(action.title(model), systemImage: action.image)
+      }
     }
     .disabled(!(model.map { action.isEnabled($0) } ?? false))
     .help(action.helpLabel(model))
     .accessibilityLabel(Text(action.title(model)))
     .accessibilityIdentifier(action.accessibilityID)
+  }
+}
+
+public func withAnimationAsNeeded<Result>(
+  _ reduceMotion: Bool,
+  _ animation: Animation? = .default,
+  _ body: () throws -> Result) rethrows -> Result
+{
+  if reduceMotion {
+    try body()
+  } else {
+    try withAnimation(animation, body)
   }
 }

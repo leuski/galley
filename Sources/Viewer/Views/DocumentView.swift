@@ -160,18 +160,13 @@ struct DocumentView: View {
       get: { model.showsTOC ? .all : .detailOnly },
       set: { newValue in
         let next = newValue != .detailOnly
-        if reduceMotion {
-          model.showsTOC = next
-        } else {
-          withAnimation { model.showsTOC = next }
-        }
+        withAnimationAsNeeded(reduceMotion) { model.showsTOC = next }
       }
     )) {
       TOCSidebar(model: model)
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
-//        .border(Color.blue, width: 1)
       // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
       // toolbar under the identifier `com.apple.SwiftUI.navigationSplitView.
       // toggleSidebar`. Combined with `.toolbar(id: "viewer.main")`'s
@@ -180,17 +175,14 @@ struct DocumentView: View {
       // throws because the same identifier appears twice. Suppress the
       // auto-injected one and provide our own non-customizable toggle in
       // `navigationToolbarItems` instead.
-//        .toolbar(removing: .sidebarToggle)
-//        .toolbar {
-//          // Replacement for SwiftUI's auto-injected NavigationSplitView
-//          // toggle — see the `.toolbar(removing: .sidebarToggle)` comment in
-//          // `body`. `.customizationBehavior(.disabled)` keeps this item out
-//          // of the customization config so it can't ever round-trip through
-//          // defaults and trigger the duplicate-identifier crash.
-//          Action.toggleTOC.toolbarItem(model: model)
-//        }
     } detail: {
       WebView(model.page)
+        .safeAreaInset(edge: .top, spacing: 0) {
+          if model.isFindVisible {
+            FindBar(model: model)
+              .transition(.move(edge: .top).combined(with: .opacity))
+          }
+        }
         .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
     }
     .navigationSplitViewStyle(.balanced)
@@ -442,6 +434,11 @@ struct DocumentView: View {
 
     ToolbarItem(id: "reload", placement: .primaryAction) {
       Action.reload.toolbarItem(model: model)
+    }
+    .customizationBehavior(.default)
+
+    ToolbarItem(id: "find", placement: .primaryAction) {
+      Action.find.toolbarItem(model: model)
     }
     .customizationBehavior(.default)
   }
