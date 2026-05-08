@@ -9,7 +9,39 @@ the source line in your editor.
 
 The same rendering engine also powers a companion menu-bar app, **Galley
 Server**, which serves the preview over HTTP so any browser (or BBEdit's
-preview pane) can view it.
+preview pane) can view it. A Quick Look extension reuses the engine too.
+
+```mermaid
+graph TD
+  BBEdit[BBEdit / editors]
+  Finder[Finder / LaunchServices]
+  Browser[Web browser]
+  QL[Quick Look]
+
+  Viewer[Galley<br/>document app]
+  Server[Galley Server<br/>menu-bar app]
+  QLExt[Quicklook.appex]
+
+  Core[GalleyCoreKit<br/>rendering · templates · routing · watch]
+  ServerKit[GalleyServerKit<br/>FlyingFox HTTP server]
+
+  Procs[External processors<br/>Pandoc · MultiMarkdown · cmark-gfm · Discount]
+
+  BBEdit -->|galley://| Viewer
+  BBEdit -->|http| Server
+  Finder --> Viewer
+  Browser -->|http| Server
+  QL --> QLExt
+  QLExt -.fallback to in-process render.-> Core
+  QLExt -->|prefer running server| Server
+
+  Viewer --> Core
+  Server --> Core
+  Server --> ServerKit
+
+  ServerKit --> Core
+  Core -->|Process| Procs
+```
 
 ## Galley — the viewer
 
