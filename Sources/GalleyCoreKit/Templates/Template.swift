@@ -70,7 +70,7 @@ public extension Template {
   /// "Default" entry directly off the kit's bundle resources.
   static let bundledDefault: Template = {
     guard let template = Template(
-      sourceURL: TemplateStore.bundleTemplatesDirectoryURL,
+      sourceURL: .bundleTemplatesDirectoryURL,
       sourceIndex: TemplateStore.bundleSourceIndex,
       name: "Default",
       nameResource: LocalizedStringResource(

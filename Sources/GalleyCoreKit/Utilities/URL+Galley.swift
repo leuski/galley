@@ -1,4 +1,5 @@
 import Foundation
+import ALFoundation
 
 /// Tabs of the Viewer's Settings scene. Carried on inbound
 /// `galley://settings?tab=<id>` URLs so external callers (e.g. the
@@ -63,4 +64,19 @@ public extension URL {
       .flatMap { $0 > 0 ? $0 : nil }
     return .document(fileURL, scrollLine: line)
   }
+
+  /// Resolves the kit framework's bundled templates folder.
+  ///
+  /// The bundled templates ship inside a `Templates.bundle` directory
+  /// because Xcode 16's synchronized root groups otherwise flatten
+  /// resource directory structure when copying — a `.bundle`-suffixed
+  /// folder is treated as an opaque wrapper and copied whole. Inside
+  /// the wrapper we keep one folder per template (`Default/`,
+  /// future `Tufte/`, etc.) using the same folder shape user
+  /// templates use.
+  static let bundleTemplatesDirectoryURL: URL = {
+    Bundle.galleyCoreKit.url(
+      forResource: "Templates", withExtension: "bundle")
+    !! "GalleyCoreKit bundle missing Templates.bundle wrapper"
+  }()
 }

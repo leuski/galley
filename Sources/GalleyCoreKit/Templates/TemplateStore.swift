@@ -164,23 +164,4 @@ public final class TemplateStore {
       watcherTasks.append(task)
     }
   }
-
-  /// Resolves the kit framework's bundled templates folder.
-  ///
-  /// The bundled templates ship inside a `Templates.bundle` directory
-  /// because Xcode 16's synchronized root groups otherwise flatten
-  /// resource directory structure when copying — a `.bundle`-suffixed
-  /// folder is treated as an opaque wrapper and copied whole. Inside
-  /// the wrapper we keep one folder per template (`Default/`,
-  /// future `Tufte/`, etc.) using the same folder shape user
-  /// templates use.
-  nonisolated public static let bundleTemplatesDirectoryURL: URL = {
-    guard
-      let url = Bundle.galleyCoreKit.url(
-        forResource: "Templates", withExtension: "bundle")
-    else {
-      fatalError("GalleyCoreKit bundle missing Templates.bundle wrapper")
-    }
-    return url
-  }()
 }
