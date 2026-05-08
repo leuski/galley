@@ -19,7 +19,7 @@ public final class TemplateStore {
   /// against tmp dirs and seed whatever entries they need.
   public static let shared = TemplateStore(
     directoryURLs: [
-      TemplateStore.bundleTemplatesDirectoryURL,
+      .bundleTemplatesDirectoryURL,
       GalleyConstants.applicationSupportDirectory / "Templates"
     ],
     watchedSourceIndices: [TemplateStore.userSourceIndex])
