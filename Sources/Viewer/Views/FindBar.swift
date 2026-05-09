@@ -36,20 +36,7 @@ struct FindBar: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      optionsMenu
-
-      TextField("Find", text: $model.findQuery)
-        .textFieldStyle(.roundedBorder)
-        .frame(maxWidth: 320)
-        .focused($fieldFocused)
-        .onSubmit { Task { await model.findNext() } }
-        .onChange(of: model.findQuery) {
-          Task { await model.performFind() }
-        }
-        .onExitCommand { dismiss() }
-        .accessibilityIdentifier(ViewerA11yID.Find.field)
-
-      countLabel
+      searchField
 
       Spacer(minLength: 8)
 
@@ -79,6 +66,51 @@ struct FindBar: View {
     .onChange(of: model.findDismissalToken) { dismiss() }
   }
 
+  /// Search-field-shaped container that hosts the options menu, the
+  /// text field, the match counter, and a clear button — mirroring
+  /// Preview's find field where every affordance lives inside one
+  /// rounded chrome.
+  @ViewBuilder
+  private var searchField: some View {
+    HStack(spacing: 4) {
+      optionsMenu
+
+      TextField("Find", text: $model.findQuery)
+        .textFieldStyle(.plain)
+        .focused($fieldFocused)
+        .onSubmit { Task { await model.findNext() } }
+        .onChange(of: model.findQuery) {
+          Task { await model.performFind() }
+        }
+        .onExitCommand { dismiss() }
+        .accessibilityIdentifier(ViewerA11yID.Find.field)
+
+      countLabel
+
+      if !model.findQuery.isEmpty {
+        Button {
+          model.findQuery = ""
+          fieldFocused = true
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Clear")
+        .accessibilityLabel(Text("Clear"))
+      }
+    }
+    .padding(.horizontal, 6)
+    .padding(.vertical, 6)
+    .background(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(.background))
+    .overlay(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .strokeBorder(.separator))
+    .frame(maxWidth: 320)
+  }
+
   /// Dropdown anchored to the magnifying-glass glyph, mirroring the
   /// affordance Safari and Preview use to host find options. Each
   /// toggle re-runs the search through `.onChange` so the highlights
@@ -95,8 +127,10 @@ struct FindBar: View {
         .accessibilityIdentifier(ViewerA11yID.Find.wholeWord)
     } label: {
       Image(systemName: "magnifyingglass")
+        .foregroundStyle(.secondary)
     }
     .menuStyle(.borderlessButton)
+    .menuIndicator(.visible)
     .fixedSize()
     .help("Find options")
     .accessibilityLabel(Text("Find options"))
