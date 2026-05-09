@@ -10,7 +10,7 @@ import SwiftUI
 /// `.global` value at the top of each list represents "Use Global
 /// Setting." When the flag is off, the menus drive the global
 /// selection directly.
-struct RenderingCommands: Commands {
+struct FormatCommands: Commands {
   @Bindable var appModel: AppModel
   @FocusedValue(\.documentModel) private var documentModel
 

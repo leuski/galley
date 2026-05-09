@@ -92,10 +92,11 @@ struct ViewerApp: App {
     .windowToolbarStyle(.unified)
     .commands {
       FileCommands(recents: recents)
+      EditCommands()
       ToolbarCommands()
       ViewCommands()
       if let model = boot.model {
-        RenderingCommands(appModel: model)
+        FormatCommands(appModel: model)
       }
     }
 
