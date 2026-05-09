@@ -6,32 +6,56 @@
 //
 
 import AppKit
-import WebKit
+import CoreTransferable
 import GalleyCoreKit
+import UniformTypeIdentifiers
+import WebKit
 import os
 
 extension DocumentModel {
   // MARK: - Print / Export
 
-  /// Render the current document as PDF and write the bytes to
-  /// `destination`. Drives the same `WKWebView.printOperation`
-  /// pipeline as Print, but pre-mutates the print info to save to a
-  /// file URL with no panel — that's how AppKit's print pipeline
-  /// produces a properly paginated PDF. The screenshot-style
-  /// `WebPage.exported(as: .pdf())` doesn't paginate at all and is
-  /// not suitable for this path.
-  func exportPDF(to destination: URL, on window: NSWindow?) async throws {
+  /// Render the current document as PDF into a freshly-allocated temp
+  /// file and return its URL. Used by the `.fileExporter`-driven
+  /// Export as PDF flow: SwiftUI takes ownership of the temp via
+  /// `SentTransferredFile(_:allowAccessingOriginalFile: true)` and
+  /// moves the bytes into the user's chosen destination.
+  ///
+  /// The print operation's modal is pinned to a fresh offscreen host
+  /// (not the document window) because SwiftUI's `.fileExporter`
+  /// sheet is still up while this closure runs — stacking another
+  /// modal on the same window would clash. Both `showsPrintPanel`
+  /// and `showsProgressPanel` are off, so the modal is invisible —
+  /// just a run-loop attachment point for `runModal(for:)`.
+  /// `Transferable` representation of this document's exportable
+  /// PDF. SwiftUI's `.fileExporter(item:)` invokes `render` only
+  /// after the user picks a destination, then moves the returned
+  /// temp file via `SentTransferredFile(_:allowAccessingOriginalFile:
+  /// true)` — no `Data` round-trip, no manual cleanup.
+  var pdfExport: PDFExport {
+    PDFExport { [weak self] in
+      guard let self else { throw CocoaError(.featureUnsupported) }
+      return try await self.exportPDF()
+    }
+  }
+
+  func exportPDF() async throws -> URL {
+    let destination = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString)
+      .appendingPathExtension("pdf")
+    let host = Self.makeOffscreenHostWindow()
     try await runPrintOperation(
       jobTitle: documentURL.lastPathComponent,
-      on: window
+      on: host
     ) { operation, _ in
       let info = operation.printInfo
       info.jobDisposition = .save
       info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL]
       = destination as NSURL
       operation.showsPrintPanel = false
-      operation.showsProgressPanel = true
+      operation.showsProgressPanel = false
     }
+    return destination
   }
 
   /// Show the system Print panel for the current document. Renders
@@ -243,5 +267,26 @@ private final class PrintLoadBridge: NSObject, WKNavigationDelegate {
     didFire = true
     completion?()
     completion = nil
+  }
+}
+
+/// `Transferable` wrapper around a lazy "render to a temp PDF file"
+/// closure. SwiftUI's `.fileExporter(item:)` invokes the closure only
+/// after the user confirms the destination, then moves the returned
+/// file via `SentTransferredFile(_:allowAccessingOriginalFile: true)`
+/// — so cancellation does no work and there's no `Data` round-trip.
+/// The closure is `@MainActor` because `DocumentModel` is main-actor-
+/// isolated; main-actor-isolated function values are `Sendable`, so
+/// `PDFExport` satisfies `Transferable`'s `Sendable` requirement
+/// without further annotation.
+struct PDFExport: Transferable {
+  let render: @MainActor () async throws -> URL
+
+  static var transferRepresentation: some TransferRepresentation {
+    FileRepresentation(exportedContentType: .pdf) { item in
+      let url = try await item.render()
+      return SentTransferredFile(
+        url, allowAccessingOriginalFile: true)
+    }
   }
 }

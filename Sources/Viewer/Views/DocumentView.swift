@@ -19,10 +19,11 @@ struct DocumentView: View {
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
 
-  /// Drives the SwiftUI rename alert. The File ▸ Rename… menu item
-  /// triggers this through the focused `RenameContext.request`
-  /// closure published below.
-  @State private var renameRequested = false
+  /// Transient text-field value for the rename alert. Seeded from
+  /// `model.documentURL.lastPathComponent` whenever
+  /// `model.isRenameRequested` flips true (see the `.onChange` in
+  /// `body`). Lives on the view because it has no meaning outside
+  /// the alert's lifetime.
   @State private var renameInput = ""
 
   /// Non-nil while the SwiftUI "Couldn't export PDF" alert is up.
@@ -63,7 +64,8 @@ struct DocumentView: View {
   @SceneStorage("\(keyPrefix).history") private var historyJSON: String = ""
 
   var body: some View {
-    splitView
+    @Bindable var model = model
+    return splitView
       .overlay(alignment: .bottom) {
         if let error = model.lastError {
           Text(error)
@@ -99,20 +101,10 @@ struct DocumentView: View {
         onDetach: { window in
           if let window { dispatcher.unregisterWindow(window) }
         }))
-      .modifier(SceneValuesModifier(
-        model: model,
-        renameContext: RenameContext(
-          url: model.documentURL,
-          request: {
-            renameInput = model.documentURL.lastPathComponent
-            renameRequested = true
-          }),
-        exportPDFContext: ExportPDFContext(
-          url: model.documentURL,
-          request: { performExportPDF() })))
+      .focusedSceneValue(\.documentModel, model)
       .alert(
         "Rename Document",
-        isPresented: $renameRequested
+        isPresented: $model.isRenameRequested
       ) {
         TextField(
           model.documentURL.lastPathComponent, text: $renameInput)
@@ -120,6 +112,9 @@ struct DocumentView: View {
         Button("Cancel", role: .cancel) { }
       } message: {
         Text("Enter a new file name for this document.")
+      }
+      .onChange(of: model.isRenameRequested) { _, new in
+        if new { renameInput = model.documentURL.lastPathComponent }
       }
       .alert(
         "Couldn’t export PDF",
@@ -130,6 +125,19 @@ struct DocumentView: View {
       } message: { message in
         Text(message)
       }
+      .fileExporter(
+        isPresented: $model.isExportingPDF,
+        item: model.pdfExport,
+        contentTypes: [.pdf],
+        defaultFilename: model.documentURL
+          .deletingPathExtension().lastPathComponent
+      ) { result in
+        if case .failure(let error) = result {
+          exportPDFError = error.localizedDescription
+        }
+      }
+      .fileDialogDefaultDirectory(
+        model.documentURL.deletingLastPathComponent())
       .navigationTitle(model.documentURL.lastPathComponent)
     // No `id:` — `replaceDocument` drives in-window URL changes
     // directly through `model.bind(to:)`, so re-firing on every
@@ -271,40 +279,6 @@ struct DocumentView: View {
   private func mirrorPerFileShowsTOC(_ value: Bool) {
     Defaults.shared.perFileStateStore[model.documentURL]
       .showsTOC = value ? true : nil
-  }
-
-  /// Run the destination save panel and the export pipeline. Called
-  /// by the File ▸ Export as PDF… menu item via the focused
-  /// `ExportPDFContext.request` closure.
-  ///
-  /// The save panel stays AppKit because SwiftUI's `.fileExporter` is
-  /// data-first and our pipeline is destination-first
-  /// (`runPrintOperation` writes paginated bytes directly to a
-  /// `jobSavingURL`). Routing the panel's title through
-  /// `String(localized:)` is enough to keep it in the strings table.
-  /// The failure surface is the SwiftUI `.alert` driven by
-  /// `exportPDFError`.
-  private func performExportPDF() {
-    let url = model.documentURL
-    let panel = NSSavePanel()
-    panel.identifier = .init(rawValue: "export-pdf")
-    panel.title = String(localized: "Export as PDF")
-    panel.allowedContentTypes = [.pdf]
-    panel.nameFieldStringValue =
-    url.deletingPathExtension().lastPathComponent + ".pdf"
-    panel.directoryURL = url.deletingLastPathComponent()
-
-    guard panel.runModal() == .OK, let destination = panel.url
-    else { return }
-
-    let window = hostWindow
-    Task { @MainActor in
-      do {
-        try await model.exportPDF(to: destination, on: window)
-      } catch {
-        exportPDFError = error.localizedDescription
-      }
-    }
   }
 
   /// Bridges the optional error string to the boolean the
@@ -545,24 +519,6 @@ private struct ChangeHandlers: ViewModifier {
   }
 }
 
-/// Publishes the per-window scene values commands rely on. Lifted
-/// out of `DocumentView.body` to keep the modifier chain short enough
-/// for the type-checker. Choice models live on `DocumentModel`; we
-/// publish whatever it has — `nil` until `bindSettings` runs, which
-/// is what the consumers (`RenderingCommands`) already handle.
-private struct SceneValuesModifier: ViewModifier {
-  let model: DocumentModel
-  let renameContext: RenameContext
-  let exportPDFContext: ExportPDFContext
-
-  func body(content: Content) -> some View {
-    content
-      .focusedSceneValue(\.documentModel, model)
-      .focusedSceneValue(\.viewerRenameContext, renameContext)
-      .focusedSceneValue(\.viewerExportPDFContext, exportPDFContext)
-  }
-}
-
 /// Brings a toolbar `Menu` icon down to the visual size of sibling
 /// toolbar buttons. SwiftUI hosts toolbar menus as `NSMenuToolbarItem`
 /// at AppKit's larger metric, and font / imageScale / controlSize all
@@ -600,4 +556,3 @@ private struct TemplateToolbarPicker: View {
     .help("Template")
   }
 }
-

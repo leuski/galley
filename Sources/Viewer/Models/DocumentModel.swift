@@ -223,6 +223,20 @@ final class DocumentModel {
   /// path; this token is the animated, focus-aware path.
   var findDismissalToken: Int = 0
 
+  /// Whether the SwiftUI `.fileExporter` for "Export as PDF" is
+  /// presented. Flipped by `requestExportPDF()` (typically from the
+  /// File menu); SwiftUI flips it back on completion or cancellation.
+  /// Lives on the model so the menu can reach it through the existing
+  /// `\.documentModel` focused value without a dedicated context type.
+  var isExportingPDF: Bool = false
+
+  /// Whether the SwiftUI rename alert is presented. Same rationale
+  /// as `isExportingPDF` — keeps the menu → focused-window bridge
+  /// to a single focused value. The alert's text-field value is
+  /// view-local `@State` on `DocumentView`, seeded via `.onChange`
+  /// when this flips true.
+  var isRenameRequested: Bool = false
+
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
@@ -670,6 +684,20 @@ final class DocumentModel {
     history = history.map { $0 == oldURL ? newURL : $0 }
     await rebindCurrent()
     return newURL
+  }
+
+  /// Present the SwiftUI rename alert. Triggered by the File ▸
+  /// Rename… menu. The view seeds its text-field `@State` from
+  /// `documentURL.lastPathComponent` on this transition.
+  func requestRename() {
+    isRenameRequested = true
+  }
+
+  /// Present the SwiftUI `.fileExporter` for "Export as PDF". The
+  /// render closure on `pdfExport` is invoked by SwiftUI only after
+  /// the user picks a destination — cancelling does no work.
+  func requestExportPDF() {
+    isExportingPDF = true
   }
 
   // MARK: - Internals

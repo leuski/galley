@@ -8,8 +8,6 @@ import SwiftUI
 struct FileCommands: Commands {
   @Bindable var recents: RecentDocumentsModel
   @FocusedValue(\.documentModel) private var model
-  @FocusedValue(\.viewerRenameContext) private var renameContext
-  @FocusedValue(\.viewerExportPDFContext) private var exportPDFContext
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
@@ -39,9 +37,9 @@ struct FileCommands: Commands {
 
     CommandGroup(after: .saveItem) {
       Button("Rename…", systemImage: "pencil") {
-        renameContext?.request()
+        model?.requestRename()
       }
-      .disabled(renameContext == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 
       Button("Open in Editor", systemImage: "arrow.up.forward.app") {
@@ -55,10 +53,10 @@ struct FileCommands: Commands {
       Divider()
 
       Button("Export as PDF…", systemImage: "arrow.up.document") {
-        exportPDFContext?.request()
+        model?.requestExportPDF()
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
-      .disabled(exportPDFContext == nil)
+      .disabled(model == nil)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.exportPDF)
     }
 
