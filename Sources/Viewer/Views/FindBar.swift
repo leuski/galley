@@ -65,7 +65,6 @@ struct FindBar: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .frame(maxWidth: .infinity)
-    .background(.bar)
     .overlay(alignment: .bottom) {
       Divider()
     }

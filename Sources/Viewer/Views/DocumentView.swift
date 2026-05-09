@@ -186,6 +186,28 @@ struct DocumentView: View {
         .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
     }
     .navigationSplitViewStyle(.balanced)
+    // Paint the page's own background color into the window's
+    // container background so the translucent toolbar / sidebar
+    // chrome samples it as the surface behind their glass material.
+    // `.containerBackground(_:for: .window)` — unlike `.background`
+    // — paints behind the entire window container, which is what
+    // chrome reads through. `nil` while loading or when the page
+    // declared no opaque bg; we then paint nothing and fall back to
+    // the system default (glass over wallpaper).
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    .containerBackground(
+      model.pageBackgroundColor ?? Color.clear,
+      for: .window)
+    // Flip the view's color scheme so AppKit-rendered chrome text
+    // (window title, toolbar labels) inverts when the page bg is
+    // dark — otherwise the system black title disappears against a
+    // black body. `.dark` only when the page declared an opaque
+    // dark color; `nil` page bg falls back to the user's system
+    // setting via the modifier-skipping `.colorScheme(.light)`
+    // never being negative.
+    .preferredColorScheme(
+      (model.pageBackgroundColor?.isLuminanceDark)
+        .map { isDark in isDark ? .dark : .light})
   }
 
   /// Called whenever the model's bind state changes — first render,
@@ -561,5 +583,24 @@ private struct TemplateToolbarPicker: View {
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Template")
+  }
+}
+
+extension Color {
+  /// Whether the color is dark enough that AppKit's default
+  /// system-dark text would disappear against it. Resolves the
+  /// `Color` through `NSColor` in sRGB so any color (named, RGB,
+  /// catalog, dynamic) gets reduced to numeric components, then
+  /// applies the standard ITU-R BT.601 luma weights. Falls back to
+  /// `false` (treat as light) when the conversion can't be made.
+  fileprivate var isLuminanceDark: Bool {
+    guard let resolved = NSColor(self).usingColorSpace(.sRGB) else {
+      return false
+    }
+    let red = resolved.redComponent
+    let green = resolved.greenComponent
+    let blue = resolved.blueComponent
+    let luma = 0.299 * red + 0.587 * green + 0.114 * blue
+    return luma < 0.5
   }
 }
