@@ -1,0 +1,100 @@
+import Foundation
+import GalleyCoreKit
+import os
+import SwiftUI
+import WebKit
+
+/// Receives the rendered page's computed background color (the
+/// `html` element's, falling back to `body`) so the SwiftUI host can
+/// paint a matching color behind translucent toolbar / sidebar
+/// chrome — creating the illusion that the document extends
+/// edge-to-edge.
+///
+/// Message body shape: `{ "color": "rgb(r,g,b)" | "rgba(r,g,b,a)" }`
+/// for opaque backgrounds, `{ "color": null }` when neither `html`
+/// nor `body` declared one (the host then falls back to the system
+/// default appearance).
+@MainActor
+final class BackgroundColorBridge: NSObject, WKScriptMessageHandler {
+  /// JS handler name. Script calls
+  /// `window.webkit.messageHandlers.backgroundColor.postMessage(...)`.
+  static let messageName = "backgroundColor"
+
+  /// Reader script. Source lives in
+  /// `Resources/Scripts/backgroundColorReader.js`; the message name
+  /// is hardcoded there and must match `messageName`.
+  static let userScript: String = Bundle.main.requiredString(
+    forResource: "backgroundColorReader", withExtension: "js")
+
+  /// Set by the owning DocumentModel; receives the parsed color or
+  /// `nil` when the page declared no opaque background (either `html`
+  /// and `body` were both transparent, or the JS payload was malformed).
+  var onColor: ((Color?) -> Void)?
+
+  private let logger = Logger(
+    subsystem: bundleIdentifier,
+    category: "BackgroundColorBridge")
+
+  func userContentController(
+    _ controller: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    guard let body = message.body as? [String: Any] else {
+      logMalformedMessage(message.body)
+      onColor?(nil)
+      return
+    }
+    if let raw = body["color"] as? String {
+      onColor?(Self.parseCSSColor(raw))
+    } else {
+      // Explicit `null` from JS — both `html` and `body` were
+      // transparent. Surface as nil so the host falls back to the
+      // system default.
+      onColor?(nil)
+    }
+  }
+
+  /// Parses the two shapes `getComputedStyle(...).backgroundColor`
+  /// emits — `rgb(r, g, b)` and `rgba(r, g, b, a)`. Components may be
+  /// integers (0–255) or floats with a decimal; alpha is 0–1. Returns
+  /// `nil` for unparseable input or fully-transparent alpha.
+  static func parseCSSColor(_ string: String) -> Color? {
+    let lowered = string
+      .trimmingCharacters(in: .whitespaces)
+      .lowercased()
+    guard let openParen = lowered.firstIndex(of: "("),
+          let closeParen = lowered.lastIndex(of: ")")
+    else { return nil }
+    let inside = lowered[
+      lowered.index(after: openParen)..<closeParen]
+    let parts = inside
+      .split(separator: ",")
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+    guard parts.count == 3 || parts.count == 4 else { return nil }
+    guard let red = Double(parts[0]),
+          let green = Double(parts[1]),
+          let blue = Double(parts[2])
+    else { return nil }
+    let alpha: Double
+    if parts.count == 4 {
+      guard let parsed = Double(parts[3]) else { return nil }
+      alpha = parsed
+    } else {
+      alpha = 1
+    }
+    guard alpha > 0 else { return nil }
+    return Color(
+      .sRGB,
+      red: red / 255,
+      green: green / 255,
+      blue: blue / 255,
+      opacity: alpha)
+  }
+
+  private func logMalformedMessage(_ body: Any) {
+    logger.warning("""
+      Ignoring malformed background message: \
+      \(String(describing: body), privacy: .public)
+      """)
+  }
+}

@@ -1,4 +1,4 @@
-html { font-size: 14px; }
+html { font-size: 14px; background: Canvas; }
 :root { color-scheme: light dark; }
 body {
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;

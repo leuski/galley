@@ -12,7 +12,7 @@
     --sepia-link: #7a4f1f;
 }
 
-html { font-size: 17px; }
+html { font-size: 17px; background: var(--sepia-bg); }
 
 body {
     font-family: "Iowan Old Style", "Palatino Linotype", Palatino,

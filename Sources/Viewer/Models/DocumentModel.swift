@@ -24,8 +24,19 @@ final class DocumentModel {
   @ObservationIgnored private let linkBridge = LinkBridge()
   @ObservationIgnored private let scrollBridge = ScrollBridge()
   @ObservationIgnored private let tocBridge = TOCBridge()
+  @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
   @ObservationIgnored private let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
+
+  /// Computed background color of the rendered page (`html` or
+  /// `body`), reported by `BackgroundColorBridge` after each render.
+  /// `DocumentView` paints this behind the split view with
+  /// `ignoresSafeAreaEdges: .all` so translucent toolbar and sidebar
+  /// chrome show a matching tint instead of the desktop wallpaper —
+  /// the illusion that the document extends edge-to-edge. `nil` when
+  /// the page declared no opaque background; the host then falls back
+  /// to the system default appearance.
+  private(set) var pageBackgroundColor: Color?
 
   /// Per-window template / processor choices. Reference types so
   /// SwiftUI's Observation tracks `selected` for menus that bind to
@@ -186,6 +197,7 @@ final class DocumentModel {
       linkBridge: linkBridge,
       scrollBridge: scrollBridge,
       tocBridge: tocBridge,
+      backgroundBridge: backgroundBridge,
       templateBox: box))
     // Seed the scheme handler's template pointer. `renderCurrent`
     // updates it again on every render — this seed only matters for
@@ -205,6 +217,7 @@ final class DocumentModel {
     linkBridge: LinkBridge,
     scrollBridge: ScrollBridge,
     tocBridge: TOCBridge,
+    backgroundBridge: BackgroundColorBridge,
     templateBox: TemplateBox
   ) -> WebPage.Configuration {
     var configuration = WebPage.Configuration()
@@ -213,6 +226,8 @@ final class DocumentModel {
     controller.add(linkBridge, name: LinkBridge.messageName)
     controller.add(scrollBridge, name: ScrollBridge.messageName)
     controller.add(tocBridge, name: TOCBridge.messageName)
+    controller.add(
+      backgroundBridge, name: BackgroundColorBridge.messageName)
     // One script handles both cmd-click → editor and plain click →
     // in-window nav, so we don't depend on capture-phase ordering
     // between two listeners — which appears to drop the editor
@@ -232,6 +247,12 @@ final class DocumentModel {
     // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
     controller.addUserScript(WKUserScript(
       source: TOCBridge.userScript,
+      injectionTime: .atDocumentEnd,
+      forMainFrameOnly: true))
+    // Computed background-color reader. Runs after layout so the
+    // host can paint a matching tint behind translucent chrome.
+    controller.addUserScript(WKUserScript(
+      source: BackgroundColorBridge.userScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
     // Find-text controller. The style script runs at document-start
@@ -289,6 +310,10 @@ final class DocumentModel {
     tocBridge.onActiveHeading = { [weak self] identifier in
       guard let self else { return }
       activeHeadingID = identifier
+    }
+    backgroundBridge.onColor = { [weak self] color in
+      guard let self else { return }
+      pageBackgroundColor = color
     }
   }
 

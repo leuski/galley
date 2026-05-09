@@ -15,7 +15,7 @@
     --term-strong: #f0c674;
 }
 
-html { font-size: 14px; }
+html { font-size: 14px; background: var(--term-bg); }
 
 body {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;

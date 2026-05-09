@@ -3,7 +3,7 @@
 
 :root { color-scheme: light; }
 
-html { font-size: 17px; }
+html { font-size: 17px; background: #fff; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
