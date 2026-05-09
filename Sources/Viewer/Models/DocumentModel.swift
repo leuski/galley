@@ -30,13 +30,21 @@ final class DocumentModel {
 
   /// Computed background color of the rendered page (`html` or
   /// `body`), reported by `BackgroundColorBridge` after each render.
-  /// `DocumentView` paints this behind the split view with
-  /// `ignoresSafeAreaEdges: .all` so translucent toolbar and sidebar
-  /// chrome show a matching tint instead of the desktop wallpaper —
-  /// the illusion that the document extends edge-to-edge. `nil` when
-  /// the page declared no opaque background; the host then falls back
-  /// to the system default appearance.
-  private(set) var pageBackgroundColor: Color?
+  /// `DocumentView` paints this into the window's container
+  /// background so translucent toolbar and sidebar chrome show a
+  /// matching tint — the illusion that the document extends
+  /// edge-to-edge.
+  ///
+  /// The page background color of the currently-resolved template.
+  /// Reads through `Template.backgroundColor` (which is itself a
+  /// computed view onto `Defaults.shared.templateBackgroundColors`),
+  /// so this property is reactive *and* the cache is automatically
+  /// shared across all DocumentModels using the same template — no
+  /// per-instance state needed. `nil` only for templates that have
+  /// never been rendered (a one-time flash on a brand-new template).
+  var pageBackgroundColor: Color? {
+    resolvedTemplate().backgroundColor
+  }
 
   /// Per-window template / processor choices. Reference types so
   /// SwiftUI's Observation tracks `selected` for menus that bind to
@@ -60,6 +68,15 @@ final class DocumentModel {
   /// to gate window-reveal alpha and to short-circuit duplicate
   /// `.task(id:)` fires from triggering re-binds.
   private(set) var didFirstBind: Bool = false
+
+  /// True once the WebView has finished painting the *current* bind's
+  /// HTML (signalled by the BackgroundColorBridge firing post-layout).
+  /// Reset to `false` at the start of every rebind so DocumentView can
+  /// overlay the WebView's empty white canvas with `pageBackgroundColor`
+  /// during the brief mount→render window — the cause of the visible
+  /// "white flash inside the WebView rectangle" on tab open / reload.
+  /// Per-bind, not per-model: the flag toggles on every navigation.
+  private(set) var isPageRendered: Bool = false
 
   /// Page zoom factor for the rendered preview. Applied via a CSS
   /// `zoom` rule injected into the document head; updated live via JS
@@ -313,7 +330,20 @@ final class DocumentModel {
     }
     backgroundBridge.onColor = { [weak self] color in
       guard let self else { return }
-      pageBackgroundColor = color
+      // Bridge fires post-layout regardless of whether the page
+      // declared an opaque bg, so any fire = "WebView has painted"
+      // and we can drop DocumentView's anti-flash overlay.
+      isPageRendered = true
+      // Treat the bridge's `nil` (page declared no opaque bg) as
+      // "keep showing what we already have" — leaving the previous
+      // template-keyed entry intact means in-window navigation
+      // between docs that don't override bg won't flash.
+      guard let color else { return }
+      // Persist to the template's slot in `Defaults.shared
+      // .templateBackgroundColors`. Every other DocumentModel using
+      // this template observes the change automatically through
+      // their own `pageBackgroundColor` computed property.
+      resolvedTemplate().setBackgroundColor(color)
     }
   }
 
@@ -487,6 +517,13 @@ final class DocumentModel {
   }
 
   func reload() async {
+    // `pageBackgroundColor` is now computed off `resolvedTemplate()
+    // .backgroundColor`, which reads through Defaults — so a
+    // template change automatically flips the chrome to the new
+    // template's cached color before the WebView re-renders.
+    // Reset `isPageRendered` so DocumentView's anti-flash overlay
+    // covers the WebView until the bridge confirms paint commits.
+    isPageRendered = false
     await renderCurrent(preserveScroll: true)
   }
 
@@ -595,6 +632,11 @@ final class DocumentModel {
     logBinding(to: url)
     documentURL = url
     didFirstBind = true
+    // The WebView's pre-paint canvas is system-white regardless of
+    // CSS — clear the rendered flag so DocumentView can mask that
+    // gap with the cached page bg until BackgroundColorBridge
+    // reports a fresh post-layout color.
+    isPageRendered = false
     bridge.documentURL = url
     linkBridge.documentURL = url
     // Drop the old document's TOC entries so the sidebar doesn't

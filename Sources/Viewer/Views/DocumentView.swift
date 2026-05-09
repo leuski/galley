@@ -177,6 +177,18 @@ struct DocumentView: View {
       // `navigationToolbarItems` instead.
     } detail: {
       WebView(model.page)
+        // The WebView's pre-paint canvas paints system-white during
+        // the gap between mount and the first HTML layout — visible
+        // as a white flash on tab open / reload regardless of CSS.
+        // Cover that gap with the cached `pageBackgroundColor`
+        // (seeded from the previously-active document, or carried
+        // through a same-bg navigation) until `isPageRendered` flips
+        // true via the BackgroundColorBridge post-layout fire.
+        .overlay {
+          if !model.isPageRendered, let color = model.pageBackgroundColor {
+            color.allowsHitTesting(false)
+          }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
           if model.isFindVisible {
             FindBar(model: model)
@@ -195,8 +207,16 @@ struct DocumentView: View {
     // declared no opaque bg; we then paint nothing and fall back to
     // the system default (glass over wallpaper).
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    // Fall back to the system-adaptive window bg (light in light
+    // mode, dark in dark mode) when no template color is cached
+    // yet — `Color.white` would be opaque white in both, fighting
+    // the user's appearance setting.
+    .background(
+      model.pageBackgroundColor
+      ?? Color(nsColor: .windowBackgroundColor))
     .containerBackground(
-      model.pageBackgroundColor ?? Color.clear,
+      model.pageBackgroundColor
+      ?? Color(nsColor: .windowBackgroundColor),
       for: .window)
     // Flip the view's color scheme so AppKit-rendered chrome text
     // (window title, toolbar labels) inverts when the page bg is
@@ -586,21 +606,3 @@ private struct TemplateToolbarPicker: View {
   }
 }
 
-extension Color {
-  /// Whether the color is dark enough that AppKit's default
-  /// system-dark text would disappear against it. Resolves the
-  /// `Color` through `NSColor` in sRGB so any color (named, RGB,
-  /// catalog, dynamic) gets reduced to numeric components, then
-  /// applies the standard ITU-R BT.601 luma weights. Falls back to
-  /// `false` (treat as light) when the conversion can't be made.
-  fileprivate var isLuminanceDark: Bool {
-    guard let resolved = NSColor(self).usingColorSpace(.sRGB) else {
-      return false
-    }
-    let red = resolved.redComponent
-    let green = resolved.greenComponent
-    let blue = resolved.blueComponent
-    let luma = 0.299 * red + 0.587 * green + 0.114 * blue
-    return luma < 0.5
-  }
-}

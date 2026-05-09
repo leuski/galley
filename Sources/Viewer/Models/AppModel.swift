@@ -34,6 +34,12 @@ final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var openBehavior: OpenBehavior = .newWindow
   @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
   @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
+  /// Per-template page background colors (hex strings), captured by
+  /// `BackgroundColorBridge` after each render. Used by
+  /// `Template.backgroundColor` so a freshly-opened tab can paint
+  /// the chrome with the right tint immediately, and by FindBar /
+  /// DocumentView for the same reason.
+  @DefaultsKey var templateBackgroundColors: [String: String] = [:]
 
   @MainActor static let shared = Defaults()
 }

@@ -41,9 +41,22 @@
     post(null);
   }
 
+  // Defer the post until WebKit has actually committed a paint
+  // frame for the current layout. `atDocumentEnd` (and even
+  // DOMContentLoaded) fire BEFORE the first paint — reporting then
+  // would let SwiftUI drop its anti-flash overlay while the WebView
+  // is still painting white. Double-rAF is the standard trick: the
+  // first callback runs before the next paint, the second runs from
+  // inside that callback so it fires AFTER the paint commits.
+  function reportAfterPaint() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(reportBackground);
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', reportBackground);
+    document.addEventListener('DOMContentLoaded', reportAfterPaint);
   } else {
-    reportBackground();
+    reportAfterPaint();
   }
 })();

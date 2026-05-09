@@ -131,7 +131,6 @@ struct FindBar: View {
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.visible)
-    .fixedSize()
     .help("Find options")
     .accessibilityLabel(Text("Find options"))
     .accessibilityIdentifier(ViewerA11yID.Find.optionsMenu)
