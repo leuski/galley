@@ -180,13 +180,12 @@ struct DocumentView: View {
         // The WebView's pre-paint canvas paints system-white during
         // the gap between mount and the first HTML layout — visible
         // as a white flash on tab open / reload regardless of CSS.
-        // Cover that gap with the cached `pageBackgroundColor`
-        // (seeded from the previously-active document, or carried
-        // through a same-bg navigation) until `isPageRendered` flips
-        // true via the BackgroundColorBridge post-layout fire.
+        // Cover that gap with the resolved page bg (which falls
+        // back through last-seen → system bg) until `isPageRendered`
+        // flips true via the BackgroundColorBridge post-layout fire.
         .overlay {
-          if !model.isPageRendered, let color = model.pageBackgroundColor {
-            color.allowsHitTesting(false)
+          if !model.isPageRendered {
+            model.pageBackgroundColor.allowsHitTesting(false)
           }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -207,27 +206,23 @@ struct DocumentView: View {
     // declared no opaque bg; we then paint nothing and fall back to
     // the system default (glass over wallpaper).
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-    // Fall back to the system-adaptive window bg (light in light
-    // mode, dark in dark mode) when no template color is cached
-    // yet — `Color.white` would be opaque white in both, fighting
-    // the user's appearance setting.
-    .background(
-      model.pageBackgroundColor
-      ?? Color(nsColor: .windowBackgroundColor))
-    .containerBackground(
-      model.pageBackgroundColor
-      ?? Color(nsColor: .windowBackgroundColor),
-      for: .window)
+    // `model.pageBackgroundColor` already resolves through the
+    // template state → last-seen → system-bg fallback chain, so
+    // it's always a real color; no second `??` needed here.
+    .background(model.pageBackgroundColor)
+    .containerBackground(model.pageBackgroundColor, for: .window)
     // Flip the view's color scheme so AppKit-rendered chrome text
     // (window title, toolbar labels) inverts when the page bg is
     // dark — otherwise the system black title disappears against a
-    // black body. `.dark` only when the page declared an opaque
-    // dark color; `nil` page bg falls back to the user's system
-    // setting via the modifier-skipping `.colorScheme(.light)`
-    // never being negative.
+    // black body. While re-rendering after a template change,
+    // pin the scheme to the user's system pref instead so WebKit's
+    // `prefers-color-scheme` media queries on the new template pick
+    // the user's preferred variant — not whichever variant was
+    // current under the previous template's bg-luminance scheme.
     .preferredColorScheme(
-      (model.pageBackgroundColor?.isLuminanceDark)
-        .map { isDark in isDark ? .dark : .light})
+      model.isRenderingNewTemplate
+      ? .userSystem
+      : (model.pageBackgroundColor.isLuminanceDark ? .dark : .light))
   }
 
   /// Called whenever the model's bind state changes — first render,

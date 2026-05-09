@@ -10,22 +10,86 @@ import SwiftUI
 /// invalidated when `BackgroundColorBridge` writes a new entry. The
 /// extension lives in the Viewer module rather than `GalleyCoreKit`
 /// so the kit stays SwiftUI-free.
+/// Sentinel stored in `Defaults.shared.templateBackgroundColors`
+/// when a template has been rendered and explicitly declares no
+/// opaque page background. Distinct from "never rendered" (no
+/// dictionary entry at all) so a stale cached color from an
+/// earlier render with different CSS gets overwritten when the
+/// user edits the template to remove its bg.
+private let templateBackgroundNoneSentinel = ""
+
+/// Resolution state for a template's page background. Encodes the
+/// three states the chrome's display logic actually needs to
+/// distinguish:
+///
+/// - `.unresolved` — the template has never been rendered (or this
+///   session can't tell). Caller should fall back to the global
+///   last-seen color, or the system window bg if even that is
+///   unknown.
+/// - `.resolved(let color)` — the template was rendered and
+///   reported `color` as its opaque page bg. Caller paints `color`
+///   directly.
+/// - `.resolvedNone` — the template was rendered and reported no
+///   opaque bg. Caller paints the system window bg, just like the
+///   `unresolved` ↔ no-last-seen case but skipping the last-seen
+///   step (the template *positively* has no bg, not "we don't
+///   know yet").
+public enum TemplateBackgroundState {
+  case unresolved
+  case resolved(Color)
+  case resolvedNone
+}
+
 extension Template {
-  /// The page background color most recently reported by the
-  /// `BackgroundColorBridge` for *this* template, or `nil` if the
-  /// template has never been rendered (cache miss → DocumentView
-  /// falls back to the system default chrome).
-  @MainActor var backgroundColor: Color? {
-    Defaults.shared.templateBackgroundColors[persistentID]
-      .flatMap(Color.init(galleyHex:))
+  /// The page background's resolution state for this template,
+  /// driven by `Defaults.shared.templateBackgroundColors`. Read by
+  /// `DocumentModel.pageBackgroundColor` to choose between the
+  /// template's own color, the global last-seen fallback, and the
+  /// system window bg.
+  @MainActor var backgroundState: TemplateBackgroundState {
+    guard let stored = Defaults.shared
+      .templateBackgroundColors[persistentID]
+    else { return .unresolved }
+    if stored == templateBackgroundNoneSentinel {
+      return .resolvedNone
+    }
+    if let color = Color(galleyHex: stored) {
+      return .resolved(color)
+    }
+    // Corrupt entry — treat as if we'd never seen it.
+    return .unresolved
   }
 
-  /// Persist `color` against this template's id so subsequent tabs
-  /// using the same template seed correctly without flashing.
-  /// Called by the bridge handler in `DocumentModel.wireBridges`.
-  @MainActor func setBackgroundColor(_ color: Color) {
-    guard let hex = color.galleyHex else { return }
-    Defaults.shared.templateBackgroundColors[persistentID] = hex
+  /// Persist the bridge's latest report against this template's id.
+  /// Always writes — `color: nil` records the sentinel so a stale
+  /// hex entry from an earlier render is invalidated. Called by the
+  /// bridge handler in `DocumentModel.wireBridges`. When `color`
+  /// is non-nil the global `lastTemplateBackgroundColor` is also
+  /// updated so brand-new templates seed correctly on next open.
+  @MainActor func setBackgroundColor(_ color: Color?) {
+    let value: String
+    if let color, let hex = color.galleyHex {
+      value = hex
+      Defaults.shared.lastTemplateBackgroundColor = hex
+    } else {
+      value = templateBackgroundNoneSentinel
+    }
+    Defaults.shared.templateBackgroundColors[persistentID] = value
+  }
+}
+
+extension ColorScheme {
+  /// The user's system-wide preferred color scheme, ignoring any
+  /// scene-level `preferredColorScheme` we've applied for chrome.
+  /// Used to reset `NSWindow.appearance` (via `preferredColorScheme`
+  /// on the scene) before re-rendering after a template change so
+  /// WebKit's `prefers-color-scheme` media queries pick the user's
+  /// preferred variant — not whichever variant was current under
+  /// the previous template's bg-luminance-derived scheme.
+  @MainActor static var userSystem: ColorScheme {
+    NSApp.effectiveAppearance
+      .bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+      ? .dark : .light
   }
 }
 
@@ -85,5 +149,31 @@ extension Color {
       + 0.587 * resolved.greenComponent
       + 0.114 * resolved.blueComponent
     return luma < 0.5
+  }
+
+  /// `NSColor.windowBackgroundColor` resolved through the *user's*
+  /// system appearance, not the scene's local
+  /// `preferredColorScheme`.
+  ///
+  /// We flip `preferredColorScheme` on the document scene based on
+  /// the page bg luminance — that's correct for AppKit-rendered
+  /// chrome text on top of a dark template. But it also makes
+  /// `Color(nsColor: .windowBackgroundColor)` resolve through the
+  /// flipped scheme, which is wrong for "fallback when no template
+  /// color is cached yet" — that fallback should reflect what the
+  /// user has set system-wide, not what we forced for a different
+  /// reason. `NSApp.effectiveAppearance` still tracks the user's
+  /// preference because `preferredColorScheme` is applied at the
+  /// scene/window level, not the app level.
+  @MainActor static var userSystemWindowBackground: Color {
+    var resolved: NSColor = .windowBackgroundColor
+    NSApp.effectiveAppearance
+      .performAsCurrentDrawingAppearance {
+        if let srgb = NSColor.windowBackgroundColor
+          .usingColorSpace(.sRGB) {
+          resolved = srgb
+        }
+      }
+    return Color(nsColor: resolved)
   }
 }

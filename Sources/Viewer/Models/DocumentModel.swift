@@ -35,15 +35,36 @@ final class DocumentModel {
   /// matching tint — the illusion that the document extends
   /// edge-to-edge.
   ///
-  /// The page background color of the currently-resolved template.
-  /// Reads through `Template.backgroundColor` (which is itself a
-  /// computed view onto `Defaults.shared.templateBackgroundColors`),
-  /// so this property is reactive *and* the cache is automatically
-  /// shared across all DocumentModels using the same template — no
-  /// per-instance state needed. `nil` only for templates that have
-  /// never been rendered (a one-time flash on a brand-new template).
-  var pageBackgroundColor: Color? {
-    resolvedTemplate().backgroundColor
+  /// The color the chrome should paint behind the resolved template.
+  /// Composes three observable inputs through a deterministic
+  /// fallback chain:
+  ///
+  /// 1. Template's own resolution state (per-template cache):
+  ///    - `.resolved(color)` → use that color directly.
+  ///    - `.resolvedNone` → template positively has no bg → system
+  ///      window bg.
+  /// 2. `.unresolved` (template never rendered) → last opaque bg
+  ///    seen across any template → so a brand-new tab doesn't flash
+  ///    while it waits for its bridge to fire.
+  /// 3. No last-seen color either → system window bg as the
+  ///    universal floor.
+  ///
+  /// Always returns a color; chrome modifiers don't need to thread
+  /// optionals or pick fallbacks themselves.
+  var pageBackgroundColor: Color {
+    switch resolvedTemplate().backgroundState {
+    case .resolved(let color):
+      return color
+    case .resolvedNone:
+      return Color.userSystemWindowBackground
+    case .unresolved:
+      let lastSeen = Defaults.shared.lastTemplateBackgroundColor
+      if !lastSeen.isEmpty,
+         let color = Color(galleyHex: lastSeen) {
+        return color
+      }
+      return Color.userSystemWindowBackground
+    }
   }
 
   /// Per-window template / processor choices. Reference types so
@@ -77,6 +98,27 @@ final class DocumentModel {
   /// "white flash inside the WebView rectangle" on tab open / reload.
   /// Per-bind, not per-model: the flag toggles on every navigation.
   private(set) var isPageRendered: Bool = false
+
+  /// True from the moment the user (or a global selection change)
+  /// switches this window to a *different* template, until the
+  /// bridge confirms the new render has painted. While true,
+  /// DocumentView pins the scene's `preferredColorScheme` to the
+  /// user's system pref instead of the previous template's
+  /// bg-luminance-derived scheme — without that override WebKit's
+  /// `prefers-color-scheme` media queries on the new template
+  /// would pick whichever variant was current under the *previous*
+  /// template (e.g. switching from Terminal-dark to a media-query
+  /// template would render the dark variant even when the user is
+  /// in light mode).
+  private(set) var isRenderingNewTemplate: Bool = false
+
+  /// `Template.persistentID` of the template that produced the
+  /// most-recently-painted render. Used to detect template changes
+  /// in `reload()` so the scheme reset above only fires when the
+  /// template actually differs — same-template reloads (file save,
+  /// in-window navigation) don't trigger a chrome flicker.
+  @ObservationIgnored
+  private var lastRenderedTemplateID: String?
 
   /// Page zoom factor for the rendered preview. Applied via a CSS
   /// `zoom` rule injected into the document head; updated live via JS
@@ -334,16 +376,18 @@ final class DocumentModel {
       // declared an opaque bg, so any fire = "WebView has painted"
       // and we can drop DocumentView's anti-flash overlay.
       isPageRendered = true
-      // Treat the bridge's `nil` (page declared no opaque bg) as
-      // "keep showing what we already have" — leaving the previous
-      // template-keyed entry intact means in-window navigation
-      // between docs that don't override bg won't flash.
-      guard let color else { return }
-      // Persist to the template's slot in `Defaults.shared
-      // .templateBackgroundColors`. Every other DocumentModel using
-      // this template observes the change automatically through
-      // their own `pageBackgroundColor` computed property.
-      resolvedTemplate().setBackgroundColor(color)
+      // Record the template that produced this render so the next
+      // `reload()` can compare and only force-reset the scheme on
+      // genuine template changes.
+      let template = resolvedTemplate()
+      lastRenderedTemplateID = template.persistentID
+      isRenderingNewTemplate = false
+      // Always persist — `color: nil` records a sentinel so a
+      // template that *used to* paint a bg but no longer does (CSS
+      // edited) overwrites its stale hex entry. Every other
+      // DocumentModel using this template observes the change
+      // through their own `pageBackgroundColor` computed property.
+      template.setBackgroundColor(color)
     }
   }
 
@@ -517,12 +561,22 @@ final class DocumentModel {
   }
 
   func reload() async {
-    // `pageBackgroundColor` is now computed off `resolvedTemplate()
-    // .backgroundColor`, which reads through Defaults — so a
-    // template change automatically flips the chrome to the new
+    // `pageBackgroundColor` is computed off `resolvedTemplate()
+    // .backgroundState` (with last-seen + system-bg fallback), so
+    // a template change automatically flips the chrome to the new
     // template's cached color before the WebView re-renders.
-    // Reset `isPageRendered` so DocumentView's anti-flash overlay
-    // covers the WebView until the bridge confirms paint commits.
+    //
+    // Detect template-change explicitly: when the new template
+    // differs from the one that produced the last render, set
+    // `isRenderingNewTemplate` so DocumentView reverts the scene
+    // scheme to the user's system pref. Without that, WebKit's
+    // `prefers-color-scheme` queries inside the new template would
+    // resolve under whatever scheme the previous template's
+    // bg-luminance forced — and pick the wrong variant.
+    let nextTemplateID = resolvedTemplate().persistentID
+    if nextTemplateID != lastRenderedTemplateID {
+      isRenderingNewTemplate = true
+    }
     isPageRendered = false
     await renderCurrent(preserveScroll: true)
   }
