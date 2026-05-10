@@ -437,16 +437,6 @@ struct DocumentView: View {
 
   @ToolbarContentBuilder
   private var navigationToolbarItems: some CustomizableToolbarContent {
-    // Replacement for SwiftUI's auto-injected NavigationSplitView
-    // toggle — see the `.toolbar(removing: .sidebarToggle)` comment in
-    // `body`. `.customizationBehavior(.disabled)` keeps this item out
-    // of the customization config so it can't ever round-trip through
-    // defaults and trigger the duplicate-identifier crash.
-    //    ToolbarItem(id: "toggleTOC", placement: .navigation) {
-    //      Action.toggleTOC.toolbarItem(model: model)
-    //    }
-    //    .customizationBehavior(.disabled)
-    //
     ToolbarItem(id: "back", placement: .navigation) {
       Action.back(model).toolbarItem()
     }
