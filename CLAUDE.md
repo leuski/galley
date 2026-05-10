@@ -34,7 +34,6 @@ Sources/
     Routes/                     # PreviewRoute, RouteNames (shared HTTP/scheme parser)
     Templates/                  # Template, BuiltInTemplate, UserTemplate, TemplateStore,
                                 # Placeholders
-    Scripts/                    # ScriptInstaller (BBEdit helper installer)
     Watch/                      # DocumentWatcher
     Notifications/              # DisplacementNotifier (catalog-displacement user notice)
     Views/                      # DividedSections (shared SwiftUI helper)
@@ -53,7 +52,7 @@ Sources/
     Models/                     # AppModel (global doc state), DocumentModel (per-window),
                                 # WindowDispatcher (routing/registry), RecentDocumentsModel,
                                 # PerFileStateStore, SceneProcessorModel,
-                                # SceneTemplateModel, EditorChoice
+                                # SceneTemplateModel, EditorChoice, EditorPreset
     Views/                      # ContentView, WelcomeView (always-alive bootstrap anchor),
                                 # WindowAccessor (NSWindow resolution helper),
                                 # SettingsView, AssortedViews, Actions, FocusedValues
@@ -145,7 +144,6 @@ External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdo
 - `Accessibility/` — `ViewerA11yID` and `ServerA11yID` enum-of-string-constants catalogs. Single source of truth for every UITest-visible accessibility identifier; both apps and the UITests target import these. Note: SwiftUI's `.accessibilityIdentifier(...)` does *not* propagate to `NSMenuItem` from `.commands { ... }` blocks (AX dump shows synthetic `menuAction:` placeholders) — menu tests fall back to title-based queries; toolbar / inline-view surfaces use the catalog identifiers.
 - `Watch/DocumentWatcher` — file-system watch over a document and its sibling directory; multiplexes events to all subscribers.
 - `Routes/PreviewRoute.swift` + `RouteNames.swift` — shared parser for `/template/<id>/<file>` and `/preview/<absolute-path>` paths. Used by both the Server's HTTP routes and the Viewer's `x-galley://` scheme handler.
-- `Scripts/ScriptInstaller` — copies bundled BBEdit helper scripts to `~/Library/Application Support/BBEdit/Scripts/`, rewriting the hardcoded port to match the running server. Lives in the kit because both apps want to reuse the same install logic.
 - `Notifications/DisplacementNotifier` — surfaces a user-facing notice when a previously-persisted processor or template selection no longer exists in the live catalog (e.g., user uninstalled Pandoc). Used by both apps.
 - `Views/DividedSections` — shared SwiftUI helper for settings-style grouped sections.
 - `Utilities/` — `MIMETypes`, `Bundle+Resources`, `String+URL`, `String+HTML`.
@@ -178,6 +176,7 @@ The Viewer is **pure SwiftUI** — there is no `NSApplicationDelegateAdaptor`. R
 - **`Models/SceneProcessorModel`, `Models/SceneTemplateModel`** — per-window override stores. Each holds an optional override that, when `enablePerDocumentOverrides` is on, wins over the global selection. Persisted via `@SceneStorage` so a restored window keeps its override; also propagated through `PerFileStateStore` so a fresh window opening a previously-seen file hydrates from disk.
 - **`Models/PerFileStateStore`** — keyed by resolved file path. Persists per-document zoom, scroll position, processor override, and template override across launches. Two-tier with `@SceneStorage`: the scene store survives state restoration of an open window; the file store hydrates a fresh window on first open.
 - **`Models/EditorChoice`** — Codable enum with `.preset(EditorPreset)` (BBEdit `x-bbedit://`, TextMate `txmt://`, VS Code `vscode://file{path}:{line}`, Sublime `subl://`, Zed `zed://file{path}:{line}`), `.customURL(template:)` with `{url}`/`{path}`/`{line}` placeholders, and `.appBundle(URL)` (silently drops the line — no portable way to pass it). Persisted as JSON in UserDefaults.
+- **`Models/EditorPreset`** — closed enum of built-in editor targets. Owns `displayName`, `InvocationStyle` (urlTemplate vs CLI command), and — for editors that ship them — bundled-scripts metadata (`scriptBundleName`, `defaultScriptDestination`, `scriptPickerDefaultDirectory` walked-up for `NSOpenPanel`) and the `installScripts(to:context:)` routine that copies the bundle out and rewrites the loopback port in shell scripts. Two editors (BBEdit, Xcode) ship kits today; the rest return nil and the settings UI hides the install affordance for them.
 - **`Views/ContentView`** — pure document viewer. Mounts with a non-nil `fileURL` from the `WindowGroup<URL>` binding (the binding type is `Binding<URL?>` because that's what SwiftUI hands us, but the welcome scene's bootstrap guarantees the binding always has a real URL by the time ContentView body fires). The `Group { if fileURL != nil { … } else { Color.clear } }` defensive branch is gone — see commit `195260a`. The `WindowAccessor` sets `alphaValue = 0` initially and flips to `1` once `model.documentURL` becomes non-nil, then registers with the dispatcher and consumes any pending tab host.
 - **`PreviewSchemeHandler`** — `WKURLSchemeHandler` for `x-galley://local`. Mirrors the HTTP server's route shapes (`/template/<id>/<file>`, `/preview/<absolute-path>`) using the shared `PreviewRoute` parser, so `Template.rewriteAssets(...)` produces URLs that resolve in the WebView the same way they resolve over HTTP. Reads the active template at request time via a `TemplateBox` reference (defined in `DocumentModel.swift`) so global template switches take effect on the next render. The non-bridged `ClassicPreviewSchemeHandler` (also in this file) is the `WKURLSchemeHandler` adapter used by the offscreen WKWebView during Print/Export — same resolution logic, no SwiftUI dependency.
 - **`EditorBridge`** — `WKScriptMessageHandler` named `editor`. A single user script handles cmd-click (→ editor) and plain click (→ `LinkBridge`) in one combined listener; routing both through one `addEventListener` avoids capture-phase ordering issues that drop the editor handler after navigations in macOS 26 WebPage. Parses any of three source-line annotation formats (`data-source-line`, pandoc's `data-pos`, cmark-gfm's `data-sourcepos`). Closure-based — the actual open call is in `DocumentModel.openInEditor(line:)` so every cmd-click reads the current `EditorChoice` from settings.

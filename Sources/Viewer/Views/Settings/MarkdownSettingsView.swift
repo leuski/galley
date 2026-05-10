@@ -78,9 +78,11 @@ struct MarkdownSettingsView: View {
       .modifier(InstallScriptsPickerModifier(
         isPresented: $showScriptPicker,
         errorMessage: $scriptInstallError,
-        defaultDestination: selectedScriptKit?.defaultDestination
+        defaultDestination: selectedScriptingPreset?
+          .scriptPickerDefaultDirectory
           ?? URL.applicationSupportDirectory,
-        customizationID: "is-\(selectedScriptKit?.bundleName ?? "default")",
+        customizationID: selectedScriptingPreset?
+          .scriptPickerCustomizationID ?? "is-default",
         onCompletion: handlePickedScriptDestination))
       detailFields
         .modifier(AppBundlePickerModifier(
@@ -101,10 +103,10 @@ struct MarkdownSettingsView: View {
     _ result: Result<[URL], any Error>
   ) {
     guard case .success(let urls) = result, let destination = urls.first,
-      let kit = selectedScriptKit
+      let preset = selectedScriptingPreset
     else { return }
     do {
-      try ScriptInstaller.install(kit, to: destination, context: [
+      try preset.installScripts(to: destination, context: [
         "__LOCATION__": Defaults.shared.host.galleyPreview.absoluteString
       ])
       NSWorkspace.shared.activateFileViewerSelecting([destination])
@@ -113,11 +115,13 @@ struct MarkdownSettingsView: View {
     }
   }
 
-  /// Kit for the currently-selected preset, or `nil` if the active
-  /// editor doesn't ship scripts.
-  private var selectedScriptKit: EditorScriptKit? {
-    if case .preset(let preset) = appModel.editors.selected {
-      return preset.scriptKit
+  /// Currently-selected preset if the user is on a preset row that
+  /// ships scripts, otherwise nil. Drives the "Install scripts…"
+  /// affordance and its picker.
+  private var selectedScriptingPreset: EditorPreset? {
+    if case .preset(let preset) = appModel.editors.selected,
+       preset.hasScriptKit {
+      return preset
     }
     return nil
   }
@@ -125,7 +129,7 @@ struct MarkdownSettingsView: View {
   @ViewBuilder
   private var detailFields: some View {
     switch appModel.editors.selected {
-    case .preset(let preset) where preset.scriptKit != nil:
+    case .preset(let preset) where preset.hasScriptKit:
       HStack {
         Spacer()
         Button("Install scripts…") { showScriptPicker = true }
@@ -255,14 +259,13 @@ private struct AppBundlePickerModifier: ViewModifier {
 /// `editorPicker` VStack level rather than on the inner `Button`
 /// because deeply-nested `.fileImporter` modifiers (Button →
 /// LabeledContent → switch case) failed to present. The default
-/// destination is supplied per editor via `EditorScriptKit`.
+/// destination is supplied per editor via the preset's
+/// `scriptPickerDefaultDirectory`, which the preset has already
+/// walked up to a directory that exists on disk.
 private struct InstallScriptsPickerModifier: ViewModifier {
   @Binding var isPresented: Bool
   @Binding var errorMessage: String?
   let defaultDestination: URL
-  /// Per-editor token so the picker remembers each editor's last-used
-  /// destination separately. Without it, picking a folder for BBEdit
-  /// would replace Xcode's remembered default and vice versa.
   let customizationID: String
   let onCompletion: (Result<[URL], any Error>) -> Void
 
@@ -281,8 +284,7 @@ private struct InstallScriptsPickerModifier: ViewModifier {
         allowedContentTypes: [.folder],
         allowsMultipleSelection: false,
         onCompletion: onCompletion)
-      .fileDialogDefaultDirectory(
-        ScriptInstaller.nearestExistingDirectory(for: defaultDestination))
+      .fileDialogDefaultDirectory(defaultDestination)
       .fileDialogConfirmationLabel("Install")
       .fileDialogMessage("""
         Choose the destination folder for the editor's scripts.
