@@ -1,6 +1,43 @@
 import Foundation
 import ALFoundation
 
+/// Per-editor description of where a bundled scripts folder lives in the
+/// product and where the user normally installs it on disk. Editors that
+/// don't ship scripts have no kit; the settings UI hides the install
+/// affordance for them.
+public struct EditorScriptKit: Sendable, Hashable {
+  /// Resource name of the `.bundle` folder in `Bundle.main` (without the
+  /// `.bundle` extension). The bundle is shipped as a folder reference and
+  /// its `.applescript` sources are compiled to `.scpt` at build time
+  /// (see `Scripts/compile-applescripts.sh`).
+  public let bundleName: String
+
+  /// Default install destination shown to the user in the folder picker.
+  /// May not exist yet — pair with `ScriptInstaller.nearestExistingDirectory`
+  /// before handing to `NSOpenPanel` / `.fileDialogDefaultDirectory`.
+  public let defaultDestination: URL
+
+  public init(bundleName: String, defaultDestination: URL) {
+    self.bundleName = bundleName
+    self.defaultDestination = defaultDestination
+  }
+
+  /// `~/Library/Application Support/BBEdit/Scripts` — BBEdit's user
+  /// scripts directory.
+  public static let bbedit = EditorScriptKit(
+    bundleName: "BBEditScripts",
+    defaultDestination:
+      URL.applicationSupportDirectory/"BBEdit"/"Scripts")
+
+  /// `~/Library/Scripts/Applications/Xcode` — macOS Script Menu
+  /// per-application directory. Scripts placed here surface in the
+  /// system Script Menu only when Xcode is frontmost.
+  public static let xcode = EditorScriptKit(
+    bundleName: "XCodeScripts",
+    defaultDestination:
+      URL.homeDirectory/"Library"/"Scripts"/"Applications"/"Xcode")
+}
+
 public enum ScriptInstaller {
   public enum InstallError: LocalizedError {
     case sourceMissing
@@ -19,18 +56,6 @@ public enum ScriptInstaller {
     }
   }
 
-  static var bundledSourceURL: URL? {
-    Bundle.main.url(forResource: "BBEditScripts", withExtension: "bundle")
-  }
-
-  /// `~/Library/Application Support/BBEdit/Scripts`. Used to seed the
-  /// folder picker so the user lands on BBEdit's scripts directory by
-  /// default. The path may not exist yet — callers should pair it
-  /// with `nearestExistingDirectory(for:)` for the file dialog.
-  public static var defaultBBEditDestination: URL {
-    URL.applicationSupportDirectory/"BBEdit"/"Scripts"
-  }
-
   /// Walks up `url` until it finds a directory that exists on disk.
   /// `NSOpenPanel` and SwiftUI's `fileDialogDefaultDirectory` both
   /// silently ignore non-existent URLs, so we land on the deepest
@@ -46,13 +71,18 @@ public enum ScriptInstaller {
     return current
   }
 
-  /// Copies the bundled Scripts folder into `destination`, customizing the
-  /// hardcoded loopback port in shell scripts to match the running server.
-  /// Files at the destination with the same relative path are overwritten.
+  /// Copies `kit.bundleName.bundle` from the main bundle into
+  /// `destination`, customizing the hardcoded loopback port in shell
+  /// scripts to match the running server. Files at the destination with
+  /// the same relative path are overwritten.
   public static func install(
-    to destination: URL, context: KeyValuePairs<String, String>) throws
-  {
-    guard let source = bundledSourceURL, source.itemExists else {
+    _ kit: EditorScriptKit,
+    to destination: URL,
+    context: KeyValuePairs<String, String>
+  ) throws {
+    guard let source = Bundle.main.url(
+      forResource: kit.bundleName, withExtension: "bundle"),
+      source.itemExists else {
       throw InstallError.sourceMissing
     }
 

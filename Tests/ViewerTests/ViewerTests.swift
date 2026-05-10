@@ -214,21 +214,21 @@ struct EditorPresetTests {
   /// Every preset's URL template must produce a parseable URL after
   /// substitution — otherwise cmd-click silently fails.
   @Test("Every preset produces a parseable URL with line",
-        arguments: EditorPreset.allCases)
+        arguments: EditorPreset.urlTemplatePresets)
   func everyPresetParsesWithLine(preset: EditorPreset) {
     let url = URL(fileURLWithPath: "/tmp/note.md")
     let result = substituteEditorTemplate(
-      preset.template, fileURL: url, line: 42)
+      preset.urlTemplate ?? "", fileURL: url, line: 42)
     #expect(URL(string: result) != nil, "\(preset) → \(result)")
     #expect(result.contains("42"), "\(preset) line missing: \(result)")
   }
 
   @Test("Every preset still parses when line is nil",
-        arguments: EditorPreset.allCases)
+        arguments: EditorPreset.urlTemplatePresets)
   func everyPresetParsesWithoutLine(preset: EditorPreset) {
     let url = URL(fileURLWithPath: "/tmp/note.md")
     let result = substituteEditorTemplate(
-      preset.template, fileURL: url, line: nil)
+      preset.urlTemplate ?? "", fileURL: url, line: nil)
     #expect(URL(string: result) != nil, "\(preset) → \(result)")
   }
 
@@ -243,11 +243,11 @@ struct EditorPresetTests {
   ///              parameter — the receiver decodes once for the
   ///              query and once for the URL.
   @Test("Spaces in path produce a parseable URL for every preset",
-        arguments: EditorPreset.allCases)
+        arguments: EditorPreset.urlTemplatePresets)
   func spacesArePercentEncoded(preset: EditorPreset) {
     let url = URL(fileURLWithPath: "/tmp/foo bar/baz.md")
     let result = substituteEditorTemplate(
-      preset.template, fileURL: url, line: 1)
+      preset.urlTemplate ?? "", fileURL: url, line: 1)
     #expect(URL(string: result) != nil, "\(preset) → \(result)")
     // The space MUST be encoded somehow — a literal space here means
     // the URL fails to parse on macOS 26 (older macOS versions were
@@ -259,6 +259,33 @@ struct EditorPresetTests {
     #expect(
       result.contains("foo%20bar") || result.contains("foo%2520bar"),
       "\(preset) → \(result)")
+  }
+
+  /// Command-style presets (Xcode's `xed`) substitute `{path}` and
+  /// `{line}` raw — no URL encoding — and `{line}` falls back to `"1"`
+  /// so `--line {line}` always sees a valid integer.
+  @Test("Every command preset substitutes path and line",
+        arguments: EditorPreset.commandPresets)
+  func everyCommandPresetSubstitutes(preset: EditorPreset) {
+    guard case .command(_, let args) = preset.invocation else {
+      Issue.record("\(preset) is not command-style")
+      return
+    }
+    let url = URL(fileURLWithPath: "/tmp/foo bar/baz.md")
+    let resolved = args.map {
+      substituteCommandArg($0, fileURL: url, line: 42)
+    }
+    #expect(resolved.contains("/tmp/foo bar/baz.md"))
+    #expect(resolved.contains("42"))
+    #expect(!resolved.contains("{path}"))
+    #expect(!resolved.contains("{line}"))
+  }
+
+  @Test("Command preset {line} defaults to 1 when caller passes nil")
+  func commandLineDefault() {
+    let url = URL(fileURLWithPath: "/tmp/note.md")
+    #expect(
+      substituteCommandArg("{line}", fileURL: url, line: nil) == "1")
   }
 
   @Test("Custom URL template substitutes all three placeholders")

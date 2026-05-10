@@ -1,8 +1,14 @@
 import AppKit
 import Foundation
 import GalleyCoreKit
+import ALFoundation
 import Observation
 import os
+
+/// Disambiguates from ALFoundation's `Logger` type (also imported here
+/// for `Process.runAndCapture`). The rest of the file uses `Logger`
+/// short-hand via this typealias.
+typealias Logger = os.Logger
 
 /// A built-in editor whose URL scheme + line-jump format we know.
 enum EditorPreset: String, Codable, CaseIterable, Identifiable,
@@ -13,6 +19,7 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   case vscode
   case sublime
   case zed
+  case xcode
 
   var id: String { rawValue }
 
@@ -23,20 +30,73 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
     case .vscode:   "Visual Studio Code"
     case .sublime:  "Sublime Text"
     case .zed:      "Zed"
+    case .xcode:    "Xcode"
     }
   }
 
-  /// URL template with `{url}`, `{path}`, `{line}` placeholders.
-  /// `{url}` is the percent-encoded `file://…`; `{path}` is the
-  /// percent-encoded absolute filesystem path; `{line}` is the
-  /// integer line number, or empty when unknown.
-  var template: String {
+  /// How this editor accepts a "open file at line" request. URL-template
+  /// editors register a custom URL scheme we hand to `NSWorkspace`; the
+  /// command form launches a CLI tool because the editor either has no
+  /// URL scheme (Xcode) or only a partial one.
+  enum InvocationStyle: Sendable, Hashable {
+    /// `{url}`, `{path}`, `{line}` placeholders, percent-encoded for
+    /// their position in the URL.
+    case urlTemplate(String)
+    /// Executable + argument list. `{path}` and `{line}` placeholders
+    /// in `args` substitute raw (no URL encoding); `{line}` substitutes
+    /// to `1` when the caller passes nil.
+    case command(executable: String, args: [String])
+  }
+
+  var invocation: InvocationStyle {
     switch self {
-    case .bbedit:   "x-bbedit://open?url={url}&line={line}"
-    case .textmate: "txmt://open?url={url}&line={line}"
-    case .vscode:   "vscode://file{path}:{line}"
-    case .sublime:  "subl://open?url={url}&line={line}"
-    case .zed:      "zed://file{path}:{line}"
+    case .bbedit:
+      .urlTemplate("x-bbedit://open?url={url}&line={line}")
+    case .textmate:
+      .urlTemplate("txmt://open?url={url}&line={line}")
+    case .vscode:
+      .urlTemplate("vscode://file{path}:{line}")
+    case .sublime:
+      .urlTemplate("subl://open?url={url}&line={line}")
+    case .zed:
+      .urlTemplate("zed://file{path}:{line}")
+    case .xcode:
+      .command(
+        executable: "/usr/bin/xed",
+        args: ["--line", "{line}", "{path}"])
+    }
+  }
+
+  /// URL template if the preset uses one; `nil` for command-style
+  /// presets. Used to seed the `customURL` slot from a known-good
+  /// example template.
+  var urlTemplate: String? {
+    if case .urlTemplate(let template) = invocation { return template }
+    return nil
+  }
+
+  /// Subset of `allCases` that use a URL-template invocation. Tests
+  /// that exercise URL substitution iterate this; command-style
+  /// presets get their own coverage.
+  static var urlTemplatePresets: [EditorPreset] {
+    allCases.filter { $0.urlTemplate != nil }
+  }
+
+  /// Subset of `allCases` that launch a CLI tool.
+  static var commandPresets: [EditorPreset] {
+    allCases.filter {
+      if case .command = $0.invocation { return true }
+      return false
+    }
+  }
+
+  /// Bundled scripts shipped for this editor, if any. Editors without a
+  /// kit don't surface an "Install scripts…" affordance in Settings.
+  var scriptKit: EditorScriptKit? {
+    switch self {
+    case .bbedit: .bbedit
+    case .xcode:  .xcode
+    case .textmate, .vscode, .sublime, .zed: nil
     }
   }
 }
@@ -135,7 +195,8 @@ final class EditorChoice: ChoiceModel {
 
   init() {
     var initial: [Element] = EditorPreset.allCases.map { .preset($0) }
-    initial.append(.customURL(template: EditorPreset.bbedit.template))
+    initial.append(.customURL(
+      template: EditorPreset.bbedit.urlTemplate ?? ""))
     initial.append(.appBundle(nil))
 
     let loaded = Defaults.shared.editor
@@ -180,12 +241,26 @@ func substituteEditorTemplate(
   ])
 }
 
+/// Substitutes `{path}` and `{line}` in a shell command argument. No URL
+/// encoding — `Process` hands argv straight to the executable. `{line}`
+/// defaults to `"1"` when nil so flags like `--line {line}` always have
+/// a valid integer to consume.
+func substituteCommandArg(
+  _ arg: String, fileURL: URL, line: Int?
+) -> String {
+  arg.substituting(substitutions: [
+    "{path}": fileURL.path,
+    "{line}": line.map(String.init) ?? "1"
+  ])
+}
+
 /// Open `fileURL` in the user's chosen editor, optionally jumping to
 /// a specific line. URL-template choices fire `NSWorkspace.open(_:)`
-/// on the substituted URL; the app-bundle choice launches the picked
-/// `.app` directly via `NSWorkspace.open(_:withApplicationAt:…)` and
-/// silently drops the line argument (no portable way to pass it).
-/// `.appBundle(nil)` is a no-op — the panel hasn't been answered yet.
+/// on the substituted URL; command-style presets launch a CLI tool;
+/// the app-bundle choice launches the picked `.app` directly via
+/// `NSWorkspace.open(_:withApplicationAt:…)` and silently drops the
+/// line argument (no portable way to pass it). `.appBundle(nil)` is
+/// a no-op — the panel hasn't been answered yet.
 @MainActor
 func openFileInEditor(
   _ value: EditorChoice.Element,
@@ -195,9 +270,20 @@ func openFileInEditor(
 ) async {
   switch value {
   case .preset(let preset):
-    let urlString = substituteEditorTemplate(
-      preset.template, fileURL: fileURL, line: line)
-    openURL(urlString, logger: logger)
+    switch preset.invocation {
+    case .urlTemplate(let template):
+      let urlString = substituteEditorTemplate(
+        template, fileURL: fileURL, line: line)
+      openURL(urlString, logger: logger)
+
+    case .command(let executable, let args):
+      let resolved = args.map {
+        substituteCommandArg($0, fileURL: fileURL, line: line)
+      }
+      await runEditorCommand(
+        executable: executable, args: resolved,
+        fileURL: fileURL, logger: logger)
+    }
 
   case .customURL(let template):
     let urlString = substituteEditorTemplate(
@@ -229,6 +315,40 @@ private func openURL(_ string: String, logger: Logger?) {
   }
   if !NSWorkspace.shared.open(url) {
     logEditorURLRejected(string, logger: logger)
+  }
+}
+
+private func runEditorCommand(
+  executable: String, args: [String],
+  fileURL: URL, logger: Logger?
+) async {
+  let executableURL = URL(filePath: executable)
+  guard executableURL.isExecutable else {
+    logger?.error("""
+      Editor command not found or not executable: \
+      \(executable, privacy: .public)
+      """)
+    return
+  }
+  do {
+    let result = try await Process.runAndCapture(
+      executableURL,
+      with: args as [ProcessArgument],
+      streams: ProcessStreams.inMemory)
+    if result.terminationStatus != 0 {
+      logger?.error("""
+        Editor command exited \(result.terminationStatus): \
+        \(executable, privacy: .public) for \
+        \(fileURL.path, privacy: .public): \
+        \(result.error, privacy: .public)
+        """)
+    }
+  } catch {
+    logger?.error("""
+      Failed to launch editor command \(executable, privacy: .public) \
+      for \(fileURL.path, privacy: .public): \
+      \(error.localizedDescription, privacy: .public)
+      """)
   }
 }
 

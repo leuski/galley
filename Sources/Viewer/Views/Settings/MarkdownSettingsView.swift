@@ -78,6 +78,9 @@ struct MarkdownSettingsView: View {
       .modifier(InstallScriptsPickerModifier(
         isPresented: $showScriptPicker,
         errorMessage: $scriptInstallError,
+        defaultDestination: selectedScriptKit?.defaultDestination
+          ?? URL.applicationSupportDirectory,
+        customizationID: "is-\(selectedScriptKit?.bundleName ?? "default")",
         onCompletion: handlePickedScriptDestination))
       detailFields
         .modifier(AppBundlePickerModifier(
@@ -97,10 +100,11 @@ struct MarkdownSettingsView: View {
   private func handlePickedScriptDestination(
     _ result: Result<[URL], any Error>
   ) {
-    guard case .success(let urls) = result, let destination = urls.first
+    guard case .success(let urls) = result, let destination = urls.first,
+      let kit = selectedScriptKit
     else { return }
     do {
-      try ScriptInstaller.install(to: destination, context: [
+      try ScriptInstaller.install(kit, to: destination, context: [
         "__LOCATION__": Defaults.shared.host.galleyPreview.absoluteString
       ])
       NSWorkspace.shared.activateFileViewerSelecting([destination])
@@ -109,10 +113,19 @@ struct MarkdownSettingsView: View {
     }
   }
 
+  /// Kit for the currently-selected preset, or `nil` if the active
+  /// editor doesn't ship scripts.
+  private var selectedScriptKit: EditorScriptKit? {
+    if case .preset(let preset) = appModel.editors.selected {
+      return preset.scriptKit
+    }
+    return nil
+  }
+
   @ViewBuilder
   private var detailFields: some View {
     switch appModel.editors.selected {
-    case .preset(.bbedit):
+    case .preset(let preset) where preset.scriptKit != nil:
       HStack {
         Spacer()
         Button("Install scripts…") { showScriptPicker = true }
@@ -237,15 +250,20 @@ private struct AppBundlePickerModifier: ViewModifier {
   }
 }
 
-/// Wraps the BBEdit-script-folder `.fileImporter`, its
-/// `.fileDialog*` config, and the failure `.alert` as a single
-/// modifier. Lives at the `editorPicker` VStack level rather than
-/// on the inner `Button` because deeply-nested `.fileImporter`
-/// modifiers (Button → LabeledContent → switch case) failed to
-/// present.
+/// Wraps the script-folder `.fileImporter`, its `.fileDialog*` config,
+/// and the failure `.alert` as a single modifier. Lives at the
+/// `editorPicker` VStack level rather than on the inner `Button`
+/// because deeply-nested `.fileImporter` modifiers (Button →
+/// LabeledContent → switch case) failed to present. The default
+/// destination is supplied per editor via `EditorScriptKit`.
 private struct InstallScriptsPickerModifier: ViewModifier {
   @Binding var isPresented: Bool
   @Binding var errorMessage: String?
+  let defaultDestination: URL
+  /// Per-editor token so the picker remembers each editor's last-used
+  /// destination separately. Without it, picking a folder for BBEdit
+  /// would replace Xcode's remembered default and vice versa.
+  let customizationID: String
   let onCompletion: (Result<[URL], any Error>) -> Void
 
   /// Bridges the optional error to the `.alert(isPresented:)` Bool;
@@ -264,14 +282,12 @@ private struct InstallScriptsPickerModifier: ViewModifier {
         allowsMultipleSelection: false,
         onCompletion: onCompletion)
       .fileDialogDefaultDirectory(
-        ScriptInstaller.nearestExistingDirectory(
-          for: ScriptInstaller.defaultBBEditDestination))
+        ScriptInstaller.nearestExistingDirectory(for: defaultDestination))
       .fileDialogConfirmationLabel("Install")
       .fileDialogMessage("""
-        Choose the destination folder. Defaults to BBEdit's \
-        Scripts folder.
+        Choose the destination folder for the editor's scripts.
         """)
-      .fileDialogCustomizationID("install-scripts")
+      .fileDialogCustomizationID(customizationID)
       .alert(
         "Could not install scripts",
         isPresented: errorPresented,
