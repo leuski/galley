@@ -194,6 +194,7 @@ struct DocumentView: View {
       // `navigationToolbarItems` instead.
     } detail: {
       WebView(model.page)
+        .frame(minWidth: 600)
         // The WebView's pre-paint canvas paints system-white during
         // the gap between mount and the first HTML layout — visible
         // as a white flash on tab open / reload regardless of CSS.
