@@ -452,17 +452,17 @@ struct DocumentView: View {
   private func mainToolbarItems(
     appModel: AppModel
   ) -> some CustomizableToolbarContent {
-    ToolbarItem(id: "renderer", placement: .primaryAction) {
+    ToolbarItem(id: "renderer", placement: .confirmationAction) {
       RendererToolbarPicker(appModel: appModel, docModel: model)
     }
     .customizationBehavior(.default)
 
-    ToolbarItem(id: "template", placement: .primaryAction) {
+    ToolbarItem(id: "template", placement: .confirmationAction) {
       TemplateToolbarPicker(appModel: appModel, docModel: model)
     }
     .customizationBehavior(.default)
 
-    ToolbarItem(id: "reload", placement: .primaryAction) {
+    ToolbarItem(id: "reload", placement: .confirmationAction) {
       Action.reload(model).toolbarItem()
     }
     .customizationBehavior(.default)
@@ -477,17 +477,17 @@ struct DocumentView: View {
 
   @ToolbarContentBuilder
   private var zoomToolbarItems: some CustomizableToolbarContent {
-    ToolbarItem(id: "zoomOut", placement: .primaryAction) {
+    ToolbarItem(id: "zoomOut", placement: .confirmationAction) {
       Action.zoomOut(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
-    ToolbarItem(id: "zoomReset", placement: .primaryAction) {
+    ToolbarItem(id: "zoomReset", placement: .confirmationAction) {
       Action.resetZoom(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
-    ToolbarItem(id: "zoomIn", placement: .primaryAction) {
+    ToolbarItem(id: "zoomIn", placement: .confirmationAction) {
       Action.zoomIn(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
