@@ -11,6 +11,7 @@ struct ViewCommands: Commands {
   var body: some Commands {
     CommandGroup(before: .toolbar) {
       Action.toggleTOC(model).menuItem()
+      Action.toggleStatusBar().menuItem()
 
       Divider()
 

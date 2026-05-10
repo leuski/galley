@@ -8,6 +8,9 @@ struct GeneralSettingsView: View {
     Section {
       openDocumentPicker
     }
+    Section("Status bar") {
+      statusBarSettings
+    }
   }
 
   @ViewBuilder
@@ -42,6 +45,42 @@ struct GeneralSettingsView: View {
             Uses the template background color to paint the window \
             toolbar and sidebar background. If the template does not \
             have background color specified, we use the default OS color.
+            """
+      )
+      .subtitle()
+    }
+  }
+
+  @ViewBuilder
+  private var statusBarSettings: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Toggle("Show status bar", isOn: $defaults.showsStatusBar)
+      Text("""
+            Adds a footer to each document window with word count, \
+            character count, heading count, and an estimated reading \
+            time.
+            """
+      )
+      .subtitle()
+    }
+
+    VStack(alignment: .leading, spacing: 4) {
+      HStack {
+        Text("Reading speed")
+        Spacer()
+        Stepper(
+          value: $defaults.readingWordsPerMinute,
+          in: 50...600,
+          step: 10
+        ) {
+          Text("\(defaults.readingWordsPerMinute) wpm")
+            .monospacedDigit()
+        }
+        .fixedSize()
+      }
+      Text("""
+            Words per minute used to estimate reading time in the \
+            status bar.
             """
       )
       .subtitle()

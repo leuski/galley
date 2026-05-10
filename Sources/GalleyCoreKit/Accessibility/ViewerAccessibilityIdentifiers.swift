@@ -33,6 +33,7 @@ public enum ViewerA11yID {
     public static let zoomOut = "viewer.view.zoomOut"
     public static let actualSize = "viewer.view.actualSize"
     public static let toggleTOC = "viewer.view.toggleTOC"
+    public static let toggleStatusBar = "viewer.view.toggleStatusBar"
     public static let find = "viewer.view.find"
     public static let useSelectionForFind =
       "viewer.view.useSelectionForFind"
