@@ -6,6 +6,10 @@ import SwiftUI
 /// magnifying-glass toolbar button toggles `isFindVisible`; ⌘F drives
 /// the same surface from the View menu.
 ///
+/// The text field, options menu, and counter live in `SearchField`;
+/// this view owns bar-level chrome (next / previous, dismissal,
+/// focus-reveal timing) and the surrounding strip.
+///
 /// State lives on `DocumentModel` so a window's find session survives
 /// file-watcher reloads — `renderCurrent` re-runs the query against
 /// the freshly-built DOM when the bar is visible.
@@ -13,7 +17,9 @@ struct FindBar: View {
   @Bindable var model: DocumentModel
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @FocusState private var fieldFocused: Bool
+  /// Plain `@State` instead of `@FocusState` because focus is owned
+  /// by `AppKitSearchField` underneath `SearchField`.
+  @State private var fieldFocused = false
 
   /// Roughly matches SwiftUI's `.default` transition duration. Focus
   /// is granted only after the slide-in completes and dropped one
@@ -36,14 +42,14 @@ struct FindBar: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      searchField
-
       Spacer(minLength: 8)
 
-      Action.findPrevious.toolbarItem(model: model, imageOnly: true)
-        .buttonStyle(.borderless)
-      Action.findNext.toolbarItem(model: model, imageOnly: true)
-        .buttonStyle(.borderless)
+      SearchField(
+        model: model,
+        isFocused: $fieldFocused,
+        prompt: "Find",
+        onSubmit: { Task { await model.findNext() } },
+        onCancel: { dismiss() })
 
       Button("Done") { dismiss() }
         .keyboardShortcut(.escape, modifiers: [])
@@ -64,101 +70,5 @@ struct FindBar: View {
       fieldFocused = true
     }
     .onChange(of: model.findDismissalToken) { dismiss() }
-  }
-
-  /// Search-field-shaped container that hosts the options menu, the
-  /// text field, the match counter, and a clear button — mirroring
-  /// Preview's find field where every affordance lives inside one
-  /// rounded chrome.
-  @ViewBuilder
-  private var searchField: some View {
-    HStack(spacing: 4) {
-      optionsMenu
-
-      TextField("Find", text: $model.findQuery)
-        .textFieldStyle(.plain)
-        .focused($fieldFocused)
-        .onSubmit { Task { await model.findNext() } }
-        .onChange(of: model.findQuery) {
-          Task { await model.performFind() }
-        }
-        .onExitCommand { dismiss() }
-        .accessibilityIdentifier(ViewerA11yID.Find.field)
-
-      countLabel
-
-      if !model.findQuery.isEmpty {
-        Button {
-          model.findQuery = ""
-          fieldFocused = true
-        } label: {
-          Image(systemName: "xmark.circle.fill")
-            .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .help("Clear")
-        .accessibilityLabel(Text("Clear"))
-      }
-    }
-    .padding(.horizontal, 6)
-    .padding(.vertical, 6)
-    .background(
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .fill(.background))
-    .overlay(
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .strokeBorder(.separator))
-    .frame(maxWidth: 320)
-  }
-
-  /// Dropdown anchored to the magnifying-glass glyph, mirroring the
-  /// affordance Safari and Preview use to host find options. Each
-  /// toggle re-runs the search through `.onChange` so the highlights
-  /// update immediately.
-  @ViewBuilder
-  private var optionsMenu: some View {
-    Menu {
-      Toggle("Ignore Case", isOn: Binding(
-        get: { !model.findCaseSensitive },
-        set: { model.findCaseSensitive = !$0 }))
-        .accessibilityIdentifier(ViewerA11yID.Find.ignoreCase)
-
-      Toggle("Whole Word", isOn: $model.findWholeWord)
-        .accessibilityIdentifier(ViewerA11yID.Find.wholeWord)
-    } label: {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(.secondary)
-    }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.visible)
-    .help("Find options")
-    .accessibilityLabel(Text("Find options"))
-    .accessibilityIdentifier(ViewerA11yID.Find.optionsMenu)
-    .onChange(of: model.findCaseSensitive) {
-      Task { await model.performFind() }
-    }
-    .onChange(of: model.findWholeWord) {
-      Task { await model.performFind() }
-    }
-  }
-
-  /// "n of N" indicator. Shows nothing while the query is empty (no
-  /// search has run yet) and "No results" when the query yielded
-  /// zero matches — both clearer than a bare "0 of 0".
-  @ViewBuilder
-  private var countLabel: some View {
-    if model.findQuery.isEmpty {
-      EmptyView()
-    } else if model.findMatchCount == 0 {
-      Text("No results")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-    } else {
-      Text("\(model.findMatchIndex + 1) of \(model.findMatchCount)")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-    }
   }
 }

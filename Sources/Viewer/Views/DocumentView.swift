@@ -19,6 +19,13 @@ struct DocumentView: View {
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
 
+  /// Tracks whether the toolbar's "find" item is currently surfaced
+  /// (toolbar visible AND item not customized away). When false, the
+  /// `safeAreaInset` `FindBar` takes over as the find UI; when true,
+  /// the toolbar's `ToolbarSearchField` is the find UI and `FindBar`
+  /// stays out of the way.
+  @State private var findSurfacing = ToolbarSurfacing(itemIdentifier: "find")
+
   /// Transient text-field value for the rename alert. Seeded from
   /// `model.documentURL.lastPathComponent` whenever
   /// `model.isRenameRequested` flips true (see the `.onChange` in
@@ -97,9 +104,11 @@ struct DocumentView: View {
           ) { newURL in
             replaceDocument(with: newURL)
           }
+          findSurfacing.attach(to: window)
         },
         onDetach: { window in
           if let window { dispatcher.unregisterWindow(window) }
+          findSurfacing.detach()
         }))
       .focusedSceneValue(\.documentModel, model)
       .alert(
@@ -197,7 +206,12 @@ struct DocumentView: View {
           }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-          if model.isFindVisible {
+          // FindBar is the fallback find UI: it appears only when
+          // the toolbar's find item isn't surfaced (toolbar hidden
+          // OR item dragged out via Customize Toolbar). Otherwise
+          // `ToolbarSearchField` is the live UI and FindBar stays
+          // off-screen.
+          if model.isFindVisible && !findSurfacing.isItemSurfaced {
             FindBar(model: model)
               .transition(.move(edge: .top).combined(with: .opacity))
           }
@@ -455,7 +469,9 @@ struct DocumentView: View {
     .customizationBehavior(.default)
 
     ToolbarItem(id: "find", placement: .primaryAction) {
-      Action.find.toolbarItem(model: model)
+      ToolbarSearchField(
+        model: model,
+        isItemSurfaced: findSurfacing.isItemSurfaced)
     }
     .customizationBehavior(.default)
   }

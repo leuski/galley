@@ -7,6 +7,28 @@
 
 import WebKit
 
+/// `SearchField` conformance. The view talks to a generic
+/// `SearchFieldModel`; `DocumentModel`'s find state already covers
+/// every requirement, so this is a thin renaming layer over the
+/// existing `find*` properties and `performFind()`.
+extension DocumentModel: SearchFieldModel {
+  var query: String {
+    get { findQuery }
+    set { findQuery = newValue }
+  }
+  var ignoresCase: Bool {
+    get { !findCaseSensitive }
+    set { findCaseSensitive = !newValue }
+  }
+  var wholeWord: Bool {
+    get { findWholeWord }
+    set { findWholeWord = newValue }
+  }
+  var matchCount: Int { findMatchCount }
+  var matchIndex: Int { findMatchIndex }
+  func performSearch() async { await performFind() }
+}
+
 extension DocumentModel {
 
   /// Ask the find bar to dismiss with focus-aware timing — used by
