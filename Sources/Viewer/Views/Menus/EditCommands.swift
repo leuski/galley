@@ -14,10 +14,10 @@ struct EditCommands: Commands {
 
   var body: some Commands {
     CommandGroup(replacing: .textEditing) {
-      Action.find(model).menuItem()
-      Action.useSelectionForFind(model).menuItem()
-      Action.findNext(model).menuItem()
-      Action.findPrevious(model).menuItem()
+      Action.find(model?.find).menuItem()
+      Action.useSelectionForFind(model?.find).menuItem()
+      Action.findNext(model?.find).menuItem()
+      Action.findPrevious(model?.find).menuItem()
 
       Divider()
     }

@@ -202,27 +202,27 @@ extension Action {
   /// show/hide affordance Safari and Preview surface in their
   /// toolbars. Title flips so the tooltip and accessibility label
   /// reflect the current state, just like `toggleTOC`.
-  static func find(_ model: DocumentModel?) -> Action {
+  static func find(_ session: FindSession?) -> Action {
     Action(
       title: {
-        (model?.isFindVisible ?? false) ? "Hide Find" : "Find…"
+        (session?.isFindVisible ?? false) ? "Hide Find" : "Find…"
       },
       image: "magnifyingglass",
       perform: { reduceMotion in
-        model?.toggleFind(reduceMotion: reduceMotion)
+        session?.toggleFind(reduceMotion: reduceMotion)
       },
       shortcut: .init("f", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.find
     )
   }
 
-  static func useSelectionForFind(_ model: DocumentModel?) -> Action {
+  static func useSelectionForFind(_ session: FindSession?) -> Action {
     Action(
       title: "Use Selection for Find",
       image: "text.magnifyingglass",
       perform: { reduceMotion in
-        guard let model else { return }
-        Task { await model.useSelectionForFind(reduceMotion: reduceMotion) }
+        guard let session else { return }
+        Task { await session.useSelectionForFind(reduceMotion: reduceMotion) }
       },
       shortcut: .init("e", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.useSelectionForFind

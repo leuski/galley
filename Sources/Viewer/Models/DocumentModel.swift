@@ -154,39 +154,12 @@ final class DocumentModel {
   /// matching row.
   private(set) var activeHeadingID: String?
 
-  /// Whether the find-text bar is showing in the window hosting this
-  /// model. Per-document; not persisted across launches.
-  var isFindVisible: Bool = false
-
-  /// Live find query. Edits trigger an immediate `performFind` from
-  /// the find bar's `.onChange`.
-  var findQuery: String = ""
-
-  /// Number of matches found by the latest `performFind` against the
-  /// rendered DOM. Drives the "n of N" count in the find bar.
-  var findMatchCount: Int = 0
-
-  /// Zero-based index of the currently-highlighted match, or `-1`
-  /// when there is nothing highlighted (empty query / no matches).
-  var findMatchIndex: Int = -1
-
-  /// When true, find matches are case-sensitive. Defaults off to
-  /// match Preview / Safari behavior — most users expect case-
-  /// insensitive find.
-  var findCaseSensitive: Bool = false
-
-  /// When true, find only matches whole words (regex `\b…\b`).
-  /// ASCII-boundary based — sufficient for the Latin-script content
-  /// the viewer most often renders.
-  var findWholeWord: Bool = false
-
-  /// Monotonic token bumped when an external surface (toolbar
-  /// `Action.toggleFind`, View menu) requests the find bar to dismiss.
-  /// `FindBar` observes this so it can drop focus before the slide-out
-  /// transition starts — otherwise the focus ring renders over content
-  /// the bar slides past. Direct `model.hideFind()` is the unanimated
-  /// path; this token is the animated, focus-aware path.
-  var findDismissalToken: Int = 0
+  /// Find-text state and JS calls for this window. Owns the query,
+  /// options, match counters, and visibility / dismissal flags.
+  /// Constructed once `page` is built so it can drive
+  /// `window.galleyFind` directly. `SearchModel`-conforming so the
+  /// `FindBar` / `ToolbarSearchField` views can `@Bindable` it.
+  let find: FindSession
 
   /// Whether the SwiftUI `.fileExporter` for "Export as PDF" is
   /// presented. Flipped by `requestExportPDF()` (typically from the
@@ -237,6 +210,7 @@ final class DocumentModel {
       tocBridge: tocBridge,
       backgroundBridge: backgroundBridge,
       templateBox: box))
+    self.find = FindSession(page: self.page)
     // Seed the scheme handler's template pointer. `renderCurrent`
     // updates it again on every render — this seed only matters for
     // asset requests that might fire before the first render.
@@ -674,9 +648,7 @@ final class DocumentModel {
         // and the visible find bar are per-window state we want to
         // honor across file-watcher reloads — re-run the search so
         // highlights and counts come back without user action.
-        if isFindVisible, !findQuery.isEmpty {
-          await performFind()
-        }
+        await find.reapplyIfActive()
       } catch {
         logNavigationFailed(error)
         lastError = error.localizedDescription
