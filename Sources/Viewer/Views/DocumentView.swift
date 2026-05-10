@@ -216,6 +216,14 @@ struct DocumentView: View {
               .transition(.move(edge: .top).combined(with: .opacity))
           }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          if Defaults.shared.showsStatusBar {
+            StatusBar(
+              stats: model.stats,
+              wordsPerMinute: Defaults.shared.readingWordsPerMinute)
+              .transition(.move(edge: .bottom).combined(with: .opacity))
+          }
+        }
         .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
     }
     .navigationSplitViewStyle(.balanced)

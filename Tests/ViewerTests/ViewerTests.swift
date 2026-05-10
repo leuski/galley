@@ -941,3 +941,29 @@ struct BindPlanTests {
     #expect(!plan.applyChoiceOverrides)
   }
 }
+
+// MARK: - DocumentStats
+
+@Suite("DocumentStats")
+struct DocumentStatsTests {
+  @Test("readingTime is wordCount / wordsPerMinute, in seconds")
+  func readingTimeArithmetic() {
+    let stats = DocumentStats(
+      wordCount: 400, characterCount: 2000, headingCount: 8)
+    #expect(stats.readingTime(wordsPerMinute: 200) == 120)
+    #expect(stats.readingTime(wordsPerMinute: 100) == 240)
+  }
+
+  @Test("readingTime is zero for an empty document")
+  func readingTimeEmpty() {
+    #expect(DocumentStats.empty.readingTime(wordsPerMinute: 200) == 0)
+  }
+
+  @Test("readingTime is zero for a non-positive WPM")
+  func readingTimeNonPositiveWPM() {
+    let stats = DocumentStats(
+      wordCount: 400, characterCount: 2000, headingCount: 8)
+    #expect(stats.readingTime(wordsPerMinute: 0) == 0)
+    #expect(stats.readingTime(wordsPerMinute: -100) == 0)
+  }
+}

@@ -24,6 +24,7 @@ final class DocumentModel {
   @ObservationIgnored private let linkBridge = LinkBridge()
   @ObservationIgnored private let scrollBridge = ScrollBridge()
   @ObservationIgnored private let tocBridge = TOCBridge()
+  @ObservationIgnored private let statsBridge = StatsBridge()
   @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
   @ObservationIgnored private let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
@@ -169,6 +170,13 @@ final class DocumentModel {
   /// matching row.
   private(set) var activeHeadingID: String?
 
+  /// Word / character / heading counts for the rendered document,
+  /// refreshed by `StatsBridge` after each load. Drives the
+  /// optional bottom `StatusBar`. Reset to `.empty` at the start of
+  /// every rebind so a stale count doesn't linger while the next
+  /// render is in flight.
+  private(set) var stats: DocumentStats = .empty
+
   /// Find-text state and JS calls for this window. Owns the query,
   /// options, match counters, and visibility / dismissal flags.
   /// Constructed once `page` is built so it can drive
@@ -223,6 +231,7 @@ final class DocumentModel {
       linkBridge: linkBridge,
       scrollBridge: scrollBridge,
       tocBridge: tocBridge,
+      statsBridge: statsBridge,
       backgroundBridge: backgroundBridge,
       templateBox: box))
     self.find = FindSession(page: self.page)
@@ -244,6 +253,7 @@ final class DocumentModel {
     linkBridge: LinkBridge,
     scrollBridge: ScrollBridge,
     tocBridge: TOCBridge,
+    statsBridge: StatsBridge,
     backgroundBridge: BackgroundColorBridge,
     templateBox: TemplateBox
   ) -> WebPage.Configuration {
@@ -253,6 +263,7 @@ final class DocumentModel {
     controller.add(linkBridge, name: LinkBridge.messageName)
     controller.add(scrollBridge, name: ScrollBridge.messageName)
     controller.add(tocBridge, name: TOCBridge.messageName)
+    controller.add(statsBridge, name: StatsBridge.messageName)
     controller.add(
       backgroundBridge, name: BackgroundColorBridge.messageName)
     // One script handles both cmd-click → editor and plain click →
@@ -274,6 +285,13 @@ final class DocumentModel {
     // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
     controller.addUserScript(WKUserScript(
       source: TOCBridge.userScript,
+      injectionTime: .atDocumentEnd,
+      forMainFrameOnly: true))
+    // Word / character / heading counts for the optional status bar.
+    // Reads `body.innerText`, so CSS-hidden chrome (template anchors,
+    // copy-button glyphs) is excluded from the totals.
+    controller.addUserScript(WKUserScript(
+      source: StatsBridge.userScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
     // Computed background-color reader. Runs after layout so the
@@ -337,6 +355,10 @@ final class DocumentModel {
     tocBridge.onActiveHeading = { [weak self] identifier in
       guard let self else { return }
       activeHeadingID = identifier
+    }
+    statsBridge.onStats = { [weak self] value in
+      guard let self else { return }
+      stats = value
     }
     backgroundBridge.onColor = { [weak self] color, templateID in
       guard let self else { return }
@@ -611,6 +633,7 @@ final class DocumentModel {
     // user script repopulates within milliseconds of `page.load`.
     headings = []
     activeHeadingID = nil
+    stats = .empty
 
     await renderCurrent(preserveScroll: false)
 

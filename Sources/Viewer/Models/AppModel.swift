@@ -50,6 +50,14 @@ final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var lastTemplateBackgroundColor: TemplateBackgroundState
   = .unresolved
   @DefaultsKey var transparentToolbar: Bool = true
+  /// Whether the bottom `StatusBar` HUD (word count, reading time,
+  /// heading count) is visible in document windows. Global pref —
+  /// the same toggle applies to every open window.
+  @DefaultsKey var showsStatusBar: Bool = false
+  /// Words-per-minute used to estimate reading time in the status
+  /// bar. 200 is the rough middle of the literature on prose reading
+  /// speed (Marked 2 defaults to 220, Hemingway uses 250).
+  @DefaultsKey var readingWordsPerMinute: Int = 200
 
   @MainActor static let shared = Defaults()
 }

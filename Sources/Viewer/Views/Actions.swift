@@ -257,6 +257,26 @@ extension Action {
     )
   }
 
+  /// Status-bar toggle. Flips the global `showsStatusBar` default,
+  /// since the bar is a chrome preference rather than per-document
+  /// state. Every open window observes the change through SwiftUI's
+  /// `@ObservableDefaults` pipeline.
+  static func toggleStatusBar() -> Action {
+    Action(
+      title: {
+        Defaults.shared.showsStatusBar
+          ? "Hide Status Bar"
+          : "Show Status Bar"
+      },
+      image: "ruler",
+      perform: { _ in
+        Defaults.shared.showsStatusBar.toggle()
+      },
+      shortcut: .init("2", modifiers: [.command, .control]),
+      accessibilityID: ViewerA11yID.ViewMenu.toggleStatusBar
+    )
+  }
+
   /// Sidebar / Table-of-Contents toggle. Single source of truth shared
   /// by the View menu (via `menuItem`) and the document toolbar (via
   /// `toolbarItem`). Title flips Show/Hide in the menu; the toolbar
