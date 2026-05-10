@@ -134,8 +134,35 @@ public extension Template {
       documentContent: documentContent,
       documentURL: documentURL,
       origin: origin)
+    let substituted = context.substitute(into: processed)
     return ComposedPreview(
-      html: context.substitute(into: processed),
+      html: injectingTemplateIDMeta(into: substituted),
       baseURL: origin.appendingPreview(documentURL))
+  }
+
+  /// Inserts `<meta name="galley-template-id" content="...">` just
+  /// before `</head>` so the Viewer's `BackgroundColorBridge` can
+  /// attribute every post to the template that's *actually* painted
+  /// in the WebView at the moment of the post — not whichever
+  /// template happens to be selected by the time the message
+  /// reaches Swift. The two diverge briefly whenever the user
+  /// switches templates faster than WebKit can reload, and the gap
+  /// was previously enough to poison the new template's cached
+  /// background color with a stale post from the outgoing page.
+  ///
+  /// Falls back to prepending the meta when the template ships no
+  /// `<head>` — orphan metas are tolerated by every renderer Galley
+  /// targets, and we still need the id present somewhere in the DOM
+  /// for the JS reader to find via `document.querySelector`.
+  private func injectingTemplateIDMeta(into html: String) -> String {
+    let meta = """
+      <meta name="galley-template-id" content="\(id.htmlAttributeEscaped)">
+      """
+    if let range = html.range(
+      of: "</head>", options: [.caseInsensitive]) {
+      return html.replacingCharacters(
+        in: range, with: meta + "</head>")
+    }
+    return meta + html
   }
 }

@@ -10,10 +10,14 @@ import WebKit
 /// chrome — creating the illusion that the document extends
 /// edge-to-edge.
 ///
-/// Message body shape: `{ "color": "rgb(r,g,b)" | "rgba(r,g,b,a)" }`
-/// for opaque backgrounds, `{ "color": null }` when neither `html`
-/// nor `body` declared one (the host then falls back to the system
-/// default appearance).
+/// Message body shape: `{ "color": "rgb(r,g,b)" | "rgba(r,g,b,a)" |
+/// null, "templateID": "<id>" | null }`. `templateID` carries the
+/// id of the template that produced the page reporting the color
+/// (read from the `<meta name="galley-template-id">` tag
+/// `Template.composeHTML` injects). The Swift handler attributes
+/// posts to that template, not to the currently-selected one — the
+/// two diverge while the user switches templates faster than the
+/// WebView can reload.
 @MainActor
 final class BackgroundColorBridge: NSObject, WKScriptMessageHandler {
   /// JS handler name. Script calls
@@ -26,10 +30,12 @@ final class BackgroundColorBridge: NSObject, WKScriptMessageHandler {
   static let userScript: String = Bundle.main.requiredString(
     forResource: "backgroundColorReader", withExtension: "js")
 
-  /// Set by the owning DocumentModel; receives the parsed color or
-  /// `nil` when the page declared no opaque background (either `html`
-  /// and `body` were both transparent, or the JS payload was malformed).
-  var onColor: ((Color?) -> Void)?
+  /// Set by the owning DocumentModel. Receives the parsed color
+  /// (`nil` for transparent / malformed payloads) and the
+  /// `templateID` the page identified itself with (`nil` when the
+  /// page predates the meta-injection or the meta was stripped by a
+  /// user template).
+  var onColor: ((Color?, String?) -> Void)?
 
   private let logger = Logger(
     subsystem: bundleIdentifier,
@@ -41,16 +47,17 @@ final class BackgroundColorBridge: NSObject, WKScriptMessageHandler {
   ) {
     guard let body = message.body as? [String: Any] else {
       logMalformedMessage(message.body)
-      onColor?(nil)
+      onColor?(nil, nil)
       return
     }
+    let templateID = body["templateID"] as? String
     if let raw = body["color"] as? String {
-      onColor?(Self.parseCSSColor(raw))
+      onColor?(Self.parseCSSColor(raw), templateID)
     } else {
       // Explicit `null` from JS — both `html` and `body` were
       // transparent. Surface as nil so the host falls back to the
       // system default.
-      onColor?(nil)
+      onColor?(nil, templateID)
     }
   }
 

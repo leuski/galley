@@ -6,10 +6,16 @@
 //
 // Loaded by BackgroundColorBridge.swift. Message name is hardcoded
 // here and must match `BackgroundColorBridge.messageName`
-// ("backgroundColor"). Posts `{ color: "rgb(...)" }` (or "rgba(...)")
-// when the page declares an opaque background; posts `{ color: null }`
-// when both `html` and `body` are transparent so the host can fall
-// back to the system default.
+// ("backgroundColor"). Posts `{ color, templateID }` where `color`
+// is `"rgb(...)"` / `"rgba(...)"` for opaque backgrounds or `null`
+// when both `html` and `body` are transparent, and `templateID` is
+// the id of the template that produced this page (read from the
+// `<meta name="galley-template-id">` injected by
+// `Template.composeHTML`). The Swift side uses `templateID` to
+// route the post to the cache slot of the template that is actually
+// painted in the WebView right now — which can differ from the
+// currently-selected template during the gap between picking a new
+// template and the new HTML finishing its first paint.
 
 (function () {
   function isTransparent(value) {
@@ -18,13 +24,19 @@
     return stripped === 'transparent' || stripped === 'rgba(0,0,0,0)';
   }
 
+  function currentTemplateID() {
+    var meta = document.querySelector(
+      'meta[name="galley-template-id"]');
+    return meta ? meta.getAttribute('content') : null;
+  }
+
   function reportBackground() {
     var post = function (color) {
       if (window.webkit
           && window.webkit.messageHandlers
           && window.webkit.messageHandlers.backgroundColor) {
         window.webkit.messageHandlers.backgroundColor.postMessage(
-          { color: color });
+          { color: color, templateID: currentTemplateID() });
       }
     };
 

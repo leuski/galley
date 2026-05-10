@@ -28,8 +28,19 @@ final class DocumentModel {
   @ObservationIgnored private let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
 
+  /// Chrome reads through this. Drives off `renderedTemplate()` —
+  /// the template *actually painted* in the WebView right now — so
+  /// the chrome stays at the previous color through a template
+  /// switch (when the selected template has flipped to the new one
+  /// but the WebView still shows the old HTML) and snaps to the new
+  /// color in a single frame when the bridge confirms the new
+  /// render. Reading `resolvedTemplate()` here instead would flash
+  /// the new template's cached color the instant the user picks it,
+  /// then flash back when the bridge corrects the cache after the
+  /// outgoing page's last (stale) post — the "sepia then dark then
+  /// sepia" flicker that motivated this refactor.
   var pageBackgroundColor: Color {
-    resolvedTemplate().backgroundState.color
+    renderedTemplate().backgroundState.color
   }
 
   /// Per-window template / processor choices. Reference types so
@@ -78,12 +89,16 @@ final class DocumentModel {
   private(set) var isRenderingNewTemplate: Bool = false
 
   /// `Template.persistentID` of the template that produced the
-  /// most-recently-painted render. Used to detect template changes
-  /// in `reload()` so the scheme reset above only fires when the
-  /// template actually differs — same-template reloads (file save,
-  /// in-window navigation) don't trigger a chrome flicker.
-  @ObservationIgnored
-  private var lastRenderedTemplateID: String?
+  /// most-recently-painted render — the one the WebView is currently
+  /// displaying, identified by the `galley-template-id` meta the
+  /// composer injects and the JS reader echoes back. Drives
+  /// `renderedTemplate()` (which `pageBackgroundColor` and the chrome
+  /// read), and `reload()` compares against `resolvedTemplate()
+  /// .persistentID` to decide whether the scheme reset is needed.
+  ///
+  /// Observed — SwiftUI re-evaluates the chrome's container
+  /// background, scheme, and overlay color the moment this flips.
+  private(set) var renderedTemplateID: String?
 
   /// Page zoom factor for the rendered preview. Applied via a CSS
   /// `zoom` rule injected into the document head; updated live via JS
@@ -323,24 +338,29 @@ final class DocumentModel {
       guard let self else { return }
       activeHeadingID = identifier
     }
-    backgroundBridge.onColor = { [weak self] color in
+    backgroundBridge.onColor = { [weak self] color, templateID in
       guard let self else { return }
       // Bridge fires post-layout regardless of whether the page
       // declared an opaque bg, so any fire = "WebView has painted"
       // and we can drop DocumentView's anti-flash overlay.
       isPageRendered = true
-      // Record the template that produced this render so the next
-      // `reload()` can compare and only force-reset the scheme on
-      // genuine template changes.
-      let template = resolvedTemplate()
-      lastRenderedTemplateID = template.persistentID
       isRenderingNewTemplate = false
+      // Attribute the post to the template that's actually painted
+      // in the WebView, identified by the `galley-template-id` meta
+      // the composer injected (echoed back by the JS reader). When
+      // that template is no longer in the catalog (uninstalled
+      // mid-render — extremely rare), fall back to the selected
+      // template; better a slightly-stale write than no write.
+      let painted = templateID.flatMap {
+        appModel.templates.findValue(forID: $0)
+      } ?? resolvedTemplate()
+      renderedTemplateID = painted.persistentID
       // Always persist — `color: nil` records a sentinel so a
       // template that *used to* paint a bg but no longer does (CSS
       // edited) overwrites its stale hex entry. Every other
       // DocumentModel using this template observes the change
       // through their own `pageBackgroundColor` computed property.
-      template.setBackgroundColor(color)
+      painted.setBackgroundColor(color)
     }
   }
 
@@ -498,20 +518,21 @@ final class DocumentModel {
   }
 
   func reload() async {
-    // `pageBackgroundColor` is computed off `resolvedTemplate()
-    // .backgroundState` (with last-seen + system-bg fallback), so
-    // a template change automatically flips the chrome to the new
-    // template's cached color before the WebView re-renders.
+    // `pageBackgroundColor` is computed off `renderedTemplate()
+    // .backgroundState`, so the chrome stays at the *current* painted
+    // template's color through the entire render — no optimistic
+    // flash to the incoming template's cached color, no flash back
+    // when the bridge corrects it.
     //
-    // Detect template-change explicitly: when the new template
-    // differs from the one that produced the last render, set
-    // `isRenderingNewTemplate` so DocumentView reverts the scene
-    // scheme to the user's system pref. Without that, WebKit's
+    // Detect template-change by comparing the selected (next) id
+    // against the currently-painted id: when they differ, set
+    // `isRenderingNewTemplate` so DocumentView pins the scene scheme
+    // to the user's system pref. Without that, WebKit's
     // `prefers-color-scheme` queries inside the new template would
     // resolve under whatever scheme the previous template's
     // bg-luminance forced — and pick the wrong variant.
     let nextTemplateID = resolvedTemplate().persistentID
-    if nextTemplateID != lastRenderedTemplateID {
+    if nextTemplateID != renderedTemplateID {
       isRenderingNewTemplate = true
     }
     isPageRendered = false
@@ -701,6 +722,22 @@ final class DocumentModel {
       return templates.selected.value
     }
     return appModel.templates.selected.value
+  }
+
+  /// Template whose HTML is currently painted in the WebView, per
+  /// the last `BackgroundColorBridge` report. Falls back to the
+  /// selected template before the first bridge fire (cold open —
+  /// the WebView is system-white, so the selected template's cached
+  /// color is the best available placeholder) and when the painted
+  /// template's id no longer resolves in the global catalog
+  /// (template uninstalled mid-session).
+  func renderedTemplate() -> Template {
+    if let id = renderedTemplateID,
+       let template = appModel.templates.findValue(forID: id)
+    {
+      return template
+    }
+    return resolvedTemplate()
   }
 
 }
