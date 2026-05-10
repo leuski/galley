@@ -35,6 +35,17 @@ struct GeneralSettingsView: View {
       )
       .subtitle()
     }
+
+    VStack(alignment: .leading, spacing: 4) {
+      Toggle("Transparent toolbar", isOn: $defaults.transparentToolbar)
+      Text("""
+            Uses the template background color to paint the window \
+            toolbar and sidebar background. If the template does not \
+            have background color specified, we use the default OS color.
+            """
+      )
+      .subtitle()
+    }
   }
 }
 

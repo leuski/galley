@@ -49,6 +49,7 @@ final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   /// in this session or any past session yet.
   @DefaultsKey var lastTemplateBackgroundColor: TemplateBackgroundState
   = .unresolved
+  @DefaultsKey var transparentToolbar: Bool = true
 
   @MainActor static let shared = Defaults()
 }

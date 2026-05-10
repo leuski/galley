@@ -23,42 +23,40 @@ struct MarkdownSettingsView: View {
   @State private var scriptInstallError: String?
 
   var body: some View {
-    Section {
-      editorPicker
+    editorPicker
 
-      LabeledContent {
-        HStack {
-          templatePicker
-          revealTemplatesButton
-        }
-      } label: {
-        Text("Template")
+    LabeledContent {
+      HStack {
+        templatePicker
+        revealTemplatesButton
       }
-
-      LabeledContent {
-        HStack {
-          processorPicker
-          rediscoverRenderersButton
-        }
-      } label: {
-        Text("Processor")
-      }
+    } label: {
+      Text("Template")
     }
 
-    Section {
-      LabeledContent {
-        Toggle("", isOn: $defaults.enablePerDocumentOverrides)
-          .labelsHidden()
-          .toggleStyle(.switch)
-      } label: {
-        Text(
-          "Allow per-window processor and template overrides")
-        Text("""
+    LabeledContent {
+      HStack {
+        processorPicker
+        rediscoverRenderersButton
+      }
+    } label: {
+      Text("Processor")
+    }
+
+    LabeledContent {
+      Toggle(
+        "Allow per-window processor and template overrides",
+        isOn: $defaults.enablePerDocumentOverrides)
+        .labelsHidden()
+        .toggleStyle(.switch)
+    } label: {
+      Text(
+        "Allow per-window processor and template overrides")
+      Text("""
           Adds a Format menu section that lets each window pin its own \
           Markdown processor or template, overriding the global \
           selection.
           """)
-      }
     }
   }
 
@@ -115,13 +113,11 @@ struct MarkdownSettingsView: View {
   private var detailFields: some View {
     switch appModel.editors.selected {
     case .preset(.bbedit):
-      LabeledContent {
+      HStack {
+        Spacer()
         Button("Install scripts…") { showScriptPicker = true }
           .padding(.top, 4)
-      } label: {
-        Text("")
       }
-
     case .preset:
       EmptyView()
 

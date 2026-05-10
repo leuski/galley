@@ -33,7 +33,7 @@ struct ServerSettingsView: View {
   }
 
   var body: some View {
-    Section {
+    VStack(alignment: .leading, spacing: 4) {
       LabeledContent {
         ServerStatusPill(status: serverStatus.status)
         Toggle("Server", isOn: serverEnabledBinding)
@@ -51,24 +51,24 @@ struct ServerSettingsView: View {
         // need to re-poll.
         serverEnabled = await ActiveServerAgent.isEnabled
       }
-
-      LabeledContent {
-        TextField("Port", text: $portString)
-          .labelsHidden()
-          .onSubmit { commitPort() }
-          .frame(width: 80)
-          .onChange(of: Defaults.shared.port) { _, newPort in
-            portString = String(newPort)
-          }
-      } label: {
-        Text("Port")
-      }
-    } footer: {
       Text("""
           When on, the background server makes documents available in any \
           browser. Registered as a login item so it restarts after \
-          logout. The server binds to 127.0.0.1 only.
-          """)
+          logout. The server binds to 127.0.0.1 only, so it's only accessible \
+          form this computer.
+          """).subtitle()
+    }
+
+    LabeledContent {
+      TextField("Port", text: $portString)
+        .labelsHidden()
+        .onSubmit { commitPort() }
+        .frame(width: 80)
+        .onChange(of: Defaults.shared.port) { _, newPort in
+          portString = String(newPort)
+        }
+    } label: {
+      Text("Port")
     }
   }
 
