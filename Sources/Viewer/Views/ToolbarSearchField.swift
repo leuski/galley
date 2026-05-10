@@ -36,16 +36,19 @@ struct ToolbarSearchField: View {
         SearchField(
           model: model,
           isFocused: $fieldFocused,
-          prompt: "Find",
+          prompt: "Search",
           onSubmit: { Task { await model.findNext() } },
           onCancel: close)
           .transition(Self.swap)
       } else {
+        // `Label` (vs bare `Image`) is what gives the Customize
+        // Toolbar panel a name to show. `.labelStyle(.iconOnly)`
+        // keeps the live toolbar rendering as just the glyph.
         Button(action: open) {
-          Image(systemName: "magnifyingglass")
+          Label("Search", systemImage: "magnifyingglass")
         }
-        .help("Find")
-        .accessibilityLabel(Text("Find"))
+        .labelStyle(.iconOnly)
+        .help("Search")
         .transition(Self.swap)
       }
     }
