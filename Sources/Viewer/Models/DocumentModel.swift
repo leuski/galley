@@ -28,43 +28,8 @@ final class DocumentModel {
   @ObservationIgnored private let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
 
-  /// Computed background color of the rendered page (`html` or
-  /// `body`), reported by `BackgroundColorBridge` after each render.
-  /// `DocumentView` paints this into the window's container
-  /// background so translucent toolbar and sidebar chrome show a
-  /// matching tint — the illusion that the document extends
-  /// edge-to-edge.
-  ///
-  /// The color the chrome should paint behind the resolved template.
-  /// Composes three observable inputs through a deterministic
-  /// fallback chain:
-  ///
-  /// 1. Template's own resolution state (per-template cache):
-  ///    - `.resolved(color)` → use that color directly.
-  ///    - `.resolvedNone` → template positively has no bg → system
-  ///      window bg.
-  /// 2. `.unresolved` (template never rendered) → last opaque bg
-  ///    seen across any template → so a brand-new tab doesn't flash
-  ///    while it waits for its bridge to fire.
-  /// 3. No last-seen color either → system window bg as the
-  ///    universal floor.
-  ///
-  /// Always returns a color; chrome modifiers don't need to thread
-  /// optionals or pick fallbacks themselves.
   var pageBackgroundColor: Color {
-    switch resolvedTemplate().backgroundState {
-    case .resolved(let color):
-      return color
-    case .resolvedNone:
-      return Color.userSystemWindowBackground
-    case .unresolved:
-      let lastSeen = Defaults.shared.lastTemplateBackgroundColor
-      if !lastSeen.isEmpty,
-         let color = Color(galleyHex: lastSeen) {
-        return color
-      }
-      return Color.userSystemWindowBackground
-    }
+    resolvedTemplate().backgroundState.color
   }
 
   /// Per-window template / processor choices. Reference types so
@@ -123,15 +88,15 @@ final class DocumentModel {
   /// Page zoom factor for the rendered preview. Applied via a CSS
   /// `zoom` rule injected into the document head; updated live via JS
   /// when the user changes it without re-rendering.
-  private(set) var pageZoom: Double = 1.0
+  var pageZoom: Double = 1.0
 
   /// Discrete zoom stops, matching what Safari and Preview offer so
   /// repeated ⌘+ presses land on familiar values.
-  private static let zoomStops: [Double] = [
+  static let zoomStops: [Double] = [
     0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0
   ]
-  private static let minZoom: Double = 0.5
-  private static let maxZoom: Double = 3.0
+  static let minZoom: Double = 0.5
+  static let maxZoom: Double = 3.0
 
   var canZoomIn: Bool { pageZoom < Self.maxZoom - 0.001 }
   var canZoomOut: Bool { pageZoom > Self.minZoom + 0.001 }
@@ -432,35 +397,19 @@ final class DocumentModel {
   /// flavors `EditorBridge` understands. Returns nil if the active
   /// renderer doesn't emit source positions, or if no positioned
   /// block is visible (very short docs, mostly).
+  ///
+  /// Script source lives in
+  /// `Resources/Scripts/topmostVisibleSourceLine.js`. `callJavaScript`
+  /// wraps it in an async function and captures a top-level `return`,
+  /// so the script must NOT be wrapped in an IIFE.
+  private static let topmostVisibleSourceLineScript: String =
+    Bundle.main.requiredString(
+      forResource: "topmostVisibleSourceLine", withExtension: "js")
+
   private func topmostVisibleSourceLine() async -> Int? {
-    // `callJavaScript` wraps the source in an async function and
-    // captures a top-level `return`. An IIFE here would just
-    // discard its value — the bug that made every "Open in
-    // Editor" land at the top of the file.
-    let script = """
-      var nodes = document.querySelectorAll(
-        '[data-source-line], [data-pos], [data-sourcepos]');
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i];
-        var rect = node.getBoundingClientRect();
-        // Skip blocks fully above the viewport — behind the user's
-        // reading position. First with bottom >= 0 is what we want.
-        if (rect.bottom < 0) continue;
-        var n = NaN;
-        if (node.dataset.sourceLine) {
-          n = parseInt(node.dataset.sourceLine, 10);
-        } else {
-          var raw = node.dataset.pos || node.dataset.sourcepos || '';
-          var m = raw.match(/(\\d+):\\d+/);
-          if (m) n = parseInt(m[1], 10);
-        }
-        if (Number.isNaN(n)) continue;
-        return n;
-      }
-      return null;
-      """
     do {
-      let value = try await page.callJavaScript(script)
+      let value = try await page.callJavaScript(
+        Self.topmostVisibleSourceLineScript)
       if let number = value as? Int { return number }
       if let number = value as? Double { return Int(number) }
       if let number = value as? NSNumber { return number.intValue }
@@ -593,65 +542,6 @@ final class DocumentModel {
     }
     isPageRendered = false
     await renderCurrent(preserveScroll: true)
-  }
-
-  // MARK: - Zoom
-
-  func zoomIn() {
-    let next = Self.zoomStops.first { $0 > pageZoom + 0.001 }
-      ?? Self.maxZoom
-    setZoom(next)
-  }
-
-  func zoomOut() {
-    let prev = Self.zoomStops.last { $0 < pageZoom - 0.001 }
-      ?? Self.minZoom
-    setZoom(prev)
-  }
-
-  func resetZoom() {
-    setZoom(1.0)
-  }
-
-  /// Set zoom directly. Pinned to `[minZoom, maxZoom]`. Updates the
-  /// live page via JS — no re-render needed.
-  func setZoom(_ factor: Double) {
-    let clamped = min(max(factor, Self.minZoom), Self.maxZoom)
-    guard abs(clamped - pageZoom) > 0.001 else { return }
-    pageZoom = clamped
-    Task { await applyZoomToPage() }
-  }
-
-  /// Push the current `pageZoom` to the live document. Idempotent —
-  /// updates the dedicated `<style>` element if present, otherwise
-  /// inserts it.
-  private func applyZoomToPage() async {
-    let css = "html{zoom:\(pageZoom);}"
-    let script = """
-      (function(){
-        var s = document.getElementById('md-eye-zoom');
-        if (!s) {
-          s = document.createElement('style');
-          s.id = 'md-eye-zoom';
-          document.head.appendChild(s);
-        }
-        s.textContent = \(jsStringLiteral(css));
-      })();
-      """
-    _ = try? await page.callJavaScript(script)
-  }
-
-  /// Embed the current zoom as a `<style>` element in the rendered
-  /// HTML so the page comes up at the right size on the very first
-  /// frame — applying via JS after load would briefly flash at 100%.
-  private func injectZoomStyle(into html: String) -> String {
-    let style = "<style id=\"md-eye-zoom\">html{zoom:\(pageZoom);}</style>"
-    if let range = html.range(
-      of: "</head>", options: .caseInsensitive)
-    {
-      return html.replacingCharacters(in: range, with: style + "</head>")
-    }
-    return style + html
   }
 
   /// Rename the current document on disk and re-bind the watcher /

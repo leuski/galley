@@ -34,27 +34,21 @@ final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var openBehavior: OpenBehavior = .newWindow
   @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
   @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
-  /// Per-template page background colors (hex strings), captured by
+  /// Per-template page background colors, captured by
   /// `BackgroundColorBridge` after each render. Used by
   /// `Template.backgroundState` so a freshly-opened tab can paint
   /// the chrome with the right tint immediately, and by FindBar /
   /// DocumentView for the same reason.
-  ///
-  /// Three states are encoded:
-  /// - **Missing key** — never rendered, resolution unknown.
-  /// - **Empty string** — rendered, declared no opaque bg.
-  ///   `Template.backgroundState` returns `.resolvedNone` so the
-  ///   chrome falls back to the system window bg.
-  /// - **Hex string** — rendered with that opaque bg.
-  ///   `Template.backgroundState` returns `.resolved(color)`.
-  @DefaultsKey var templateBackgroundColors: [String: String] = [:]
+  @DefaultsKey var templateBackgroundColors: [String: TemplateBackgroundState]
+  = [:]
   /// Most recent opaque page bg observed by *any* template. Used as
   /// a global fallback when the currently-resolved template hasn't
   /// reported yet — opening a new tab using a never-seen template
   /// hydrates with this last-seen color instead of flashing to the
   /// system default. Empty string means no color has been observed
   /// in this session or any past session yet.
-  @DefaultsKey var lastTemplateBackgroundColor: String = ""
+  @DefaultsKey var lastTemplateBackgroundColor: TemplateBackgroundState
+  = .unresolved
 
   @MainActor static let shared = Defaults()
 }

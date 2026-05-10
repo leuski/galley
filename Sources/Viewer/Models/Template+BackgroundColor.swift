@@ -18,26 +18,85 @@ import SwiftUI
 /// user edits the template to remove its bg.
 private let templateBackgroundNoneSentinel = ""
 
-/// Resolution state for a template's page background. Encodes the
-/// three states the chrome's display logic actually needs to
-/// distinguish:
+/// Resolution state for a template's page background. Two cases:
 ///
-/// - `.unresolved` — the template has never been rendered (or this
-///   session can't tell). Caller should fall back to the global
-///   last-seen color, or the system window bg if even that is
-///   unknown.
+/// - `.unresolved` — the template has never been rendered (or the
+///   cache entry is missing). Caller falls back to the global
+///   last-seen state, or the system window bg.
 /// - `.resolved(let color)` — the template was rendered and
-///   reported `color` as its opaque page bg. Caller paints `color`
-///   directly.
-/// - `.resolvedNone` — the template was rendered and reported no
-///   opaque bg. Caller paints the system window bg, just like the
-///   `unresolved` ↔ no-last-seen case but skipping the last-seen
-///   step (the template *positively* has no bg, not "we don't
-///   know yet").
-public enum TemplateBackgroundState {
+///   reported `color` as its page bg. Two subtly different things
+///   collapse here:
+///   * The template painted an explicit opaque color → `color` is
+///     the corresponding sRGB-pinned `Color`.
+///   * The template declared no opaque bg → `color` is the
+///     deferred dynamic `Color.userSystemWindowBackground`, which
+///     re-resolves to the user's current system bg on every draw.
+///   The `Codable` boundary distinguishes the two via `Color`
+///   equality with the static `userSystemWindowBackground`
+///   reference: that one comparison detects "use the deferred
+///   sentinel" and round-trips as the empty-string sentinel; any
+///   other color round-trips as a hex literal.
+public enum TemplateBackgroundState: Codable {
   case unresolved
   case resolved(Color)
-  case resolvedNone
+
+  /// The color the chrome should paint behind this state. `Color`
+  /// is always real; callers don't have to thread fallbacks. The
+  /// `.unresolved` branch defers to `Defaults.shared
+  /// .lastTemplateBackgroundColor` but resolves it manually rather
+  /// than calling `.color` recursively, so a corrupt or hand-
+  /// edited last-seen entry can't trigger a stack overflow.
+  @MainActor
+  public var color: Color {
+    switch self {
+    case .resolved(let color):
+      return color
+    case .unresolved:
+      switch Defaults.shared.lastTemplateBackgroundColor {
+      case .resolved(let color):
+        return color
+      case .unresolved:
+        return .userSystemWindowBackground
+      }
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    switch try decoder.singleValueContainer().decode(String?.self) {
+    case .none:
+      self = .unresolved
+    case .some(let string):
+      if string == templateBackgroundNoneSentinel {
+        self = .resolved(.userSystemWindowBackground)
+      } else if let color = Color(galleyHex: string) {
+        self = .resolved(color)
+      } else {
+        self = .unresolved
+      }
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    let value: String? = switch self {
+    case .unresolved: nil
+    case .resolved(let color):
+      // `Color` equality compares the underlying storage, not the
+      // pixels rendered at draw time — so `Color
+      // .userSystemWindowBackground` (a single static reference
+      // wrapping a named dynamic NSColor) is `==` only to itself,
+      // never to a hex-decoded literal that *happens to* render
+      // the same RGB. That property lets a single comparison
+      // separate "the deferred sentinel" from every real opaque
+      // color.
+      if color == .userSystemWindowBackground {
+        templateBackgroundNoneSentinel
+      } else {
+        color.galleyHex
+      }
+    }
+    try container.encode(value)
+  }
 }
 
 extension Template {
@@ -47,17 +106,7 @@ extension Template {
   /// template's own color, the global last-seen fallback, and the
   /// system window bg.
   @MainActor var backgroundState: TemplateBackgroundState {
-    guard let stored = Defaults.shared
-      .templateBackgroundColors[persistentID]
-    else { return .unresolved }
-    if stored == templateBackgroundNoneSentinel {
-      return .resolvedNone
-    }
-    if let color = Color(galleyHex: stored) {
-      return .resolved(color)
-    }
-    // Corrupt entry — treat as if we'd never seen it.
-    return .unresolved
+    Defaults.shared.templateBackgroundColors[persistentID] ?? .unresolved
   }
 
   /// Persist the bridge's latest report against this template's id.
@@ -67,13 +116,9 @@ extension Template {
   /// is non-nil the global `lastTemplateBackgroundColor` is also
   /// updated so brand-new templates seed correctly on next open.
   @MainActor func setBackgroundColor(_ color: Color?) {
-    let value: String
-    if let color, let hex = color.galleyHex {
-      value = hex
-      Defaults.shared.lastTemplateBackgroundColor = hex
-    } else {
-      value = templateBackgroundNoneSentinel
-    }
+    let value: TemplateBackgroundState = .resolved(
+      color ?? .userSystemWindowBackground)
+    Defaults.shared.lastTemplateBackgroundColor = value
     Defaults.shared.templateBackgroundColors[persistentID] = value
   }
 }
@@ -89,7 +134,7 @@ extension ColorScheme {
   @MainActor static var userSystem: ColorScheme {
     NSApp.effectiveAppearance
       .bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-      ? .dark : .light
+    ? .dark : .light
   }
 }
 
@@ -146,11 +191,24 @@ extension Color {
       return false
     }
     let luma = 0.299 * resolved.redComponent
-      + 0.587 * resolved.greenComponent
-      + 0.114 * resolved.blueComponent
+    + 0.587 * resolved.greenComponent
+    + 0.114 * resolved.blueComponent
     return luma < 0.5
   }
 
+  /// Backing dynamic `NSColor` for `userSystemWindowBackground`.
+  /// Resolves at draw time through the user's *system-wide*
+  /// preferred appearance — read directly from
+  /// `AppleInterfaceStyle` instead of the appearance handed to the
+  /// provider, which would reflect any scene-local
+  /// `preferredColorScheme` override we've applied for chrome.
+  ///
+  /// Pinned to sRGB inside the appearance block so the returned
+  /// `NSColor` is a concrete numeric value rather than another
+  /// dynamic alias — `Color(nsColor:)` then captures it as a
+  /// stable component but each draw still re-invokes the provider,
+  /// so the visible color follows the user toggling system
+  /// appearance live without any cache invalidation on our side.
   /// `NSColor.windowBackgroundColor` resolved through the *user's*
   /// system appearance, not the scene's local
   /// `preferredColorScheme`.
@@ -165,15 +223,20 @@ extension Color {
   /// reason. `NSApp.effectiveAppearance` still tracks the user's
   /// preference because `preferredColorScheme` is applied at the
   /// scene/window level, not the app level.
-  @MainActor static var userSystemWindowBackground: Color {
-    var resolved: NSColor = .windowBackgroundColor
-    NSApp.effectiveAppearance
-      .performAsCurrentDrawingAppearance {
+  static let userSystemWindowBackground = Color(
+    nsColor: NSColor(name: "galley.userSystemWindowBackground") { _ in
+      let isDark = UserDefaults.standard
+        .string(forKey: "AppleInterfaceStyle") == "Dark"
+      let appearance = NSAppearance(
+        named: isDark ? .darkAqua : .aqua)
+      ?? NSAppearance.currentDrawing()
+      var resolved: NSColor = .windowBackgroundColor
+      appearance.performAsCurrentDrawingAppearance {
         if let srgb = NSColor.windowBackgroundColor
           .usingColorSpace(.sRGB) {
           resolved = srgb
         }
       }
-    return Color(nsColor: resolved)
-  }
+      return resolved
+    })
 }
