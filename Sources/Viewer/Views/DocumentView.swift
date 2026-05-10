@@ -437,13 +437,16 @@ struct DocumentView: View {
 
   @ToolbarContentBuilder
   private var navigationToolbarItems: some CustomizableToolbarContent {
-    ToolbarItem(id: "back", placement: .navigation) {
-      Action.back(model).toolbarItem()
-    }
-    .customizationBehavior(.default)
-
-    ToolbarItem(id: "forward", placement: .navigation) {
-      Action.forward(model).toolbarItem()
+    ToolbarItem(id: "backForward", placement: .navigation) {
+      Label {
+        Text("Back/Forward")
+      } icon: {
+        ControlGroup {
+          Action.back(model).toolbarItem()
+          Action.forward(model).toolbarItem()
+        }
+        .controlGroupStyle(.navigation)
+      }
     }
     .customizationBehavior(.default)
   }
