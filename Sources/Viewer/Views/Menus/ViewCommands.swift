@@ -10,19 +10,19 @@ struct ViewCommands: Commands {
 
   var body: some Commands {
     CommandGroup(before: .toolbar) {
-      Action.toggleTOC.menuItem(model: model)
+      Action.toggleTOC(model).menuItem()
 
       Divider()
 
-      Action.zoomIn.menuItem(model: model)
-      Action.zoomOut.menuItem(model: model)
-      Action.resetZoom.menuItem(model: model)
+      Action.zoomIn(model).menuItem()
+      Action.zoomOut(model).menuItem()
+      Action.resetZoom(model).menuItem()
 
       Divider()
 
-      Action.back.menuItem(model: model)
-      Action.forward.menuItem(model: model)
-      Action.reload.menuItem(model: model)
+      Action.back(model).menuItem()
+      Action.forward(model).menuItem()
+      Action.reload(model).menuItem()
 
       Divider()
 

@@ -439,12 +439,12 @@ struct DocumentView: View {
     //    .customizationBehavior(.disabled)
     //
     ToolbarItem(id: "back", placement: .navigation) {
-      Action.back.toolbarItem(model: model)
+      Action.back(model).toolbarItem()
     }
     .customizationBehavior(.default)
 
     ToolbarItem(id: "forward", placement: .navigation) {
-      Action.forward.toolbarItem(model: model)
+      Action.forward(model).toolbarItem()
     }
     .customizationBehavior(.default)
   }
@@ -464,7 +464,7 @@ struct DocumentView: View {
     .customizationBehavior(.default)
 
     ToolbarItem(id: "reload", placement: .primaryAction) {
-      Action.reload.toolbarItem(model: model)
+      Action.reload(model).toolbarItem()
     }
     .customizationBehavior(.default)
 
@@ -479,17 +479,17 @@ struct DocumentView: View {
   @ToolbarContentBuilder
   private var zoomToolbarItems: some CustomizableToolbarContent {
     ToolbarItem(id: "zoomOut", placement: .primaryAction) {
-      Action.zoomOut.toolbarItem(model: model)
+      Action.zoomOut(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
     ToolbarItem(id: "zoomReset", placement: .primaryAction) {
-      Action.resetZoom.toolbarItem(model: model)
+      Action.resetZoom(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
     ToolbarItem(id: "zoomIn", placement: .primaryAction) {
-      Action.zoomIn.toolbarItem(model: model)
+      Action.zoomIn(model).toolbarItem()
     }
     .defaultCustomization(.hidden)
   }

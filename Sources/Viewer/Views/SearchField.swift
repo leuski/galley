@@ -40,9 +40,9 @@ struct SearchField: View {
 
       if !model.query.isEmpty {
         if model.matchCount > 0 {
-          Action.findPrevious.toolbarItem(model: model, imageOnly: true)
+          Action.findPrevious(model).toolbarItem(imageOnly: true)
             .buttonStyle(.borderless)
-          Action.findNext.toolbarItem(model: model, imageOnly: true)
+          Action.findNext(model).toolbarItem(imageOnly: true)
             .buttonStyle(.borderless)
         }
 

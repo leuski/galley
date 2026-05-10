@@ -8,30 +8,37 @@
 import GalleyCoreKit
 import SwiftUI
 
+/// Bound action — title/icon/shortcut metadata plus closures that
+/// already capture whichever model they act on. `Action` itself is
+/// model-agnostic: the menu and toolbar renderers know nothing about
+/// `DocumentModel` or any future model type. Factories live as static
+/// methods (e.g. `Action.zoomIn(_:)`) so a single file lists every
+/// action the app ships, while still letting each factory bind to a
+/// specific model type via its parameter.
 @MainActor
 struct Action {
-  let title: @MainActor (DocumentModel?) -> LocalizedStringResource
+  let title: @MainActor () -> LocalizedStringResource
   let image: String
   /// The action receives the live `reduceMotion` env so toggles that
   /// animate (e.g. sidebar reveal) can honor accessibility settings
   /// from any call site without each call site re-implementing the
   /// check.
-  let action: @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void
-  let isEnabled: @MainActor (DocumentModel) -> Bool
+  let perform: @MainActor (_ reduceMotion: Bool) -> Void
+  let isEnabled: @MainActor () -> Bool
   let shortcut: KeyboardShortcut?
   let accessibilityID: String
 
   init(
-    title: @escaping @MainActor (DocumentModel?) -> LocalizedStringResource,
+    title: @escaping @MainActor () -> LocalizedStringResource,
     image: String,
-    action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
-    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    perform: @escaping @MainActor (_ reduceMotion: Bool) -> Void,
+    isEnabled: @escaping @MainActor () -> Bool = { true },
     shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.title = title
     self.image = image
-    self.action = action
+    self.perform = perform
     self.isEnabled = isEnabled
     self.shortcut = shortcut
     self.accessibilityID = accessibilityID
@@ -40,15 +47,15 @@ struct Action {
   init(
     title: LocalizedStringResource,
     image: String,
-    action: @escaping @MainActor (DocumentModel, _ reduceMotion: Bool) -> Void,
-    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    perform: @escaping @MainActor (_ reduceMotion: Bool) -> Void,
+    isEnabled: @escaping @MainActor () -> Bool = { true },
     shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.init(
-      title: { _ in title },
+      title: { title },
       image: image,
-      action: action,
+      perform: perform,
       isEnabled: isEnabled,
       shortcut: shortcut,
       accessibilityID: accessibilityID
@@ -58,23 +65,23 @@ struct Action {
   init(
     title: LocalizedStringResource,
     image: String,
-    action: @escaping @MainActor (DocumentModel) -> Void,
-    isEnabled: @escaping @MainActor (DocumentModel) -> Bool,
+    perform: @escaping @MainActor () -> Void,
+    isEnabled: @escaping @MainActor () -> Bool = { true },
     shortcut: KeyboardShortcut? = nil,
     accessibilityID: String
   ) {
     self.init(
-      title: { _ in title },
+      title: { title },
       image: image,
-      action: { model, _ in action(model) },
+      perform: { _ in perform() },
       isEnabled: isEnabled,
       shortcut: shortcut,
       accessibilityID: accessibilityID
     )
   }
 
-  func helpLabel(_ model: DocumentModel?) -> LocalizedStringResource {
-    let title = self.title(model)
+  func helpLabel() -> LocalizedStringResource {
+    let title = self.title()
     guard let shortcut else { return title }
     return "\(title) (\(Self.format(shortcut)))"
   }
@@ -105,135 +112,172 @@ struct Action {
     }
   }
 
-  func menuItem(model: DocumentModel?) -> some View {
-    ActionMenuButton(action: self, model: model)
+  func menuItem() -> some View {
+    ActionMenuButton(action: self)
   }
 
-  func toolbarItem(
-    model: DocumentModel?, imageOnly: Bool = false) -> some View
-  {
-    ActionToolbarButton(action: self, model: model, imageOnly: imageOnly)
+  func toolbarItem(imageOnly: Bool = false) -> some View {
+    ActionToolbarButton(action: self, imageOnly: imageOnly)
+  }
+}
+
+// MARK: - DocumentModel factories
+
+extension Action {
+  static func zoomIn(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Zoom In",
+      image: "plus.magnifyingglass",
+      perform: { model?.zoomIn() },
+      isEnabled: { model?.canZoomOut ?? false },
+      shortcut: .init("+", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.zoomIn
+    )
   }
 
-  static let zoomIn = Action(
-    title: "Zoom In",
-    image: "plus.magnifyingglass",
-    action: { $0.zoomIn() },
-    isEnabled: { $0.canZoomOut },
-    shortcut: .init("+", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.zoomIn
-  )
+  static func zoomOut(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Zoom Out",
+      image: "minus.magnifyingglass",
+      perform: { model?.zoomOut() },
+      isEnabled: { model?.canZoomOut ?? false },
+      shortcut: .init("-", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.zoomOut
+    )
+  }
 
-  static let zoomOut = Action(
-    title: "Zoom Out",
-    image: "minus.magnifyingglass",
-    action: { $0.zoomOut() },
-    isEnabled: { $0.canZoomOut },
-    shortcut: .init("-", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.zoomOut
-  )
+  static func resetZoom(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Actual Size",
+      image: "1.magnifyingglass",
+      perform: { model?.resetZoom() },
+      isEnabled: { model?.canResetZoom ?? false },
+      shortcut: .init("0", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.actualSize
+    )
+  }
 
-  static let resetZoom = Action(
-    title: "Actual Size",
-    image: "1.magnifyingglass",
-    action: { $0.resetZoom() },
-    isEnabled: { $0.canResetZoom },
-    shortcut: .init("0", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.actualSize
-  )
+  static func back(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Back",
+      image: "chevron.backward",
+      perform: {
+        guard let model else { return }
+        Task { await model.goBack() }
+      },
+      isEnabled: { model?.canGoBack ?? false },
+      shortcut: .init("[", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.back
+    )
+  }
 
-  static let back = Action(
-    title: "Back",
-    image: "chevron.backward",
-    action: { model in Task { await model.goBack() } },
-    isEnabled: { $0.canGoBack },
-    shortcut: .init("[", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.back
-  )
+  static func forward(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Forward",
+      image: "chevron.forward",
+      perform: {
+        guard let model else { return }
+        Task { await model.goForward() }
+      },
+      isEnabled: { model?.canGoForward ?? false },
+      shortcut: .init("]", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.forward
+    )
+  }
 
-  static let forward = Action(
-    title: "Forward",
-    image: "chevron.forward",
-    action: { model in Task { await model.goForward() } },
-    isEnabled: { $0.canGoForward },
-    shortcut: .init("]", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.forward
-  )
-
-  static let reload = Action(
-    title: "Reload",
-    image: "arrow.clockwise",
-    action: { model in Task { await model.reload() } },
-    isEnabled: { _ in true },
-    shortcut: .init("r", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.reload
-  )
+  static func reload(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Reload",
+      image: "arrow.clockwise",
+      perform: {
+        guard let model else { return }
+        Task { await model.reload() }
+      },
+      shortcut: .init("r", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.reload
+    )
+  }
 
   /// Toolbar variant that flips the bar in and out, mirroring the
   /// show/hide affordance Safari and Preview surface in their
   /// toolbars. Title flips so the tooltip and accessibility label
   /// reflect the current state, just like `toggleTOC`.
-  static let find = Action(
-    title: { model in
-      (model?.isFindVisible ?? false) ? "Hide Find" : "Find…"
-    },
-    image: "magnifyingglass",
-    action: { model, reduceMotion in
-      model.toggleFind(reduceMotion: reduceMotion)
-    },
-    isEnabled: { _ in true },
-    shortcut: .init("f", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.find
-  )
+  static func find(_ model: DocumentModel?) -> Action {
+    Action(
+      title: {
+        (model?.isFindVisible ?? false) ? "Hide Find" : "Find…"
+      },
+      image: "magnifyingglass",
+      perform: { reduceMotion in
+        model?.toggleFind(reduceMotion: reduceMotion)
+      },
+      shortcut: .init("f", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.find
+    )
+  }
 
-  static let useSelectionForFind = Action(
-    title: "Use Selection for Find",
-    image: "text.magnifyingglass",
-    action: { model, reduceMotion in
-      Task { await model.useSelectionForFind(reduceMotion: reduceMotion) }
-    },
-    isEnabled: { _ in true },
-    shortcut: .init("e", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.useSelectionForFind
-  )
+  static func useSelectionForFind(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Use Selection for Find",
+      image: "text.magnifyingglass",
+      perform: { reduceMotion in
+        guard let model else { return }
+        Task { await model.useSelectionForFind(reduceMotion: reduceMotion) }
+      },
+      shortcut: .init("e", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.useSelectionForFind
+    )
+  }
 
-  static let findNext = Action(
-    title: "Find Next",
-    image: "chevron.down",
-    action: { model in Task { await model.findNext() } },
-    isEnabled: { $0.findMatchCount > 0 },
-    shortcut: .init("g", modifiers: [.command]),
-    accessibilityID: ViewerA11yID.ViewMenu.findNext
-  )
+  static func findNext(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Find Next",
+      image: "chevron.down",
+      perform: {
+        guard let model else { return }
+        Task { await model.findNext() }
+      },
+      isEnabled: { (model?.findMatchCount ?? 0) > 0 },
+      shortcut: .init("g", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.ViewMenu.findNext
+    )
+  }
 
-  static let findPrevious = Action(
-    title: "Find Previous",
-    image: "chevron.up",
-    action: { model in Task { await model.findPrevious() } },
-    isEnabled: { $0.findMatchCount > 0 },
-    shortcut: .init("g", modifiers: [.command, .shift]),
-    accessibilityID: ViewerA11yID.ViewMenu.findPrevious
-  )
+  static func findPrevious(_ model: DocumentModel?) -> Action {
+    Action(
+      title: "Find Previous",
+      image: "chevron.up",
+      perform: {
+        guard let model else { return }
+        Task { await model.findPrevious() }
+      },
+      isEnabled: { (model?.findMatchCount ?? 0) > 0 },
+      shortcut: .init("g", modifiers: [.command, .shift]),
+      accessibilityID: ViewerA11yID.ViewMenu.findPrevious
+    )
+  }
 
   /// Sidebar / Table-of-Contents toggle. Single source of truth shared
   /// by the View menu (via `menuItem`) and the document toolbar (via
   /// `toolbarItem`). Title flips Show/Hide in the menu; the toolbar
   /// uses the static "Toggle…" label as its tooltip / accessibility
   /// label.
-  static let toggleTOC = Action(
-    title: { model in
-      (model?.showsTOC ?? false)
-        ? "Hide Table of Contents"
-        : "Show Table of Contents"
-    },
-    image: "sidebar.left",
-    action: { model, reduceMotion in
-      withAnimationAsNeeded(reduceMotion) { model.showsTOC.toggle() }
-    },
-    isEnabled: { _ in true },
-    shortcut: .init("1", modifiers: [.command, .control]),
-    accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
-  )
+  static func toggleTOC(_ model: DocumentModel?) -> Action {
+    Action(
+      title: {
+        (model?.showsTOC ?? false)
+          ? "Hide Table of Contents"
+          : "Show Table of Contents"
+      },
+      image: "sidebar.left",
+      perform: { reduceMotion in
+        guard let model else { return }
+        withAnimationAsNeeded(reduceMotion) { model.showsTOC.toggle() }
+      },
+      shortcut: .init("1", modifiers: [.command, .control]),
+      accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
+    )
+  }
 }
 
 /// Menu rendering for an `Action`. Dedicated View so `@Environment` for
@@ -242,15 +286,13 @@ struct Action {
 @MainActor
 private struct ActionMenuButton: View {
   let action: Action
-  let model: DocumentModel?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    Button(action.title(model), systemImage: action.image) {
-      guard let model else { return }
-      action.action(model, reduceMotion)
+    Button(action.title(), systemImage: action.image) {
+      action.perform(reduceMotion)
     }
-    .disabled(!(model.map { action.isEnabled($0) } ?? false))
+    .disabled(!action.isEnabled())
     .keyboardShortcut(action.shortcut)
     .accessibilityIdentifier(action.accessibilityID)
   }
@@ -262,24 +304,22 @@ private struct ActionMenuButton: View {
 @MainActor
 private struct ActionToolbarButton: View {
   let action: Action
-  let model: DocumentModel?
   let imageOnly: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     Button {
-      guard let model else { return }
-      action.action(model, reduceMotion)
+      action.perform(reduceMotion)
     } label: {
       if imageOnly {
         Image(systemName: action.image)
       } else {
-        Label(action.title(model), systemImage: action.image)
+        Label(action.title(), systemImage: action.image)
       }
     }
-    .disabled(!(model.map { action.isEnabled($0) } ?? false))
-    .help(action.helpLabel(model))
-    .accessibilityLabel(Text(action.title(model)))
+    .disabled(!action.isEnabled())
+    .help(action.helpLabel())
+    .accessibilityLabel(Text(action.title()))
     .accessibilityIdentifier(action.accessibilityID)
   }
 }
