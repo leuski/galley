@@ -11,123 +11,55 @@ backlog, not a roadmap — pick from it, don't burn through it.
 
 ---
 
+## Shipped since the last revision
+
+Tracked here so the original Tier-1/Tier-2 numbering keeps its meaning when
+cross-referenced from elsewhere. None of the items below are candidates for
+new work — only follow-ups call them out.
+
+- **1.2 Mermaid in the bundled default template.** Shipped as part of the
+  template-collapse refactor (`742775e`). `mermaid.min.js` lives next to
+  the bundled HTML in `Sources/GalleyCoreKit/Resources/Templates.bundle/`
+  and the default template initializes it on `language-mermaid` blocks.
+  The opt-out toggle envisioned in the original spec was not added — if a
+  user complaint surfaces, that's where the follow-up would land.
+- **1.3 Auto-generated table-of-contents sidebar.** `TOCSidebar.swift`
+  ships a toggleable left rail; `697b5dd` added active-section highlighting
+  driven by the existing `ScrollBridge`. Built from the rendered DOM, so it
+  works regardless of processor.
+- **2.1 In-document search (⌘F).** Shipped as a focus-aware sliding find
+  bar (`511c83d`), with later refactors splitting the model
+  (`SearchFieldModel`, `FindSession`) from the view (`FindBar`,
+  `ToolbarSearchField`, `AppKitSearchField`, `SearchField`). Lives under
+  the Edit menu (`EditCommands.swift`).
+
+Partially shipped:
+
+- **1.1 Built-in themes.** Five hand-tuned bundled templates ship in
+  `Templates.bundle` (`Default`, `GitHub`, `HighContrast`, `Sepia`,
+  `Terminal`) per `0940f98`. They're surfaced through the existing Template
+  menu rather than as a separate "Theme" submenu — i.e. the
+  template-and-theme axes were collapsed rather than split. The
+  manuscript/serif and Tufte-style sidenote layouts envisioned in the
+  original spec are still missing; treat those as follow-ups to 1.1 if the
+  audience asks for them.
+
+Adjacent work that doesn't map onto a tier in this list but is worth knowing
+about when scoping the remaining items:
+
+- Server liveness probe + "stale server detected" UX
+  (`Sources/GalleyCoreKit/Networking/ServerProbe.swift`,
+  `ServerStatus.swift`, plus `ServerStatusModel` / `ServerStatusPill` in
+  the Viewer).
+- Page-background-color resolution + window-chrome tinting (`e463081`,
+  `0c2417e`, `803fde6`, `cd683fe`) — relevant if a future export feature
+  needs to honor the rendered background.
+- "Transparent toolbar" Settings toggle (`0cc5af3`).
+- PDF export migrated to SwiftUI's `fileExporter` (`ee41fa6`).
+
+---
+
 ## Tier 1 — High value, low cost (do these first)
-
-### 1.1 Built-in CSS theme picker on top of the template engine
-
-**Gap.** A first-time user opening Galley sees one default rendering and a
-template menu that's empty until they install something. Marked 2 ships nine
-themes; MacMD Viewer ships light/dark; QLMarkdown ships several. The bar for
-"feels finished out of the box" is set by them.
-
-**Audience.** Every new user. This is the single biggest first-impression
-gap.
-
-**What "done" looks like.**
-
-- The bundled default template grows a `--theme` query parameter or a
-  template-relative CSS variable set.
-- Five to seven hand-tuned themes ship in the bundle: GitHub-style light,
-  GitHub-style dark, sepia/reading, high-contrast, terminal-mono,
-  manuscript/serif, and a Tufte-style sidenote layout.
-- A "Theme" submenu under "View" — separate from "Template" — switches them.
-- Selection persists per-document via `PerFileStateStore`, with a global
-  default in `AppModel`.
-- A scene-level override is honored when `enablePerDocumentOverrides` is on.
-
-**Where it lives.**
-
-- New `Sources/GalleyCoreKit/Templates/BuiltInThemes.swift` enumerating themes.
-- Bundled CSS lives next to `DefaultTemplate.html` in
-  `GalleyCoreKit/Resources/`.
-- New `SceneThemeModel` mirroring `SceneTemplateModel`.
-- New `ThemeMenu` view in `Sources/Viewer/Views/Menus/`.
-- `Placeholders.swift` grows a `#THEME_CSS_HREF#` placeholder so user
-  templates that opt in get the same dropdown for free.
-
-**Cost.** ~1 engineering week for the framework and menu plumbing, then
-ongoing design time for each new theme. Themes are content, not code.
-
-**Risks.** Low. The only architectural risk is double-coupling: themes
-need to be expressible *both* through the placeholder system (so user
-templates can use them) and as a standalone fallback that works when no user
-template is installed. Designing the contract once, up front, avoids a
-migration later.
-
-### 1.2 First-class Mermaid in the bundled default template
-
-**Gap.** MacMD Viewer's headline feature; QLMarkdown supports it; Marked 2
-reaches it via custom processor. Galley reaches it only if the user picks a
-processor + template combination that includes the Mermaid runtime — and
-the bundled default template does not.
-
-**Audience.** Anyone reading AI-generated `.md` files (which routinely
-include Mermaid blocks), engineering teams documenting architecture,
-academics drawing flowcharts.
-
-**What "done" looks like.**
-
-- The bundled default template embeds the Mermaid runtime and initializes
-  it on `<pre><code class="language-mermaid">` blocks regardless of which
-  processor produced them.
-- A "Mermaid" toggle in Settings (default on) so users can opt out for
-  bandwidth/security reasons.
-- Mermaid runs in the Galley scheme handler as well as the HTTP server, and
-  works in the Quick Look extension.
-
-**Where it lives.**
-
-- `Sources/GalleyCoreKit/Resources/DefaultTemplate.html` gains the
-  Mermaid loader (vendored, not CDN — see risks).
-- `Sources/GalleyCoreKit/Resources/mermaid.min.js` vendored at a pinned
-  version.
-- Optional setting in the Viewer's `AppModel`.
-
-**Cost.** ~1 week. Most of the work is template surgery and verifying
-behavior across processors (Pandoc, cmark-gfm, and swift-markdown all emit
-the language class slightly differently — the template needs to be tolerant
-of each).
-
-**Risks.** Mermaid is ~2 MB minified. Inlining it inflates every preview
-load. Mitigation: serve it via the scheme handler / HTTP server as a static
-asset (`/runtime/mermaid.js`) so it caches once. **Don't** load it from a
-public CDN — Galley's audience expects offline-friendly behavior, and CDN
-loads conflict with the security posture of macOS WebView's default CSP.
-
-### 1.3 Auto-generated table of contents sidebar
-
-**Gap.** Marked 2 and MacMD Viewer both ship a TOC sidebar with typeahead
-search that follows the active heading as you scroll. Galley relies on the
-template to provide one, which means in practice most users don't get one.
-
-**Audience.** Anyone reading documents longer than one screen.
-
-**What "done" looks like.**
-
-- A toggleable left sidebar (View → Show Outline, ⌥⌘O).
-- Built from `<h1>`–`<h6>` tags in the rendered DOM, not from the source —
-  this way it works regardless of processor.
-- Active-heading highlight follows scroll position (uses the existing
-  `ScrollBridge`).
-- Click jumps to the heading; ⌘F-style typeahead search filters the list.
-
-**Where it lives.**
-
-- New `Sources/Viewer/Views/OutlineSidebar.swift`.
-- Template grows a `#OUTLINE_HOOK#` no-op placeholder for templates that
-  want to opt out (replaced with empty string), defaults to extracting from
-  the rendered DOM via a small WebView script bridge.
-- Existing `ScrollBridge` extended to include the active-heading element ID.
-
-**Cost.** ~2 weeks. The visual design is the longest part, not the
-plumbing. Consider whether the sidebar should be a SwiftUI overlay on the
-WebView or part of the rendered HTML — overlay is more consistent across
-templates, HTML is more flexible per-template.
-
-**Risks.** Heading IDs need to be stable. Pandoc and cmark-gfm both have
-auto-ID behavior; the swift-markdown renderer doesn't generate IDs by
-default. Galley would need to inject IDs at render time for templates that
-don't.
 
 ### 1.4 Word count and reading-time HUD
 
@@ -152,12 +84,13 @@ of. Also Markoff users who already expect this.
 - New `Sources/Viewer/Views/StatusBar.swift`.
 - Stats computed from the rendered text content (via WebView script
   bridge — the source `.md` may contain transclusion or other directives
-  that make raw-source counts misleading).
+  that make raw-source counts misleading). The TOC sidebar already
+  evaluates JS against the rendered DOM; reuse the same plumbing.
 
 **Cost.** ~3 days. Genuinely small.
 
-**Risks.** None significant. This is the cheapest user-visible win in the
-backlog.
+**Risks.** None significant. This is the cheapest user-visible win still
+on the backlog.
 
 ### 1.5 Re-enable the notarized release pipeline + ship a stable DMG channel
 
@@ -172,7 +105,8 @@ how to right-click → Open.
 **What "done" looks like.**
 
 - `release.yml` re-enabled with the secrets it needs (Apple Developer ID,
-  signing certificate, app-specific password, team ID).
+  signing certificate, app-specific password, team ID — already
+  enumerated in the workflow's header comment).
 - Each tag produces a notarized, stapled DMG attached to the GitHub
   release.
 - A homebrew-cask formula (`brew install --cask galley`) for distribution
@@ -185,37 +119,26 @@ overhead. The tricky parts are entirely in the Apple side, not the code.
 non-trivial onboarding time. The notarization workflow occasionally fails
 for opaque reasons — budget time for first-build debugging.
 
+### 1.1-followup Two more bundled themes (manuscript / Tufte)
+
+The five-template set covers GitHub-style, sepia, high-contrast, and
+terminal-mono. The original spec called out a manuscript/serif layout and
+a Tufte-style sidenote layout as Tier-1 wins; both are still missing. Each
+is a single hand-tuned CSS pass against the existing template engine — the
+plumbing is done, only the design work is left.
+
+**Cost.** ~1 day each, gated on design time.
+
 ---
 
 ## Tier 2 — Medium value, medium cost
 
-### 2.1 In-document search (⌘F)
-
-**Gap.** Marked 2 has typeahead search across both the TOC and the body;
-MacMD Viewer has both.
-
-**Audience.** Same as the TOC item — anyone reading long documents.
-
-**What "done" looks like.**
-
-- ⌘F invokes the WebView's built-in find bar (`WKWebView` exposes
-  `findString(_:)` via a private-but-stable API; SwiftUI `WebPage` may need
-  a small bridge).
-- ⌘G / ⇧⌘G next/previous.
-- The find bar surfaces match counts and supports case-sensitive +
-  whole-word toggles.
-
-**Cost.** ~1 week.
-
-**Risks.** SwiftUI's `WebPage` doesn't expose the underlying find API
-cleanly. The fallback is a small JS-side find implementation — slower, less
-polished, but works everywhere. Pick one and commit.
-
 ### 2.2 Export as self-contained HTML
 
 **Gap.** Marked 2 exports HTML with self-contained inlined images; Galley
-exports PDF only. For users handing rendered output to colleagues or to a
-CMS, the gap is real.
+exports PDF only (now via `fileExporter`, see `DocumentModel+Print.swift`).
+For users handing rendered output to colleagues or to a CMS, the gap is
+real.
 
 **Audience.** Documentation writers, blog authors, anyone doing handoff.
 
@@ -235,15 +158,17 @@ CMS, the gap is real.
   `printOperation`, snapshots the rendered DOM via
   `evaluateJavaScript("document.documentElement.outerHTML")`, then
   post-processes to inline assets.
+- Honor the resolved page background color (see `Template+BackgroundColor`)
+  so exported HTML matches the in-app preview.
 
 **Cost.** ~1.5 weeks. The asset-inlining pass is the bulk of the work
 because it has to chase every URL the template might emit (background
-images in CSS, `srcset` attributes, fonts, etc.).
+images in CSS, `srcset` attributes, fonts, Mermaid runtime, etc.).
 
 **Risks.** "Self-contained" has soft edges — fonts loaded by `@font-face`
 need their bytes; remote URLs have to be downloaded; some templates pull
-runtime libraries (Mermaid, KaTeX). Be explicit about what is and isn't
-inlined.
+runtime libraries (Mermaid is now bundled in the default template, KaTeX
+is template-dependent). Be explicit about what is and isn't inlined.
 
 ### 2.3 Multi-file / book mode (Tier-2 scope, not full Marked 2 parity)
 
@@ -301,6 +226,7 @@ subtle but tractable with the existing `bindGeneration` pattern in
 
 - File → Export → Rich Text Format.
 - Done via `NSAttributedString(html:options:)` over the rendered HTML.
+- Best paired with 2.2 — they share the rendered-HTML snapshot path.
 
 **Cost.** ~3 days. `NSAttributedString` does most of the work.
 
@@ -318,7 +244,7 @@ unevenly. Document the limitation rather than fight it.
 - German + French as a starting pair (both have active Mac developer
   audiences, both are tractable to QA).
 - All four `Localizable.xcstrings` files (Viewer, Server, GalleyCoreKit,
-  GalleyServerKit) and the Quicklook lproj directories updated.
+  GalleyServerKit) and the Quicklook `lproj` directories updated.
 - Spanish, Italian, Japanese, Simplified Chinese as Tier-3 follow-ups.
 
 **Cost.** ~1 week per language, but most of the cost is translation
@@ -373,8 +299,8 @@ documents.
 
 - ⌘D adds a bookmark at the current scroll position with the active
   heading as the title.
-- Bookmarks panel in a left-rail sidebar (alongside or below the TOC from
-  Tier 1.3).
+- Bookmarks panel in the existing TOC sidebar (alongside or below the
+  heading list — `TOCSidebar.swift` already shipped).
 - Persisted in `PerFileStateStore`.
 
 **Cost.** ~1 week, mostly UX design.
@@ -386,7 +312,7 @@ documents.
 **Audience.** Tiny but loud — OmniOutliner / iThoughts users.
 
 **Cost.** ~3 days. Convert the heading tree into OPML; the data structure
-is identical.
+the TOC sidebar already builds is the source.
 
 ### 3.4 Mac App Store distribution
 
@@ -409,7 +335,9 @@ Not strictly a development item, but the highest-leverage non-code work
 available:
 
 - A short demo video showing cmd-click → editor jump and the
-  BBEdit-pane-to-Galley-server pairing.
+  BBEdit-pane-to-Galley-server pairing. The find bar and TOC sidebar are
+  worth screen time too — they shipped after the original draft of this
+  list and aren't reflected anywhere user-facing yet.
 - A blog post on "BBEdit + Galley" for the BBEdit power-user audience.
 - A blog post on "Pandoc previewing on macOS" for the academic audience.
 - Listings on alternativeto.net, MacUpdate, Setapp (if it fits), and the
@@ -424,17 +352,21 @@ a few weeks of compounding inbound interest.
 
 ## Sequencing recommendation
 
-If I had four engineering weeks to spend:
+If I had four engineering weeks to spend now:
 
 1. **Week 1.** Tier 1.4 (word count / reading time HUD — fastest visible
-   win) + Tier 1.5 (notarized DMG pipeline — biggest trust improvement).
-2. **Week 2.** Tier 1.2 (Mermaid in the bundled template).
-3. **Weeks 3–4.** Tier 1.1 (built-in themes) + Tier 1.3 (TOC sidebar) — the
-   two together close the "first impression" gap completely.
+   win still on the list) + Tier 1.5 (notarized DMG pipeline — biggest
+   trust improvement).
+2. **Weeks 2–3.** Tier 2.2 (HTML export) + Tier 2.4 (RTF export) bundled
+   together — they share the rendered-HTML snapshot path, so building
+   them as a pair is cheaper than building them sequentially.
+3. **Week 4.** Tier 1.1 follow-up (manuscript + Tufte themes) and Tier 3.5
+   (marketing) — both unlock audience growth without heavy engineering.
 
-After that, Tier 2.2 (HTML export) is the next-best individual item, and
-Tier 3.5 (marketing) is the lever that converts engineering investment into
-audience.
+After that, Tier 2.3 (multi-file / book mode) is the next-best individual
+item if there's signal that the academic / book-author audience matters,
+and Tier 2.5 (DE/FR localization) is the lever that opens the Western
+European market.
 
 What *not* to do first:
 

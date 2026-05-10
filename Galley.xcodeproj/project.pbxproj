@@ -135,16 +135,6 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		62FA000600000000CADD7300 /* Copy Launch Agent Plist */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LaunchAgents;
-			dstSubfolderSpec = 1;
-			files = (
-			);
-			name = "Copy Launch Agent Plist";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -190,6 +180,11 @@
 				62564F3F2FA857A400FF0F84 /* Exceptions for "Quicklook" folder in "Quicklook" target */,
 			);
 			path = Quicklook;
+			sourceTree = "<group>";
+		};
+		626B7C552FB0F65A00075804 /* docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = docs;
 			sourceTree = "<group>";
 		};
 		62CC3C602FA7B8F90018F091 /* UITests */ = {
@@ -308,6 +303,7 @@
 		626E8D462F9DD1C700BD51F9 = {
 			isa = PBXGroup;
 			children = (
+				626B7C552FB0F65A00075804 /* docs */,
 				62D5E0FF2FA5C53400CADD72 /* Frameworks */,
 				626E8D502F9DD1C700BD51F9 /* Products */,
 				62D5C9302FA01C3900CADD72 /* Scripts */,
@@ -475,9 +471,8 @@
 				62D5E0A62FA5BFB000CADD72 /* Lint */,
 				62D5CA162FA048F000CADD72 /* Frameworks */,
 				62D5CA172FA048F000CADD72 /* Resources */,
+				62D5E0A82FA5BFB000CADD72 /* Compile AppleScripts */,
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
-				62FA000600000000CADD7300 /* Copy Launch Agent Plist */,
-				62D5E1102FA5C60500CADD72 /* Install Release */,
 				62564F432FA857A400FF0F84 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -691,26 +686,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"\n\nif which swiftlint > /dev/null; then\n  swiftlint --config swiftlint.yml Sources\nelse\n  echo \"warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint\"\nfi\n";
+			shellScript = "\"${SRCROOT}/Scripts/lint.sh\"\n";
 		};
-		62D5E1102FA5C60500CADD72 /* Install Release */ = {
+		62D5E0A82FA5BFB000CADD72 /* Compile AppleScripts */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
+			buildActionMask = 12;
 			files = (
 			);
 			inputFileListPaths = (
 			);
 			inputPaths = (
 			);
-			name = "Install Release";
+			name = "Compile AppleScripts";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Only run for Release builds, and skip during archive (release.sh handles install).\nif [ \"$CONFIGURATION\" != \"Release\" ]; then\n    exit 0\nfi\nif [ \"$ACTION\" = \"install\" ]; then\n    echo \"Skipping /Applications install during archive (release.sh handles it).\"\n    exit 0\nfi\n\nset -e\n\nAPP_NAME=\"${FULL_PRODUCT_NAME}\"\nBUILD_PATH=\"${TARGET_BUILD_DIR}/${APP_NAME}\"\nINSTALL_DIR=\"/Applications\"\nINSTALL_PATH=\"${INSTALL_DIR}/${APP_NAME}\"\n\necho \"Installing ${APP_NAME} to ${INSTALL_DIR}...\"\n\n# Remove existing app\nif [ -d \"${INSTALL_PATH}\" ]; then\n    echo \"Removing existing app...\"\n    rm -rf \"${INSTALL_PATH}\"\nfi\n\n# Copy new build\nditto \"${BUILD_PATH}\" \"${INSTALL_PATH}\"\n\necho \"Installed ${APP_NAME} to ${INSTALL_PATH}\"\n";
+			shellScript = "\"${SRCROOT}/Scripts/compile-applescripts.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

@@ -20,7 +20,7 @@ public enum ScriptInstaller {
   }
 
   static var bundledSourceURL: URL? {
-    Bundle.main.url(forResource: "Scripts", withExtension: "bundle")
+    Bundle.main.url(forResource: "BBEditScripts", withExtension: "bundle")
   }
 
   /// `~/Library/Application Support/BBEdit/Scripts`. Used to seed the
