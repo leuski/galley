@@ -227,4 +227,28 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
     ["sh", "bash", "zsh", "command"]
       .contains(url.pathExtension.lowercased())
   }
+
+  /// Post-install UI follow-up. Always reveals `destination` in
+  /// Finder so the user can see where the scripts went; for editors
+  /// whose script host needs poking (Xcode's system Script Menu),
+  /// also enables and opens that host. Safe to call after every
+  /// install — both the defaults write and the Script Menu launch
+  /// are idempotent.
+  @MainActor
+  func presentInstalledScripts(at destination: URL) {
+    NSWorkspace.shared.activateFileViewerSelecting([destination])
+    switch self {
+    case .xcode:
+      // System Script Menu surfaces user scripts only when it's
+      // enabled. Same as `defaults write com.apple.scriptmenu
+      // ScriptMenuEnabled -bool true` — writing through
+      // `UserDefaults(suiteName:)` skips a `Process` round-trip.
+      UserDefaults(suiteName: "com.apple.scriptmenu")?
+        .set(true, forKey: "ScriptMenuEnabled")
+      NSWorkspace.shared.open(URL(filePath:
+        "/System/Library/CoreServices/Script Menu.app"))
+    case .bbedit, .textmate, .vscode, .sublime, .zed:
+      break
+    }
+  }
 }

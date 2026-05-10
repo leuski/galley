@@ -109,7 +109,7 @@ struct MarkdownSettingsView: View {
       try preset.installScripts(to: destination, context: [
         "__LOCATION__": Defaults.shared.host.galleyPreview.absoluteString
       ])
-      NSWorkspace.shared.activateFileViewerSelecting([destination])
+      preset.presentInstalledScripts(at: destination)
     } catch {
       scriptInstallError = error.localizedDescription
     }
