@@ -7,8 +7,6 @@ struct GeneralSettingsView: View {
   var body: some View {
     Section {
       openDocumentPicker
-    }
-    Section("Status bar") {
       statusBarSettings
     }
   }
@@ -54,20 +52,7 @@ struct GeneralSettingsView: View {
   @ViewBuilder
   private var statusBarSettings: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Toggle("Show status bar", isOn: $defaults.showsStatusBar)
-      Text("""
-            Adds a footer to each document window with word count, \
-            character count, heading count, and an estimated reading \
-            time.
-            """
-      )
-      .subtitle()
-    }
-
-    VStack(alignment: .leading, spacing: 4) {
-      HStack {
-        Text("Reading speed")
-        Spacer()
+      LabeledContent("Reading speed") {
         Stepper(
           value: $defaults.readingWordsPerMinute,
           in: 50...600,
@@ -76,7 +61,6 @@ struct GeneralSettingsView: View {
           Text("\(defaults.readingWordsPerMinute) wpm")
             .monospacedDigit()
         }
-        .fixedSize()
       }
       Text("""
             Words per minute used to estimate reading time in the \
