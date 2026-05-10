@@ -26,7 +26,9 @@ where Model: SearchModel
   @State private var fieldFocused = false
 
   var body: some View {
-    Group {
+    Label {
+      Text("Search")
+    } icon: {
       if isOpen {
         SearchField(
           model: model,
@@ -34,19 +36,19 @@ where Model: SearchModel
           prompt: "Search",
           onSubmit: { Task { await model.findNext() } },
           onCancel: close)
-          .transition(swap)
+        .transition(swap)
       } else {
         // `Label` (vs bare `Image`) is what gives the Customize
         // Toolbar panel a name to show. `.labelStyle(.iconOnly)`
         // keeps the live toolbar rendering as just the glyph.
         Button(action: open) {
-          Label("Search", systemImage: "magnifyingglass")
+          Image(systemName: "magnifyingglass")
         }
-        .labelStyle(.iconOnly)
-        .help("Search")
         .transition(swap)
       }
     }
+    .help("Search")
+    .accessibilityLabel(Text("Search"))
     .onAppear {
       // Re-mount mid-find session (state restoration, the user
       // re-adding the item via Customize Toolbar) should resume in
@@ -104,4 +106,4 @@ where Model: SearchModel
 /// identity-change transition for views inside a toolbar item.
 @MainActor
 private let swap: AnyTransition =
-  .opacity.animation(.easeInOut(duration: 5.5))
+  .opacity.animation(.easeInOut(duration: 0.5))
