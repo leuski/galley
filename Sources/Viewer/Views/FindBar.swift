@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Find-text bar styled after Preview's: a full-width horizontal bar
 /// pinned below the toolbar via `.safeAreaInset(edge: .top)`. The
-/// magnifying-glass toolbar button toggles `isFindVisible`; ⌘F drives
+/// magnifying-glass toolbar button toggles `isVisible`; ⌘F drives
 /// the same surface from the View menu.
 ///
 /// The text field, options menu, and counter live in `SearchField`;
@@ -38,7 +38,7 @@ where Model: SearchModel
     fieldFocused = false
     Task {
       try? await Task.sleep(for: .milliseconds(50))
-      withAnimationAsNeeded(reduceMotion) { model.hideFind() }
+      withAnimationAsNeeded(reduceMotion) { model.hide() }
     }
   }
 
@@ -71,6 +71,6 @@ where Model: SearchModel
       try? await Task.sleep(for: .milliseconds(transitionMillis))
       fieldFocused = true
     }
-    .onChange(of: model.findDismissalToken) { dismiss() }
+    .onChange(of: model.dismissalToken) { dismiss() }
   }
 }

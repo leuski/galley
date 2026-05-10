@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// `isItemSurfaced` is forwarded by the parent so this view can tell
 /// when *it* is the live find UI versus when `FindBar` is. Only the
-/// active surface should respond to `findDismissalToken`; otherwise
+/// active surface should respond to `dismissalToken`; otherwise
 /// both surfaces would race on the dismiss path.
 struct ToolbarSearchField<Model>: View
 where Model: SearchModel
@@ -51,14 +51,14 @@ where Model: SearchModel
       // Re-mount mid-find session (state restoration, the user
       // re-adding the item via Customize Toolbar) should resume in
       // open state.
-      if model.isFindVisible { open() }
+      if model.isVisible { open() }
     }
     .onChange(of: isItemSurfaced) { _, surfaced in
       // Took over from `FindBar` while a session was active —
       // open and reclaim focus so typing keeps working.
-      if surfaced && model.isFindVisible { open() }
+      if surfaced && model.isVisible { open() }
     }
-    .onChange(of: model.isFindVisible) { _, isVisible in
+    .onChange(of: model.isVisible) { _, isVisible in
       // External commands (⌘F / ⌘E / Edit menu) drive the flag;
       // mirror that here.
       if isVisible {
@@ -67,7 +67,7 @@ where Model: SearchModel
         close()
       }
     }
-    .onChange(of: model.findDismissalToken) {
+    .onChange(of: model.dismissalToken) {
       // `Action.find` bumps the dismissal token instead of flipping
       // `isFindVisible` so `FindBar` can choreograph its slide-out.
       // The toolbar field has no slide animation; just close. Only
@@ -85,7 +85,7 @@ where Model: SearchModel
 
   private func open() {
     if !isOpen { isOpen = true }
-    if !model.isFindVisible { model.isFindVisible = true }
+    if !model.isVisible { model.isVisible = true }
     // `AppKitSearchField`'s `updateNSView` will pick this up on the
     // next render and call `makeFirstResponder` async-safe.
     if !fieldFocused { fieldFocused = true }
@@ -94,7 +94,7 @@ where Model: SearchModel
   private func close() {
     if fieldFocused { fieldFocused = false }
     if isOpen { isOpen = false }
-    if model.isFindVisible { model.isFindVisible = false }
+    if model.isVisible { model.isVisible = false }
   }
 }
 

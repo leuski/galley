@@ -21,7 +21,7 @@ protocol SearchFieldModel: AnyObject, Observable {
 }
 
 protocol SearchModel: SearchFieldModel {
-  var isFindVisible: Bool { get set }
-  var findDismissalToken: Int { get set }
-  func hideFind()
+  var isVisible: Bool { get set }
+  var dismissalToken: Int { get set }
+  func hide()
 }

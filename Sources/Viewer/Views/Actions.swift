@@ -205,7 +205,7 @@ extension Action {
   static func find(_ session: FindSession?) -> Action {
     Action(
       title: {
-        (session?.isFindVisible ?? false) ? "Hide Find" : "Find…"
+        (session?.isVisible ?? false) ? "Hide Find" : "Find…"
       },
       image: "magnifyingglass",
       perform: { reduceMotion in

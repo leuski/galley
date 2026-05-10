@@ -19,7 +19,7 @@ final class FindSession: SearchModel {
 
   /// Whether the find-text bar is showing in the host window.
   /// Per-document; not persisted across launches.
-  var isFindVisible: Bool = false
+  var isVisible: Bool = false
 
   /// Live find query. `SearchField`'s `.onChange` triggers an
   /// immediate `performSearch`.
@@ -46,9 +46,9 @@ final class FindSession: SearchModel {
   /// `Action.toggleFind`, View menu) requests the find bar to dismiss.
   /// `FindBar` observes this so it can drop focus before the slide-out
   /// transition starts — otherwise the focus ring renders over content
-  /// the bar slides past. Direct `hideFind()` is the unanimated path;
+  /// the bar slides past. Direct `hide()` is the unanimated path;
   /// this token is the animated, focus-aware path.
-  var findDismissalToken: Int = 0
+  var dismissalToken: Int = 0
 
   init(page: WebPage) {
     self.page = page
@@ -60,16 +60,16 @@ final class FindSession: SearchModel {
   /// hide so the focus ring isn't drawn over content as the bar
   /// slides away.
   func requestFindDismissal() {
-    findDismissalToken &+= 1
+    dismissalToken &+= 1
   }
 
   func toggleFind(reduceMotion: Bool) {
-    if isFindVisible {
+    if isVisible {
       // Routed through the dismissal token so `FindBar` can drop
       // focus before the slide-out transition begins.
       requestFindDismissal()
     } else {
-      withAnimationAsNeeded(reduceMotion) { isFindVisible = true }
+      withAnimationAsNeeded(reduceMotion) { isVisible = true }
     }
   }
 
@@ -82,11 +82,11 @@ final class FindSession: SearchModel {
     let trimmed = selection.trimmingCharacters(
       in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
-      withAnimationAsNeeded(reduceMotion) { isFindVisible = true }
+      withAnimationAsNeeded(reduceMotion) { isVisible = true }
       return
     }
     query = trimmed
-    withAnimationAsNeeded(reduceMotion) { isFindVisible = true }
+    withAnimationAsNeeded(reduceMotion) { isVisible = true }
     // The bar's `.onChange(of: query)` is wired only once the
     // view mounts, so the synchronous assignment above wouldn't
     // trigger it on first reveal — drive the search explicitly.
@@ -111,8 +111,8 @@ final class FindSession: SearchModel {
   /// `withAnimation { ... }`. JS highlight teardown is fire-and-forget
   /// — observers don't care about its completion and it would block
   /// the animation otherwise.
-  func hideFind() {
-    isFindVisible = false
+  func hide() {
+    isVisible = false
     matchCount = 0
     matchIndex = -1
     Task { await clearHighlights() }
@@ -174,7 +174,7 @@ final class FindSession: SearchModel {
   /// by `DocumentModel` after every render so highlights and counts
   /// come back without user action across file-watcher reloads.
   func reapplyIfActive() async {
-    guard isFindVisible, !query.isEmpty else { return }
+    guard isVisible, !query.isEmpty else { return }
     await performSearch()
   }
 

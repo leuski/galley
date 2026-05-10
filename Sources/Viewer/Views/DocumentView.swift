@@ -211,7 +211,7 @@ struct DocumentView: View {
           // OR item dragged out via Customize Toolbar). Otherwise
           // `ToolbarSearchField` is the live UI and FindBar stays
           // off-screen.
-          if model.find.isFindVisible && !findSurfacing.isItemSurfaced {
+          if model.find.isVisible && !findSurfacing.isItemSurfaced {
             FindBar(model: model.find)
               .transition(.move(edge: .top).combined(with: .opacity))
           }
