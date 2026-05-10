@@ -11,7 +11,7 @@ import WebKit
 /// `SearchFieldModel`; `DocumentModel`'s find state already covers
 /// every requirement, so this is a thin renaming layer over the
 /// existing `find*` properties and `performFind()`.
-extension DocumentModel: SearchFieldModel {
+extension DocumentModel: SearchModel {
   var query: String {
     get { findQuery }
     set { findQuery = newValue }

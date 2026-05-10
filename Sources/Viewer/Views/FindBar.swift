@@ -13,8 +13,10 @@ import SwiftUI
 /// State lives on `DocumentModel` so a window's find session survives
 /// file-watcher reloads — `renderCurrent` re-runs the query against
 /// the freshly-built DOM when the bar is visible.
-struct FindBar: View {
-  @Bindable var model: DocumentModel
+struct FindBar<Model>: View
+where Model: SearchModel
+{
+  @Bindable var model: Model
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// Plain `@State` instead of `@FocusState` because focus is owned

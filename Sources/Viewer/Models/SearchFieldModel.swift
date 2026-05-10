@@ -16,4 +16,12 @@ protocol SearchFieldModel: AnyObject, Observable {
   var matchCount: Int { get }
   var matchIndex: Int { get }
   func performSearch() async
+  func findPrevious() async
+  func findNext() async
+}
+
+protocol SearchModel: SearchFieldModel {
+  var isFindVisible: Bool { get set }
+  var findDismissalToken: Int { get set }
+  func hideFind()
 }

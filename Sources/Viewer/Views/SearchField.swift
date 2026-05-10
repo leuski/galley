@@ -11,8 +11,10 @@ import SwiftUI
 /// Bar-level concerns (next / previous, dismissal, focus reveal
 /// timing) live in the host view; this struct only owns the field
 /// chrome and forwards `onSubmit` / `onCancel`.
-struct SearchField: View {
-  @Bindable var model: DocumentModel
+struct SearchField<Model>: View
+where Model: SearchFieldModel
+{
+  @Bindable var model: Model
   /// Two-way focus binding. Writing `true` requests focus; the
   /// underlying `AppKitSearchField` reports begin / end editing back
   /// through the same binding so callers see real focus changes.

@@ -229,7 +229,7 @@ extension Action {
     )
   }
 
-  static func findNext(_ model: DocumentModel?) -> Action {
+  static func findNext(_ model: SearchFieldModel?) -> Action {
     Action(
       title: "Find Next",
       image: "chevron.down",
@@ -237,13 +237,13 @@ extension Action {
         guard let model else { return }
         Task { await model.findNext() }
       },
-      isEnabled: { (model?.findMatchCount ?? 0) > 0 },
+      isEnabled: { (model?.matchCount ?? 0) > 0 },
       shortcut: .init("g", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.findNext
     )
   }
 
-  static func findPrevious(_ model: DocumentModel?) -> Action {
+  static func findPrevious(_ model: SearchFieldModel?) -> Action {
     Action(
       title: "Find Previous",
       image: "chevron.up",
@@ -251,7 +251,7 @@ extension Action {
         guard let model else { return }
         Task { await model.findPrevious() }
       },
-      isEnabled: { (model?.findMatchCount ?? 0) > 0 },
+      isEnabled: { (model?.matchCount ?? 0) > 0 },
       shortcut: .init("g", modifiers: [.command, .shift]),
       accessibilityID: ViewerA11yID.ViewMenu.findPrevious
     )

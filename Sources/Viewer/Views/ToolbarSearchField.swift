@@ -13,8 +13,10 @@ import SwiftUI
 /// when *it* is the live find UI versus when `FindBar` is. Only the
 /// active surface should respond to `findDismissalToken`; otherwise
 /// both surfaces would race on the dismiss path.
-struct ToolbarSearchField: View {
-  @Bindable var model: DocumentModel
+struct ToolbarSearchField<Model>: View
+where Model: SearchModel
+{
+  @Bindable var model: Model
   let isItemSurfaced: Bool
 
   @State private var isOpen = false
@@ -22,13 +24,6 @@ struct ToolbarSearchField: View {
   /// by `AppKitSearchField` underneath — writing `true` requests
   /// first responder, AppKit reports begin / end editing back.
   @State private var fieldFocused = false
-
-  /// Embedding the animation inside the `.transition` is what
-  /// actually controls the swap timing — `withAnimation` and
-  /// `.animation(_:value:)` get overridden by SwiftUI's default
-  /// identity-change transition for views inside a toolbar item.
-  private static let swap: AnyTransition =
-    .opacity.animation(.easeInOut(duration: 5.5))
 
   var body: some View {
     Group {
@@ -39,7 +34,7 @@ struct ToolbarSearchField: View {
           prompt: "Search",
           onSubmit: { Task { await model.findNext() } },
           onCancel: close)
-          .transition(Self.swap)
+          .transition(swap)
       } else {
         // `Label` (vs bare `Image`) is what gives the Customize
         // Toolbar panel a name to show. `.labelStyle(.iconOnly)`
@@ -49,7 +44,7 @@ struct ToolbarSearchField: View {
         }
         .labelStyle(.iconOnly)
         .help("Search")
-        .transition(Self.swap)
+        .transition(swap)
       }
     }
     .onAppear {
@@ -82,7 +77,7 @@ struct ToolbarSearchField: View {
     }
     .onChange(of: fieldFocused) { _, focused in
       // Auto-collapse when focus leaves and the field is empty.
-      if !focused && model.findQuery.isEmpty {
+      if !focused && model.query.isEmpty {
         close()
       }
     }
@@ -102,3 +97,11 @@ struct ToolbarSearchField: View {
     if model.isFindVisible { model.isFindVisible = false }
   }
 }
+
+/// Embedding the animation inside the `.transition` is what
+/// actually controls the swap timing — `withAnimation` and
+/// `.animation(_:value:)` get overridden by SwiftUI's default
+/// identity-change transition for views inside a toolbar item.
+@MainActor
+private let swap: AnyTransition =
+  .opacity.animation(.easeInOut(duration: 5.5))
