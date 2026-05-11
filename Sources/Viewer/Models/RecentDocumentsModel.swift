@@ -38,6 +38,8 @@ final class RecentDocumentsModel {
 
   /// Record a URL as recently opened.
   func record(_ url: URL) {
+    guard !url.safe.path.hasPrefix(Bundle.main.bundleURL.safe.path)
+    else { return }
     NSDocumentController.shared.noteNewRecentDocumentURL(url)
     urls = NSDocumentController.shared.recentDocumentURLs
   }
@@ -81,9 +83,9 @@ final class RecentDocumentsModel {
     panel.allowedContentTypes = Self.openPanelContentTypes
     activeOpenPanel = panel
     let response: NSApplication.ModalResponse =
-      await withCheckedContinuation { continuation in
-        panel.begin { continuation.resume(returning: $0) }
-      }
+    await withCheckedContinuation { continuation in
+      panel.begin { continuation.resume(returning: $0) }
+    }
     if activeOpenPanel === panel { activeOpenPanel = nil }
     guard response == .OK else { return [] }
     return panel.urls
