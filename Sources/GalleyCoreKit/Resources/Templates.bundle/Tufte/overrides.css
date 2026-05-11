@@ -5,7 +5,13 @@
    Sections:
      1. Overscroll chrome — vendor file paints `body` but not `html`, so
                             the WebView's rubber-band area flashes white.
-     2. Mermaid           — vendor file doesn't know about mermaid output. */
+     2. Measure           — vendor targets `section > p/ul/…` for the 55%
+                            narrow column; markdown gives us `article > p`
+                            without inner sections, so those rules never
+                            fire. Mirror them on `article >` so prose sits
+                            in Tufte's intended column rather than at body
+                            width (87.5%, up to 1400px).
+     3. Mermaid           — vendor file doesn't know about mermaid output. */
 
 /* 1. Overscroll chrome */
 
@@ -17,7 +23,34 @@ html { background-color: #fffff8; }
     html { background-color: #151515; }
 }
 
-/* 2. Mermaid */
+/* 2. Measure — mirror Tufte's `section >` widths onto `article >` */
+
+article > p,
+article > footer,
+article > table,
+article > blockquote { width: 55%; }
+
+article > dl,
+article > ol,
+article > ul {
+    width: 50%;
+    padding-inline-start: 5%;
+}
+
+@media (max-width: 760px) {
+    article > p,
+    article > footer,
+    article > table,
+    article > blockquote,
+    article > dl,
+    article > ol,
+    article > ul {
+        width: 100%;
+        padding-inline-start: 0;
+    }
+}
+
+/* 3. Mermaid */
 
 .mermaid { display: block; margin: 1rem auto; text-align: center; }
 
