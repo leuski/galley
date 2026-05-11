@@ -110,6 +110,7 @@ struct ViewerApp: App {
       }
     }
     .defaultSize(width: 580, height: 360)
+    .windowResizability(.contentSize)
   }
 
   private func configureRouting() {

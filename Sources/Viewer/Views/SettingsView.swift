@@ -27,17 +27,17 @@ struct SettingsView: View {
         }
         .tag(SettingsTab.server)
     }
-    .frame(minHeight: 360)
+    .frame(minWidth: 520, minHeight: 320)
   }
 }
 
 struct SettingsPaneModifier: ViewModifier {
   func body(content: Content) -> some View {
-    Form{
+    Form {
       content
     }
-    .padding()
     .formStyle(.grouped)
+    .padding()
   }
 }
 
