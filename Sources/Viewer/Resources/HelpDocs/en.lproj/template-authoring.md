@@ -27,11 +27,11 @@ The folder's name is the template's user-facing label.
 ```
 Templates/
 └── MyTheme/
-      ├── Template.html
-      ├── style.css
-      ├── fonts/
-      │   └── MyFont.woff2
-      └── LICENSE
+    ├── Template.html
+    ├── style.css
+    ├── fonts/
+    │   └── MyFont.woff2
+    └── LICENSE
 ```
 
 References from `Template.html` are relative to the folder —
@@ -59,8 +59,8 @@ while keeping the main template file in the root.
 Templates/
 ├── MyTheme.html
 └── MyTheme/
-      ├── shared-style.css
-      └── shared-font.woff2
+    ├── shared-style.css
+    └── shared-font.woff2
 ```
 
 ## Placeholders
