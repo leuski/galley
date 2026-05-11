@@ -1,6 +1,10 @@
 import GalleyCoreKit
 import SwiftUI
 
+let searchMinWidth: CGFloat = 180
+let searchMaxWidth: CGFloat = 350
+let webViewMinWidth: CGFloat = 600
+
 /// Rounded search field with an inline options menu (case-sensitive /
 /// whole-word toggles), a "n of N" match counter, and a clear button —
 /// the visual shape Preview and Safari use inside their find bars.
@@ -22,6 +26,11 @@ where Model: SearchFieldModel
   let prompt: String
   let onSubmit: () -> Void
   let onCancel: () -> Void
+  /// Forwarded to `AppKitSearchField`. Toolbar hosts pass a
+  /// surrender-to-FindBar callback here; `FindBar` itself leaves
+  /// this at the default no-op since it isn't subject to toolbar-
+  /// driven view detachment.
+  var onLostWindow: () -> Void = {}
 
   var body: some View {
     HStack(spacing: 4) {
@@ -32,7 +41,9 @@ where Model: SearchFieldModel
         prompt: prompt,
         isFocused: $isFocused,
         onSubmit: onSubmit,
-        onCancel: onCancel)
+        onCancel: onCancel,
+        onLostWindow: onLostWindow)
+      .frame(maxWidth: .infinity)
       .onChange(of: model.query) {
         Task { await model.performSearch() }
       }
@@ -68,9 +79,12 @@ where Model: SearchFieldModel
     .overlay(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .strokeBorder(.separator))
-    // Fixed width so the field doesn't reflow as the count label
-    // and clear button appear / disappear with the live query.
-    .frame(width: 320)
+    // Flexible width. `NSToolbarItem.minSize`/`maxSize` from
+    // `ToolbarSurfacing` is what `NSToolbar` actually consults to
+    // size the cell; this `.frame` lets the SwiftUI view fill
+    // whatever the toolbar gives it instead of capping inside a
+    // larger cell.
+    .frame(minWidth: searchMinWidth, maxWidth: searchMaxWidth)
   }
 
   /// Dropdown anchored to the magnifying-glass glyph, mirroring the
