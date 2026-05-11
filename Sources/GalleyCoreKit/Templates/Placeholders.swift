@@ -33,6 +33,11 @@ public struct PlaceholderContext: Sendable {
     let fileName = documentURL.lastPathComponent
     let baseName = documentURL.fileName
     let ext = documentURL.pathExtension
+    // `#TITLE#` is the author-intended document title: the first
+    // `<h1>` of the rendered body, falling back to the filename's
+    // basename when the document has none. Template authors who want
+    // the filename verbatim can still use `#FILE#` / `#BASENAME#`.
+    let title = HTMLHeadings.firstH1Text(in: documentContent) ?? baseName
 
     // Substitute metadata placeholders in the template first, then inject
     // the document body. Doing it the other way round would re-scan the
@@ -40,7 +45,7 @@ public struct PlaceholderContext: Sendable {
     // in their markdown (even inside a code span) would get them
     // template-substituted instead of rendered as literal text.
     let withMetadata = template.substituting(substitutions: [
-      "#TITLE#": baseName.htmlAttributeEscaped,
+      "#TITLE#": title.htmlAttributeEscaped,
       "#BASE#": baseHref.htmlAttributeEscaped,
       "#FILE#": fileName.htmlAttributeEscaped,
       "#BASENAME#": baseName.htmlAttributeEscaped,

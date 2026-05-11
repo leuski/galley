@@ -164,7 +164,6 @@ struct DocumentView: View {
       }
       .fileDialogDefaultDirectory(
         model.documentURL.deletingLastPathComponent())
-      .navigationTitle(model.documentURL.lastPathComponent)
     // No `id:` — `replaceDocument` drives in-window URL changes
     // directly through `model.bind(to:)`, so re-firing on every
     // `fileURL` write would be wasted work that the early-return
@@ -180,7 +179,12 @@ struct DocumentView: View {
         onScrollY: mirrorPerFileScrollY,
         onShowsTOC: mirrorPerFileShowsTOC,
         reload: reloadModel))
-      .navigationDocument(model.documentURL)
+      .navigationDocument(model.documentURL, when: kind == .document)
+      .navigationTitle(
+        kind == .help
+          ? Text("Help")
+          : Text(model.documentURL.lastPathComponent))
+      .navigationSubtitle(model.page.title)
   }
 
   /// The window's main split: TOC sidebar (column-visibility bound to
@@ -237,7 +241,9 @@ struct DocumentView: View {
               .transition(.move(edge: .bottom).combined(with: .opacity))
           }
         }
-        .toolbar(id: "viewer.main") { toolbarContent(appModel: appModel) }
+        .toolbar(id: kind == .document ? "viewer.main" : "viewer.help") {
+          toolbarContent(appModel: appModel)
+        }
     }
     .navigationSplitViewStyle(.balanced)
     // Paint the page's own background color into the window's
@@ -442,7 +448,9 @@ struct DocumentView: View {
   ) -> some CustomizableToolbarContent {
     navigationToolbarItems
     //    ToolbarSpacer(.flexible, placement: .automatic)
-    mainToolbarItems(appModel: appModel)
+    if kind == .document {
+      mainToolbarItems(appModel: appModel)
+    }
     zoomToolbarItems
     //    ToolbarSpacer(.fixed, placement: .automatic)
   }
@@ -584,5 +592,16 @@ private struct TemplateToolbarPicker: View {
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
     .help("Template")
+  }
+}
+
+private extension View {
+  /// Gates `.navigationDocument(_:)` on a condition. The Help window's
+  /// `DocumentView` opts out so AppKit doesn't attach a proxy icon or
+  /// the title-bar document menu (rename / move / version) to what is
+  /// really a read-only resource inside the app bundle.
+  @ViewBuilder
+  func navigationDocument(_ url: URL, when condition: Bool) -> some View {
+    if condition { navigationDocument(url) } else { self }
   }
 }
