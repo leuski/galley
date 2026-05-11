@@ -60,6 +60,36 @@ final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
   @DefaultsKey var readingWordsPerMinute: Int = 200
 
   @MainActor static let shared = Defaults()
+
+  /// Synchronize the `@ObservableDefaults` macro's per-property cache
+  /// with the actual on-disk values. Must be called once at app boot,
+  /// BEFORE any SwiftUI layout pass.
+  ///
+  /// Why: the macro maintains a `_<property>` cache that backs its
+  /// `userDefaultsDidChange` handler. The cache is initialized to each
+  /// property's literal default (not the persisted value) and is only
+  /// updated from inside the notification handler. So the FIRST
+  /// `UserDefaults.didChangeNotification` received in the process
+  /// triggers `withMutation` for every property whose persisted value
+  /// differs from its declared default.
+  ///
+  /// WebKit's `+[NSParagraphArbitrator initialize]` calls
+  /// `[NSUserDefaults registerDefaults:]` the first time `WKWebView`
+  /// initializes, which posts that notification synchronously from
+  /// inside a SwiftUI layout pass (`sizeThatFits` → `makeNSViewController`
+  /// → `WKWebView.initWithFrame:configuration:`). The resulting
+  /// `withMutation` re-enters `GraphHost.flushTransactions` and trips
+  /// the `AG::Graph::value_set` precondition.
+  ///
+  /// Posting one synchronous notification during boot warms the cache
+  /// so the WebKit-triggered notification finds no diffs and skips
+  /// the mutation entirely.
+  @MainActor static func warmCache() {
+    _ = Defaults.shared
+    NotificationCenter.default.post(
+      name: UserDefaults.didChangeNotification,
+      object: UserDefaults.standard)
+  }
 }
 
 @MainActor @Observable
