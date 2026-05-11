@@ -1,0 +1,195 @@
+/* Solarized — Ethan Schoonover's dual-mode palette
+   (https://ethanschoonover.com/solarized/, MIT). Hand-rolled for
+   Galley; nothing vendored. Body is Charter (Apple Books' "Serif"
+   default) so the cream base3 / slate base03 backgrounds read like
+   long-form prose on paper rather than a code editor.
+
+   Solarized's accent hues are perceptually balanced across both
+   modes, so light/dark differ only in `--bg-*` and `--fg-*`. */
+
+:root {
+    color-scheme: light dark;
+
+    /* Accent ramp — identical in both modes */
+    --sol-yellow:  #b58900;
+    --sol-orange:  #cb4b16;
+    --sol-red:     #dc322f;
+    --sol-magenta: #d33682;
+    --sol-violet:  #6c71c4;
+    --sol-blue:    #268bd2;
+    --sol-cyan:    #2aa198;
+    --sol-green:   #859900;
+
+    /* Light: bg = base3 cream, fg = base00 slate */
+    --bg:        #fdf6e3;
+    --bg-soft:   #eee8d5;
+    --fg:        #657b83;
+    --fg-strong: #586e75;
+    --fg-muted:  #93a1a1;
+    --rule:      #eee8d5;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* Dark: bg = base03 slate, fg = base0 muted aqua */
+        --bg:        #002b36;
+        --bg-soft:   #073642;
+        --fg:        #839496;
+        --fg-strong: #93a1a1;
+        --fg-muted:  #586e75;
+        --rule:      #073642;
+    }
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+}
+
+body {
+    font-family: "Charter", "Iowan Old Style", "Iowan Old Style BT",
+                 Georgia, serif;
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+}
+
+article {
+    max-width: 38rem;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+}
+
+/* Headings — base01/base1 (one step stronger than body) for emphasis
+   without screaming. */
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--fg-strong);
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 2em 0 0.6em;
+}
+
+h1 { font-size: 1.9em; margin-top: 1em; }
+h2 { font-size: 1.45em; }
+h3 { font-size: 1.2em; }
+h4 { font-size: 1.05em; }
+h5, h6 { font-size: 1em; font-style: italic; }
+
+h1, h2 {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.3em;
+}
+
+/* Body text */
+
+p, ul, ol, blockquote, pre, table { margin: 0 0 1em; }
+
+a {
+    color: var(--sol-blue);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 100ms ease-out;
+}
+a:hover { border-bottom-color: var(--sol-blue); }
+a:visited { color: var(--sol-violet); }
+a:visited:hover { border-bottom-color: var(--sol-violet); }
+
+em, i { font-style: italic; }
+strong, b { color: var(--fg-strong); font-weight: 700; }
+
+/* Code — accent-soft background, monospace, preserves palette */
+
+code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    background: var(--bg-soft);
+    color: var(--fg-strong);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+}
+
+pre {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    background: var(--bg-soft);
+    color: var(--fg-strong);
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+
+pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+}
+
+/* Blockquote — left rule in cyan to pick up an accent without
+   overwhelming */
+
+blockquote {
+    border-left: 3px solid var(--sol-cyan);
+    padding: 0 1.25em;
+    color: var(--fg-muted);
+    font-style: italic;
+}
+
+blockquote em { font-style: normal; }
+
+/* Tables */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th, td {
+    border-bottom: 1px solid var(--rule);
+    padding: 0.5em 0.85em;
+    text-align: left;
+}
+
+th {
+    color: var(--fg-strong);
+    border-bottom-color: var(--fg-muted);
+}
+
+/* Horizontal rule */
+
+hr {
+    border: 0;
+    height: 1px;
+    background: var(--rule);
+    margin: 2em 0;
+}
+
+/* Images */
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Mermaid */
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+
+/* Print */
+
+@page { margin: 0.75in; }
+
+@media print {
+    :root { color-scheme: light; }
+    html, body { background: #fff; }
+    body { color: #000; }
+    article { max-width: none; margin: 0; padding: 0; }
+    a { color: inherit; }
+    pre, blockquote, table, figure, img { break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+    .mermaid svg { max-width: 100%; height: auto; }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="theme-color" content="#fdf6e3"
+          media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#002b36"
+          media="(prefers-color-scheme: dark)">
+    <title>#TITLE#</title>
+    <base href="#BASE#">
+    <link rel="stylesheet" href="Solarized/style.css">
+</head>
+<body>
+<article>
+#DOCUMENT_CONTENT#
+</article>
+<script src="Common.js"></script>
+<script src="mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    window.mermaid.initialize({
+      startOnLoad: true,
+      theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default'
+    });
+  }
+</script>
+</body>
+</html>

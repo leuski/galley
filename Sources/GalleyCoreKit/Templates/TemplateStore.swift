@@ -140,6 +140,8 @@ public final class TemplateStore {
       "Manuscript", bundle: .galleyCoreKit),
     "Sepia": LocalizedStringResource(
       "Sepia", bundle: .galleyCoreKit),
+    "Solarized": LocalizedStringResource(
+      "Solarized", bundle: .galleyCoreKit),
     "Terminal": LocalizedStringResource(
       "Terminal", bundle: .galleyCoreKit),
     "Tufte": LocalizedStringResource(
