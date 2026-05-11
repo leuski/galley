@@ -209,10 +209,8 @@ renders in Tufte.
 Galley ships nine built-in templates. They aren't editable in place, but
 their source CSS is a good reference. Two especially worth peeking at:
 
-- **Default** — the simplest complete example. Sans body, light/dark,
+- **[Default](finder:Contents/Frameworks/GalleyCoreKit.framework/Resources/Templates.bundle/Default.html)** — the simplest complete example. Sans body, light/dark,
   print rules.
-- **Tufte** — vendored upstream CSS plus a tiny Galley-side overrides
+- **[Tufte](finder:Contents/Frameworks/GalleyCoreKit.framework/Resources/Templates.bundle/Tufte.html)** — vendored upstream CSS plus a tiny Galley-side overrides
   file. Shows how to layer your own rules on top of an external
   stylesheet without forking it.
-
-You can find the [built-ins inside the app bundle]({{GALLEY_APP_FINDER_URL}}/Contents/Frameworks/GalleyCoreKit.framework/Resources/Templates.bundle/Default.html).

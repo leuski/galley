@@ -53,7 +53,10 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
       // the same path and select it — Finder opens the parent (which
       // may be inside a package) with the target highlighted. This is
       // the macOS equivalent of "Show Package Contents".
-      let fileURL = URL(fileURLWithPath: target.path).safe
+      let fileURL = URL(
+        fileURLWithPath: target.path,
+        relativeTo: Bundle.main.bundleURL
+      ).safe
       NSWorkspace.shared.activateFileViewerSelecting([fileURL])
       return
     }
