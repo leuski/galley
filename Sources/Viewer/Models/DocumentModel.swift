@@ -181,7 +181,7 @@ final class DocumentModel {
   /// options, match counters, and visibility / dismissal flags.
   /// Constructed once `page` is built so it can drive
   /// `window.galleyFind` directly. `SearchModel`-conforming so the
-  /// `FindBar` / `ToolbarSearchField` views can `@Bindable` it.
+  /// `FindBar` view can `@Bindable` it.
   let find: FindSession
 
   /// Whether the SwiftUI `.fileExporter` for "Export as PDF" is

@@ -19,13 +19,8 @@ struct SearchField<Model>: View
 where Model: SearchFieldModel
 {
   @Bindable var model: Model
-  /// Two-way focus binding. Writing `true` requests focus; the
-  /// underlying `AppKitSearchField` reports begin / end editing back
-  /// through the same binding so callers see real focus changes.
-  /// Owner declares `@State var fieldFocused: Bool` and passes
-  /// `$fieldFocused`. (`@FocusState` is unreliable for toolbar-
-  /// hosted TextFields — see `AppKitSearchField`.)
-  @Binding var isFocused: Bool
+  /// Two-way focus binding from the owner's `@FocusState`.
+  var isFocused: FocusState<Bool>.Binding
   let prompt: String
   let onSubmit: () -> Void
   let onCancel: () -> Void
@@ -34,12 +29,11 @@ where Model: SearchFieldModel
     HStack(spacing: 4) {
       optionsMenu
 
-      AppKitSearchField(
-        text: $model.query,
-        prompt: prompt,
-        isFocused: $isFocused,
-        onSubmit: onSubmit,
-        onCancel: onCancel)
+      TextField(prompt, text: $model.query)
+        .textFieldStyle(.plain)
+        .focused(isFocused)
+        .onSubmit(onSubmit)
+        .onExitCommand(perform: onCancel)
         .frame(maxWidth: .infinity)
         .onChange(of: model.query) {
           Task { await model.performSearch() }
@@ -58,7 +52,7 @@ where Model: SearchFieldModel
 
         Button {
           model.query = ""
-          isFocused = true
+          isFocused.wrappedValue = true
         } label: {
           Image(systemName: "xmark.circle.fill")
             .foregroundStyle(.secondary)
@@ -76,10 +70,6 @@ where Model: SearchFieldModel
     .overlay(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .strokeBorder(.separator))
-    // Flexible width. `ToolbarSurfacing`'s Auto Layout constraints
-    // are what `NSToolbar` actually consults to size the cell; this
-    // `.frame` lets the SwiftUI view fill whatever the toolbar
-    // gives it instead of capping inside a larger cell.
     .frame(minWidth: searchMinWidth, maxWidth: searchMaxWidth)
   }
 

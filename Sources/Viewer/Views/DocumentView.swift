@@ -19,27 +19,6 @@ struct DocumentView: View {
   @State private var didRestore = false
   @State private var hostWindow: NSWindow?
 
-  /// Tracks whether the toolbar's "find" item is currently surfaced
-  /// (toolbar visible AND item not customized away). When false, the
-  /// `safeAreaInset` `FindBar` takes over as the find UI; when true,
-  /// the toolbar's `ToolbarSearchField` is the find UI and `FindBar`
-  /// stays out of the way.
-  /// Compact = a tight 32pt cell while the search field is closed,
-  /// so the toolbar button sits flush with siblings. Expanded =
-  /// 150–500pt flexible range while the field is open, so
-  /// `NSToolbar` actually resizes the cell to fit available toolbar
-  /// space (and overflows other items, not the search, when tight).
-  @State private var findSurfacing = ToolbarSurfacing(
-    itemIdentifier: "find",
-    compactWidth: 32,
-    expandedMinWidth: searchMinWidth,
-    expandedMaxWidth: searchMaxWidth,
-    // Bias these to overflow first when toolbar gets tight, so the
-    // expanded search field consistently wins the priority contest
-    // (including on the close-then-reopen case where `NSToolbar`'s
-    // reflow heuristic would otherwise pick the search to overflow).
-    lowPriorityIdentifiers: ["renderer", "template", "reload"])
-
   /// Transient text-field value for the rename alert. Seeded from
   /// `model.documentURL.lastPathComponent` whenever
   /// `model.isRenameRequested` flips true (see the `.onChange` in
@@ -118,11 +97,9 @@ struct DocumentView: View {
           ) { newURL in
             replaceDocument(with: newURL)
           }
-          findSurfacing.attach(to: window)
         },
         onDetach: { window in
           if let window { dispatcher.unregisterWindow(window) }
-          findSurfacing.detach()
         }))
       .focusedSceneValue(\.documentModel, model)
       .alert(
@@ -221,13 +198,7 @@ struct DocumentView: View {
           }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-          // FindBar mounts whenever the toolbar isn't *actually*
-          // hosting the search field. `isToolbarActive` is true iff
-          // we requested expansion AND `NSToolbar` kept the item
-          // in `visibleItems` — anything else (overflow,
-          // customized out, narrow-window prediction, surrender
-          // after a failed expansion) routes here.
-          if model.find.isVisible && !findSurfacing.isToolbarActive {
+          if model.find.isVisible {
             FindBar(model: model.find)
               .transition(.move(edge: .top).combined(with: .opacity))
           }
@@ -485,12 +456,6 @@ struct DocumentView: View {
     }
     .customizationBehavior(.default)
 
-    ToolbarItem(id: "find", placement: .primaryAction) {
-      ToolbarSearchField(
-        model: model.find,
-        surfacing: findSurfacing)
-    }
-    .customizationBehavior(.default)
   }
 
   @ToolbarContentBuilder
