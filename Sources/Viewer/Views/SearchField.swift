@@ -22,15 +22,13 @@ where Model: SearchFieldModel
   /// Two-way focus binding. Writing `true` requests focus; the
   /// underlying `AppKitSearchField` reports begin / end editing back
   /// through the same binding so callers see real focus changes.
+  /// Owner declares `@State var fieldFocused: Bool` and passes
+  /// `$fieldFocused`. (`@FocusState` is unreliable for toolbar-
+  /// hosted TextFields — see `AppKitSearchField`.)
   @Binding var isFocused: Bool
   let prompt: String
   let onSubmit: () -> Void
   let onCancel: () -> Void
-  /// Forwarded to `AppKitSearchField`. Toolbar hosts pass a
-  /// surrender-to-FindBar callback here; `FindBar` itself leaves
-  /// this at the default no-op since it isn't subject to toolbar-
-  /// driven view detachment.
-  var onLostWindow: () -> Void = {}
 
   var body: some View {
     HStack(spacing: 4) {
@@ -41,13 +39,12 @@ where Model: SearchFieldModel
         prompt: prompt,
         isFocused: $isFocused,
         onSubmit: onSubmit,
-        onCancel: onCancel,
-        onLostWindow: onLostWindow)
-      .frame(maxWidth: .infinity)
-      .onChange(of: model.query) {
-        Task { await model.performSearch() }
-      }
-      .accessibilityIdentifier(ViewerA11yID.Find.field)
+        onCancel: onCancel)
+        .frame(maxWidth: .infinity)
+        .onChange(of: model.query) {
+          Task { await model.performSearch() }
+        }
+        .accessibilityIdentifier(ViewerA11yID.Find.field)
 
       countLabel
 
@@ -79,11 +76,10 @@ where Model: SearchFieldModel
     .overlay(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .strokeBorder(.separator))
-    // Flexible width. `NSToolbarItem.minSize`/`maxSize` from
-    // `ToolbarSurfacing` is what `NSToolbar` actually consults to
-    // size the cell; this `.frame` lets the SwiftUI view fill
-    // whatever the toolbar gives it instead of capping inside a
-    // larger cell.
+    // Flexible width. `ToolbarSurfacing`'s Auto Layout constraints
+    // are what `NSToolbar` actually consults to size the cell; this
+    // `.frame` lets the SwiftUI view fill whatever the toolbar
+    // gives it instead of capping inside a larger cell.
     .frame(minWidth: searchMinWidth, maxWidth: searchMaxWidth)
   }
 

@@ -1,46 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// `NSTextField` subclass that detects "removed from its window
-/// *after* this instance held first responder." Defensive safety
-/// net for a previously-observed AppKit bug where `NSToolbar`'s
-/// relayout on the second expand would swap `NSToolbarItem.view`
-/// out from under SwiftUI's hosting, taking our focused field with
-/// it. Eliminated by always-mounting both states in
-/// `ToolbarSearchField`'s `ZStack`, but the recovery path is cheap
-/// to keep in case the underlying AppKit behavior resurfaces.
-///
-/// `markBecameFirstResponder()` is called from
-/// `AppKitSearchField.updateNSView` when `makeFirstResponder`
-/// succeeds, so phantom instances that are torn down before focus
-/// lands don't trip the recovery.
-final class WindowAwareTextField: NSTextField {
-  var onLostWindowAfterFocus: (() -> Void)?
-  private var everHadFocus = false
-
-  func markBecameFirstResponder() {
-    everHadFocus = true
-  }
-
-  override func viewWillMove(toWindow newWindow: NSWindow?) {
-    if newWindow == nil, self.window != nil, everHadFocus {
-      // Defer the callback — we're inside an AppKit view-hierarchy
-      // mutation, and the callback writes SwiftUI state that can
-      // re-enter the toolbar layout.
-      let callback = onLostWindowAfterFocus
-      DispatchQueue.main.async { callback?() }
-    }
-    super.viewWillMove(toWindow: newWindow)
-  }
-}
-
-/// `NSTextField`-backed search input. SwiftUI's `TextField` +
-/// `@FocusState` does not reliably grant or report focus when hosted
-/// inside a toolbar item — focus dispatch races the SwiftUI host
-/// view's mount and the `@FocusState` binding does not always see
-/// AppKit-level focus loss. This wrapper sidesteps that by managing
-/// first-responder state directly through the responder chain and
-/// reporting changes through `NSTextFieldDelegate`.
+/// `NSTextField`-backed search input. SwiftUI's `TextField` plus
+/// `@FocusState` doesn't reliably grant or report focus when hosted
+/// inside an `NSToolbarItem` — programmatic focus writes fail to
+/// land, and AppKit-level focus changes don't propagate back to the
+/// binding. This wrapper sidesteps both by managing first-responder
+/// state directly through the responder chain and reporting changes
+/// through `NSTextFieldDelegate`.
 ///
 /// Two-way `isFocused` binding:
 ///
@@ -55,15 +22,9 @@ struct AppKitSearchField: NSViewRepresentable {
   @Binding var isFocused: Bool
   let onSubmit: () -> Void
   let onCancel: () -> Void
-  /// Fired when the field's hosted `NSView` is removed from its
-  /// window *after* it had first-responder focus. Defaults to no-op
-  /// so non-toolbar callers (e.g. `FindBar`) don't need to wire
-  /// anything.
-  var onLostWindow: () -> Void = {}
 
   func makeNSView(context: Context) -> NSTextField {
-    let field = WindowAwareTextField()
-    field.onLostWindowAfterFocus = onLostWindow
+    let field = NSTextField()
     field.placeholderString = prompt
     field.isBordered = false
     field.drawsBackground = false
@@ -86,13 +47,9 @@ struct AppKitSearchField: NSViewRepresentable {
   }
 
   func updateNSView(_ field: NSTextField, context: Context) {
-    // Keep the coordinator's view of the parent fresh and refresh
-    // the lost-window callback so the latest closure (capturing
-    // the current `ToolbarSearchField` state) runs.
+    // Keep the coordinator's view of the parent fresh so its
+    // delegate callbacks write through to the current bindings.
     context.coordinator.parent = self
-    if let aware = field as? WindowAwareTextField {
-      aware.onLostWindowAfterFocus = onLostWindow
-    }
 
     if field.stringValue != text {
       field.stringValue = text
@@ -104,10 +61,7 @@ struct AppKitSearchField: NSViewRepresentable {
       DispatchQueue.main.async {
         guard let window = field.window else { return }
         if window.firstResponder !== field.currentEditor() {
-          let ok = window.makeFirstResponder(field)
-          if ok, let aware = field as? WindowAwareTextField {
-            aware.markBecameFirstResponder()
-          }
+          window.makeFirstResponder(field)
         }
       }
     } else if let window = field.window,

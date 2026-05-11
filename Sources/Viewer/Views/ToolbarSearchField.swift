@@ -36,6 +36,7 @@ where Model: SearchModel
   /// Plain `@State` instead of `@FocusState` because focus is owned
   /// by `AppKitSearchField` underneath — writing `true` requests
   /// first responder, AppKit reports begin / end editing back.
+  /// `@FocusState` is unreliable for toolbar-hosted TextFields.
   @State private var fieldFocused = false
   /// Timestamp of the last `open()`. Used by the blur handler to
   /// distinguish a user-initiated click-away from a transient
@@ -53,13 +54,7 @@ where Model: SearchModel
           isFocused: $fieldFocused,
           prompt: "Search",
           onSubmit: { Task { await model.findNext() } },
-          onCancel: close,
-          // Defensive safety net for the (now-fixed) bug where
-          // `NSToolbar` would steal `NSToolbarItem.view` on the
-          // second expand. If the live field ever loses its window
-          // again, fall through to `FindBar`. Should not fire under
-          // the always-mounted ZStack design but cheap to keep.
-          onLostWindow: { surrenderToFindBar(resetExpanded: true) })
+          onCancel: close)
           .opacity(isOpen ? 1 : 0)
           .allowsHitTesting(isOpen)
           // Collapse to zero while closed so `ToolbarSurfacing`'s
@@ -95,7 +90,7 @@ where Model: SearchModel
         // to `FindBar` without resetting `surfacing.isExpanded` —
         // that would let `NSToolbar` yank us back into the toolbar
         // and re-trigger the same overflow.
-        surrenderToFindBar(resetExpanded: false)
+        surrenderToFindBar()
       }
     }
     .onChange(of: model.isVisible) { _, isVisible in
@@ -137,10 +132,7 @@ where Model: SearchModel
       // kick a synchronous refresh first so we read live state.
       surfacing.refreshNow()
       if !surfacing.isItemSurfaced {
-        // Blur-driven surrender = overflow case (we're no longer
-        // in visibleItems). Don't reset `isExpanded` or NSToolbar
-        // would pull us back, re-triggering the cycle.
-        surrenderToFindBar(resetExpanded: false)
+        surrenderToFindBar()
       } else {
         close()
       }
@@ -164,8 +156,6 @@ where Model: SearchModel
     surfacing.isExpanded = true
     if !isOpen { isOpen = true }
     if !model.isVisible { model.isVisible = true }
-    // `AppKitSearchField`'s `updateNSView` picks this up on the
-    // next render and calls `makeFirstResponder` async-safe.
     if !fieldFocused { fieldFocused = true }
     openedAt = Date()
   }
@@ -181,25 +171,17 @@ where Model: SearchModel
     surfacing.isExpanded = false
   }
 
-  /// Hand the live find session off to `FindBar` without ending the
-  /// session. Two callers:
-  ///
-  /// 1. **Overflow** (`resetExpanded: false`) — `NSToolbar` moved
-  ///    our cell into the overflow menu. Keep `isExpanded = true`
-  ///    so flipping to compact doesn't pull us back, then expand
-  ///    again, etc.
-  /// 2. **Detach** (`resetExpanded: true`) — defensive safety net
-  ///    for the (now-fixed) NSToolbar view-swap bug. The cell is
-  ///    not in overflow; `containsItem` is still `true` so
-  ///    `isToolbarActive` would keep gating `FindBar` off unless
-  ///    we also drop `isExpanded`.
-  private func surrenderToFindBar(resetExpanded: Bool) {
+  /// Hand the live find session off to `FindBar` when `NSToolbar`
+  /// moved our cell into the overflow menu. `isExpanded` stays
+  /// `true` on purpose — flipping to compact would let the toolbar
+  /// pull the cell back in, only for the layout to push it back
+  /// to overflow, in a loop. The user dismisses the find session
+  /// via Escape / FindBar's Done button, at which point `close()`
+  /// resets `isExpanded`.
+  private func surrenderToFindBar() {
     openedAt = nil
     if fieldFocused { fieldFocused = false }
     if isOpen { isOpen = false }
     // model.isVisible stays true so `FindBar` mounts.
-    if resetExpanded, surfacing.isExpanded {
-      surfacing.isExpanded = false
-    }
   }
 }

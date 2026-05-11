@@ -19,8 +19,8 @@ where Model: SearchModel
   @Bindable var model: Model
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  /// Plain `@State` instead of `@FocusState` because focus is owned
-  /// by `AppKitSearchField` underneath `SearchField`.
+  /// Plain `@State` (not `@FocusState`) because focus is owned by
+  /// `AppKitSearchField` underneath `SearchField`.
   @State private var fieldFocused = false
 
   /// Roughly matches SwiftUI's `.default` transition duration. Focus
