@@ -38,8 +38,7 @@ final class RecentDocumentsModel {
 
   /// Record a URL as recently opened.
   func record(_ url: URL) {
-    guard !url.safe.path.hasPrefix(Bundle.main.bundleURL.safe.path)
-    else { return }
+    guard !url.isInMainBundle else { return }
     NSDocumentController.shared.noteNewRecentDocumentURL(url)
     urls = NSDocumentController.shared.recentDocumentURLs
   }

@@ -18,6 +18,10 @@ extension URL {
     isFileURL ? standardizedFileURL.resolvingSymlinksInPath() : self
   }
 
+  public var isInMainBundle: Bool {
+    safe.path.hasPrefix(Bundle.main.bundleURL.safe.path)
+  }
+
   public var galleyPreview: URL {
     appending(path: RouteNames.preview)
   }
