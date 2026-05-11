@@ -23,6 +23,15 @@ import SwiftUI
 @Observable
 final class WindowDispatcher {
   @ObservationIgnored private(set) var openHandler: ((URL) -> Void)?
+
+  /// Closure that spawns or rebinds the singleton Help window. Set
+  /// by the bootstrap modifier; receives the URL to display, captures
+  /// `\.openWindow` and writes to a shared `HelpModel`.
+  /// Help URLs bypass the regular routing pipeline entirely — they
+  /// are not registered in `WindowRegistry`, never tab-merge, never
+  /// focus-existing onto a doc window.
+  @ObservationIgnored private(set) var helpHandler: ((URL) -> Void)?
+
   @ObservationIgnored private var launchBuffer = LaunchURLBuffer()
   @ObservationIgnored private var registry = WindowRegistry()
   @ObservationIgnored private var pendingScrolls = PendingScrollLines()
@@ -96,6 +105,17 @@ final class WindowDispatcher {
       case .openSettings(let tab):
         onSettingsRequested(tab)
       case .document(let fileURL, let line):
+        // Help docs route to the singleton Help window — never
+        // registered with the routing system, never tab-merged,
+        // never recorded in Open Recent (the latter is enforced
+        // by `RecentDocumentsModel.record` independently). If
+        // `helpHandler` isn't installed yet (pre-launch race),
+        // fall through to the regular dispatch path rather than
+        // dropping the URL.
+        if fileURL.isInMainBundle, let helpHandler {
+          helpHandler(fileURL)
+          continue
+        }
         if let line {
           pendingScrolls.stash(line, for: fileURL)
         }
@@ -321,6 +341,12 @@ final class WindowDispatcher {
     openHandler = handler
     for url in launchBuffer.drain() { handler(url) }
     return hadPending
+  }
+
+  /// Install the closure that drives the singleton Help window.
+  /// Idempotent — subsequent calls re-capture the latest closure.
+  func installHelp(_ handler: @escaping (URL) -> Void) {
+    helpHandler = handler
   }
 
   /// Pre-seed the launch buffer with a URL. Used by the test-mode

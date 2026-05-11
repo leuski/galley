@@ -10,6 +10,7 @@ struct ViewerApp: App {
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()
+  @State private var help = HelpModel()
 
   private static func createApplicationSupportDirectory() {
     let localized = GalleyConstants
@@ -70,6 +71,7 @@ struct ViewerApp: App {
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
+        .environment(help)
     }
     // Always present at launch. Without this, SwiftUI may remember
     // a previous "closed" state and skip auto-spawning, leaving us
@@ -95,6 +97,7 @@ struct ViewerApp: App {
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
+        .environment(help)
     }
     .defaultSize(width: 700, height: 900)
     .windowToolbarStyle(.unified)
@@ -108,6 +111,22 @@ struct ViewerApp: App {
       }
       HelpCommands(dispatcher: dispatcher)
     }
+
+    // Singleton Help window. SwiftUI enforces "exactly one" — calling
+    // `openWindow(id: "help")` while a Help window is open just brings
+    // it forward. The URL to display is held in `HelpModel`; the
+    // dispatcher writes it before triggering the open via the
+    // installed help handler. `.restorationBehavior(.disabled)` keeps
+    // the help window out of state-restoration entirely — closing the
+    // app while help is open does not bring it back on relaunch.
+    Window("Help", id: "help") {
+      HelpWindowView()
+        .environment(boot)
+        .environment(dispatcher)
+        .environment(recents)
+        .environment(help)
+    }
+    .restorationBehavior(.disabled)
 
     Settings {
       if let model = boot.model {

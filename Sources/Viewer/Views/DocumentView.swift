@@ -10,8 +10,22 @@ import WebKit
 /// catalog discovery — so this view always has a concrete URL and a
 /// hydrated `AppModel` to work with.
 struct DocumentView: View {
+  /// Distinguishes a normal document window from the singleton Help
+  /// window. Help mode skips the routing-registry handshake (adopt /
+  /// unregister / updateCurrentURL) so help windows are invisible to
+  /// the URL dispatcher — they're never tab-merge targets, never
+  /// focus-existing targets, never rebind targets. `record(_:)` on
+  /// `RecentDocumentsModel` independently refuses bundle URLs, so
+  /// the inline `recents.record(...)` calls below are no-ops in help
+  /// mode without needing a conditional.
+  enum Kind {
+    case document
+    case help
+  }
+
   @Binding var fileURL: URL
   let appModel: AppModel
+  let kind: Kind
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -41,9 +55,14 @@ struct DocumentView: View {
   /// State-restored windows that come back to a different URL than
   /// the WindowGroup's binding will have their persistent IDs updated
   /// in `launchTask` once the snapshot is decoded.
-  init(fileURL: Binding<URL>, appModel: AppModel) {
+  init(
+    fileURL: Binding<URL>,
+    appModel: AppModel,
+    kind: Kind = .document
+  ) {
     self._fileURL = fileURL
     self.appModel = appModel
+    self.kind = kind
     let url = fileURL.wrappedValue
     let stored = Defaults.shared.perFileStateStore[url]
     self._model = State(wrappedValue: DocumentModel(
@@ -87,6 +106,12 @@ struct DocumentView: View {
           // reopened tab into a floating, toolbar-less window.
           guard let window, window !== hostWindow else { return }
           hostWindow = window
+          if kind == .help {
+            // Help windows reveal themselves directly — no dispatcher
+            // adoption, no registry entry, no tab "+" hook.
+            window.alphaValue = model.didFirstBind ? 1 : 0
+            return
+          }
           // The window-adoption ceremony (alpha unhide, tab merge,
           // tab "+" hook, registry insert) lives on the dispatcher
           // so it stays unit-testable. See `WindowDispatcher.adopt`.
@@ -99,7 +124,8 @@ struct DocumentView: View {
           }
         },
         onDetach: { window in
-          if let window { dispatcher.unregisterWindow(window) }
+          guard kind == .document, let window else { return }
+          dispatcher.unregisterWindow(window)
         }))
       .focusedSceneValue(\.documentModel, model)
       .alert(
@@ -255,7 +281,7 @@ struct DocumentView: View {
   /// safe to call from multiple `.onChange` observers.
   private func handleDocumentBound() {
     saveHistory()
-    if let window = hostWindow {
+    if kind == .document, let window = hostWindow {
       dispatcher.updateCurrentURL(window, model.documentURL)
     }
     if model.didFirstBind {
