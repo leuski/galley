@@ -48,6 +48,16 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     }
     logOpeningLink(target)
 
+    if target.scheme == Self.finderScheme {
+      // Author-declared "reveal in Finder" link. Swap to a file URL on
+      // the same path and select it — Finder opens the parent (which
+      // may be inside a package) with the target highlighted. This is
+      // the macOS equivalent of "Show Package Contents".
+      let fileURL = URL(fileURLWithPath: target.path).safe
+      NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+      return
+    }
+
     if target.isFileURL,
        MarkdownFileTypes.extensions.contains(
          target.pathExtension.lowercased())
@@ -76,6 +86,11 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
       }
     }
   }
+
+  /// Custom URL scheme that means "reveal this path in Finder rather
+  /// than open it." `finder:///Applications/Galley.app/Contents/...`
+  /// is a regular file path; the scheme just flips the dispatch.
+  private static let finderScheme = "finder"
 
   private func logMalformedMessage(_ body: Any) {
     logger.warning(
@@ -130,10 +145,6 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     if path.isEmpty { return nil }
 
     let decoded = path.removingPercentEncoding ?? path
-    if decoded.hasPrefix("/") {
-      return URL(fileURLWithPath: decoded).standardized
-    }
-    return URL(fileURLWithPath: decoded, relativeTo: baseDir)
-      .standardized
+    return URL(fileURLWithPath: decoded, relativeTo: baseDir).safe
   }
 }

@@ -98,6 +98,7 @@ struct ViewerApp: App {
       if let model = boot.model {
         FormatCommands(appModel: model)
       }
+      HelpCommands(dispatcher: dispatcher)
     }
 
     Settings {

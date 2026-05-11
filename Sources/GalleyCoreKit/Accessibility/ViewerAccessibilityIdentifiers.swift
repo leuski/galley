@@ -23,6 +23,12 @@ public enum ViewerA11yID {
     public static let print = "viewer.file.print"
   }
 
+  // MARK: Help menu
+
+  public enum HelpMenu {
+    public static let templateAuthoring = "viewer.help.templateAuthoring"
+  }
+
   // MARK: View menu
 
   public enum ViewMenu {
