@@ -1,0 +1,212 @@
+/* Manuscript — typewriter-style draft view. Courier monospace,
+   double-spaced lines, cream paper background, narrow measure so the
+   page feels written rather than published. No box-shadow page chrome
+   on purpose; the paper-coloured viewport is the page. */
+
+:root {
+    color-scheme: light dark;
+    --paper: #f8f5ec;
+    --ink: #1a1a18;
+    --muted: #6b6457;
+    --rule: #c8c0aa;
+    --accent: #7a5b1e;
+    --code-bg: #efeadc;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #1a1916;
+        --ink: #e6dcc6;
+        --muted: #8b8472;
+        --rule: #3a342a;
+        --accent: #c9a96e;
+        --code-bg: #25221c;
+    }
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+}
+
+body {
+    font-family: "Courier Prime", Courier, "Courier New", monospace;
+    font-size: 16px;
+    line-height: 2;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+article {
+    max-width: 65ch;
+    margin: 3rem auto;
+    padding: 0 2rem;
+}
+
+/* Headings — Courier'd so they don't break the typewriter rhythm.
+   No bold display faces; just scale + tracking + uppercase for h1/h2. */
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: inherit;
+    line-height: 1.4;
+    margin: 2.5em 0 1em;
+}
+
+h1 {
+    font-size: 1.4em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: center;
+}
+
+h2 {
+    font-size: 1.15em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+h3 { font-size: 1em; font-weight: bold; }
+h4, h5, h6 { font-size: 1em; font-weight: bold; font-style: italic; }
+
+/* Paragraphs — indented first line, no blank line between. Standard
+   manuscript convention. First paragraph after a heading is flush left. */
+
+p {
+    margin: 0;
+    text-indent: 2em;
+}
+
+h1 + p,
+h2 + p,
+h3 + p,
+h4 + p,
+h5 + p,
+h6 + p,
+blockquote + p,
+hr + p,
+pre + p,
+ul + p,
+ol + p,
+table + p {
+    text-indent: 0;
+}
+
+/* Links — restrained, no underline by default; underline on hover so
+   the typewriter texture stays clean. */
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+/* Emphasis */
+
+em, i { font-style: italic; }
+strong, b { font-weight: bold; }
+
+/* Lists — keep monospaced rhythm; no fancy bullets. */
+
+ul, ol {
+    padding-left: 4em;
+    margin: 0;
+}
+
+li { margin: 0; }
+
+/* Blockquotes — indented block, no left bar (that's a published-page
+   convention). Italics signal the quote. */
+
+blockquote {
+    margin: 1.5em 4em;
+    font-style: italic;
+    color: var(--muted);
+}
+
+/* Code — same monospace, slightly washed background to set it apart
+   without breaking the typewriter feel. */
+
+code {
+    background: var(--code-bg);
+    padding: 0 0.3em;
+    border-radius: 2px;
+}
+
+pre {
+    background: var(--code-bg);
+    padding: 1em 1.5em;
+    overflow-x: auto;
+    line-height: 1.5;
+    margin: 1.5em 0;
+}
+
+pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+/* Tables — single-rule, no shading. Stays in keeping. */
+
+table {
+    border-collapse: collapse;
+    margin: 1.5em 0;
+    width: 100%;
+}
+
+th, td {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.4em 0.8em;
+    text-align: left;
+}
+
+th { font-weight: bold; }
+
+/* Horizontal rule — three centred asterisks, the manuscript scene
+   break. Done with a pseudo so users typing `---` get it for free. */
+
+hr {
+    border: 0;
+    text-align: center;
+    margin: 2.5em 0;
+    line-height: 1;
+}
+
+hr::after {
+    content: "* * *";
+    color: var(--muted);
+    letter-spacing: 0.8em;
+}
+
+/* Images — full width within the measure, no decoration. */
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5em auto;
+}
+
+/* Mermaid */
+
+.mermaid { display: block; margin: 1.5em auto; text-align: center; }
+
+/* Print — clean letter page. Drop background tint; printer ink is
+   black on white anyway. Manuscript convention is 1in margins. */
+
+@page { margin: 1in; }
+
+@media print {
+    :root { color-scheme: light; }
+    html, body { background: #fff; }
+    body { color: #000; }
+    article { max-width: none; margin: 0; padding: 0; }
+    a { color: inherit; }
+    pre, blockquote, table, figure, img { break-inside: avoid; }
+    h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+    .mermaid svg { max-width: 100%; height: auto; }
+}

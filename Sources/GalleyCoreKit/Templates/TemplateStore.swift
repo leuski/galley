@@ -121,10 +121,34 @@ public final class TemplateStore {
     onReload?()
   }
 
-  /// For the bundled source, supply literal `LocalizedStringResource`s
-  /// so Xcode's catalog extraction picks up the translatable labels.
-  /// User-source templates fall back to the runtime
-  /// `LocalizationValue` derived from the filename.
+  /// Literal `LocalizedStringResource`s for every bundled template so
+  /// Xcode's catalog extraction picks the labels up. Keyed by the
+  /// template's on-disk base name (`Default.html` → `"Default"`,
+  /// `Tufte/` → `"Tufte"`). Add a row when adding a new bundled
+  /// template; the rest of the discovery path is filename-driven.
+  private static let bundledNameResources:
+    [String: LocalizedStringResource] = [
+    "Default": LocalizedStringResource(
+      "Default", bundle: .galleyCoreKit),
+    "GitHub": LocalizedStringResource(
+      "GitHub", bundle: .galleyCoreKit),
+    "HighContrast": LocalizedStringResource(
+      "High Contrast", bundle: .galleyCoreKit),
+    "LaTeX": LocalizedStringResource(
+      "LaTeX", bundle: .galleyCoreKit),
+    "Manuscript": LocalizedStringResource(
+      "Manuscript", bundle: .galleyCoreKit),
+    "Sepia": LocalizedStringResource(
+      "Sepia", bundle: .galleyCoreKit),
+    "Terminal": LocalizedStringResource(
+      "Terminal", bundle: .galleyCoreKit),
+    "Tufte": LocalizedStringResource(
+      "Tufte", bundle: .galleyCoreKit)
+  ]
+
+  /// For the bundled source, look the translatable label up in
+  /// `bundledNameResources`. User-source templates fall back to the
+  /// runtime `LocalizationValue` derived from the filename.
   private func makeNameResourceProvider(
     forSource index: Int
   ) -> (String) -> LocalizedStringResource? {
@@ -132,39 +156,12 @@ public final class TemplateStore {
     return { entryName in
       // Strip `.html` / `.htm` so file-shape bundled templates and
       // folder-shape bundled templates resolve to the same key.
-      let base: String = {
-        let url = URL(fileURLWithPath: entryName)
-        let ext = url.pathExtension.lowercased()
-        if ext == "html" || ext == "htm" {
-          return url.deletingPathExtension().lastPathComponent
-        }
-        return entryName
-      }()
-      switch base {
-      case "Default":
-        return LocalizedStringResource(
-          "Default", bundle: .galleyCoreKit)
-      case "GitHub":
-        return LocalizedStringResource(
-          "GitHub", bundle: .galleyCoreKit)
-      case "Sepia":
-        return LocalizedStringResource(
-          "Sepia", bundle: .galleyCoreKit)
-      case "HighContrast":
-        return LocalizedStringResource(
-          "High Contrast", bundle: .galleyCoreKit)
-      case "LaTeX":
-        return LocalizedStringResource(
-          "LaTeX", bundle: .galleyCoreKit)
-      case "Terminal":
-        return LocalizedStringResource(
-          "Terminal", bundle: .galleyCoreKit)
-      case "Tufte":
-        return LocalizedStringResource(
-          "Tufte", bundle: .galleyCoreKit)
-      default:
-        return nil
-      }
+      let url = URL(fileURLWithPath: entryName)
+      let ext = url.pathExtension.lowercased()
+      let base = (ext == "html" || ext == "htm")
+        ? url.deletingPathExtension().lastPathComponent
+        : entryName
+      return Self.bundledNameResources[base]
     }
   }
 
