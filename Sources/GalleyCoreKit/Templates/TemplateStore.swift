@@ -153,6 +153,9 @@ public final class TemplateStore {
       case "HighContrast":
         return LocalizedStringResource(
           "High Contrast", bundle: .galleyCoreKit)
+      case "LaTeX":
+        return LocalizedStringResource(
+          "LaTeX", bundle: .galleyCoreKit)
       case "Terminal":
         return LocalizedStringResource(
           "Terminal", bundle: .galleyCoreKit)

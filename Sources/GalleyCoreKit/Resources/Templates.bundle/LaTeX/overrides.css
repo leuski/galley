@@ -1,0 +1,14 @@
+/* Galley-specific overrides for latex-css. Loaded AFTER LaTeX/vendor.css
+   so these rules win. Keep this file small.
+
+   Dark-mode tracking lives in LaTeX.html: a tiny <head> script toggles
+   the vendor's `.latex-dark` class on <html> when prefers-color-scheme
+   is dark, so the vendor's own palette is the single source of truth. */
+
+:root { color-scheme: light dark; }
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+
+@media print {
+    .mermaid svg { max-width: 100%; height: auto; }
+}

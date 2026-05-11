@@ -42,3 +42,24 @@ Galley-specific overrides (mermaid, print) live in
 vendor file. Tufte CSS already ships a dark-mode variant.
 
 <!-- END: tufte-css -->
+
+<!-- BEGIN: latex-css -->
+
+## latex-css
+
+- Source: <https://github.com/vincentdoerig/latex-css>
+- License: MIT (see `Templates.bundle/LaTeX/LICENSE`)
+- Pinned version: `1.13.0`
+- Vendored: `Templates.bundle/LaTeX/vendor.css` (SHA-256 `773c8dfd6ac8d602e54b014d01db83ba2cde262646e528577cdbb1508353aba4`)
+- Fonts: `Templates.bundle/LaTeX/fonts/` (1246984 bytes, Latin Modern + Libertinus, woff2 only)
+- Last sync: 2026-05-11
+- Sync command: `./Scripts/sync-latex-css.sh`
+
+Galley-specific overrides (mermaid, print) live in
+`Templates.bundle/LaTeX/overrides.css` and load *after* the
+vendor file. The vendor's dark mode is an opt-in `.latex-dark`
+class; `LaTeX.html` ships a one-line script that toggles it on
+`<html>` when the system reports dark, so the vendor palette
+stays the single source of truth.
+
+<!-- END: latex-css -->
