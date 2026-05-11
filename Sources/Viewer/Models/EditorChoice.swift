@@ -20,7 +20,7 @@ typealias Logger = os.Logger
 @Observable
 @MainActor
 final class EditorChoice: ChoiceModel {
-  enum Element: ChoiceValue, Codable {
+  enum Element: ChoiceValue, Codable, Equatable {
     case preset(EditorPreset)
     case customURL(template: String)
     case appBundle(URL?)

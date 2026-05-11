@@ -36,7 +36,7 @@ private let templateBackgroundNoneSentinel = ""
 ///   reference: that one comparison detects "use the deferred
 ///   sentinel" and round-trips as the empty-string sentinel; any
 ///   other color round-trips as a hex literal.
-public enum TemplateBackgroundState: Codable {
+public enum TemplateBackgroundState: Codable, Equatable {
   case unresolved
   case resolved(Color)
 
