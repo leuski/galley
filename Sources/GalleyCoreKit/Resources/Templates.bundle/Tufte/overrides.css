@@ -1,0 +1,26 @@
+/* Galley-specific overrides for tufte-css. Loaded AFTER Tufte-vendor.css
+   so these rules win. Tufte already ships its own print rules, dark-mode
+   variant, and mobile breakpoint — keep this file tiny.
+
+   Sections:
+     1. Overscroll chrome — vendor file paints `body` but not `html`, so
+                            the WebView's rubber-band area flashes white.
+     2. Mermaid           — vendor file doesn't know about mermaid output. */
+
+/* 1. Overscroll chrome */
+
+:root { color-scheme: light dark; }
+
+html { background-color: #fffff8; }
+
+@media (prefers-color-scheme: dark) {
+    html { background-color: #151515; }
+}
+
+/* 2. Mermaid */
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+
+@media print {
+    .mermaid svg { max-width: 100%; height: auto; }
+}

@@ -13,8 +13,11 @@ DEFAULT_VERSION="5.9.0"
 VERSION="${1:-$DEFAULT_VERSION}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST_DIR="$REPO_ROOT/Sources/GalleyCoreKit/Resources/Templates.bundle"
+DEST_DIR="$REPO_ROOT/Sources/GalleyCoreKit/Resources/Templates.bundle/GitHub"
 MANIFEST="$REPO_ROOT/docs/vendored-templates.md"
+SECTION="github-markdown-css"
+
+mkdir -p "$DEST_DIR"
 
 TARBALL_URL="https://github.com/sindresorhus/github-markdown-css/archive/refs/tags/v${VERSION}.tar.gz"
 TMP_DIR="$(mktemp -d)"
@@ -30,44 +33,44 @@ if [[ ! -d "$SRC_DIR" ]]; then
     exit 1
 fi
 
-echo "==> Copying github-markdown.css → GitHub-vendor.css"
-cp "$SRC_DIR/github-markdown.css" "$DEST_DIR/GitHub-vendor.css"
+echo "==> Copying github-markdown.css → GitHub/vendor.css"
+cp "$SRC_DIR/github-markdown.css" "$DEST_DIR/vendor.css"
 
-echo "==> Copying license → GitHub-vendor-LICENSE"
-cp "$SRC_DIR/license" "$DEST_DIR/GitHub-vendor-LICENSE"
+echo "==> Copying license → GitHub/LICENSE"
+cp "$SRC_DIR/license" "$DEST_DIR/LICENSE"
 
-SOURCE_SHA="$(shasum -a 256 "$DEST_DIR/GitHub-vendor.css" | awk '{print $1}')"
+SOURCE_SHA="$(shasum -a 256 "$DEST_DIR/vendor.css" | awk '{print $1}')"
 TODAY="$(date -u +%Y-%m-%d)"
 
-mkdir -p "$(dirname "$MANIFEST")"
+SECTION_FILE="$TMP_DIR/section.md"
 {
-    echo "# Vendored Template CSS"
-    echo
-    echo "Upstream stylesheets vendored into"
-    echo "\`Sources/GalleyCoreKit/Resources/Templates.bundle/\`."
-    echo "Re-sync with the per-repo scripts in \`Scripts/\`."
-    echo
     echo "## github-markdown-css"
     echo
     echo "- Source: <https://github.com/sindresorhus/github-markdown-css>"
-    echo "- License: MIT (see \`GitHub-vendor-LICENSE\`)"
+    echo "- License: MIT (see \`Templates.bundle/GitHub/LICENSE\`)"
     echo "- Pinned version: \`${VERSION}\`"
-    echo "- Vendored file: \`GitHub-vendor.css\` (SHA-256 \`${SOURCE_SHA}\`)"
+    echo "- Vendored: \`Templates.bundle/GitHub/vendor.css\` (SHA-256 \`${SOURCE_SHA}\`)"
     echo "- Last sync: ${TODAY}"
     echo "- Sync command: \`./Scripts/sync-github-markdown-css.sh\`"
     echo
-    echo "Galley-specific overrides (page layout, print rules, mermaid)"
-    echo "live in \`GitHub-overrides.css\` and load *after* the vendor file."
-} > "$MANIFEST"
+    echo "Galley-specific overrides (page chrome, print rules, mermaid)"
+    echo "live in \`Templates.bundle/GitHub/overrides.css\` and load *after*"
+    echo "the vendor file."
+} > "$SECTION_FILE"
+
+awk -v section="$SECTION" -v content_file="$SECTION_FILE" '
+    $0 == "<!-- BEGIN: " section " -->" {
+        print; print ""
+        while ((getline line < content_file) > 0) print line
+        print ""
+        in_block = 1
+        next
+    }
+    $0 == "<!-- END: " section " -->" { in_block = 0; print; next }
+    !in_block { print }
+' "$MANIFEST" > "$MANIFEST.new" && mv "$MANIFEST.new" "$MANIFEST"
 
 echo "==> Done. Files updated:"
-echo "    $DEST_DIR/GitHub-vendor.css"
-echo "    $DEST_DIR/GitHub-vendor-LICENSE"
-echo "    $MANIFEST"
-echo
-echo "Next steps:"
-echo "  1. Verify GitHub.html wraps content in <article class=\"markdown-body\">."
-echo "  2. Confirm GitHub-vendor.css and GitHub-vendor-LICENSE are members of"
-echo "     the GalleyCoreKit target's Templates.bundle resources in Xcode."
-echo "  3. Build the Viewer scheme and spot-check a markdown doc with the"
-echo "     GitHub template selected."
+echo "    $DEST_DIR/vendor.css"
+echo "    $DEST_DIR/LICENSE"
+echo "    $MANIFEST (section: $SECTION)"

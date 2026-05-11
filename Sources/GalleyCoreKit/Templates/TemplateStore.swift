@@ -156,6 +156,9 @@ public final class TemplateStore {
       case "Terminal":
         return LocalizedStringResource(
           "Terminal", bundle: .galleyCoreKit)
+      case "Tufte":
+        return LocalizedStringResource(
+          "Tufte", bundle: .galleyCoreKit)
       default:
         return nil
       }
