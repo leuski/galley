@@ -70,5 +70,10 @@ where Model: SearchModel
       fieldFocused = true
     }
     .onChange(of: model.dismissalToken) { dismiss() }
+    .onChange(of: fieldFocused) { _, new in
+      if !new && model.query.isEmpty {
+        dismiss()
+      }
+    }
   }
 }
