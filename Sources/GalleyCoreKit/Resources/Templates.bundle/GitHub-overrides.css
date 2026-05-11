@@ -1,0 +1,61 @@
+/* Galley-specific overrides for github-markdown-css. Loaded AFTER
+   GitHub-vendor.css so these rules win. Keep this file small — any rule
+   that could live upstream should live upstream.
+
+   Sections:
+     1. Viewport chrome  — vendor file only paints `.markdown-body`, so
+                           we paint html/body and centre the article.
+     2. Mermaid          — vendor file doesn't know about mermaid output.
+     3. Print pipeline   — pairs with DocumentModel's print/PDF export. */
+
+/* 1. Viewport chrome */
+
+:root { color-scheme: light dark; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+    html, body { background: #0d1117; }
+}
+
+.markdown-body {
+    box-sizing: border-box;
+    max-width: 50rem;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+}
+
+/* 2. Mermaid */
+
+.mermaid { display: block; margin: 1rem auto; text-align: center; }
+
+/* 3. Print pipeline */
+
+@page { margin: 0.75in; }
+@media print {
+    :root { color-scheme: light; }
+    html, body { background: #fff; }
+    .markdown-body {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+    }
+    .markdown-body a { color: inherit; }
+    .markdown-body pre,
+    .markdown-body blockquote,
+    .markdown-body table,
+    .markdown-body figure,
+    .markdown-body img { break-inside: avoid; }
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4,
+    .markdown-body h5,
+    .markdown-body h6 { break-after: avoid; }
+    .mermaid svg { max-width: 100%; height: auto; }
+}
