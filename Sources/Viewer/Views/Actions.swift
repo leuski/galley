@@ -269,8 +269,10 @@ extension Action {
           : "Show Status Bar"
       },
       image: "ruler",
-      perform: { _ in
-        Defaults.shared.showsStatusBar.toggle()
+      perform: { reduceMotion in
+        withAnimationAsNeeded(reduceMotion) {
+          Defaults.shared.showsStatusBar.toggle()
+        }
       },
       shortcut: .init("2", modifiers: [.command, .control]),
       accessibilityID: ViewerA11yID.ViewMenu.toggleStatusBar

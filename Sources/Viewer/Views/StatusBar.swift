@@ -22,7 +22,7 @@ struct StatusBar: View {
     .font(.caption)
     .foregroundStyle(.secondary)
     .monospacedDigit()
-    .padding(.horizontal, 12)
+    .padding(.horizontal, 16)
     .padding(.vertical, 6)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .top) { Divider() }
