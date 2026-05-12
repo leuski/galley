@@ -85,7 +85,7 @@ docs/                         # test-framework
 
 ## Build & test
 
-Pure Xcode project — **no `Package.swift` anywhere**. Frameworks build inside the project. Schemes:
+Pure Xcode project — **no `Package.swift` anywhere**. Frameworks build inside the project. New source files dropped into the per-target source directories (`Sources/Viewer/...`, `Sources/Server/...`, etc.) are picked up automatically — the project uses Xcode 16 filesystem-synchronized groups, so `Galley.xcodeproj/project.pbxproj` has no individual file references and **no manual registration is required** when adding a file. Schemes:
 
 - **Viewer** — the Galley document app
 - **Server** — the menu-bar previewer
