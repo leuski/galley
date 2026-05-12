@@ -456,7 +456,7 @@ struct DocumentView: View {
         .controlGroupStyle(.navigation)
       }
     }
-    .customizationBehavior(.default)
+    .defaultCustomization(.hidden)
   }
 
   @ToolbarContentBuilder
@@ -466,18 +466,17 @@ struct DocumentView: View {
     ToolbarItem(id: "renderer", placement: .confirmationAction) {
       RendererToolbarPicker(appModel: appModel, docModel: model)
     }
-    .customizationBehavior(.default)
+    .defaultCustomization(.hidden)
 
     ToolbarItem(id: "template", placement: .confirmationAction) {
       TemplateToolbarPicker(appModel: appModel, docModel: model)
     }
-    .customizationBehavior(.default)
+    .defaultCustomization(.hidden)
 
     ToolbarItem(id: "reload", placement: .confirmationAction) {
       Action.reload(model).toolbarItem()
     }
-    .customizationBehavior(.default)
-
+    .defaultCustomization(.hidden)
   }
 
   @ToolbarContentBuilder
