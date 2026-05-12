@@ -10,22 +10,8 @@ import WebKit
 /// catalog discovery — so this view always has a concrete URL and a
 /// hydrated `AppModel` to work with.
 struct DocumentView: View {
-  /// Distinguishes a normal document window from the singleton Help
-  /// window. Help mode skips the routing-registry handshake (adopt /
-  /// unregister / updateCurrentURL) so help windows are invisible to
-  /// the URL dispatcher — they're never tab-merge targets, never
-  /// focus-existing targets, never rebind targets. `record(_:)` on
-  /// `RecentDocumentsModel` independently refuses bundle URLs, so
-  /// the inline `recents.record(...)` calls below are no-ops in help
-  /// mode without needing a conditional.
-  enum Kind {
-    case document
-    case help
-  }
-
   @Binding var fileURL: URL
   let appModel: AppModel
-  let kind: Kind
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -58,18 +44,18 @@ struct DocumentView: View {
   init(
     fileURL: Binding<URL>,
     appModel: AppModel,
-    kind: Kind = .document
+    kind: DocumentModel.Kind = .document
   ) {
     self._fileURL = fileURL
     self.appModel = appModel
-    self.kind = kind
     let url = fileURL.wrappedValue
     let stored = Defaults.shared.perFileStateStore[url]
     self._model = State(wrappedValue: DocumentModel(
       initialURL: url,
       appModel: appModel,
       templatePersistent: stored.templatePersistent,
-      processorPersistent: stored.rendererPersistent))
+      processorPersistent: stored.rendererPersistent,
+      kind: kind))
   }
 
   /// Per-window persisted back/forward stack. SwiftUI's `@SceneStorage`
@@ -106,7 +92,7 @@ struct DocumentView: View {
           // reopened tab into a floating, toolbar-less window.
           guard let window, window !== hostWindow else { return }
           hostWindow = window
-          if kind == .help {
+          if model.kind == .help {
             // Help windows reveal themselves directly — no dispatcher
             // adoption, no registry entry, no tab "+" hook.
             window.alphaValue = model.didFirstBind ? 1 : 0
@@ -124,7 +110,7 @@ struct DocumentView: View {
           }
         },
         onDetach: { window in
-          guard kind == .document, let window else { return }
+          guard model.kind == .document, let window else { return }
           dispatcher.unregisterWindow(window)
         }))
       .focusedSceneValue(\.documentModel, model)
@@ -179,9 +165,9 @@ struct DocumentView: View {
         onScrollY: mirrorPerFileScrollY,
         onShowsTOC: mirrorPerFileShowsTOC,
         reload: reloadModel))
-      .navigationDocument(model.documentURL, when: kind == .document)
+      .navigationDocument(model.documentURL, when: model.kind == .document)
       .navigationTitle(
-        kind == .help
+        model.kind == .help
           ? Text("Help")
           : Text(model.documentURL.lastPathComponent))
       .navigationSubtitle(model.page.title)
@@ -241,7 +227,7 @@ struct DocumentView: View {
               .transition(.move(edge: .bottom).combined(with: .opacity))
           }
         }
-        .toolbar(id: kind == .document ? "viewer.main" : "viewer.help") {
+        .toolbar(id: model.kind == .document ? "viewer.main" : "viewer.help") {
           toolbarContent(appModel: appModel)
         }
     }
@@ -287,7 +273,7 @@ struct DocumentView: View {
   /// safe to call from multiple `.onChange` observers.
   private func handleDocumentBound() {
     saveHistory()
-    if kind == .document, let window = hostWindow {
+    if model.kind == .document, let window = hostWindow {
       dispatcher.updateCurrentURL(window, model.documentURL)
     }
     if model.didFirstBind {
@@ -448,7 +434,7 @@ struct DocumentView: View {
   ) -> some CustomizableToolbarContent {
     navigationToolbarItems
     //    ToolbarSpacer(.flexible, placement: .automatic)
-    if kind == .document {
+    if model.kind == .document {
       mainToolbarItems(appModel: appModel)
     }
     zoomToolbarItems

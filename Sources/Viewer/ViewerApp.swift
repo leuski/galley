@@ -127,6 +127,12 @@ struct ViewerApp: App {
         .environment(help)
     }
     .restorationBehavior(.disabled)
+    // Drop SwiftUI's static "Help" entry from the Window menu —
+    // AppKit auto-lists the window dynamically once it's visible
+    // (and removes the entry when it closes), so the static entry
+    // would only show "Help" as an always-present opener even when
+    // no help window exists.
+    .commandsRemoved()
 
     Settings {
       if let model = boot.model {

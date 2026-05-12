@@ -16,6 +16,8 @@ public enum ViewerA11yID {
     public static let openRecentMenu = "viewer.file.openRecent.menu"
     public static let openRecentItem = "viewer.file.openRecent.item"
     public static let openRecentClear = "viewer.file.openRecent.clear"
+    public static let close = "viewer.file.close"
+    public static let closeAll = "viewer.file.closeAll"
     public static let rename = "viewer.file.rename"
     public static let openInEditor = "viewer.file.openInEditor"
     public static let exportPDF = "viewer.file.exportPDF"

@@ -9,6 +9,12 @@ struct FileCommands: Commands {
   @Bindable var recents: RecentDocumentsModel
   @FocusedValue(\.documentModel) private var model
 
+  var visibleWindows: [NSWindow] {
+    NSApp.windows.filter { window in
+      window.isVisible
+    }
+  }
+
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
       Button("Open…", systemImage: "arrow.up.forward") {
@@ -35,11 +41,42 @@ struct FileCommands: Commands {
       .accessibilityIdentifier(ViewerA11yID.FileMenu.openRecentMenu)
     }
 
+    // Replace the `.saveItem` slot — which is otherwise empty for us —
+    // with explicit Close / Close All commands at a stable position
+    // below Open. SwiftUI's auto-injected Close pair lands above
+    // `.newItem` whenever the singleton Help window participates in
+    // the multi-window state, which puts it above our Open — a
+    // visual bug rooted in SwiftUI's File-menu rebuild quirks. Owning
+    // the commands ourselves keeps the order predictable regardless
+    // of which scene is key.
+    CommandGroup(replacing: .saveItem) {
+      Button("Close", systemImage: "xmark") {
+        NSApp.keyWindow?.performClose(nil)
+      }
+      .disabled(NSApp.keyWindow == nil)
+      .keyboardShortcut("w", modifiers: .command)
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.close)
+
+      Button("Close All", systemImage: "xmark.rectangle") {
+        // Iterate over a snapshot; `performClose(_:)` mutates
+        // `NSApp.windows` as the close animation completes. Filter
+        // out invisible / excluded windows (the Welcome anchor sits
+        // at alpha 0 and is excluded; we don't want to ask it to
+        // close).
+        for window in visibleWindows {
+          window.performClose(nil)
+        }
+      }
+      .disabled(visibleWindows.isEmpty)
+      .keyboardShortcut("w", modifiers: [.command, .option])
+      .accessibilityIdentifier(ViewerA11yID.FileMenu.closeAll)
+    }
+
     CommandGroup(after: .saveItem) {
       Button("Rename…", systemImage: "pencil") {
         model?.requestRename()
       }
-      .disabled(model == nil)
+      .disabled(model?.kind != .document)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 
       Button("Open in Editor", systemImage: "arrow.up.forward.app") {
