@@ -59,7 +59,7 @@ where Model: SearchFieldModel
         }
         .buttonStyle(.plain)
         .help("Clear")
-        .accessibilityLabel(Text("Clear"))
+        .accessibilityLabel("Clear")
       }
     }
     .padding(.horizontal, 6)
@@ -92,7 +92,7 @@ where Model: SearchFieldModel
     .menuStyle(.borderlessButton)
     .menuIndicator(.visible)
     .help("Find options")
-    .accessibilityLabel(Text("Find options"))
+    .accessibilityLabel("Find options")
     .accessibilityIdentifier(ViewerA11yID.Find.optionsMenu)
     .onChange(of: model.ignoresCase) {
       Task { await model.performSearch() }

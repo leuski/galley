@@ -39,7 +39,7 @@ public struct PullDownIconButton: View {
           .font(.caption2.weight(.semibold))
       }
     }
-    .accessibilityLabel(Text(accessibilityLabel))
+    .accessibilityLabel(accessibilityLabel)
     .background(MenuAnchorView(anchor: anchor))
   }
 

@@ -341,7 +341,7 @@ private struct ActionToolbarButton: View {
     }
     .disabled(!action.isEnabled())
     .help(action.helpLabel())
-    .accessibilityLabel(Text(action.title()))
+    .accessibilityLabel(action.title())
     .accessibilityIdentifier(action.accessibilityID)
   }
 }

@@ -19,7 +19,7 @@ struct ServerStatusPill: View {
         .frame(width: 8, height: 8)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(Text("Server status: \(labelText)"))
+    .accessibilityLabel("Server status: \(labelText)")
   }
 
   /// Per-case localized label. Returning `Text` (rather than a
