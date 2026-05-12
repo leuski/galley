@@ -4,8 +4,6 @@ import WebKit
 import os
 import ALFoundation
 
-let keyPrefix = bundleIdentifier
-
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible
 /// `WebPage`. The actual asset resolution lives in
 /// `GalleyCoreKit.PreviewScheme.resolve` and is shared with the

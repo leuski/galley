@@ -66,7 +66,7 @@ struct DocumentView: View {
   /// piece of per-window state has, since `WindowRegistry`'s focus-
   /// existing rule guarantees one window per URL and the per-file
   /// store already carries the same fields.
-  @SceneStorage("\(keyPrefix).history") private var historyJSON: String = ""
+  @SceneStorage("history") private var historyJSON: String = ""
 
   var body: some View {
     @Bindable var model = model
