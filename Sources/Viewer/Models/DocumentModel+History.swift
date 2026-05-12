@@ -50,14 +50,18 @@ extension DocumentModel {
   }
 
   /// Verify a link target is readable before we commit to navigating
-  /// to it. Returns `true` when the file exists; otherwise sets
-  /// `lastError` and returns `false`.
+  /// to it. Returns `true` when the file exists; otherwise posts an
+  /// ephemeral notice + beep and returns `false`. Ephemeral because
+  /// the current document's state is unaffected — only the user's
+  /// just-clicked link was bad — so a brief receipt is appropriate.
   func reportIfUnreachable(_ url: URL) -> Bool {
     if FileManager.default.isReadableFile(atPath: url.path) {
-      lastError = nil
       return true
     }
-    lastError = "Cannot open \(url.lastPathComponent): file not found."
+    report(
+      String(localized:
+        "Cannot open \(url.lastPathComponent): file not found."),
+      lifetime: .ephemeral)
     NSSound.beep()
     return false
   }

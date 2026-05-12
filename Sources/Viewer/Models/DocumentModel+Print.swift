@@ -72,17 +72,9 @@ extension DocumentModel {
         operation.showsPrintPanel = true
         operation.showsProgressPanel = true
       }
-      lastError = nil
     } catch {
-      logPrintFailed(error)
-      lastError = error.localizedDescription
+      report(failure: error, context: "print", lifetime: .ephemeral)
     }
-  }
-
-  private func logPrintFailed(_ error: any Error) {
-    logger.error("""
-      print failed: \(error.localizedDescription, privacy: .public)
-      """)
   }
 
   /// Show the system Page Setup sheet on `window` (app-modal fallback

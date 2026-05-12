@@ -72,7 +72,24 @@ final class DocumentModel {
   /// rename, reload). Render-state visibility is tracked separately
   /// by `didFirstBind`.
   private(set) var documentURL: URL
-  var lastError: String?
+
+  /// Single user-visible error / status channel. Replaces the prior
+  /// scattered `lastError = …` writes. `nil` means "no notice." Set
+  /// via `report(_:lifetime:)` / `report(failure:context:lifetime:)`;
+  /// cleared by `dismissNotice()` (banner close), the auto-clear
+  /// timer (for `.ephemeral`), or `clearRenderBoundNotice()` at the
+  /// start of every render (for `.renderBound` — so a stale render
+  /// failure doesn't outlive its bind, but an in-flight ephemeral
+  /// receipt for a separate action is left alone). Set-access stays
+  /// open so the `+Notice` extension can manage state; readers should
+  /// not mutate directly.
+  var notice: DocumentNotice?
+
+  /// Auto-clear task for ephemeral notices. Cancelled when a new
+  /// notice arrives or when the user manually dismisses, so old
+  /// timers can't blow away a fresher notice. Owned by the `+Notice`
+  /// extension; nothing else writes it.
+  @ObservationIgnored var ephemeralClearTask: Task<Void, Never>?
 
   /// Set to `true` at the start of the first `rebindCurrent` call.
   /// Distinguishes "model exists, has a URL, but render hasn't been
@@ -537,10 +554,13 @@ final class DocumentModel {
     do {
       try FileManager.default.moveItem(at: oldURL, to: newURL)
     } catch {
-      lastError = "Rename failed: \(error.localizedDescription)"
+      report(
+        failure: error, context: "rename",
+        message: String(localized:
+          "Rename failed: \(error.localizedDescription)"),
+        lifetime: .ephemeral)
       throw error
     }
-    lastError = nil
 
     // Patch every history entry that referenced the old URL — Back
     // would otherwise lead to a now-missing path and trip the
@@ -604,6 +624,13 @@ final class DocumentModel {
   }
 
   private func renderCurrent(preserveScroll: Bool) async {
+    // Drop any prior render-bound notice — it described the previous
+    // bind and would otherwise sit behind the incoming render until
+    // the next failure overwrote it. Leaves an in-flight ephemeral
+    // notice (e.g. a broken-link beep banner from milliseconds ago)
+    // alone; that's action feedback, not bind state.
+    clearRenderBoundNotice()
+
     let url = documentURL
     let renderer = resolvedRenderer()
     let template = resolvedTemplate()
@@ -629,7 +656,6 @@ final class DocumentModel {
       logLoadingHTML(byteCount: html.count)
       do {
         for try await _ in page.load(html: html, baseURL: composed.baseURL) {}
-        lastError = nil
         if let line = pendingScrollLine {
           // One-shot — consume before the JS call so an in-flight
           // file-watcher reload doesn't re-jump.
@@ -651,12 +677,10 @@ final class DocumentModel {
         // highlights and counts come back without user action.
         await find.reapplyIfActive()
       } catch {
-        logNavigationFailed(error)
-        lastError = error.localizedDescription
+        report(failure: error, context: "navigation", lifetime: .renderBound)
       }
     } catch {
-      logRenderFailed(error)
-      lastError = error.localizedDescription
+      report(failure: error, context: "render", lifetime: .renderBound)
     }
   }
 
@@ -668,18 +692,6 @@ final class DocumentModel {
 
   private func logLoadingHTML(byteCount: Int) {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
-  }
-
-  private func logNavigationFailed(_ error: any Error) {
-    logger.error("""
-      Navigation failed: \(error.localizedDescription, privacy: .public)
-      """)
-  }
-
-  private func logRenderFailed(_ error: any Error) {
-    logger.error("""
-      render failed: \(error.localizedDescription, privacy: .public)
-      """)
   }
 
   /// Resolve the renderer for the next render. When the per-document

@@ -72,13 +72,15 @@ struct DocumentView: View {
     @Bindable var model = model
     return splitView
       .overlay(alignment: .bottom) {
-        if let error = model.lastError {
-          Text(error)
-            .padding(8)
-            .background(.regularMaterial, in: .rect(cornerRadius: 8))
-            .padding()
+        if let notice = model.notice {
+          NoticeBanner(message: notice.message) {
+            model.dismissNotice()
+          }
+          .padding()
+          .transition(.move(edge: .bottom).combined(with: .opacity))
         }
       }
+      .animation(reduceMotion ? nil : .default, value: model.notice)
       .background(WindowAccessor(
         onAttach: { window in
           // Re-run registration whenever the resolved NSWindow
@@ -589,5 +591,28 @@ private extension View {
   @ViewBuilder
   func navigationDocument(_ url: URL, when condition: Bool) -> some View {
     if condition { navigationDocument(url) } else { self }
+  }
+}
+
+/// Bottom-overlay banner for `DocumentModel.notice`. Owns no state —
+/// the close button calls `onDismiss` so the model can cancel any
+/// pending auto-clear timer alongside clearing the notice.
+private struct NoticeBanner: View {
+  let message: String
+  let onDismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Text(message)
+        .textSelection(.enabled)
+      Button(action: onDismiss) {
+        Image(systemName: "xmark.circle.fill")
+          .foregroundStyle(.secondary)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Dismiss")
+    }
+    .padding(8)
+    .background(.regularMaterial, in: .rect(cornerRadius: 8))
   }
 }
