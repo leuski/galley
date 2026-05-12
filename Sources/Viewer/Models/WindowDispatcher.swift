@@ -24,13 +24,21 @@ import SwiftUI
 final class WindowDispatcher {
   @ObservationIgnored private(set) var openHandler: ((URL) -> Void)?
 
-  /// Closure that spawns or rebinds the singleton Help window. Set
-  /// by the bootstrap modifier; receives the URL to display, captures
-  /// `\.openWindow` and writes to a shared `HelpModel`.
-  /// Help URLs bypass the regular routing pipeline entirely — they
-  /// are not registered in `WindowRegistry`, never tab-merge, never
-  /// focus-existing onto a doc window.
-  @ObservationIgnored private(set) var helpHandler: ((URL) -> Void)?
+  /// Closure that brings the singleton Help window to front. Set by
+  /// the bootstrap modifier; captures `\.openWindow`. Help URLs bypass
+  /// the regular routing pipeline entirely — they are not registered
+  /// in `WindowRegistry`, never tab-merge, never focus-existing onto
+  /// a doc window. The URL to display is stored in `currentHelpURL`
+  /// and observed by `HelpWindowView`.
+  @ObservationIgnored private(set) var helpHandler: (() -> Void)?
+
+  /// URL the singleton Help window should display. The Help scene is
+  /// a SwiftUI `Window(id: "help")` — singular, not a
+  /// `WindowGroup<URL>`, so SwiftUI cannot persist a URL binding for
+  /// us. `handleOpenURLs` writes here before triggering `helpHandler`;
+  /// `HelpWindowView` observes the value and binds it into the
+  /// underlying `DocumentView`.
+  var currentHelpURL: URL?
 
   @ObservationIgnored private var launchBuffer = LaunchURLBuffer()
   @ObservationIgnored private var registry = WindowRegistry()
@@ -113,7 +121,8 @@ final class WindowDispatcher {
         // fall through to the regular dispatch path rather than
         // dropping the URL.
         if fileURL.isInMainBundle, let helpHandler {
-          helpHandler(fileURL)
+          currentHelpURL = fileURL
+          helpHandler()
           continue
         }
         if let line {
@@ -343,9 +352,10 @@ final class WindowDispatcher {
     return hadPending
   }
 
-  /// Install the closure that drives the singleton Help window.
-  /// Idempotent — subsequent calls re-capture the latest closure.
-  func installHelp(_ handler: @escaping (URL) -> Void) {
+  /// Install the closure that brings the singleton Help window to
+  /// front. Idempotent — subsequent calls re-capture the latest
+  /// closure.
+  func installHelp(_ handler: @escaping () -> Void) {
     helpHandler = handler
   }
 

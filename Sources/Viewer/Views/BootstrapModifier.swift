@@ -30,7 +30,6 @@ struct BootstrapDispatchModifier: ViewModifier {
   @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(AppBoot.self) private var boot
-  @Environment(HelpModel.self) private var help
   @Environment(\.openWindow) private var openWindow
   @Environment(\.openSettings) private var openSettings
 
@@ -41,12 +40,11 @@ struct BootstrapDispatchModifier: ViewModifier {
         dispatcher.install { url in
           action(value: url)
         }
-        // Help URLs route to the singleton "help" scene. Set the
-        // URL first so the help window's content view observes the
+        // Help URLs route to the singleton "help" scene. The
+        // dispatcher writes `currentHelpURL` before invoking this
+        // handler so the help window's content view observes the
         // value before SwiftUI mounts/raises the window.
-        let help = help
-        dispatcher.installHelp { url in
-          help.currentURL = url
+        dispatcher.installHelp {
           action(id: "help")
         }
       }

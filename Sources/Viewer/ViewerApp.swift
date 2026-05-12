@@ -10,7 +10,6 @@ struct ViewerApp: App {
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()
-  @State private var help = HelpModel()
 
   private static func createApplicationSupportDirectory() {
     let localized = GalleyConstants
@@ -71,7 +70,6 @@ struct ViewerApp: App {
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
-        .environment(help)
     }
     // Always present at launch. Without this, SwiftUI may remember
     // a previous "closed" state and skip auto-spawning, leaving us
@@ -97,7 +95,6 @@ struct ViewerApp: App {
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
-        .environment(help)
     }
     .defaultSize(width: 700, height: 900)
     .windowToolbarStyle(.unified)
@@ -114,9 +111,10 @@ struct ViewerApp: App {
 
     // Singleton Help window. SwiftUI enforces "exactly one" — calling
     // `openWindow(id: "help")` while a Help window is open just brings
-    // it forward. The URL to display is held in `HelpModel`; the
-    // dispatcher writes it before triggering the open via the
-    // installed help handler. `.restorationBehavior(.disabled)` keeps
+    // it forward. The URL to display is held on the dispatcher in
+    // `currentHelpURL`; the dispatcher writes it before triggering the
+    // open via the installed help handler.
+    // `.restorationBehavior(.disabled)` keeps
     // the help window out of state-restoration entirely — closing the
     // app while help is open does not bring it back on relaunch.
     Window("Help", id: "help") {
@@ -124,7 +122,6 @@ struct ViewerApp: App {
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)
-        .environment(help)
     }
     .restorationBehavior(.disabled)
     // Drop SwiftUI's static "Help" entry from the Window menu —
@@ -133,6 +130,7 @@ struct ViewerApp: App {
     // would only show "Help" as an always-present opener even when
     // no help window exists.
     .commandsRemoved()
+    .defaultSize(width: 600, height: 900)
 
     Settings {
       if let model = boot.model {

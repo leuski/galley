@@ -2,16 +2,16 @@ import GalleyCoreKit
 import SwiftUI
 
 /// Content for the singleton Help window scene. Reads the URL to
-/// display from `HelpModel` and mounts `DocumentView` in `.help`
-/// mode so the window bypasses the routing registry, tab-merging,
-/// and recents recording.
+/// display from `WindowDispatcher.currentHelpURL` and mounts
+/// `DocumentView` in `.help` mode so the window bypasses the routing
+/// registry, tab-merging, and recents recording.
 struct HelpWindowView: View {
-  @Environment(HelpModel.self) private var help
+  @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(AppBoot.self) private var boot
 
   var body: some View {
-    @Bindable var help = help
-    if let urlBinding = Binding($help.currentURL),
+    @Bindable var dispatcher = dispatcher
+    if let urlBinding = Binding($dispatcher.currentHelpURL),
        let appModel = boot.model
     {
       DocumentView(
