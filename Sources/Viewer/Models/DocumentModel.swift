@@ -135,13 +135,10 @@ final class DocumentModel {
   /// Visited documents in chronological order; `currentIndex` points
   /// at the one currently rendered. Navigation actions move
   /// `currentIndex` and rebind without truncating the stack — so
-  /// pressing Forward after Back works.
-  private var history: [URL] = []
-  private var currentIndex: Int = -1
-
-  var canGoBack: Bool { currentIndex > 0 }
-  var canGoForward: Bool {
-    currentIndex >= 0 && currentIndex < history.count - 1 }
+  /// pressing Forward after Back works. Mutated by the History
+  /// extension's `navigate`/`goBack`/`goForward` and by `rename`.
+  var history: [URL] = []
+  var currentIndex: Int = -1
 
   /// Increments on every `bind(to:)` call. Watcher loops captured by
   /// older bind invocations check this and bail out when superseded.
@@ -499,62 +496,6 @@ final class DocumentModel {
     await rebindCurrent()
   }
 
-  /// Codable view of the back/forward stack for `@SceneStorage`.
-  /// Returns nil when there is nothing meaningful to persist.
-  var historySnapshot: HistorySnapshot? {
-    guard !history.isEmpty,
-          currentIndex >= 0,
-          currentIndex < history.count
-    else { return nil }
-    return HistorySnapshot(urls: history, currentIndex: currentIndex)
-  }
-
-  /// Push a new URL onto the history and navigate to it. Truncates
-  /// any forward entries (browser-standard new-link behaviour).
-  ///
-  /// If the target file isn't readable, surfaces an error and leaves
-  /// history, bridges, and the visible document untouched — that way
-  /// a broken link click doesn't strand the window with a corrupted
-  /// base URL the link bridge would resolve subsequent clicks against.
-  func navigate(to url: URL) async {
-    guard reportIfUnreachable(url) else { return }
-    if currentIndex >= 0, currentIndex < history.count {
-      history.removeSubrange((currentIndex + 1)..<history.count)
-    }
-    history.append(url)
-    currentIndex = history.count - 1
-    await rebindCurrent()
-  }
-
-  func goBack() async {
-    guard canGoBack else { return }
-    let target = history[currentIndex - 1]
-    guard reportIfUnreachable(target) else { return }
-    currentIndex -= 1
-    await rebindCurrent()
-  }
-
-  func goForward() async {
-    guard canGoForward else { return }
-    let target = history[currentIndex + 1]
-    guard reportIfUnreachable(target) else { return }
-    currentIndex += 1
-    await rebindCurrent()
-  }
-
-  /// Verify a link target is readable before we commit to navigating
-  /// to it. Returns `true` when the file exists; otherwise sets
-  /// `lastError` and returns `false`.
-  private func reportIfUnreachable(_ url: URL) -> Bool {
-    if FileManager.default.isReadableFile(atPath: url.path) {
-      lastError = nil
-      return true
-    }
-    lastError = "Cannot open \(url.lastPathComponent): file not found."
-    NSSound.beep()
-    return false
-  }
-
   func reload() async {
     // `pageBackgroundColor` is computed off `renderedTemplate()
     // .backgroundState`, so the chrome stays at the *current* painted
@@ -628,7 +569,7 @@ final class DocumentModel {
   /// Rebind the model to whichever URL is at `currentIndex`. Drives
   /// the initial render and keeps reloading on file changes until
   /// another rebind supersedes this one.
-  private func rebindCurrent() async {
+  func rebindCurrent() async {
     guard currentIndex >= 0, currentIndex < history.count else { return }
     let url = history[currentIndex]
 
@@ -788,18 +729,4 @@ final class DocumentModel {
 @MainActor
 final class TemplateBox {
   var template: Template?
-}
-
-/// Serializable form of a window's back/forward stack. Persisted via
-/// `@SceneStorage` so each window restores to whichever document the
-/// user was viewing when the app last quit.
-struct HistorySnapshot: Codable, Sendable, Equatable {
-  let urls: [URL]
-  let currentIndex: Int
-
-  /// The URL the snapshot says the window was last viewing, or `nil`
-  /// when `currentIndex` is out of range (corrupted store).
-  var currentURL: URL? {
-    urls.indices.contains(currentIndex) ? urls[currentIndex] : nil
-  }
 }
