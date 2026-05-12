@@ -184,7 +184,7 @@ final class DocumentModel {
   /// in-window link navigation so a child doc inherits the parent's
   /// pick. Cold opens / Replace-current rebinds reset this from the
   /// destination URL's `PerFileStateStore` entry instead.
-  var showsTOC: Bool = false
+  var showsTOC: Bool = true
 
   /// Headings extracted from the rendered DOM after each load. The
   /// `TOCBridge` user script walks `<h1>…<h6>`, assigns synthetic ids
@@ -484,12 +484,12 @@ final class DocumentModel {
     initialScrollY: Double? = nil,
     initialShowsTOC: Bool? = nil
   ) async {
-    history = [url]
-    currentIndex = 0
     pendingScrollLine = scrollToLine
-    pendingScrollY = initialScrollY
-    if let initialShowsTOC { showsTOC = initialShowsTOC }
-    await rebindCurrent()
+    await finishBind(
+      urls: [url],
+      currentIndex: 0,
+      initialScrollY: initialScrollY,
+      initialShowsTOC: initialShowsTOC)
   }
 
   /// Restore a previously-saved history stack. Used at window
@@ -506,10 +506,25 @@ final class DocumentModel {
           snapshot.currentIndex >= 0,
           snapshot.currentIndex < snapshot.urls.count
     else { return }
-    history = snapshot.urls
-    currentIndex = snapshot.currentIndex
+    await finishBind(
+      urls: snapshot.urls,
+      currentIndex: snapshot.currentIndex,
+      initialScrollY: initialScrollY,
+      initialShowsTOC: initialShowsTOC)
+  }
+
+  private func finishBind(
+    urls: [URL],
+    currentIndex: Int,
+    initialScrollY: Double?,
+    initialShowsTOC: Bool?) async
+  {
+    history = urls
+    self.currentIndex = currentIndex
     pendingScrollY = initialScrollY
-    if let initialShowsTOC { showsTOC = initialShowsTOC }
+    // always open sidebar initially, otherwise, sidebar
+    // content will not extend beyond the top of the split view
+    // if let initialShowsTOC { showsTOC = initialShowsTOC }
     await rebindCurrent()
   }
 
