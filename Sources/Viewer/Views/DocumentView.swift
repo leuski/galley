@@ -190,7 +190,7 @@ struct DocumentView: View {
       }
     )) {
       TOCSidebar(model: model)
-        .listStyle(.sidebar)
+//        .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
       // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
@@ -204,6 +204,21 @@ struct DocumentView: View {
     } detail: {
       WebView(model.page)
         .frame(minWidth: webViewMinWidth)
+        // Collapse the TOC sidebar just before the very first paint
+        // of this split view if the user wanted it closed. `showsTOC`
+        // starts `true` so NavigationSplitView is born with a sidebar
+        // and AppKit wires the column as `.behavior = .sidebar` (so
+        // it extends up under the tab bar). `savedShowsTOC` holds the
+        // user's actual preference; we apply it inside `viewWillDraw`
+        // — same runloop turn as the first paint, so the visible
+        // state never includes the open-sidebar frame. One-shot via
+        // the `savedShowsTOC` flag flip.
+        .background(BeforeFirstDrawAccessor {
+          if !model.savedShowsTOC {
+            model.savedShowsTOC = true
+            model.showsTOC = false
+          }
+        })
         // The WebView's pre-paint canvas paints system-white during
         // the gap between mount and the first HTML layout — visible
         // as a white flash on tab open / reload regardless of CSS.

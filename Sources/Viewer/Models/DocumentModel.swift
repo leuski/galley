@@ -184,7 +184,22 @@ final class DocumentModel {
   /// in-window link navigation so a child doc inherits the parent's
   /// pick. Cold opens / Replace-current rebinds reset this from the
   /// destination URL's `PerFileStateStore` entry instead.
+  ///
+  /// Starts `true` so `NavigationSplitView` is born with a visible
+  /// sidebar — AppKit only wires `NSSplitViewItem.behavior = .sidebar`
+  /// when the column is visible at first paint, otherwise a later
+  /// toggle puts sidebar content below the tab bar instead of
+  /// extending up under it. `BeforeFirstDrawAccessor` collapses it
+  /// pre-paint when `savedShowsTOC` says the user wanted it closed.
   var showsTOC: Bool = true
+
+  /// One-shot guard for the pre-first-draw sidebar collapse. `false`
+  /// means "the user wanted TOC closed for this bind — collapse on
+  /// the next `viewWillDraw`." `true` means "leave the sidebar
+  /// alone" (either the user wants it open, or we've already
+  /// applied the collapse). Set by `finishBind` from the bind's
+  /// `initialShowsTOC` and consumed by `BeforeFirstDrawAccessor`.
+  @ObservationIgnored var savedShowsTOC: Bool = true
 
   /// Headings extracted from the rendered DOM after each load. The
   /// `TOCBridge` user script walks `<h1>…<h6>`, assigns synthetic ids
@@ -522,9 +537,12 @@ final class DocumentModel {
     history = urls
     self.currentIndex = currentIndex
     pendingScrollY = initialScrollY
-    // always open sidebar initially, otherwise, sidebar
-    // content will not extend beyond the top of the split view
-    // if let initialShowsTOC { showsTOC = initialShowsTOC }
+    // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
+    // to apply pre-first-paint. `showsTOC` itself stays `true` so
+    // NavigationSplitView is born with the sidebar visible and
+    // AppKit wires `NSSplitViewItem.behavior = .sidebar` — without
+    // that, a later toggle puts sidebar content below the tab bar.
+    savedShowsTOC = initialShowsTOC ?? false
     await rebindCurrent()
   }
 

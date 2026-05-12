@@ -56,3 +56,43 @@ private final class ResolvingView: NSView {
     onAttach(window)
   }
 }
+
+/// Fires `onWillDraw` immediately before each AppKit draw pass of the
+/// host view — the earliest hook available before the first pixel of
+/// the surrounding SwiftUI hierarchy hits the screen. Caller guards
+/// against re-firing (e.g. with a one-shot model flag).
+///
+/// `.onAppear` / `.task` fire *after* the first render, so they can't
+/// configure SwiftUI state that needs to be correct on the initial
+/// paint without a visible flash. `viewWillDraw` runs inside AppKit's
+/// display cycle on the same runloop turn that's about to paint, so
+/// any state mutation here applies before anything is composited —
+/// works on a new tab the same way it works on a fresh window, with
+/// no `alphaValue` reveal needed.
+struct BeforeFirstDrawAccessor: NSViewRepresentable {
+  let onWillDraw: () -> Void
+
+  func makeNSView(context: Context) -> NSView {
+    PreDrawView(onWillDraw: onWillDraw)
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class PreDrawView: NSView {
+  let onWillDraw: () -> Void
+
+  init(onWillDraw: @escaping () -> Void) {
+    self.onWillDraw = onWillDraw
+    super.init(frame: .zero)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewWillDraw() {
+    super.viewWillDraw()
+    onWillDraw()
+  }
+}
