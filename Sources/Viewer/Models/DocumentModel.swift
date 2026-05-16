@@ -271,14 +271,21 @@ final class DocumentModel {
 
     let box = TemplateBox()
     self.templateBox = box
-    self.page = WebPage(configuration: Self.makeConfiguration(
-      editorBridge: bridge,
-      linkBridge: linkBridge,
-      scrollBridge: scrollBridge,
-      tocBridge: tocBridge,
-      statsBridge: statsBridge,
-      backgroundBridge: backgroundBridge,
-      templateBox: box))
+    self.page = WebPage(
+      configuration: Self.makeConfiguration(
+        editorBridge: bridge,
+        linkBridge: linkBridge,
+        scrollBridge: scrollBridge,
+        tocBridge: tocBridge,
+        statsBridge: statsBridge,
+        backgroundBridge: backgroundBridge,
+        templateBox: box),
+      // Pin the Galley Server HTTPS cert. Most loads are
+      // in-process via `x-galley://local`, but any HTTPS asset that
+      // resolves to the server (template-rewritten URLs, future
+      // server-driven loads) gets validated against
+      // `server-cert.pem` instead of the user's keychain.
+      navigationDecider: ServerCertificatePinner())
     self.find = FindSession(page: self.page)
     // Seed the scheme handler's template pointer. `renderCurrent`
     // updates it again on every render — this seed only matters for
