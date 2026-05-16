@@ -1,5 +1,5 @@
 {
-  "originHash" : "c540f0d1acce1234eac1bca8b890531687d731fbff433c004c3bf0da1cb4c6d6",
+  "originHash" : "80f84f9ad997a3a86a2cf9e1e2faca19bb5c36bc2716ecb0ed1d3f2b38dd45e4",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -115,7 +115,7 @@
       "location" : "https://github.com/leuski/swift-core-kit",
       "state" : {
         "branch" : "main",
-        "revision" : "7861715f474a26447c6fdf59f1b76fca5366286c"
+        "revision" : "d735a3197fa210e12b19a311edde7f12f82eb930"
       }
     },
     {
