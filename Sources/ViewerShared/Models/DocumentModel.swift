@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import GalleyCoreKit
 import Observation
@@ -445,7 +444,13 @@ final class DocumentModel {
   /// topmost visible position-tagged block in the WebView; falls
   /// back to opening at the file with no line if the active renderer
   /// emits no source positions.
+  ///
+  /// macOS-only: external editors (BBEdit / VS Code / Xcode / …) are
+  /// not a visionOS concept. On non-macOS this is a no-op so callers
+  /// (cmd-click bridge handler, File > Open in Editor menu item)
+  /// don't need to platform-guard at the call site.
   func openInEditor(line: Int? = nil) async {
+    #if os(macOS)
     let url = documentURL
     let resolvedLine: Int?
     if let line {
@@ -458,6 +463,9 @@ final class DocumentModel {
       fileURL: url,
       line: resolvedLine,
       logger: logger)
+    #else
+    _ = line
+    #endif
   }
 
   /// Find the smallest source line of any block currently in (or

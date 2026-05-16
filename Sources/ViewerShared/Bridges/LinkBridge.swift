@@ -1,4 +1,6 @@
+#if os(macOS)
 import AppKit
+#endif
 import Foundation
 import GalleyCoreKit
 import WebKit
@@ -23,6 +25,20 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
   /// of opening a new Viewer document. Lets the host re-point the
   /// current WebView (browser-style) rather than spawning a window.
   var onMarkdownLink: ((URL) -> Void)?
+
+  /// Optional callback for external URLs (non-markdown local files,
+  /// http/https, mailto, etc.). When set, the bridge delegates the
+  /// open to the host. On macOS the bridge falls back to
+  /// `NSWorkspace.shared.open` when this is `nil` (the historical
+  /// behavior); on visionOS / iOS the host MUST install this — the
+  /// fallback is `#if`'d out because `NSWorkspace` is unavailable.
+  var onExternalURL: ((URL) -> Void)?
+
+  /// Optional callback for `finder://…` reveal links. Macros to
+  /// "select this path in Finder". macOS-only convention; the
+  /// callback is wired in only on macOS. visionOS / iOS hosts will
+  /// never see this fire.
+  var onFinderReveal: ((URL) -> Void)?
 
   private let logger = Logger(
     subsystem: bundleIdentifier,
@@ -57,7 +73,18 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
         fileURLWithPath: target.path,
         relativeTo: Bundle.main.bundleURL
       ).safe
-      NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+      #if os(macOS)
+      if let onFinderReveal {
+        onFinderReveal(fileURL)
+      } else {
+        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+      }
+      #else
+      // visionOS / iOS: no Finder. Hand off as an external URL if the
+      // host installed a callback; otherwise silently drop — there's
+      // no graceful platform fallback for a "reveal in Finder" link.
+      onExternalURL?(fileURL)
+      #endif
       return
     }
 
@@ -67,27 +94,50 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     {
       // Markdown — prefer in-window navigation (browser style) when
       // the host has wired the callback. Fall back to opening a new
-      // Viewer document via NSDocumentController.
+      // Viewer document via NSDocumentController (macOS only).
       if let onMarkdownLink {
         onMarkdownLink(target)
-      } else {
-        NSDocumentController.shared.openDocument(
-          withContentsOf: target,
-          display: true
-        ) { [weak self] _, _, error in
-          if let error {
-            self?.logOpenDocumentFailed(target: target, error: error)
-          }
+        return
+      }
+      #if os(macOS)
+      NSDocumentController.shared.openDocument(
+        withContentsOf: target,
+        display: true
+      ) { [weak self] _, _, error in
+        if let error {
+          self?.logOpenDocumentFailed(target: target, error: error)
         }
       }
-    } else {
-      // External URL or non-markdown local file — let LaunchServices
-      // pick the right app.
-      let opened = NSWorkspace.shared.open(target)
-      if !opened {
-        logWorkspaceOpenFailed(target)
-      }
+      #else
+      // visionOS / iOS: no NSDocumentController. Hosts that want
+      // markdown links to spawn a new window MUST install
+      // `onMarkdownLink`. Reaching here is a host-wiring bug.
+      logger.warning("""
+        Markdown link with no onMarkdownLink callback: \
+        \(target.absoluteString, privacy: .public)
+        """)
+      #endif
+      return
     }
+
+    // External URL or non-markdown local file.
+    if let onExternalURL {
+      onExternalURL(target)
+      return
+    }
+    #if os(macOS)
+    // macOS fallback for hosts that haven't wired onExternalURL —
+    // let LaunchServices pick the right app.
+    let opened = NSWorkspace.shared.open(target)
+    if !opened {
+      logWorkspaceOpenFailed(target)
+    }
+    #else
+    logger.warning("""
+      External URL with no onExternalURL callback: \
+      \(target.absoluteString, privacy: .public)
+      """)
+    #endif
   }
 
   /// Custom URL scheme that means "reveal this path in Finder rather
@@ -108,6 +158,7 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     logger.notice("Opening link: \(target.absoluteString, privacy: .public)")
   }
 
+  #if os(macOS)
   private func logOpenDocumentFailed(target: URL, error: any Error) {
     logger.error("""
       openDocument failed for \(target.path, privacy: .public): \
@@ -121,6 +172,7 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
       \(target.absoluteString, privacy: .public)
       """)
   }
+  #endif
 
   /// Resolve an `href` from the document against `documentURL`'s
   /// directory. Returns the resulting URL, or nil if the input is

@@ -1,4 +1,6 @@
+#if os(macOS)
 import AppKit
+#endif
 import Foundation
 
 extension DocumentModel {
@@ -62,7 +64,9 @@ extension DocumentModel {
       String(localized:
         "Cannot open \(url.lastPathComponent): file not found."),
       lifetime: .ephemeral)
+    #if os(macOS)
     NSSound.beep()
+    #endif
     return false
   }
 }

@@ -346,14 +346,3 @@ private struct ActionToolbarButton: View {
   }
 }
 
-public func withAnimationAsNeeded<Result>(
-  _ reduceMotion: Bool,
-  _ animation: Animation? = .default,
-  _ body: () throws -> Result) rethrows -> Result
-{
-  if reduceMotion {
-    try body()
-  } else {
-    try withAnimation(animation, body)
-  }
-}

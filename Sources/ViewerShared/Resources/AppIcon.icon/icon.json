@@ -8,7 +8,14 @@
         {
           "glass" : false,
           "image-name" : "Galley1.png",
-          "name" : "Galley1"
+          "name" : "Galley1",
+          "position" : {
+            "scale" : 0.85,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         },
         {
           "glass" : false,
