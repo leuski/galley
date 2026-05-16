@@ -2,35 +2,17 @@ import SwiftUI
 import GalleyCoreKit
 
 struct ServerSettingsView: View {
-  @Bindable var defaults = Defaults.shared
-
-  @State private var portString: String = String(Defaults.shared.port)
   @State private var serverStatus = ServerStatusModel()
 
   /// Mirrors `ActiveServerAgent.isEnabled` as @State so SwiftUI
   /// tracks changes. The agents are static enums (not Observable
   /// sources) — without this @State, flipping the toggle wouldn't
-  /// re-evaluate `probeKey` and the `.task(id:)` loop wouldn't
+  /// re-evaluate the probe key and the `.task(id:)` loop wouldn't
   /// restart, leaving the pill stuck at "Disabled".
   ///
   /// Initialised to `false`; the real value is loaded async in
   /// `body`'s `.task` because `ActiveServerAgent.isEnabled` is async.
   @State private var serverEnabled: Bool = false
-
-  /// Stable id for `.task(id:)` — restarts the probe loop only when
-  /// the toggle flips or the port changes.
-  private struct ProbeKey: Equatable {
-    let enabled: Bool
-    let port: UInt16
-  }
-
-  private var probeKey: ProbeKey {
-    ProbeKey(enabled: serverEnabled, port: defaults.port)
-  }
-
-  private var probeHost: URL? {
-    serverEnabled ? defaults.host : nil
-  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -42,8 +24,10 @@ struct ServerSettingsView: View {
       } label: {
         Text("Server")
       }
-      .task(id: probeKey) {
-        await serverStatus.run(host: probeHost)
+      .task(id: serverEnabled) {
+        await serverStatus.run(enabled: serverEnabled) {
+          ServerPortFile.preferredEndpointURL
+        }
       }
       .task {
         // Load the real agent state once on appear. Subsequent
@@ -57,18 +41,6 @@ struct ServerSettingsView: View {
           logout. The server binds to 127.0.0.1 only, so it's only accessible \
           form this computer.
           """).subtitle()
-    }
-
-    LabeledContent {
-      TextField("Port", text: $portString)
-        .labelsHidden()
-        .onSubmit { commitPort() }
-        .frame(width: 80)
-        .onChange(of: Defaults.shared.port) { _, newPort in
-          portString = String(newPort)
-        }
-    } label: {
-      Text("Port")
     }
   }
 
@@ -89,14 +61,6 @@ struct ServerSettingsView: View {
         }
       }
     )
-  }
-
-  private func commitPort() {
-    guard let value = UInt16(portString), value > 0 else {
-      portString = String(Defaults.shared.port)
-      return
-    }
-    Defaults.shared.port = value
   }
 }
 

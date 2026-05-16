@@ -3,15 +3,6 @@ import Quartz
 import WebKit
 import GalleyCoreKit
 
-@ObservableDefaults(
-  suiteName: "net.leuski.galley",
-  limitToInstance: false)
-final class Defaults: GalleyNetworkDefaults {
-  @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
-
-  @MainActor static let shared = Defaults()
-}
-
 /// Quick Look preview for Markdown files.
 ///
 /// Tries the running Markdown Preview Server first so the user's
@@ -46,11 +37,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   }
 
   func preparePreviewOfFile(at url: URL) async throws {
-    do {
-      try await loadFromServer(Defaults.shared.host.appendingPreview(url))
-    } catch {
-      try await loadInProcess(file: url)
+    if let endpoint = ServerPortFile.preferredEndpointURL {
+      do {
+        try await loadFromServer(endpoint.appendingPreview(url))
+        return
+      } catch {
+        // Fall through to in-process render.
+      }
     }
+    try await loadInProcess(file: url)
   }
 
   // MARK: - Server path

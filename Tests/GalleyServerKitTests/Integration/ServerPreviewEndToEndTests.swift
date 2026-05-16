@@ -11,13 +11,6 @@ import GalleyCoreKit
 @Suite("Server preview end-to-end", .serialized)
 @MainActor
 struct ServerPreviewEndToEndTests {
-  /// High-numbered port unlikely to clash with the user's running
-  /// Server (default 8089) or any common dev tooling.
-  private static let port: UInt16 = 19089
-
-  private static let host: URL = URL(
-    string: "http://127.0.0.1:\(port)")!
-
   // MARK: - Fixtures
 
   /// Creates a fresh temp directory and `Hello.md` inside it. Returns
@@ -37,21 +30,22 @@ struct ServerPreviewEndToEndTests {
   }
 
   /// Spins up a controller, waits until `state == .running` (polled
-  /// at 50 ms intervals), and returns it ready to serve. Calls
-  /// `Issue.record` and returns nil on timeout / failure.
+  /// at 50 ms intervals), and returns the running controller plus
+  /// the auto-assigned host URL. Calls `Issue.record` and returns
+  /// nil on timeout / failure.
   private func startReadyController(
     renderer: any MarkdownRenderer = SwiftMarkdownRenderer()
-  ) async -> PreviewServerController? {
+  ) async -> (PreviewServerController, URL)? {
     let controller = PreviewServerController(
       selectedTemplateProvider: { Template.default },
       rendererProvider: { renderer })
-    controller.start(url: Self.host)
+    controller.start()
 
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
     while ContinuousClock.now < deadline {
       switch controller.state {
-      case .running:
-        return controller
+      case .running(let url):
+        return (controller, url)
       case .failed(let message):
         Issue.record("Server failed to start: \(message)")
         return nil
@@ -94,10 +88,10 @@ struct ServerPreviewEndToEndTests {
     let file = try makeTempMarkdownFile()
     defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
 
-    guard let controller = await startReadyController() else { return }
+    guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
 
-    let previewURL = Self.host.appendingPreview(file)
+    let previewURL = host.appendingPreview(file)
     let (status, body) = try await get(previewURL)
 
     #expect(status == 200, "Body was: \(body.prefix(500))")
@@ -113,11 +107,11 @@ struct ServerPreviewEndToEndTests {
 
   @Test("GET /preview/<missing> returns 404 with 'Cannot read'")
   func missingFileReturnsNotFound() async throws {
-    guard let controller = await startReadyController() else { return }
+    guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
 
     let bogus = "/tmp/galley-e2e-does-not-exist-\(UUID().uuidString).md"
-    let previewURL = Self.host.appendingPreview(URL(fileURLWithPath: bogus))
+    let previewURL = host.appendingPreview(URL(fileURLWithPath: bogus))
     let (status, body) = try await get(previewURL)
 
     #expect(status == 404)
@@ -137,10 +131,10 @@ struct ServerPreviewEndToEndTests {
     let file = dir.appendingPathComponent("My Notes.md")
     try "# Spaced\n\nText\n".data(using: .utf8)!.write(to: file)
 
-    guard let controller = await startReadyController() else { return }
+    guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
 
-    let previewURL = Self.host.appendingPreview(file)
+    let previewURL = host.appendingPreview(file)
     let (status, body) = try await get(previewURL)
 
     #expect(status == 200, "Body was: \(body.prefix(500))")

@@ -33,43 +33,23 @@ public final class PreviewServerController {
     self.rendererProvider = rendererProvider
   }
 
-  public func start(url: URL) {
+  /// Binds to `127.0.0.1` on an OS-assigned port. After FlyingFox
+  /// reports the listener is up, the actual port is queried via
+  /// `listeningAddress` and written to `ServerPortFile` so consumers
+  /// (Viewer probe, Quicklook, bundled scripts) can discover the
+  /// endpoint. The port file is cleared on `stop()` and on listener
+  /// failure so stale values don't outlive the process.
+  public func start() {
     stop()
 
     let templateProvider = selectedTemplateProvider
     let provider = rendererProvider
     let watcher = self.watcher
 
-    guard let components = URLComponents(
-      url: url, resolvingAgainstBaseURL: false)
-    else {
-      state = .failed(
-        message: String(
-          localized: "Cannot resolve url: \(url.absoluteString)",
-          bundle: .galleyServerKit))
-      return
-    }
-
-    let host = components.host ?? GalleyConstants.defaultHost
-    let port = components.port.map { port in UInt16(port) }
-    ?? GalleyConstants.defaultPort
-
-    var fullComponents = URLComponents()
-    fullComponents.scheme = "http"
-    fullComponents.host = host
-    fullComponents.port = Int(port)
-
-    guard let fullURL = components.url else {
-      state = .failed(
-        message: String(
-          localized: "Cannot resolve url: \(String(describing: components))",
-          bundle: .galleyServerKit))
-      return
-    }
-
     let address: sockaddr_in
     do {
-      address = try sockaddr_in.inet(ip4: host, port: port)
+      address = try sockaddr_in.inet(
+        ip4: GalleyConstants.defaultHost, port: 0)
     } catch {
       state = .failed(message: String(
         localized: """
@@ -84,22 +64,57 @@ public final class PreviewServerController {
     Task { [weak self] in
       await Routes.register(
         on: server,
-        hostURL: fullURL,
+        hostURLProvider: { await Self.endpointURL(for: server) },
         selectedTemplateProvider: templateProvider,
         rendererProvider: provider,
         watcher: watcher)
 
-      do {
-        self?.publish(state: .running(url: fullURL))
-        try await server.run()
-        self?.publish(state: .stopped)
-      } catch {
-        self?.publish(state: .failed(message: error.localizedDescription))
+      let runTask = Task {
+        do {
+          try await server.run()
+        } catch {
+          await self?.publishFailure(error.localizedDescription)
+        }
+        await self?.publishStopped()
       }
+
+      do {
+        try await server.waitUntilListening(timeout: 5)
+      } catch {
+        await self?.publishFailure(error.localizedDescription)
+        runTask.cancel()
+        return
+      }
+
+      guard let endpoint = await Self.endpointURL(for: server),
+        let port = await Self.boundPort(for: server)
+      else {
+        await self?.publishFailure(String(
+          localized: "Server bound but reported no address.",
+          bundle: .galleyServerKit))
+        runTask.cancel()
+        return
+      }
+
+      do {
+        try ServerPortFile.write(port, for: .http)
+      } catch {
+        await self?.publishFailure(String(
+          localized: """
+            Cannot write port file: \(error.localizedDescription)
+            """,
+          bundle: .galleyServerKit))
+        runTask.cancel()
+        return
+      }
+
+      await self?.publishRunning(endpoint)
+      _ = await runTask.value
     }
   }
 
   public func stop() {
+    ServerPortFile.clear(for: .http)
     Task { [server] in
       await server?.stop()
     }
@@ -107,14 +122,50 @@ public final class PreviewServerController {
     state = .stopped
   }
 
-  nonisolated private func publish(state: State) {
-    Task { @MainActor [weak self] in
-      self?.state = state
+  nonisolated private func publishRunning(_ url: URL) async {
+    await MainActor.run { self.state = .running(url: url) }
+  }
+
+  nonisolated private func publishStopped() async {
+    await MainActor.run {
+      ServerPortFile.clear(for: .http)
+      self.state = .stopped
+    }
+  }
+
+  nonisolated private func publishFailure(_ message: String) async {
+    await MainActor.run {
+      ServerPortFile.clear(for: .http)
+      self.state = .failed(message: message)
     }
   }
 
   public var serverURL: URL? {
     guard case .running(let url) = state else { return nil }
     return url
+  }
+
+  /// Reads the bound port from `listeningAddress`. Returns nil if
+  /// the listener isn't up or bound a non-IPv4 socket.
+  private static func boundPort(
+    for server: HTTPServer) async -> UInt16?
+  {
+    guard let address = await server.listeningAddress else { return nil }
+    if case .ip4(_, port: let port) = address { return port }
+    return nil
+  }
+
+  /// Builds the `http://127.0.0.1:<bound-port>/` URL for a running
+  /// listener. Returns nil if the listener isn't bound yet. Used by
+  /// `Routes` to resolve relative URLs in template asset rewriting.
+  private static func endpointURL(
+    for server: HTTPServer) async -> URL?
+  {
+    guard let port = await boundPort(for: server) else { return nil }
+    var components = URLComponents()
+    components.scheme = "http"
+    components.host = GalleyConstants.defaultHost
+    components.port = Int(port)
+    return components.url
   }
 }

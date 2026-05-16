@@ -15,6 +15,13 @@ enum HTTPResponses {
     plainText(statusCode: .forbidden, message: message)
   }
 
+  static func unavailable() -> HTTPResponse {
+    plainText(
+      statusCode: .serviceUnavailable,
+      message: String(
+        localized: "Server is not ready.", bundle: .galleyServerKit))
+  }
+
   static func errorPage(
     title: String, detail: String, source: String) -> HTTPResponse
   {

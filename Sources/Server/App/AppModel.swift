@@ -18,8 +18,7 @@ private let defaultsLog = Logger(
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyNetworkDefaults, GalleyRenderDefaults {
-  @DefaultsKey var port: UInt16 = GalleyConstants.defaultPort
+final class Defaults: GalleyRenderDefaults {
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
 
@@ -35,8 +34,6 @@ final class AppModel {
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
-
-  nonisolated static let defaultHost: String = "127.0.0.1"
 
   init() {
     Self.logInit(
@@ -103,7 +100,6 @@ final class AppModel {
     }
 
     startServer()
-    startPortObservation()
     publishGalleyAppHash()
   }
 
@@ -168,34 +164,7 @@ final class AppModel {
   }
 
   private func startServer() {
-    server.start(url: Defaults.shared.host)
-  }
-
-  private func restartServerIfRunning() {
-    if case .running = server.state {
-      startServer()
-    }
-  }
-
-  /// Watches `self.port` via `withObservationTracking`. Cross-process
-  /// writes from the Viewer surface as Observable changes here thanks
-  /// to `limitToInstance: false` in `@ObservableDefaults`, so no
-  /// manual KVO or notification observer is needed.
-  private func startPortObservation() {
-    Task { @MainActor [weak self] in
-      while !Task.isCancelled {
-        guard let self else { return }
-        await withCheckedContinuation
-        { (cont: CheckedContinuation<Void, Never>) in
-          withObservationTracking {
-            _ = Defaults.shared.port
-          } onChange: {
-            cont.resume()
-          }
-        }
-        self.restartServerIfRunning()
-      }
-    }
+    server.start()
   }
 }
 

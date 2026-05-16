@@ -9,16 +9,21 @@ import Foundation
 /// poll-interval sleep between iterations. Pure poller — no UX
 /// semantics like "starting grace" live here; callers layer that
 /// on top.
+///
+/// The probe host is resolved per-iteration through
+/// `hostProvider`, so a server restart that publishes a new port
+/// (via `ServerPortFile`) is picked up automatically on the next
+/// poll — no need to tear down the probe and rebuild it.
 public struct ServerProbe: AsyncSequence, Sendable {
   public typealias Element = ServerStatus
 
-  private let host: URL
+  private let hostProvider: @Sendable () -> URL?
   private let session: URLSession
   private let timeout: TimeInterval
   private let pollInterval: Duration
 
   public init(
-    host: URL,
+    hostProvider: @escaping @Sendable () -> URL?,
     timeout: TimeInterval = 1.0,
     pollInterval: Duration = .seconds(2))
   {
@@ -27,7 +32,7 @@ public struct ServerProbe: AsyncSequence, Sendable {
     config.timeoutIntervalForResource = timeout
     config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
     config.httpAdditionalHeaders = ["Sec-Fetch-Site": "same-origin"]
-    self.host = host
+    self.hostProvider = hostProvider
     self.session = URLSession(configuration: config)
     self.timeout = timeout
     self.pollInterval = pollInterval
@@ -35,26 +40,26 @@ public struct ServerProbe: AsyncSequence, Sendable {
 
   public func makeAsyncIterator() -> AsyncIterator {
     AsyncIterator(
-      host: host,
+      hostProvider: hostProvider,
       session: session,
       timeout: timeout,
       pollInterval: pollInterval)
   }
 
   public struct AsyncIterator: AsyncIteratorProtocol {
-    private let host: URL
+    private let hostProvider: @Sendable () -> URL?
     private let session: URLSession
     private let timeout: TimeInterval
     private let pollInterval: Duration
     private var hasEmitted: Bool = false
 
     init(
-      host: URL,
+      hostProvider: @escaping @Sendable () -> URL?,
       session: URLSession,
       timeout: TimeInterval,
       pollInterval: Duration)
     {
-      self.host = host
+      self.hostProvider = hostProvider
       self.session = session
       self.timeout = timeout
       self.pollInterval = pollInterval
@@ -70,6 +75,7 @@ public struct ServerProbe: AsyncSequence, Sendable {
       }
       hasEmitted = true
       if Task.isCancelled { return nil }
+      guard let host = hostProvider() else { return .stopped }
       return await Self.probeOnce(
         host: host, session: session, timeout: timeout)
     }

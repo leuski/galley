@@ -6,8 +6,7 @@ import GalleyCoreKit
 /// A built-in editor whose URL scheme + line-jump format we know.
 /// Also owns its bundled-scripts kit (BBEdit/Xcode) — name of the
 /// resource bundle, default install destination, and the install
-/// routine that copies the bundle out and rewrites the loopback
-/// port in shell scripts.
+/// routine that copies the bundle out to a user-chosen folder.
 enum EditorPreset: String, Codable, CaseIterable, Identifiable,
                    Hashable, Sendable
 {
@@ -172,16 +171,15 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
     }
   }
 
-  /// Copies this editor's bundled scripts folder into `destination`,
-  /// customizing the hardcoded loopback port in shell scripts via
-  /// `context` so the installed scripts talk to the running server.
+  /// Copies this editor's bundled scripts folder into `destination`.
   /// Files at the destination with the same relative path are
-  /// overwritten. Throws `.sourceMissing` if this editor has no kit
-  /// or the bundle is absent from the app.
-  func installScripts(
-    to destination: URL,
-    context: KeyValuePairs<String, String>
-  ) throws {
+  /// overwritten. Shell scripts get +x. Throws `.sourceMissing` if
+  /// this editor has no kit or the bundle is absent from the app.
+  ///
+  /// Shell scripts in the bundle resolve the server endpoint at run
+  /// time by reading `ServerPortFile`, so the install is a plain
+  /// copy — no port-placeholder rewriting.
+  func installScripts(to destination: URL) throws {
     guard let bundleName = scriptBundleName,
       let source = Bundle.main.url(
         forResource: bundleName, withExtension: "bundle"),
@@ -199,7 +197,7 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
       let target = destination.appending(path: url.relativePath)
 
       do {
-        try installScriptFile(from: url, to: target, context: context)
+        try installScriptFile(from: url, to: target)
       } catch {
         throw ScriptInstallError.copyFailed(url, error)
       }
@@ -207,19 +205,12 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   }
 
   private func installScriptFile(
-    from source: URL, to target: URL,
-    context: KeyValuePairs<String, String>
+    from source: URL, to target: URL
   ) throws {
     try target.parent.createDirectory()
-
+    try source.copy(to: target, overwrite: true)
     if isShellScript(source) {
-      let original = try String(contentsOf: source, encoding: .utf8)
-      let customized = original.substituting(substitutions: context)
-      try? target.remove()
-      try customized.write(to: target, atomically: true, encoding: .utf8)
       try target.setPosixPermissions(0o755)
-    } else {
-      try source.copy(to: target, overwrite: true)
     }
   }
 

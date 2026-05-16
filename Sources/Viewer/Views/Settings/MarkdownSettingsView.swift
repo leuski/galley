@@ -106,9 +106,7 @@ struct MarkdownSettingsView: View {
       let preset = selectedScriptingPreset
     else { return }
     do {
-      try preset.installScripts(to: destination, context: [
-        "__LOCATION__": Defaults.shared.host.galleyPreview.absoluteString
-      ])
+      try preset.installScripts(to: destination)
       preset.presentInstalledScripts(at: destination)
     } catch {
       scriptInstallError = error.localizedDescription

@@ -30,21 +30,27 @@ final class ServerStatusModel {
     self.startupGraceCount = startupGraceCount
   }
 
-  /// When `host` is nil, sets `.disabled` and returns. Otherwise loops
-  /// over a fresh `ServerProbe` sequence until the surrounding task is
-  /// cancelled. Resets to `.unknown` and refreshes the grace budget
-  /// first so the pill clears any stale value from a previous run and
-  /// the first two `.stopped`/`.notResponding` results read as
-  /// `.starting`.
-  func run(host: URL?) async {
-    guard let host else {
+  /// When `enabled` is false, sets `.disabled` and returns. Otherwise
+  /// loops over a fresh `ServerProbe` sequence until the surrounding
+  /// task is cancelled. The probe re-resolves its host on every
+  /// iteration via `hostProvider`, so a server restart that publishes
+  /// a new port through `ServerPortFile` is picked up automatically.
+  ///
+  /// Resets to `.unknown` and refreshes the grace budget first so the
+  /// pill clears any stale value from a previous run and the first
+  /// two `.stopped`/`.notResponding` results read as `.starting`.
+  func run(
+    enabled: Bool,
+    hostProvider: @escaping @Sendable () -> URL?
+  ) async {
+    guard enabled else {
       status = .disabled
       return
     }
     status = .unknown
     var graceRemaining = startupGraceCount
     let probe = ServerProbe(
-      host: host,
+      hostProvider: hostProvider,
       timeout: timeout,
       pollInterval: pollInterval)
     for await raw in probe {

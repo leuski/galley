@@ -15,10 +15,6 @@ public protocol GalleyDefaults: AnyObject {
   @MainActor static var shared: Self { get }
 }
 
-public protocol GalleyNetworkDefaults: GalleyDefaults {
-  var port: UInt16 { get set }
-}
-
 public protocol GalleyRenderDefaults: GalleyDefaults {
   var renderer: String? { get set }
   var template: String? { get set }
@@ -29,7 +25,6 @@ public let bundleIdentifier = Bundle.main.bundleIdentifier
 
 public enum GalleyConstants {
   public static let defaultHost: String = "127.0.0.1"
-  public static let defaultPort: UInt16 = 8089
   public static let settingsURL: URL = "galley://settings"
 
   /// Build a `galley://settings` URL aimed at a specific Settings tab.
@@ -58,22 +53,5 @@ public enum GalleyConstants {
   /// running.
   public static var applicationSupportDirectory: URL {
     URL.applicationSupportDirectory / "\(suiteName).localized"
-  }
-}
-
-nonisolated private func hostURL(port: UInt16) -> URL {
-  var components = URLComponents()
-  components.scheme = "http"
-  components.host = GalleyConstants.defaultHost
-  components.port = Int(port)
-  guard let url = components.url else {
-    preconditionFailure("hostURL components produced no URL")
-  }
-  return url
-}
-
-public extension GalleyNetworkDefaults {
-  var host: URL {
-    hostURL(port: port)
   }
 }

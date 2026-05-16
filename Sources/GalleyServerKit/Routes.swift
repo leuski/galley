@@ -13,15 +13,27 @@ enum Routes {
     "pdf"
   ]
 
+  /// `hostURLProvider` returns the live `http://127.0.0.1:<bound-port>`
+  /// URL the server actually answers on. Resolved per-request rather
+  /// than passed as a stored value because the bound port is not
+  /// known until FlyingFox's listener is up — register runs before
+  /// `server.run()`, so we capture a closure that asks the server at
+  /// request time. The provider is expected to return a valid URL
+  /// (the listener is guaranteed bound by the time the first request
+  /// hits a route); nil → reject with 503 as a defensive last
+  /// resort.
   static func register(
     on server: HTTPServer,
-    hostURL: URL,
+    hostURLProvider: @Sendable @escaping () async -> URL?,
     selectedTemplateProvider: @Sendable @escaping () async -> Template,
     rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
   ) async {
     await server.appendRoute(
       .init(method: .GET, path: "/\(RouteNames.preview)/*")) { request in
+        guard let hostURL = await hostURLProvider() else {
+          return HTTPResponses.unavailable()
+        }
         if let denied = guardRequest(request, hostURL: hostURL) {
           return denied
         }
@@ -34,6 +46,9 @@ enum Routes {
 
     await server.appendRoute(
       .init(method: .GET, path: "/\(RouteNames.template)/*")) { request in
+        guard let hostURL = await hostURLProvider() else {
+          return HTTPResponses.unavailable()
+        }
         if let denied = guardRequest(request, hostURL: hostURL) {
           return denied
         }
@@ -42,6 +57,9 @@ enum Routes {
 
     await server.appendRoute(
       .init(method: .GET, path: "/\(RouteNames.events)/*")) { request in
+        guard let hostURL = await hostURLProvider() else {
+          return HTTPResponses.unavailable()
+        }
         if let denied = guardRequest(request, hostURL: hostURL) {
           return denied
         }
@@ -49,6 +67,9 @@ enum Routes {
       }
 
     await server.appendRoute("GET /") { request in
+      guard let hostURL = await hostURLProvider() else {
+        return HTTPResponses.unavailable()
+      }
       if let denied = guardRequest(request, hostURL: hostURL) {
         return denied
       }
