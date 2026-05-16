@@ -17,8 +17,8 @@
 		62D5E44A2FA5D95400CADD72 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
 		62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E49C2FA5D9D900CADD72 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49B2FA5D9D900CADD72 /* Markdown */; };
-		62D5E49F2FA5D9F100CADD72 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49E2FA5D9F100CADD72 /* FlyingFox */; };
-		62D5E4A12FA5D9F100CADD72 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4A02FA5D9F100CADD72 /* FlyingSocks */; };
+		62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49E2FA5D9F100CADD72 /* Hummingbird */; };
+		62D5E4A12FA5D9F100CADD72 /* HummingbirdTLS in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */; };
 		62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
 		62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B22FA5DAEC00CADD72 /* ALFoundation */; };
@@ -292,8 +292,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */,
-				62D5E49F2FA5D9F100CADD72 /* FlyingFox in Frameworks */,
-				62D5E4A12FA5D9F100CADD72 /* FlyingSocks in Frameworks */,
+				62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */,
+				62D5E4A12FA5D9F100CADD72 /* HummingbirdTLS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -541,8 +541,8 @@
 			);
 			name = GalleyServerKit;
 			packageProductDependencies = (
-				62D5E49E2FA5D9F100CADD72 /* FlyingFox */,
-				62D5E4A02FA5D9F100CADD72 /* FlyingSocks */,
+				62D5E49E2FA5D9F100CADD72 /* Hummingbird */,
+				62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */,
 			);
 			productName = GalleyServerKit;
 			productReference = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */;
@@ -596,7 +596,7 @@
 			packageReferences = (
 				62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */,
 				62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */,
-				62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */,
 				62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -797,11 +797,11 @@
 		};
 		62D5E4AB2FA5DA1F00CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = 62D5E4AA2FA5DA1F00CADD72 /* FlyingFox */;
+			productRef = 62D5E4AA2FA5DA1F00CADD72 /* Hummingbird */;
 		};
 		62D5E4AD2FA5DA1F00CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = 62D5E4AC2FA5DA1F00CADD72 /* FlyingSocks */;
+			productRef = 62D5E4AC2FA5DA1F00CADD72 /* HummingbirdTLS */;
 		};
 		62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1439,12 +1439,12 @@
 				minimumVersion = 0.7.3;
 			};
 		};
-		62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+		62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/swhitty/FlyingFox.git";
+			repositoryURL = "https://github.com/hummingbird-project/hummingbird.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.26.2;
+				minimumVersion = 2.23.0;
 			};
 		};
 		62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */ = {
@@ -1463,15 +1463,15 @@
 			package = 62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
 		};
-		62D5E49E2FA5D9F100CADD72 /* FlyingFox */ = {
+		62D5E49E2FA5D9F100CADD72 /* Hummingbird */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */;
-			productName = FlyingFox;
+			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = Hummingbird;
 		};
-		62D5E4A02FA5D9F100CADD72 /* FlyingSocks */ = {
+		62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */;
-			productName = FlyingSocks;
+			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = HummingbirdTLS;
 		};
 		62D5E4A22FA5DA0600CADD72 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1483,15 +1483,15 @@
 			package = 62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
 		};
-		62D5E4AA2FA5DA1F00CADD72 /* FlyingFox */ = {
+		62D5E4AA2FA5DA1F00CADD72 /* Hummingbird */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */;
-			productName = FlyingFox;
+			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = Hummingbird;
 		};
-		62D5E4AC2FA5DA1F00CADD72 /* FlyingSocks */ = {
+		62D5E4AC2FA5DA1F00CADD72 /* HummingbirdTLS */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "FlyingFox" */;
-			productName = FlyingSocks;
+			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = HummingbirdTLS;
 		};
 		62D5E4B22FA5DAEC00CADD72 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;

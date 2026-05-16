@@ -1,5 +1,7 @@
 import Foundation
-import FlyingFox
+import HTTPTypes
+import Hummingbird
+import NIOCore
 import Security
 import GalleyCoreKit
 
@@ -13,83 +15,81 @@ enum Routes {
     "pdf"
   ]
 
-  /// `hostURLProvider` returns the live `http://127.0.0.1:<bound-port>`
-  /// URL the server actually answers on. Resolved per-request rather
-  /// than passed as a stored value because the bound port is not
-  /// known until FlyingFox's listener is up — register runs before
-  /// `server.run()`, so we capture a closure that asks the server at
-  /// request time. The provider is expected to return a valid URL
-  /// (the listener is guaranteed bound by the time the first request
-  /// hits a route); nil → reject with 503 as a defensive last
-  /// resort.
-  static func register(
-    on server: HTTPServer,
+  /// Builds the shared `Router` used by both the HTTP and HTTPS
+  /// listeners. `hostURLProvider` returns the URL the request was
+  /// expected to hit — used for DNS-rebinding host-header checks and
+  /// for generating absolute URLs during template rewriting. It is
+  /// invoked at request time because the bound port is unknown until
+  /// the listener is up.
+  static func makeRouter(
     hostURLProvider: @Sendable @escaping () async -> URL?,
     selectedTemplateProvider: @Sendable @escaping () async -> Template,
     rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
-  ) async {
-    await server.appendRoute(
-      .init(method: .GET, path: "/\(RouteNames.preview)/*")) { request in
-        guard let hostURL = await hostURLProvider() else {
-          return HTTPResponses.unavailable()
-        }
-        if let denied = guardRequest(request, hostURL: hostURL) {
-          return denied
-        }
-        return await previewOrAssetResponse(
-          request: request,
-          hostURL: hostURL,
-          selectedTemplate: await selectedTemplateProvider(),
-          renderer: await rendererProvider())
-      }
+  ) -> Router<BasicRequestContext> {
+    let router = Router()
 
-    await server.appendRoute(
-      .init(method: .GET, path: "/\(RouteNames.template)/*")) { request in
-        guard let hostURL = await hostURLProvider() else {
-          return HTTPResponses.unavailable()
-        }
-        if let denied = guardRequest(request, hostURL: hostURL) {
-          return denied
-        }
-        return await templateAssetResponse(request: request)
-      }
-
-    await server.appendRoute(
-      .init(method: .GET, path: "/\(RouteNames.events)/*")) { request in
-        guard let hostURL = await hostURLProvider() else {
-          return HTTPResponses.unavailable()
-        }
-        if let denied = guardRequest(request, hostURL: hostURL) {
-          return denied
-        }
-        return await eventsResponse(request: request, watcher: watcher)
-      }
-
-    await server.appendRoute("GET /") { request in
+    router.get("/\(RouteNames.preview)/**") { request, _ -> Response in
       guard let hostURL = await hostURLProvider() else {
         return HTTPResponses.unavailable()
       }
       if let denied = guardRequest(request, hostURL: hostURL) {
         return denied
       }
-      return HTTPResponse(
-        statusCode: .ok,
-        headers: [.contentType: "text/plain; charset=utf-8"],
-        body: Data("Galley Server is running.\n".utf8))
+      return await previewOrAssetResponse(
+        request: request,
+        hostURL: hostURL,
+        selectedTemplate: await selectedTemplateProvider(),
+        renderer: await rendererProvider())
     }
+
+    router.get("/\(RouteNames.template)/**") { request, _ -> Response in
+      guard let hostURL = await hostURLProvider() else {
+        return HTTPResponses.unavailable()
+      }
+      if let denied = guardRequest(request, hostURL: hostURL) {
+        return denied
+      }
+      return await templateAssetResponse(request: request)
+    }
+
+    router.get("/\(RouteNames.events)/**") { request, _ -> Response in
+      guard let hostURL = await hostURLProvider() else {
+        return HTTPResponses.unavailable()
+      }
+      if let denied = guardRequest(request, hostURL: hostURL) {
+        return denied
+      }
+      return eventsResponse(request: request, watcher: watcher)
+    }
+
+    router.get("/") { request, _ -> Response in
+      guard let hostURL = await hostURLProvider() else {
+        return HTTPResponses.unavailable()
+      }
+      if let denied = guardRequest(request, hostURL: hostURL) {
+        return denied
+      }
+      return Response(
+        status: .ok,
+        headers: [.contentType: "text/plain; charset=utf-8"],
+        body: ResponseBody(
+          byteBuffer: ByteBuffer(string: "Galley Server is running.\n")))
+    }
+
+    return router
   }
 
   // MARK: - /preview/<path>
 
   private static func previewOrAssetResponse(
-    request: HTTPRequest,
+    request: Request,
     hostURL: URL,
     selectedTemplate: Template,
     renderer: (any MarkdownRenderer)?
-  ) async -> HTTPResponse {
+  ) async -> Response {
     guard let documentURL = decodeFilePath(
-      from: request.path, prefix: "/\(RouteNames.preview)")
+      from: request.uri.path, prefix: "/\(RouteNames.preview)")
     else {
       return HTTPResponses.badRequest(
         String(localized: "Invalid path", bundle: .galleyServerKit))
@@ -112,7 +112,6 @@ enum Routes {
       }
       return await renderPreview(
         documentURL: documentURL,
-        request: request,
         hostURL: hostURL,
         template: selectedTemplate,
         renderer: renderer)
@@ -128,11 +127,10 @@ enum Routes {
 
   private static func renderPreview(
     documentURL: URL,
-    request: HTTPRequest,
     hostURL: URL,
     template: Template,
     renderer: any MarkdownRenderer
-  ) async -> HTTPResponse {
+  ) async -> Response {
     guard FileManager.default.isReadableFile(atPath: documentURL.path) else {
       return HTTPResponses.notFound(
         String(
@@ -183,13 +181,13 @@ enum Routes {
     let withReload = injectReloadScript(
       into: substituted, documentURL: documentURL, nonce: nonce)
 
-    return HTTPResponse(
-      statusCode: .ok,
+    return Response(
+      status: .ok,
       headers: htmlSecurityHeaders(scriptNonce: nonce),
-      body: Data(withReload.utf8))
+      body: ResponseBody(byteBuffer: ByteBuffer(string: withReload)))
   }
 
-  private static func serveFile(at url: URL) -> HTTPResponse {
+  private static func serveFile(at url: URL) -> Response {
     guard FileManager.default.isReadableFile(atPath: url.path) else {
       return HTTPResponses.notFound(
         String(
@@ -203,28 +201,31 @@ enum Routes {
       return HTTPResponses.notFound(error.localizedDescription)
     }
     let mime = MIMETypes.mimeType(for: url)
-    var headers: HTTPHeaders = [
+    var headers: HTTPFields = [
       .contentType: mime,
-      HTTPHeader("Cache-Control"): "no-store",
-      HTTPHeader("X-Content-Type-Options"): "nosniff",
-      HTTPHeader("Cross-Origin-Resource-Policy"): "same-origin",
-      HTTPHeader("Cross-Origin-Opener-Policy"): "same-origin"
+      .cacheControl: "no-store",
+      .xContentTypeOptions: "nosniff",
+      .crossOriginResourcePolicy: "same-origin",
+      .crossOriginOpenerPolicy: "same-origin"
     ]
     if mime.lowercased().hasPrefix("text/html") {
-      headers[HTTPHeader("Content-Security-Policy")] = strictAssetCSP
-      headers[HTTPHeader("X-Frame-Options")] = "DENY"
-      headers[HTTPHeader("Referrer-Policy")] = "no-referrer"
+      headers[.contentSecurityPolicy] = strictAssetCSP
+      headers[.xFrameOptions] = "DENY"
+      headers[.referrerPolicy] = "no-referrer"
     }
-    return HTTPResponse(statusCode: .ok, headers: headers, body: data)
+    return Response(
+      status: .ok,
+      headers: headers,
+      body: ResponseBody(byteBuffer: ByteBuffer(bytes: data)))
   }
 
   // MARK: - /template/<id>/<file>
 
   private static func templateAssetResponse(
-    request: HTTPRequest
-  ) async -> HTTPResponse {
+    request: Request
+  ) async -> Response {
     guard case .templateAsset(let templateID, let file)
-      = PreviewRoute(path: request.path)
+      = PreviewRoute(path: request.uri.path)
     else {
       return HTTPResponses.badRequest(
         String(
@@ -252,12 +253,12 @@ enum Routes {
   // MARK: - /events/<path> (SSE)
 
   private static func eventsResponse(
-    request: HTTPRequest,
+    request: Request,
     watcher: DocumentWatcher
-  ) async -> HTTPResponse {
+  ) -> Response {
     guard
       let documentURL = decodeFilePath(
-        from: request.path, prefix: "/\(RouteNames.events)"),
+        from: request.uri.path, prefix: "/\(RouteNames.events)"),
       MarkdownFileTypes.extensions.contains(
         documentURL.pathExtension.lowercased())
     else {
@@ -265,34 +266,30 @@ enum Routes {
         String(localized: "Invalid event path", bundle: .galleyServerKit))
     }
 
-    let bodyStream = AsyncStream<Data> { continuation in
-      let task = Task {
-        continuation.yield(Data(": connected\n\n".utf8))
-        let events = await watcher.subscribe(to: documentURL)
-        for await _ in events {
-          continuation.yield(SSE.encode(event: "reload", data: "ok"))
-        }
-        continuation.finish()
+    let body = ResponseBody { writer in
+      try await writer.write(ByteBuffer(string: ": connected\n\n"))
+      let events = await watcher.subscribe(to: documentURL)
+      for await _ in events {
+        let payload = SSE.encode(event: "reload", data: "ok")
+        try await writer.write(ByteBuffer(bytes: payload))
       }
-      continuation.onTermination = { _ in task.cancel() }
+      try await writer.finish(nil)
     }
 
-    let body = HTTPBodySequence(from: SSEByteSequence(upstream: bodyStream))
-
-    return HTTPResponse(
-      statusCode: .ok,
+    return Response(
+      status: .ok,
       headers: [
         .contentType: "text/event-stream",
-        HTTPHeader("Cache-Control"): "no-cache",
-        HTTPHeader("Connection"): "keep-alive",
-        HTTPHeader("X-Accel-Buffering"): "no"
+        .cacheControl: "no-cache",
+        .connection: "keep-alive",
+        .xAccelBuffering: "no"
       ],
       body: body)
   }
 
   // MARK: - Helpers
 
-  /// Extracts a filesystem path from `request.path` (e.g.
+  /// Extracts a filesystem path from `requestPath` (e.g.
   /// "/preview/Users/foo.md") by stripping `prefix` ("/preview"). Returns
   /// the resolved file URL or nil if the extracted path is not absolute,
   /// escapes the filesystem root, has no extension, or refers to a
@@ -342,16 +339,19 @@ enum Routes {
   /// expected port (DNS-rebinding defence) or that originate from another
   /// site (`Sec-Fetch-Site: cross-site` / `same-site`). Returns nil when
   /// the request is acceptable.
-  private static func guardRequest(
-    _ request: HTTPRequest, hostURL: URL) -> HTTPResponse?
+  static func guardRequest(
+    _ request: Request, hostURL: URL) -> Response?
   {
-    let expectedPort = hostURL.port ?? 80
-    let hostHeader = request.headers[.host] ?? ""
+    let expectedPort = hostURL.port ?? defaultPort(forScheme: hostURL.scheme)
+    // HTTP/1.1 carries Host in the request line authority; Hummingbird
+    // surfaces it via `head.authority`. `HTTPField.Name.host` is marked
+    // unavailable in swift-http-types in favour of this accessor.
+    let hostHeader = request.head.authority ?? ""
     if !isHostAllowed(hostHeader, expectedPort: expectedPort) {
       return HTTPResponses.forbidden(
         String(localized: "Host header not allowed", bundle: .galleyServerKit))
     }
-    if let site = request.headers[HTTPHeader("Sec-Fetch-Site")]?.lowercased(),
+    if let site = request.headers[.secFetchSite]?.lowercased(),
        site != "same-origin", site != "none" {
       return HTTPResponses.forbidden(
         String(
@@ -362,7 +362,7 @@ enum Routes {
   }
 
   /// Internal (not `private`) so unit tests can drive the loopback host
-  /// allowlist directly without constructing a full `HTTPRequest`.
+  /// allowlist directly without constructing a full `Request`.
   static func isHostAllowed(
     _ value: String, expectedPort: Int) -> Bool
   {
@@ -374,6 +374,10 @@ enum Routes {
     guard let host = url.host?.lowercased(), allowed.contains(host)
     else { return false }
     return (url.port ?? 80) == expectedPort
+  }
+
+  private static func defaultPort(forScheme scheme: String?) -> Int {
+    scheme?.lowercased() == "https" ? 443 : 80
   }
 
   private static func generateNonce() -> String {
@@ -391,7 +395,7 @@ enum Routes {
   }
 
   private static func htmlSecurityHeaders(
-    scriptNonce nonce: String) -> HTTPHeaders
+    scriptNonce nonce: String) -> HTTPFields
   {
     let csp = [
       "default-src 'none'",
@@ -408,13 +412,13 @@ enum Routes {
     ].joined(separator: "; ")
     return [
       .contentType: "text/html; charset=utf-8",
-      HTTPHeader("Cache-Control"): "no-store",
-      HTTPHeader("Content-Security-Policy"): csp,
-      HTTPHeader("X-Content-Type-Options"): "nosniff",
-      HTTPHeader("X-Frame-Options"): "DENY",
-      HTTPHeader("Referrer-Policy"): "no-referrer",
-      HTTPHeader("Cross-Origin-Resource-Policy"): "same-origin",
-      HTTPHeader("Cross-Origin-Opener-Policy"): "same-origin"
+      .cacheControl: "no-store",
+      .contentSecurityPolicy: csp,
+      .xContentTypeOptions: "nosniff",
+      .xFrameOptions: "DENY",
+      .referrerPolicy: "no-referrer",
+      .crossOriginResourcePolicy: "same-origin",
+      .crossOriginOpenerPolicy: "same-origin"
     ]
   }
 
@@ -431,26 +435,24 @@ enum Routes {
     "base-uri 'self'",
     "object-src 'none'"
   ].joined(separator: "; ")
-
 }
 
-private struct TemplateStoreRef: Sendable {
-  private let store: TemplateStore
-
-  init(_ store: TemplateStore) {
-    self.store = store
-  }
-
-  func template(id: String) async -> Template? {
-    await MainActor.run { store.existingTemplate(forID: id) }
-  }
-}
-
-private extension HTTPRequest {
-  func query(_ name: String) -> String? {
-    for item in query where item.name == name {
-      return item.value
+/// Header names not covered by swift-http-types' built-in catalog.
+/// `cacheControl`, `contentSecurityPolicy`, `crossOriginResourcePolicy`,
+/// `xContentTypeOptions`, and `contentType` are provided by HTTPTypes.
+/// Names are RFC-valid by construction, so the optional `init` is
+/// guarded with `??` rather than force-unwrapped.
+extension HTTPField.Name {
+  private static func named(_ name: String) -> HTTPField.Name {
+    guard let result = HTTPField.Name(name) else {
+      preconditionFailure("Invalid HTTP header name: \(name)")
     }
-    return nil
+    return result
   }
+
+  static let crossOriginOpenerPolicy = named("Cross-Origin-Opener-Policy")
+  static let referrerPolicy = named("Referrer-Policy")
+  static let secFetchSite = named("Sec-Fetch-Site")
+  static let xAccelBuffering = named("X-Accel-Buffering")
+  static let xFrameOptions = named("X-Frame-Options")
 }

@@ -1,54 +1,55 @@
 import Foundation
-import FlyingFox
+import HTTPTypes
+import Hummingbird
+import NIOCore
 import GalleyCoreKit
 
 enum HTTPResponses {
-  static func badRequest(_ message: String) -> HTTPResponse {
-    plainText(statusCode: .badRequest, message: message)
+  static func badRequest(_ message: String) -> Response {
+    plainText(status: .badRequest, message: message)
   }
 
-  static func notFound(_ message: String) -> HTTPResponse {
-    plainText(statusCode: .notFound, message: message)
+  static func notFound(_ message: String) -> Response {
+    plainText(status: .notFound, message: message)
   }
 
-  static func forbidden(_ message: String) -> HTTPResponse {
-    plainText(statusCode: .forbidden, message: message)
+  static func forbidden(_ message: String) -> Response {
+    plainText(status: .forbidden, message: message)
   }
 
-  static func unavailable() -> HTTPResponse {
+  static func unavailable() -> Response {
     plainText(
-      statusCode: .serviceUnavailable,
+      status: .serviceUnavailable,
       message: String(
         localized: "Server is not ready.", bundle: .galleyServerKit))
   }
 
   static func errorPage(
-    title: String, detail: String, source: String) -> HTTPResponse
+    title: String, detail: String, source: String) -> Response
   {
     let html = errorPageTemplate.substituting(substitutions: [
       "#TITLE#": title.htmlEscaped,
       "#DETAIL#": detail.htmlEscaped,
       "#SOURCE#": source.htmlEscaped
     ])
-    return HTTPResponse(
-      statusCode: .internalServerError,
+    return Response(
+      status: .internalServerError,
       headers: [.contentType: "text/html; charset=utf-8"],
-      body: Data(html.utf8))
+      body: ResponseBody(byteBuffer: ByteBuffer(string: html)))
   }
 
   private final class Helper {}
 
   private static let errorPageTemplate: String =
-  Bundle(for: Helper.self).requiredString(
+    Bundle(for: Helper.self).requiredString(
       forResource: "ErrorPage", withExtension: "html")
 
   private static func plainText(
-    statusCode: HTTPStatusCode, message: String) -> HTTPResponse
+    status: HTTPResponse.Status, message: String) -> Response
   {
-    HTTPResponse(
-      statusCode: statusCode,
+    Response(
+      status: status,
       headers: [.contentType: "text/plain; charset=utf-8"],
-      body: Data((message + "\n").utf8))
+      body: ResponseBody(byteBuffer: ByteBuffer(string: message + "\n")))
   }
-
 }
