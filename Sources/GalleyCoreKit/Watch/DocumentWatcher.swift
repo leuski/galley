@@ -53,6 +53,7 @@ public actor DocumentWatcher {
   }
 
   private func consume(url: URL, key: String) async {
+    #if os(macOS)
     // `contentChanges` watches the parent directory via FSEvents and
     // filters for `url`, which survives editor atomic saves
     // (write-temp + rename) — the previous `fileEvents` watcher held
@@ -64,6 +65,12 @@ public actor DocumentWatcher {
     for await _ in events.debounce(for: .milliseconds(120)) {
       broadcast(key: key)
     }
+    #else
+    // visionOS / iOS: FSEvents is unavailable. Live-reload is a
+    // non-goal for v1 — subscribers receive no events and detach
+    // when their AsyncStream is cancelled.
+    _ = (url, key)
+    #endif
   }
 
   private func detach(id: UUID, key: String) {

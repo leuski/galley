@@ -1,7 +1,9 @@
 import Foundation
 import Observation
 import ALFoundation
+#if os(macOS)
 import AppKit
+#endif
 
 @Observable
 @MainActor
@@ -80,7 +82,9 @@ public final class TemplateStore {
   }
 
   public func revealFolder() {
+    #if os(macOS)
     NSWorkspace.shared.activateFileViewerSelecting([userDirectoryURL])
+    #endif
   }
 
   public func reload() {
@@ -168,6 +172,7 @@ public final class TemplateStore {
   }
 
   private func startWatching() {
+    #if os(macOS)
     for index in watchedSourceIndices {
       guard directoryURLs.indices.contains(index) else { continue }
       let url = directoryURLs[index]
@@ -180,5 +185,6 @@ public final class TemplateStore {
       }
       watcherTasks.append(task)
     }
+    #endif
   }
 }

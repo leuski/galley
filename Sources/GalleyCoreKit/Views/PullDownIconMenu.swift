@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import AppKit
 
@@ -102,3 +103,4 @@ private final class MenuTarget: NSObject {
   init(action: @escaping () -> Void) { self.action = action }
   @objc func run(_ sender: Any?) { action() }
 }
+#endif

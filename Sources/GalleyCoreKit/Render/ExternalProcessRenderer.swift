@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import ALFoundation
 
@@ -44,3 +45,4 @@ struct ExternalProcessRenderer: MarkdownRenderer {
     return result.output
   }
 }
+#endif

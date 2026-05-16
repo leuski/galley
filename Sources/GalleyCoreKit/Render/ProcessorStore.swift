@@ -76,6 +76,13 @@ public final class ProcessorStore {
   /// Order is preserved in the picker. The built-in renderer comes
   /// first so the app has a working default before any external tool
   /// is found.
+  ///
+  /// On non-macOS platforms (visionOS / iOS) the array is empty:
+  /// `Process` is unavailable, so external processors cannot be
+  /// discovered or invoked. `discoverAll()` still returns
+  /// `[.builtIn]`, and the picker collapses to just the in-process
+  /// `SwiftMarkdownRenderer`.
+  #if os(macOS)
   private static let specs: [Spec] = [
     Spec(
       id: "multimarkdown",
@@ -136,6 +143,9 @@ public final class ProcessorStore {
           toolName: "Markdown.pl")
       })
   ]
+  #else
+  private static let specs: [Spec] = []
+  #endif
 
   private static func discoverAll() async -> [Processor] {
     var entries: [Processor] = [.builtIn]
