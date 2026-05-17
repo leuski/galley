@@ -92,7 +92,7 @@ struct MacViewerApp: App {
     .commandsRemoved()
 
     WindowGroup(for: URL.self) { $url in
-      ContentView(fileURL: $url)
+      MacContentView(fileURL: $url)
         .environment(boot)
         .environment(dispatcher)
         .environment(recents)

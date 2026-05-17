@@ -10,7 +10,7 @@ import WebKit
 /// flight, a welcome landing surface when the WindowGroup binding
 /// has no URL yet, and `DocumentScreen` once both `AppModel` and a
 /// `fileURL` are available.
-struct ContentView: View {
+struct VisionContentView: View {
   let fileURL: URL?
   let boot: AppBoot
 
@@ -85,6 +85,7 @@ private struct DocumentScreen: View {
 
   @State private var model: DocumentModel?
   @Environment(\.openURL) private var openURL
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     Group {
@@ -105,7 +106,13 @@ private struct DocumentScreen: View {
   /// reload, zoom, find, TOC, status-bar toggle).
   @ViewBuilder
   private func documentChrome(model: DocumentModel) -> some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: Binding(
+      get: { model.showsTOC ? .all : .detailOnly },
+      set: { newValue in
+        let next = newValue != .detailOnly
+        withAnimationAsNeeded(reduceMotion) { model.showsTOC = next }
+      }
+    )) {
       TOCSidebar(model: model)
         .navigationSplitViewColumnWidth(min: 200, ideal: 240)
     } detail: {

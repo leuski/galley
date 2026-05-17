@@ -184,9 +184,9 @@
 				Utilities/mac/LaunchctlServerAgent.swift = (macos, );
 				Utilities/mac/ServerAgent.swift = (macos, );
 				Views/mac/BootstrapModifier.swift = (macos, );
-				Views/mac/ContentView.swift = (macos, );
 				Views/mac/DocumentView.swift = (macos, );
 				Views/mac/HelpWindowView.swift = (macos, );
+				Views/mac/MacContentView.swift = (macos, );
 				Views/mac/Menus/EditCommands.swift = (macos, );
 				Views/mac/Menus/FileCommands.swift = (macos, );
 				Views/mac/Menus/FormatCommands.swift = (macos, );
@@ -200,7 +200,7 @@
 				Views/mac/SettingsView.swift = (macos, );
 				Views/mac/WelcomeView.swift = (macos, );
 				Views/mac/WindowAccessor.swift = (macos, );
-				Views/vision/ContentView.swift = (xros, );
+				Views/vision/VisionContentView.swift = (xros, );
 			};
 			target = 62D5CA182FA048F000CADD72 /* Viewer */;
 		};

@@ -10,7 +10,7 @@ import SwiftUI
 /// (or as a soft-fail if SwiftUI ever delivers a nil URL — the
 /// `WindowGroup<URL>` API is typed `URL?` even though every spawn
 /// path in this app supplies a real URL).
-struct ContentView: View {
+struct MacContentView: View {
   @Binding var fileURL: URL?
   @Environment(AppBoot.self) private var boot
 
