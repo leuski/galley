@@ -38,6 +38,14 @@ final class Defaults: GalleyRenderDefaults {
     [String: TemplateBackgroundState] = [:]
   @DefaultsKey var lastTemplateBackgroundColor: TemplateBackgroundState
     = .unresolved
+  /// Whether the bottom `StatusBar` HUD (word count, reading time,
+  /// heading count) is visible in document windows. Toggled via
+  /// `Action.toggleStatusBar`.
+  @DefaultsKey var showsStatusBar: Bool = false
+  /// Words-per-minute used to estimate reading time in the status
+  /// bar. 200 is the rough middle of the literature on prose reading
+  /// speed.
+  @DefaultsKey var readingWordsPerMinute: Int = 200
 
   @MainActor static let shared = Defaults()
 

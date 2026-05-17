@@ -182,17 +182,7 @@
 		62B8B7542FB93783004FB681 /* Exceptions for "ViewerShared" folder in "Viewer.vision" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"/Localized: Resources/InfoPlist.strings",
-				Resources/AppIcon.icon,
 				Resources/Info.plist,
-				Resources/Scripts/backgroundColorReader.js,
-				Resources/Scripts/editorClick.js,
-				Resources/Scripts/findController.js,
-				Resources/Scripts/findStyle.js,
-				Resources/Scripts/scrollListener.js,
-				Resources/Scripts/statsReader.js,
-				Resources/Scripts/tocController.js,
-				Resources/Scripts/topmostVisibleSourceLine.js,
 			);
 			target = 62B8B6E12FB92DF9004FB681 /* Viewer.vision */;
 		};

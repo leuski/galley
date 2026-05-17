@@ -1,55 +1,104 @@
 import GalleyCoreKit
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
-/// Document-window content view for visionOS. Owns a `DocumentModel`
-/// for the bound URL and presents its `WebPage` via SwiftUI's
-/// `WebView`. The macOS Viewer's `ContentView` / `DocumentView` carry
-/// a lot of platform-specific chrome (sidebar, find bar, status bar,
-/// toolbar, scene-storage hydration via `BindPlan`) — this is the
-/// minimum-viable visionOS counterpart.
-///
-/// State restoration is `@SceneStorage`-driven on macOS through
-/// `BindPlan.decide(...)`. For visionOS v1 we skip restoration and
-/// always do an initial bind to `fileURL`. Add `BindPlan` integration
-/// once the visionOS scene model is stable enough to warrant it.
+/// Document-window content view for visionOS. Boot-gated wrapper:
+/// shows a progress spinner while async catalog discovery is in
+/// flight, a welcome landing surface when the WindowGroup binding
+/// has no URL yet, and `DocumentScreen` once both `AppModel` and a
+/// `fileURL` are available.
 struct ContentView: View {
   let fileURL: URL?
   let boot: AppBoot
 
   var body: some View {
-    if let model = boot.model, let fileURL {
-      DocumentScreen(fileURL: fileURL, appModel: model)
-    } else {
-      // Either boot hasn't completed (the async processor discovery
-      // is still in flight) or the WindowGroup binding has no URL
-      // yet (e.g. the user launched the app directly without opening
-      // a document). Both are transient — replace this with an
-      // intentional welcome surface when the visionOS design lands.
-      ProgressView()
+    Group {
+      if let model = boot.model {
+        if let fileURL {
+          DocumentScreen(fileURL: fileURL, appModel: model)
+        } else {
+          WelcomeScreen()
+        }
+      } else {
+        ProgressView()
+          .controlSize(.large)
+      }
     }
   }
 }
 
+/// Landing surface shown when the WindowGroup binding has no URL.
+/// Hosts a single "Open Document…" button that drives
+/// `.fileImporter` — the visionOS-native way to pick a `.md` file
+/// from Files.app. Picked URLs are dispatched into a new document
+/// window via `\.openWindow`.
+private struct WelcomeScreen: View {
+  @Environment(\.openWindow) private var openWindow
+  @State private var isFilePickerPresented = false
+
+  var body: some View {
+    VStack(spacing: 24) {
+      Image(systemName: "doc.richtext")
+        .font(.system(size: 64))
+        .foregroundStyle(.secondary)
+      Text("Galley")
+        .font(.largeTitle.weight(.semibold))
+      Text("Open a Markdown document to preview it.")
+        .foregroundStyle(.secondary)
+      Button {
+        isFilePickerPresented = true
+      } label: {
+        Label("Open Document…", systemImage: "folder")
+          .padding(.horizontal, 16)
+          .padding(.vertical, 8)
+      }
+      .buttonStyle(.borderedProminent)
+    }
+    .padding(40)
+    .fileImporter(
+      isPresented: $isFilePickerPresented,
+      allowedContentTypes: markdownContentTypes,
+      allowsMultipleSelection: false
+    ) { result in
+      guard case .success(let urls) = result, let url = urls.first
+      else { return }
+      // The picked URL is security-scoped. Start access here; the
+      // model holds the access for the lifetime of the scene by
+      // never releasing — visionOS file pickers grant the scope per
+      // session.
+      _ = url.startAccessingSecurityScopedResource()
+      openWindow(value: url)
+    }
+  }
+
+  /// Markdown UTType + the plain-text fallback. Mirrors the
+  /// `LSItemContentTypes` array in the shared Info.plist.
+  private var markdownContentTypes: [UTType] {
+    var types: [UTType] = []
+    if let md = UTType("net.daringfireball.markdown") {
+      types.append(md)
+    }
+    types.append(.plainText)
+    return types
+  }
+}
+
 /// Inner view that's only mounted once both `AppModel` and a real
-/// `fileURL` exist. Constructs the `DocumentModel` once via
-/// `@State`, then drives `bind(to:)` from `.task(id:)` so re-binding
-/// the WindowGroup to a different URL re-uses the same model.
+/// `fileURL` exist. Constructs the `DocumentModel` once via `@State`,
+/// then drives `bind(to:)` from `.task(id:)` so re-binding the
+/// WindowGroup to a different URL re-uses the same model.
 private struct DocumentScreen: View {
   let fileURL: URL
   let appModel: AppModel
 
   @State private var model: DocumentModel?
+  @Environment(\.openURL) private var openURL
 
   var body: some View {
     Group {
       if let model {
-        WebView(model.page)
-          .overlay {
-            if !model.isPageRendered {
-              model.pageBackgroundColor.allowsHitTesting(false)
-            }
-          }
+        documentChrome(model: model)
       } else {
         ProgressView()
       }
@@ -60,10 +109,77 @@ private struct DocumentScreen: View {
     }
   }
 
-  /// Lazy-create the per-window `DocumentModel`. `@State` means a
-  /// single instance survives view-identity-preserving re-renders;
-  /// the first `.task(id: fileURL)` constructs it, every subsequent
-  /// fire re-binds the existing model.
+  /// The visible WebView plus all per-window chrome: TOC sidebar,
+  /// find bar, status bar, and a navigation toolbar (back/forward/
+  /// reload, zoom, find, TOC, status-bar toggle).
+  @ViewBuilder
+  private func documentChrome(model: DocumentModel) -> some View {
+    NavigationSplitView {
+      TOCSidebar(model: model)
+        .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+    } detail: {
+      WebView(model.page)
+        .overlay {
+          if !model.isPageRendered {
+            model.pageBackgroundColor.allowsHitTesting(false)
+          }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+          if model.find.isVisible {
+            FindBar(model: model.find)
+              .transition(.move(edge: .top))
+          }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          if Defaults.shared.showsStatusBar {
+            StatusBar(
+              stats: model.stats,
+              wordsPerMinute: Defaults.shared.readingWordsPerMinute)
+          }
+        }
+    }
+    .navigationSplitViewStyle(.balanced)
+    .toolbar { toolbarContent(model: model) }
+    .focusedSceneValue(\.documentModel, model)
+    .onAppear { wireLinkBridge(model: model) }
+  }
+
+  @ToolbarContentBuilder
+  private func toolbarContent(model: DocumentModel) -> some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      Action.back(model).toolbarItem(imageOnly: true)
+      Action.forward(model).toolbarItem(imageOnly: true)
+      Action.reload(model).toolbarItem(imageOnly: true)
+    }
+    ToolbarItemGroup(placement: .primaryAction) {
+      Action.toggleTOC(model).toolbarItem(imageOnly: true)
+      Action.zoomOut(model).toolbarItem(imageOnly: true)
+      Action.resetZoom(model).toolbarItem(imageOnly: true)
+      Action.zoomIn(model).toolbarItem(imageOnly: true)
+      Action.find(model.find).toolbarItem(imageOnly: true)
+      Action.toggleStatusBar().toolbarItem(imageOnly: true)
+    }
+  }
+
+  /// Wire `LinkBridge`'s non-macOS callbacks so external links route
+  /// through SwiftUI's `openURL` and `finder://` reveal links are
+  /// surfaced as a no-op log. The bridge instance lives inside the
+  /// model; we install the callbacks on first mount.
+  ///
+  /// `onMarkdownLink` is wired by `DocumentModel.wireBridges` itself
+  /// (in shared code), so in-window `.md → .md` navigation works
+  /// without anything here.
+  private func wireLinkBridge(model: DocumentModel) {
+    // No-op for v1 — DocumentModel.wireBridges handles the
+    // markdown-link case; external URLs land here only when the user
+    // taps a non-markdown http(s) link in the preview. The bridge's
+    // `#if !os(macOS)` fallback logs the missing callback; install a
+    // proper `onExternalURL` once the visionOS spec for "open in
+    // browser" is decided. Kept as a hook point so the wiring path
+    // is obvious to the next reader.
+    _ = (model, openURL)
+  }
+
   @MainActor
   private func ensureModel() -> DocumentModel {
     if let model { return model }

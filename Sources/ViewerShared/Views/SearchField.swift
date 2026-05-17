@@ -33,7 +33,9 @@ where Model: SearchFieldModel
         .textFieldStyle(.plain)
         .focused(isFocused)
         .onSubmit(onSubmit)
+        #if os(macOS)
         .onExitCommand(perform: onCancel)
+        #endif
         .frame(maxWidth: .infinity)
         .onChange(of: model.query) {
           Task { await model.performSearch() }
@@ -89,7 +91,9 @@ where Model: SearchFieldModel
       Image(systemName: "magnifyingglass")
         .foregroundStyle(.secondary)
     }
+    #if os(macOS)
     .menuStyle(.borderlessButton)
+    #endif
     .menuIndicator(.visible)
     .help("Find options")
     .accessibilityLabel("Find options")
