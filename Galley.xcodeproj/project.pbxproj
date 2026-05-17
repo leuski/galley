@@ -184,6 +184,7 @@
 			membershipExceptions = (
 				"/Localized: Resources/InfoPlist.strings",
 				Resources/AppIcon.icon,
+				Resources/Info.plist,
 				Resources/Scripts/backgroundColorReader.js,
 				Resources/Scripts/editorClick.js,
 				Resources/Scripts/findController.js,
@@ -195,12 +196,12 @@
 			);
 			target = 62B8B6E12FB92DF9004FB681 /* Viewer.vision */;
 		};
-		62B8B75E2FB93839004FB681 /* Exceptions for "ViewerVisionOS" folder in "Viewer.vision" target */ = {
+		62B8BCC42FB93AE9004FB681 /* Exceptions for "ViewerShared" folder in "Viewer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
 			);
-			target = 62B8B6E12FB92DF9004FB681 /* Viewer.vision */;
+			target = 62D5CA182FA048F000CADD72 /* Viewer */;
 		};
 		62D5EB3A2FA5E36900CADD72 /* Exceptions for "Tests" folder in "Tests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -227,15 +228,13 @@
 		};
 		62B8B6F32FB92E1A004FB681 /* ViewerVisionOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				62B8B75E2FB93839004FB681 /* Exceptions for "ViewerVisionOS" folder in "Viewer.vision" target */,
-			);
 			path = ViewerVisionOS;
 			sourceTree = "<group>";
 		};
 		62B8B7162FB935F1004FB681 /* ViewerShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				62B8BCC42FB93AE9004FB681 /* Exceptions for "ViewerShared" folder in "Viewer" target */,
 				62B8B7542FB93783004FB681 /* Exceptions for "ViewerShared" folder in "Viewer.vision" target */,
 			);
 			path = ViewerShared;
@@ -1208,7 +1207,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = Sources/ViewerShared/Info.plist;
+				INFOPLIST_FILE = Sources/ViewerShared/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1230,7 +1229,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = Sources/ViewerShared/Info.plist;
+				INFOPLIST_FILE = Sources/ViewerShared/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1284,7 +1283,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = Sources/ViewerShared/Info.plist;
+				INFOPLIST_FILE = Sources/ViewerShared/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1305,7 +1304,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = Sources/ViewerShared/Info.plist;
+				INFOPLIST_FILE = Sources/ViewerShared/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
