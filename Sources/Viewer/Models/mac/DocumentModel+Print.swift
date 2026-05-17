@@ -5,6 +5,8 @@
 //  Created by Anton Leuski on 5/2/26.
 //
 
+#if os(macOS)
+
 import AppKit
 import CoreTransferable
 import GalleyCoreKit
@@ -282,3 +284,5 @@ struct PDFExport: Transferable {
     }
   }
 }
+
+#endif

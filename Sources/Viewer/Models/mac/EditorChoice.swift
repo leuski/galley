@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import AppKit
 import Foundation
 import GalleyCoreKit
@@ -286,3 +288,5 @@ private func logEditorURLRejected(_ string: String, logger: Logger?) {
     No handler accepted editor URL: \(string, privacy: .public)
     """)
 }
+
+#endif

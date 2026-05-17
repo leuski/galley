@@ -70,9 +70,7 @@ struct MenuBarContent: View {
   private func openFile() {
     let panel = NSOpenPanel()
     panel.identifier = .init(rawValue: "open.file.panel")
-    panel.allowedContentTypes = MarkdownFileTypes.extensions
-      .compactMap { ext in UTType(filenameExtension: ext) }
-    + [ UTType.plainText ]
+    panel.allowedContentTypes = UTType.allMarkdownTypesAndPlainText
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowsMultipleSelection = false

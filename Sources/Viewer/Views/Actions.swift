@@ -345,4 +345,3 @@ private struct ActionToolbarButton: View {
     .accessibilityIdentifier(action.accessibilityID)
   }
 }
-

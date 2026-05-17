@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import GalleyCoreKit
 import SwiftUI
@@ -5,7 +6,7 @@ import UniformTypeIdentifiers
 import ALFoundation
 
 @main
-struct ViewerApp: App {
+struct MacViewerApp: App {
   @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
@@ -158,3 +159,4 @@ struct ViewerApp: App {
     }
   }
 }
+#endif

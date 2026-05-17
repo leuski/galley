@@ -4,7 +4,7 @@
 //
 //  Created by Anton Leuski on 5/8/26.
 //
-
+#if os(macOS)
 import AppKit
 import GalleyCoreKit
 import SwiftUI
@@ -23,3 +23,4 @@ struct EditCommands: Commands {
     }
   }
 }
+#endif

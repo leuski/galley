@@ -1,3 +1,4 @@
+#if os(visionOS)
 import GalleyCoreKit
 import SwiftUI
 
@@ -11,7 +12,7 @@ import SwiftUI
 /// can't trip `ObservableDefaults`'s mutation handler mid-flush — see
 /// the macOS `Defaults.warmCache()` doc comment for the failure mode.
 @main
-struct ViewerApp: App {
+struct VisionViewerApp: App {
   @State private var boot = AppBoot()
 
   init() {
@@ -24,3 +25,4 @@ struct ViewerApp: App {
     }
   }
 }
+#endif

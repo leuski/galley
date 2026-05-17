@@ -1,3 +1,5 @@
+#if !os(macOS)
+
 import GalleyCoreKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -58,7 +60,7 @@ private struct WelcomeScreen: View {
     .padding(40)
     .fileImporter(
       isPresented: $isFilePickerPresented,
-      allowedContentTypes: markdownContentTypes,
+      allowedContentTypes: UTType.allMarkdownTypesAndPlainText,
       allowsMultipleSelection: false
     ) { result in
       guard case .success(let urls) = result, let url = urls.first
@@ -70,17 +72,6 @@ private struct WelcomeScreen: View {
       _ = url.startAccessingSecurityScopedResource()
       openWindow(value: url)
     }
-  }
-
-  /// Markdown UTType + the plain-text fallback. Mirrors the
-  /// `LSItemContentTypes` array in the shared Info.plist.
-  private var markdownContentTypes: [UTType] {
-    var types: [UTType] = []
-    if let md = UTType("net.daringfireball.markdown") {
-      types.append(md)
-    }
-    types.append(.plainText)
-    return types
   }
 }
 
@@ -194,3 +185,5 @@ private struct DocumentScreen: View {
     return created
   }
 }
+
+#endif

@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import AppKit
 import GalleyCoreKit
 import Observation
@@ -366,3 +368,5 @@ final class WindowDispatcher {
     launchBuffer.append(url)
   }
 }
+
+#endif

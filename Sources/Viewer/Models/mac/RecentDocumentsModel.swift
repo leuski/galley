@@ -1,4 +1,6 @@
+#if os(macOS)
 import AppKit
+#endif
 import GalleyCoreKit
 import Observation
 import SwiftUI
@@ -24,6 +26,7 @@ final class RecentDocumentsModel {
   /// Bound from the File menu's Open Recent submenu.
   private(set) var urls: [URL] = []
 
+#if os(macOS)
   /// Active FTUE open panel, kept weak so we don't extend its
   /// lifetime past presentation.
   @ObservationIgnored private weak var activeOpenPanel: NSOpenPanel?
@@ -31,25 +34,38 @@ final class RecentDocumentsModel {
   /// Routes opened URLs through the same pipeline as Finder
   /// dispatches. Wired by `ViewerApp.body` after construction.
   @ObservationIgnored weak var dispatcher: WindowDispatcher?
+#endif
 
   init() {
+#if os(macOS)
     self.urls = NSDocumentController.shared.recentDocumentURLs
+#endif
   }
 
   /// Record a URL as recently opened.
   func record(_ url: URL) {
     guard !url.isInMainBundle else { return }
+#if os(macOS)
     NSDocumentController.shared.noteNewRecentDocumentURL(url)
     urls = NSDocumentController.shared.recentDocumentURLs
+#else
+    urls.removeAll(where: { $0 == url })
+    urls = [url] + urls
+#endif
   }
 
   /// Clear the recents list. Called from File > Open Recent >
   /// Clear Menu.
   func clearAll() {
+#if os(macOS)
     NSDocumentController.shared.clearRecentDocuments(nil)
     urls = NSDocumentController.shared.recentDocumentURLs
+#else
+    urls = []
+#endif
   }
 
+#if os(macOS)
   /// Open one previously-opened URL through the same dispatch path
   /// as Finder/NSOpenPanel — used by the Open Recent menu.
   func openRecent(_ url: URL) {
@@ -79,7 +95,7 @@ final class RecentDocumentsModel {
     panel.allowsMultipleSelection = true
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
-    panel.allowedContentTypes = Self.openPanelContentTypes
+    panel.allowedContentTypes = UTType.allMarkdownTypesAndPlainText
     activeOpenPanel = panel
     let response: NSApplication.ModalResponse =
     await withCheckedContinuation { continuation in
@@ -89,14 +105,5 @@ final class RecentDocumentsModel {
     guard response == .OK else { return [] }
     return panel.urls
   }
-
-  private static let openPanelContentTypes: [UTType] = {
-    var types: [UTType] = []
-    types.append(UTType(importedAs: "net.daringfireball.markdown"))
-    for ext in MarkdownFileTypes.extensions {
-      if let type = UTType(filenameExtension: ext) { types.append(type) }
-    }
-    types.append(.plainText)
-    return types
-  }()
+#endif
 }

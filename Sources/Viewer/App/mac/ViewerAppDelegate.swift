@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 
 /// Minimal AppDelegate that exists for one reason only: to declare
@@ -24,3 +25,4 @@ final class ViewerAppDelegate: NSObject, NSApplicationDelegate {
     true
   }
 }
+#endif

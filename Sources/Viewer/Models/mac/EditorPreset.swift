@@ -1,3 +1,5 @@
+#if os(macOS)
+
 import AppKit
 import Foundation
 import ALFoundation
@@ -243,3 +245,5 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
     }
   }
 }
+
+#endif

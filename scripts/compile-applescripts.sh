@@ -10,6 +10,13 @@
 
 set -euo pipefail
 
+# AppleScript / osacompile is macOS-only. Skip cleanly on every other SDK
+# (iphoneos, iphonesimulator, xros, xrsimulator, watchos, ...).
+if [[ "${PLATFORM_NAME:-}" != "macosx" ]]; then
+    echo "note: skipping AppleScript compile on platform '${PLATFORM_NAME:-unknown}'"
+    exit 0
+fi
+
 resources="${TARGET_BUILD_DIR:?TARGET_BUILD_DIR not set}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:?UNLOCALIZED_RESOURCES_FOLDER_PATH not set}"
 
 if [[ ! -d "$resources" ]]; then
