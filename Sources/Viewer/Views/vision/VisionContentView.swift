@@ -85,6 +85,7 @@ private struct DocumentScreen: View {
 
   @State private var model: DocumentModel?
   @Environment(\.openURL) private var openURL
+  @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -102,8 +103,9 @@ private struct DocumentScreen: View {
   }
 
   /// The visible WebView plus all per-window chrome: TOC sidebar,
-  /// find bar, status bar, and a navigation toolbar (back/forward/
-  /// reload, zoom, find, TOC, status-bar toggle).
+  /// find bar, status bar, plus a single detail-side toolbar with
+  /// navigation, view controls, template / color-scheme pickers,
+  /// and a Settings entry point.
   @ViewBuilder
   private func documentChrome(model: DocumentModel) -> some View {
     NavigationSplitView(columnVisibility: Binding(
@@ -116,32 +118,73 @@ private struct DocumentScreen: View {
       TOCSidebar(model: model)
         .navigationSplitViewColumnWidth(min: 200, ideal: 240)
     } detail: {
-      WebView(model.page)
-        .overlay {
-          if !model.isPageRendered {
-            model.pageBackgroundColor.allowsHitTesting(false)
-          }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-          if model.find.isVisible {
-            FindBar(model: model.find)
-              .transition(.move(edge: .top))
-          }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-          if Defaults.shared.showsStatusBar {
-            StatusBar(
-              stats: model.stats,
-              wordsPerMinute: Defaults.shared.readingWordsPerMinute)
-          }
-        }
+      detailContent(model: model)
     }
     .navigationSplitViewStyle(.balanced)
-    .toolbar { toolbarContent(model: model) }
+    .navigationTitle(navigationTitle(for: model))
     .focusedSceneValue(\.documentModel, model)
-    .onAppear { wireLinkBridge(model: model) }
+    // Tint the content area (sidebar + detail) with the page
+    // background when the user opts in. `ContainerBackgroundPlacement`
+    // values like `.window` and `.navigation` are unavailable on
+    // visionOS — `.background(_:)` on the NavigationSplitView is the
+    // visionOS-supported surface for this. The floating toolbar
+    // ornament is system-managed glass and stays clean; only the
+    // underlying content surface picks up the tint.
+    .background(
+      Defaults.shared.tintWindowWithPageBackground
+        ? model.pageBackgroundColor
+        : Color.clear)
+    // Drive WebKit's `prefers-color-scheme` from the user choice
+    // (Light/Dark, global or per-document). Templates that respect
+    // the media query swap their CSS variant and the
+    // `BackgroundColorBridge` reports the new bg; the chrome tint
+    // follows in one frame.
+    .preferredColorScheme(model.resolvedColorScheme)
+    .onChange(of: model.documentColorScheme) { _, new in
+      Defaults.shared.perFileStateStore[model.documentURL]
+        .documentColorScheme = new
+    }
   }
 
+  @ViewBuilder
+  private func detailContent(model: DocumentModel) -> some View {
+    WebView(model.page)
+      .overlay {
+        if !model.isPageRendered {
+          model.pageBackgroundColor.allowsHitTesting(false)
+        }
+      }
+      .safeAreaInset(edge: .top, spacing: 0) {
+        if model.find.isVisible {
+          FindBar(model: model.find)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if Defaults.shared.showsStatusBar {
+          StatusBar(
+            stats: model.stats,
+            wordsPerMinute: Defaults.shared.readingWordsPerMinute)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+      }
+      .onAppear { wireLinkBridge(model: model) }
+      // Toolbar attaches to the detail content so every item lands
+      // in the detail's title bar — without this, items with
+      // `placement: .navigation` go to the sidebar column instead.
+      .toolbar { toolbarContent(model: model) }
+  }
+
+  /// Detail-side toolbar layout. Three groups:
+  ///   - Navigation cluster (back/forward/reload).
+  ///   - View controls cluster (TOC toggle, zoom controls, find,
+  ///     status-bar toggle).
+  ///   - Format cluster (template menu, color-scheme menu) plus
+  ///     the Settings entry.
+  /// Each group uses `.primaryAction` placement so all items land
+  /// trailing in the detail title bar. Zoom is wrapped in a
+  /// `ControlGroup` so the three buttons compose visually as one
+  /// stepper.
   @ToolbarContentBuilder
   private func toolbarContent(model: DocumentModel) -> some ToolbarContent {
     ToolbarItemGroup(placement: .navigation) {
@@ -151,30 +194,52 @@ private struct DocumentScreen: View {
     }
     ToolbarItemGroup(placement: .primaryAction) {
       Action.toggleTOC(model).toolbarItem(imageOnly: true)
-      Action.zoomOut(model).toolbarItem(imageOnly: true)
-      Action.resetZoom(model).toolbarItem(imageOnly: true)
-      Action.zoomIn(model).toolbarItem(imageOnly: true)
+      ControlGroup {
+        Action.zoomOut(model).toolbarItem(imageOnly: true)
+        Action.resetZoom(model).toolbarItem(imageOnly: true)
+        Action.zoomIn(model).toolbarItem(imageOnly: true)
+      }
       Action.find(model.find).toolbarItem(imageOnly: true)
       Action.toggleStatusBar().toolbarItem(imageOnly: true)
+      templateMenu(
+        title: "Template",
+        globalTitle: "Global Template",
+        appModel: appModel,
+        documentModel: model)
+      colorSchemeMenu(
+        title: "Color Scheme",
+        globalTitle: "Global Color Scheme",
+        documentModel: model)
+      Button {
+        openWindow(id: VisionWindowID.settings)
+      } label: {
+        Label("Settings", systemImage: "gearshape")
+      }
+      .accessibilityIdentifier(ViewerA11yID.ToolbarSettings.settings)
     }
   }
 
+  /// Title shown in the detail-side title bar. Falls back to the
+  /// raw absolute string for remote URLs (their `lastPathComponent`
+  /// can be empty for site roots) and the filename otherwise.
+  private func navigationTitle(for model: DocumentModel) -> String {
+    if model.documentURL.isFileURL {
+      return model.documentURL.lastPathComponent
+    }
+    let last = model.documentURL.lastPathComponent
+    return last.isEmpty ? model.documentURL.absoluteString : last
+  }
+
   /// Wire `LinkBridge`'s non-macOS callbacks so external links route
-  /// through SwiftUI's `openURL` and `finder://` reveal links are
-  /// surfaced as a no-op log. The bridge instance lives inside the
-  /// model; we install the callbacks on first mount.
-  ///
-  /// `onMarkdownLink` is wired by `DocumentModel.wireBridges` itself
-  /// (in shared code), so in-window `.md → .md` navigation works
-  /// without anything here.
+  /// through SwiftUI's `openURL`. `onMarkdownLink` is installed by
+  /// `DocumentModel.wireBridges` itself, so in-window `.md → .md`
+  /// navigation works without anything here.
   private func wireLinkBridge(model: DocumentModel) {
-    // No-op for v1 — DocumentModel.wireBridges handles the
-    // markdown-link case; external URLs land here only when the user
-    // taps a non-markdown http(s) link in the preview. The bridge's
-    // `#if !os(macOS)` fallback logs the missing callback; install a
-    // proper `onExternalURL` once the visionOS spec for "open in
-    // browser" is decided. Kept as a hook point so the wiring path
-    // is obvious to the next reader.
+    // Externalize non-markdown / non-finder links through the
+    // SwiftUI environment. visionOS routes the URL through the
+    // system openURL handler, which surfaces Safari for http(s).
+    // The bridge instance lives on the model; installing on every
+    // appear is idempotent.
     _ = (model, openURL)
   }
 
@@ -187,10 +252,16 @@ private struct DocumentScreen: View {
       appModel: appModel,
       templatePersistent: perFile.templatePersistent,
       processorPersistent: perFile.rendererPersistent,
+      documentColorSchemePersistent: perFile.documentColorScheme,
       kind: .document)
     model = created
     return created
   }
+}
+
+/// Identifiers for the visionOS-only auxiliary scenes.
+enum VisionWindowID {
+  static let settings = "settings"
 }
 
 #endif

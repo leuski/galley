@@ -200,6 +200,13 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     if path.isEmpty { return nil }
 
     let decoded = path.removingPercentEncoding ?? path
-    return URL(fileURLWithPath: decoded, relativeTo: baseDir).safe
+    if documentURL.isFileURL {
+      return URL(fileURLWithPath: decoded, relativeTo: baseDir).safe
+    }
+    // Remote document: resolve the href against the remote base so a
+    // relative `../foo.md` stays remote. `URL(string:relativeTo:)`
+    // preserves the scheme/host on the base; `absoluteURL`
+    // flattens the resolution into a self-contained URL.
+    return URL(string: path, relativeTo: baseDir)?.absoluteURL
   }
 }

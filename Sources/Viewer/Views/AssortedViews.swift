@@ -56,3 +56,61 @@ func processorMenu(
     ProcessorMenu(title: title, model: appModel.processors)
   }
 }
+
+#if !os(macOS)
+/// Color-scheme picker menu. visionOS-only — macOS adopts the
+/// system appearance directly. Mirrors the template/processor
+/// menus' per-document override pattern: when overrides are on AND
+/// a document model is supplied, the menu drives the per-document
+/// slot with a "Global Color Scheme" row clearing the override;
+/// otherwise it drives `Defaults.shared.documentColorScheme`.
+@ViewBuilder @MainActor
+func colorSchemeMenu(
+  title: LocalizedStringResource = "Color Scheme",
+  globalTitle: LocalizedStringResource? = nil,
+  documentModel: DocumentModel? = nil) -> some View
+{
+  let resolvedTitle: LocalizedStringResource = (
+    Defaults.shared.enablePerDocumentOverrides && documentModel == nil
+    ? globalTitle : nil) ?? title
+  Menu {
+    if Defaults.shared.enablePerDocumentOverrides,
+       let documentModel
+    {
+      Toggle(
+        "Global Color Scheme",
+        isOn: Binding(
+          get: { documentModel.documentColorScheme == nil },
+          set: { isOn in
+            if isOn { documentModel.documentColorScheme = nil }
+          }))
+      Divider()
+      ForEach(DocumentColorScheme.allCases) { value in
+        Toggle(
+          isOn: Binding(
+            get: { documentModel.documentColorScheme == value },
+            set: { isOn in
+              if isOn { documentModel.documentColorScheme = value }
+            })
+        ) {
+          Text(value.displayName)
+        }
+      }
+    } else {
+      ForEach(DocumentColorScheme.allCases) { value in
+        Toggle(
+          isOn: Binding(
+            get: { Defaults.shared.documentColorScheme == value },
+            set: { isOn in
+              if isOn { Defaults.shared.documentColorScheme = value }
+            })
+        ) {
+          Text(value.displayName)
+        }
+      }
+    }
+  } label: {
+    Label(resolvedTitle, systemImage: "circle.lefthalf.filled")
+  }
+}
+#endif

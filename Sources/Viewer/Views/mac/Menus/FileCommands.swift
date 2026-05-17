@@ -77,7 +77,8 @@ struct FileCommands: Commands {
       Button("Rename…", systemImage: "pencil") {
         model?.requestRename()
       }
-      .disabled(model?.kind != .document)
+      .disabled(model?.kind != .document
+                || model?.documentURL.isFileURL != true)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 
       Button("Open in Editor", systemImage: "arrow.up.forward.app") {
@@ -85,7 +86,7 @@ struct FileCommands: Commands {
         Task { await model.openInEditor(line: nil) }
       }
       .keyboardShortcut("e", modifiers: [.command, .option])
-      .disabled(model == nil)
+      .disabled(model == nil || model?.documentURL.isFileURL != true)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.openInEditor)
 
       Divider()

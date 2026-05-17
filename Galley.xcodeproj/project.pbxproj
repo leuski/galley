@@ -1179,9 +1179,17 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Viewer/Resources/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=xros*]" = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=xrsimulator*]" = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;
@@ -1203,9 +1211,17 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Viewer/Resources/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=xros*]" = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=xrsimulator*]" = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;

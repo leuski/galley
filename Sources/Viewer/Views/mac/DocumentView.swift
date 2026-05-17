@@ -258,16 +258,16 @@ struct DocumentView: View {
     // declared no opaque bg; we then paint nothing and fall back to
     // the system default (glass over wallpaper).
     .toolbarBackgroundVisibility(
-      Defaults.shared.transparentToolbar ? .hidden : .visible,
+      Defaults.shared.tintWindowWithPageBackground ? .hidden : .visible,
       for: .windowToolbar)
     // `model.pageBackgroundColor` already resolves through the
     // template state → last-seen → system-bg fallback chain, so
     // it's always a real color; no second `??` needed here.
     .background(
-      Defaults.shared.transparentToolbar
+      Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor : .userSystemWindowBackground)
     .containerBackground(
-      Defaults.shared.transparentToolbar
+      Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
     // Flip the view's color scheme so AppKit-rendered chrome text
     // (window title, toolbar labels) inverts when the page bg is
@@ -278,7 +278,8 @@ struct DocumentView: View {
     // the user's preferred variant — not whichever variant was
     // current under the previous template's bg-luminance scheme.
     .preferredColorScheme(
-      model.isRenderingNewTemplate || !Defaults.shared.transparentToolbar
+      model.isRenderingNewTemplate
+      || !Defaults.shared.tintWindowWithPageBackground
       ? .userSystem
       : (model.pageBackgroundColor.isLuminanceDark ? .dark : .light))
   }

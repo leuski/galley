@@ -13,6 +13,12 @@ struct PerFileState: Codable, Equatable, Sendable {
   var rendererPersistent: String?
   var templatePersistent: String?
   var showsTOC: Bool?
+  /// visionOS-only per-document color-scheme override. `nil` means
+  /// "use the global default." macOS never writes here — its
+  /// presentation tracks the system appearance directly. The field
+  /// stays in shared shape so Codable round-trips through the
+  /// suite-shared plist remain stable across platforms.
+  var documentColorScheme: DocumentColorScheme?
 
   var isEmpty: Bool {
     pageZoom == nil
@@ -20,10 +26,21 @@ struct PerFileState: Codable, Equatable, Sendable {
       && rendererPersistent == nil
       && templatePersistent == nil
       && showsTOC == nil
+      && documentColorScheme == nil
   }
 
+  /// Keying strategy:
+  /// - File URLs normalize through `safe` (standardized +
+  ///   symlink-resolved) and use `.path()` so two windows opened on
+  ///   the same on-disk file via different paths share state.
+  /// - Remote URLs use `absoluteString` so host+path uniqueness is
+  ///   preserved — `safe.path()` would drop the host and collide
+  ///   across origins.
   static func key(for url: URL) -> String {
-    url.safe.path()
+    if url.isFileURL {
+      return url.safe.path()
+    }
+    return url.absoluteString
   }
 }
 

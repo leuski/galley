@@ -38,11 +38,13 @@ struct GeneralSettingsView: View {
     }
 
     VStack(alignment: .leading, spacing: 4) {
-      Toggle("Transparent toolbar", isOn: $defaults.transparentToolbar)
+      Toggle(
+        "Tint window with page background",
+        isOn: $defaults.tintWindowWithPageBackground)
       Text("""
-            Uses the template background color to paint the window \
-            toolbar and sidebar background. If the template does not \
-            have background color specified, we use the default OS color.
+            Paints the page background color behind the window \
+            toolbar and sidebar. When the template does not declare a \
+            background color, the default system color is used.
             """
       )
       .subtitle()

@@ -35,6 +35,14 @@ final class Defaults: GalleyRenderDefaults {
   @DefaultsKey var enablePerDocumentOverrides: Bool = false
   @DefaultsKey var openBehavior: OpenBehavior = .newWindow
   @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
+  /// When on, the active page's background color is painted behind
+  /// the window glass via `.containerBackground(_:for:.window)` so
+  /// the toolbar/ornament/sidebar chrome sample it through their
+  /// material. When off, the window keeps the platform's default
+  /// surface (system window background on macOS; plain glass on
+  /// visionOS). Promoted out of macOS-only scope so visionOS reads
+  /// the same key.
+  @DefaultsKey var tintWindowWithPageBackground: Bool = true
   /// Per-template page background colors, captured by
   /// `BackgroundColorBridge` after each render. Used by
   /// `Template.backgroundState` so a freshly-opened tab can paint
@@ -61,7 +69,12 @@ final class Defaults: GalleyRenderDefaults {
 
 #if os(macOS)
   @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
-  @DefaultsKey var transparentToolbar: Bool = true
+#else
+  /// Default color scheme for newly-opened documents on visionOS.
+  /// Drives `DocumentModel.resolvedColorScheme`; per-document
+  /// overrides (gated by `enablePerDocumentOverrides`) live in
+  /// `PerFileState.documentColorScheme`.
+  @DefaultsKey var documentColorScheme: DocumentColorScheme = .light
 #endif
 
   @MainActor static let shared = Defaults()

@@ -88,4 +88,10 @@ public enum ViewerA11yID {
     public static let webView = "viewer.document.webView"
     public static let placeholder = "viewer.document.placeholder"
   }
+
+  // MARK: Toolbar — visionOS-specific entry points
+
+  public enum ToolbarSettings {
+    public static let settings = "viewer.toolbar.settings"
+  }
 }

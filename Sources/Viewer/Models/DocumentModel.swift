@@ -39,7 +39,7 @@ final class DocumentModel {
   @ObservationIgnored private let tocBridge = TOCBridge()
   @ObservationIgnored private let statsBridge = StatsBridge()
   @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
-  @ObservationIgnored private let appModel: AppModel
+  @ObservationIgnored let appModel: AppModel
   @ObservationIgnored private let templateBox: TemplateBox
 
   /// Chrome reads through this. Drives off `renderedTemplate()` —
@@ -243,11 +243,21 @@ final class DocumentModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
+  /// Per-document color-scheme override slot. `nil` means "use the
+  /// global default" (`Defaults.shared.documentColorScheme`, visionOS
+  /// only). Gated by `enablePerDocumentOverrides` at read time the
+  /// same way template/processor per-doc choices are. macOS does
+  /// not surface this — it tracks the system appearance directly —
+  /// but the field exists in shared code so the constructor stays
+  /// uniform.
+  var documentColorScheme: DocumentColorScheme?
+
   init(
     initialURL: URL,
     appModel: AppModel,
     templatePersistent: String?,
     processorPersistent: String?,
+    documentColorSchemePersistent: DocumentColorScheme? = nil,
     kind: Kind
   ) {
     self.kind = kind
@@ -255,6 +265,7 @@ final class DocumentModel {
     self.history = [initialURL]
     self.currentIndex = 0
     self.appModel = appModel
+    self.documentColorScheme = documentColorSchemePersistent
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
       persistent: templatePersistent
@@ -292,85 +303,6 @@ final class DocumentModel {
     self.templateBox.template = resolvedTemplate()
 
     wireBridges()
-  }
-
-  /// Build the `WebPage.Configuration`: register every script-message
-  /// handler, inject the user scripts each bridge needs, and wire the
-  /// custom URL scheme that resolves template-bundled assets through
-  /// `templateBox`. Static so it can run before `self` is fully
-  /// initialized; pure plumbing — no closures capture the model.
-  private static func makeConfiguration(
-    editorBridge: EditorBridge,
-    linkBridge: LinkBridge,
-    scrollBridge: ScrollBridge,
-    tocBridge: TOCBridge,
-    statsBridge: StatsBridge,
-    backgroundBridge: BackgroundColorBridge,
-    templateBox: TemplateBox
-  ) -> WebPage.Configuration {
-    var configuration = WebPage.Configuration()
-    let controller = configuration.userContentController
-    controller.add(editorBridge, name: EditorBridge.messageName)
-    controller.add(linkBridge, name: LinkBridge.messageName)
-    controller.add(scrollBridge, name: ScrollBridge.messageName)
-    controller.add(tocBridge, name: TOCBridge.messageName)
-    controller.add(statsBridge, name: StatsBridge.messageName)
-    controller.add(
-      backgroundBridge, name: BackgroundColorBridge.messageName)
-    // One script handles both cmd-click → editor and plain click →
-    // in-window nav, so we don't depend on capture-phase ordering
-    // between two listeners — which appears to drop the editor
-    // listener after the first navigation in macOS 26 WebPage.
-    controller.addUserScript(WKUserScript(
-      source: EditorBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Debounced scroll listener — feeds `currentScrollY` so
-    // ContentView can persist the resting position via `@SceneStorage`.
-    controller.addUserScript(WKUserScript(
-      source: ScrollBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Heading extraction. Runs once per load, assigns synthetic ids
-    // to headings that lack one, and posts the list back. Renderer-
-    // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
-    controller.addUserScript(WKUserScript(
-      source: TOCBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Word / character / heading counts for the optional status bar.
-    // Reads `body.innerText`, so CSS-hidden chrome (template anchors,
-    // copy-button glyphs) is excluded from the totals.
-    controller.addUserScript(WKUserScript(
-      source: StatsBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Computed background-color reader. Runs after layout so the
-    // host can paint a matching tint behind translucent chrome.
-    controller.addUserScript(WKUserScript(
-      source: BackgroundColorBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Find-text controller. The style script runs at document-start
-    // so the highlight CSS is in place before any match is wrapped;
-    // the controller script runs at document-end so `document.body`
-    // exists when `window.galleyFind` is wired up.
-    controller.addUserScript(WKUserScript(
-      source: FindBridge.styleScript,
-      injectionTime: .atDocumentStart,
-      forMainFrameOnly: true))
-    controller.addUserScript(WKUserScript(
-      source: FindBridge.userScript,
-      injectionTime: .atDocumentEnd,
-      forMainFrameOnly: true))
-    // Custom URL scheme so template-bundled assets (CSS, fonts,
-    // images) resolve from disk through the SwiftUI WebView. Reads
-    // the active template at request time via `templateBox`, kept
-    // current by `renderCurrent` on every render.
-    let handler = PreviewSchemeHandler(
-      templateProvider: { templateBox.template ?? .default })
-    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
-    return configuration
   }
 
   /// Attach `[weak self]` callbacks to each bridge. Lifted out of
@@ -591,6 +523,15 @@ final class DocumentModel {
   @discardableResult
   func renameCurrentDocument(toName newName: String) async throws -> URL {
     let oldURL = documentURL
+    guard oldURL.isFileURL else {
+      // Remote documents have no on-disk presence to rename. Surface
+      // a notice so a stray menu trigger gives feedback instead of
+      // failing silently.
+      report(
+        String(localized: "Remote documents can’t be renamed."),
+        lifetime: .ephemeral)
+      return oldURL
+    }
     let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty,
           !trimmed.contains("/"),
@@ -662,6 +603,11 @@ final class DocumentModel {
 
     await renderCurrent(preserveScroll: false)
 
+    // Only file URLs get a live-reload subscription. Remote
+    // documents have no FSEvents source — the user reloads
+    // manually via the Reload command.
+    guard url.isFileURL else { return }
+
     let stream = await watcher.subscribe(to: url)
     for await _ in stream {
       if Task.isCancelled || bindGeneration != myGeneration { break }
@@ -694,7 +640,7 @@ final class DocumentModel {
       : 0
 
     do {
-      let source = try String(contentsOf: url, encoding: .utf8)
+      let source = try await Self.readSource(at: url)
       let body = try await renderer.render(source, baseURL: url)
       let composed = try template.composeHTML(
         documentContent: body,
@@ -740,44 +686,6 @@ final class DocumentModel {
 
   private func logLoadingHTML(byteCount: Int) {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
-  }
-
-  /// Resolve the renderer for the next render. When the per-document
-  /// override flag is on, the window-local choice wins (falling back
-  /// to the global selection if its pick is unavailable). Otherwise
-  /// always use the global selection.
-  func resolvedRenderer() -> any MarkdownRenderer {
-    if Defaults.shared.enablePerDocumentOverrides == true,
-       let renderer = processors.selected.value.renderer
-    {
-      return renderer
-    }
-
-    return appModel.processors.selected.value.renderer
-    ?? SwiftMarkdownRenderer()
-  }
-
-  func resolvedTemplate() -> Template {
-    if Defaults.shared.enablePerDocumentOverrides == true {
-      return templates.selected.value
-    }
-    return appModel.templates.selected.value
-  }
-
-  /// Template whose HTML is currently painted in the WebView, per
-  /// the last `BackgroundColorBridge` report. Falls back to the
-  /// selected template before the first bridge fire (cold open —
-  /// the WebView is system-white, so the selected template's cached
-  /// color is the best available placeholder) and when the painted
-  /// template's id no longer resolves in the global catalog
-  /// (template uninstalled mid-session).
-  func renderedTemplate() -> Template {
-    if let id = renderedTemplateID,
-       let template = appModel.templates.findValue(forID: id)
-    {
-      return template
-    }
-    return resolvedTemplate()
   }
 
 }
