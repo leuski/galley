@@ -94,4 +94,11 @@ public enum ViewerA11yID {
   public enum ToolbarSettings {
     public static let settings = "viewer.toolbar.settings"
   }
+
+  public enum Toolbar {
+    public static let share = "viewer.toolbar.share"
+    public static let shareMarkdown = "viewer.toolbar.share.markdown"
+    public static let sharePDF = "viewer.toolbar.share.pdf"
+    public static let more = "viewer.toolbar.more"
+  }
 }

@@ -18,7 +18,10 @@ struct VisionContentView: View {
     Group {
       if let model = boot.model {
         if let url = fileURL {
-          DocumentScreen(fileURL: url, appModel: model)
+          DocumentScreen(
+            fileURL: url,
+            appModel: model,
+            bindingFileURL: $fileURL)
         } else {
           WelcomeScreen(fileURL: $fileURL)
         }
@@ -87,7 +90,9 @@ private struct DocumentScreen: View {
   let fileURL: URL
   let appModel: AppModel
 
+  @Binding var bindingFileURL: URL?
   @State private var model: DocumentModel?
+  @State private var isFilePickerPresented = false
   @Environment(\.openURL) private var openURL
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -103,6 +108,19 @@ private struct DocumentScreen: View {
     .task(id: fileURL) {
       let resolved = ensureModel()
       await resolved.bind(to: fileURL)
+    }
+    // The "Open Document…" entry in the More menu drives this — the
+    // visionOS-native file picker rebinds the current window's URL
+    // slot instead of spawning a second window.
+    .fileImporter(
+      isPresented: $isFilePickerPresented,
+      allowedContentTypes: UTType.allMarkdownTypesAndPlainText,
+      allowsMultipleSelection: false
+    ) { result in
+      guard case .success(let urls) = result, let url = urls.first
+      else { return }
+      _ = url.startAccessingSecurityScopedResource()
+      bindingFileURL = url
     }
   }
 
@@ -182,27 +200,109 @@ private struct DocumentScreen: View {
   /// Bottom-ornament toolbar. visionOS renders
   /// `ToolbarItemPlacement.bottomOrnament` as a floating glass pill
   /// below the window — system-managed material, hit-test margins,
-  /// and spacing. The previous title-bar toolbar is gone.
-  /// Three logical groups:
-  ///   - Navigation cluster (back/forward/reload).
-  ///   - View controls (TOC toggle, zoom, find, status-bar toggle).
-  ///   - Format cluster (template + color-scheme menus) + Settings.
-  /// Zoom is wrapped in a `ControlGroup` so the three buttons compose
-  /// visually as one stepper.
+  /// and spacing. There is no menu bar on visionOS, so every command
+  /// the macOS app surfaces in the menu has to land in chrome here.
+  ///
+  /// Layout, left to right, with spacers between groups:
+  ///   1. Navigation — back / forward / reload
+  ///   2. Layout — TOC toggle
+  ///   3. Zoom — `ControlGroup` of zoomOut / 100% / zoomIn
+  ///   4. Find toggle
+  ///   5. Share menu — Markdown source + Rendered PDF
+  ///   6. More (•••) menu — Open, Status Bar, Template, Color Scheme,
+  ///      [Processor when >1], Settings, Help
+  ///
+  /// Pulling configuration knobs (template, color scheme, processor)
+  /// and one-off commands (Open, Settings, Help) off the primary
+  /// surface and into "More" keeps the visible glass pill compact
+  /// — there's no menu-bar fallback when it gets crowded.
   @ToolbarContentBuilder
   private func toolbarContent(model: DocumentModel) -> some ToolbarContent {
     ToolbarItemGroup(placement: .bottomOrnament) {
       Action.back(model).toolbarItem(imageOnly: true)
       Action.forward(model).toolbarItem(imageOnly: true)
       Action.reload(model).toolbarItem(imageOnly: true)
+
+      Spacer()
+
       Action.toggleTOC(model).toolbarItem(imageOnly: true)
+
+      Spacer()
+
       ControlGroup {
         Action.zoomOut(model).toolbarItem(imageOnly: true)
         Action.resetZoom(model).toolbarItem(imageOnly: true)
         Action.zoomIn(model).toolbarItem(imageOnly: true)
       }
+
+      Spacer()
+
       Action.find(model.find).toolbarItem(imageOnly: true)
-      Action.toggleStatusBar().toolbarItem(imageOnly: true)
+
+      Spacer()
+
+      shareMenu(model: model)
+
+      moreMenu(model: model)
+    }
+  }
+
+  /// Share submenu. Two `ShareLink`s as menu rows. The Markdown row
+  /// shares the file URL directly (cheap — no work). The PDF row
+  /// uses a `Transferable` so WebKit only renders the PDF after the
+  /// user actually picks the row in the system share sheet. The
+  /// Markdown row is hidden when the document isn't a file (e.g. a
+  /// remote URL) — sharing the URL labeled "Markdown Source" would
+  /// misrepresent what arrives at the other end.
+  @ViewBuilder
+  private func shareMenu(model: DocumentModel) -> some View {
+    Menu {
+      if model.documentURL.isFileURL {
+        ShareLink(
+          item: model.documentURL,
+          subject: Text(model.documentURL.lastPathComponent),
+          message: Text(model.documentURL.lastPathComponent)
+        ) {
+          Label("Markdown Source", systemImage: "doc.text")
+        }
+        .accessibilityIdentifier(ViewerA11yID.Toolbar.shareMarkdown)
+      }
+      ShareLink(
+        item: model.pdfExport,
+        preview: SharePreview(
+          model.pdfExport.suggestedName,
+          image: Image(systemName: "doc.richtext"))
+      ) {
+        Label("Rendered PDF", systemImage: "doc.richtext")
+      }
+      .accessibilityIdentifier(ViewerA11yID.Toolbar.sharePDF)
+    } label: {
+      Label("Share", systemImage: "square.and.arrow.up")
+    }
+    .accessibilityIdentifier(ViewerA11yID.Toolbar.share)
+  }
+
+  /// "More" (•••) menu. Catch-all for lower-frequency commands that
+  /// don't earn a dedicated slot on the ornament. Mirrors what the
+  /// macOS app puts in the File / View / Format / Help menus, minus
+  /// items that don't apply on visionOS (Print, Page Setup, Open in
+  /// Editor, Close, Rename — the last two are deferred pending
+  /// security-scoped FS plumbing).
+  @ViewBuilder
+  private func moreMenu(model: DocumentModel) -> some View {
+    Menu {
+      Button {
+        isFilePickerPresented = true
+      } label: {
+        Label("Open Document…", systemImage: "folder")
+      }
+
+      Divider()
+
+      Action.toggleStatusBar().menuItem()
+
+      Divider()
+
       templateMenu(
         title: "Template",
         globalTitle: "Global Template",
@@ -213,13 +313,43 @@ private struct DocumentScreen: View {
         globalTitle: "Global Color Scheme",
         appModel: appModel,
         documentModel: model)
+      // Processor picker only appears when there's an actual choice
+      // to make. visionOS ships with the built-in Swift renderer
+      // alone — external CLI processors aren't reachable — so a
+      // degenerate one-row menu would just confuse users.
+      if appModel.processors.values.count > 1 {
+        processorMenu(
+          title: "Markdown Processor",
+          globalTitle: "Global Markdown Processor",
+          appModel: appModel,
+          documentModel: model)
+      }
+
+      Divider()
+
       Button {
         openWindow(id: VisionWindowID.settings)
       } label: {
-        Label("Settings", systemImage: "gearshape")
+        Label("Settings…", systemImage: "gearshape")
       }
       .accessibilityIdentifier(ViewerA11yID.ToolbarSettings.settings)
+
+      if let helpURL = Bundle.main.url(
+        forResource: "template-authoring",
+        withExtension: "md") {
+        Button {
+          bindingFileURL = helpURL
+        } label: {
+          Label(
+            "How to Make a Template",
+            systemImage: "questionmark.circle")
+        }
+        .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)
+      }
+    } label: {
+      Label("More", systemImage: "ellipsis.circle")
     }
+    .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
   }
 
   /// Title shown in the detail-side title bar. Falls back to the
