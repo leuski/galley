@@ -79,7 +79,7 @@ extension DocumentModel {
       source: FindBridge.userScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
-    #if !os(macOS)
+#if !os(macOS)
     // visionOS pinches the WebView's content like an iOS WKWebView
     // unless the document opts out via viewport meta. Templates we
     // ship don't all declare one, and even when they do the page
@@ -90,7 +90,7 @@ extension DocumentModel {
       source: disablePinchZoomScript,
       injectionTime: .atDocumentEnd,
       forMainFrameOnly: true))
-    #endif
+#endif
     // Custom URL scheme so template-bundled assets (CSS, fonts,
     // images) resolve from disk through the SwiftUI WebView. Reads
     // the active template at request time via `templateBox`, kept

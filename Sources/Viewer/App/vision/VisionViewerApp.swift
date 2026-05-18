@@ -14,6 +14,7 @@ import SwiftUI
 @main
 struct VisionViewerApp: App {
   @State private var boot = AppBoot()
+  @State private var recents = RecentDocumentsModel()
 
   init() {
     Defaults.warmCache()
@@ -22,6 +23,7 @@ struct VisionViewerApp: App {
   var body: some Scene {
     WindowGroup(for: URL.self) { $fileURL in
       VisionContentView(fileURL: $fileURL, boot: boot)
+        .environment(recents)
     }
 
     // Single settings window. visionOS has no `Settings { ... }`

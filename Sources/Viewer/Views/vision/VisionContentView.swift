@@ -41,6 +41,7 @@ struct VisionContentView: View {
 /// rather than spawning a second window.
 private struct WelcomeScreen: View {
   @Binding var fileURL: URL?
+  @Environment(RecentDocumentsModel.self) private var recents
   @State private var isFilePickerPresented = false
 
   var body: some View {
@@ -60,6 +61,10 @@ private struct WelcomeScreen: View {
           .padding(.vertical, 8)
       }
       .buttonStyle(.borderedProminent)
+
+      if !recents.urls.isEmpty {
+        recentsList
+      }
     }
     .padding(40)
     .fileImporter(
@@ -74,11 +79,65 @@ private struct WelcomeScreen: View {
       // never releasing — visionOS file pickers grant the scope per
       // session.
       _ = url.startAccessingSecurityScopedResource()
+      recents.record(url)
       // Rebind this window's URL slot. The parent view's `if let`
       // flips to `DocumentScreen` on the next layout pass — no
       // second window spawned.
       fileURL = url
     }
+  }
+
+  /// Compact "Recent" panel below the Open button. Re-resolving a
+  /// bookmark here yields a fresh security-scoped URL; we bind that
+  /// — not the stored one — into the window slot.
+  @ViewBuilder
+  private var recentsList: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("Recent")
+          .font(.headline)
+        Spacer()
+        Button("Clear", role: .destructive) {
+          recents.clearAll()
+        }
+        .buttonStyle(.plain)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      }
+      ForEach(recents.urls.prefix(5), id: \.self) { url in
+        Button {
+          if let fresh = recents.openRecent(url) {
+            fileURL = fresh
+          }
+        } label: {
+          HStack {
+            Image(systemName: "doc.text")
+              .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(url.lastPathComponent)
+                .font(.body)
+              Text(url.deletingLastPathComponent().path)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            }
+            Spacer()
+          }
+          .padding(.vertical, 4)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+          Button("Remove from Recent", role: .destructive) {
+            recents.remove(url)
+          }
+        }
+      }
+    }
+    .padding(16)
+    .frame(maxWidth: 480)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
   }
 }
 
@@ -96,6 +155,7 @@ private struct DocumentScreen: View {
   @Environment(\.openURL) private var openURL
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(RecentDocumentsModel.self) private var recents
 
   var body: some View {
     Group {
@@ -107,6 +167,7 @@ private struct DocumentScreen: View {
     }
     .task(id: fileURL) {
       let resolved = ensureModel()
+      recents.record(fileURL)
       await resolved.bind(to: fileURL)
     }
     // The "Open Document…" entry in the More menu drives this — the
@@ -120,6 +181,7 @@ private struct DocumentScreen: View {
       guard case .success(let urls) = result, let url = urls.first
       else { return }
       _ = url.startAccessingSecurityScopedResource()
+      recents.record(url)
       bindingFileURL = url
     }
   }
@@ -171,6 +233,10 @@ private struct DocumentScreen: View {
   @ViewBuilder
   private func detailContent(model: DocumentModel) -> some View {
     WebView(model.page)
+      .navigationTitle(
+        model.kind == .help
+        ? Text("Help")
+        : Text(model.documentURL.lastPathComponent))
       .overlay {
         if !model.isPageRendered {
           model.pageBackgroundColor.allowsHitTesting(false)
@@ -297,6 +363,8 @@ private struct DocumentScreen: View {
         Label("Open Document…", systemImage: "folder")
       }
 
+      openRecentMenu
+
       Divider()
 
       Action.toggleStatusBar().menuItem()
@@ -350,6 +418,31 @@ private struct DocumentScreen: View {
       Label("More", systemImage: "ellipsis.circle")
     }
     .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
+  }
+
+  /// Open Recent submenu for the More menu. Hidden when the list is
+  /// empty so users don't see a dead entry on first launch.
+  @ViewBuilder
+  private var openRecentMenu: some View {
+    if !recents.urls.isEmpty {
+      Menu {
+        ForEach(recents.urls, id: \.self) { url in
+          Button {
+            if let fresh = recents.openRecent(url) {
+              bindingFileURL = fresh
+            }
+          } label: {
+            Label(url.lastPathComponent, systemImage: "doc.text")
+          }
+        }
+        Divider()
+        Button("Clear Menu", role: .destructive) {
+          recents.clearAll()
+        }
+      } label: {
+        Label("Open Recent", systemImage: "clock")
+      }
+    }
   }
 
   /// Title shown in the detail-side title bar. Falls back to the

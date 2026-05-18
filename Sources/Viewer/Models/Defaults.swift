@@ -69,6 +69,14 @@ final class Defaults: GalleyRenderDefaults {
 
 #if os(macOS)
   @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
+#else
+  /// Persisted visionOS Open Recent entries. Each entry carries a
+  /// URL and — for local file URLs only — a bookmark blob that lets
+  /// us re-resolve a fresh security-scoped URL after relaunch.
+  /// Remote (http(s)) URLs persist as URL-only entries. macOS uses
+  /// `NSDocumentController` for the same purpose and has no need for
+  /// this key.
+  @DefaultsKey var recentEntries: [RecentDocumentEntry] = []
 #endif
 
   /// Persisted (serialized) form of the global color-scheme choice.
