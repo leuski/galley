@@ -14,6 +14,7 @@ import SwiftUI
 struct VisionSettingsView: View {
   @Bindable var appModel: AppModel
   @Bindable private var defaults = Defaults.shared
+  private let subtitleSpacing: CGFloat = 16
 
   var body: some View {
     Form {
@@ -30,7 +31,7 @@ struct VisionSettingsView: View {
   @ViewBuilder
   private var generalSection: some View {
     Section("General") {
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
         HStack {
           Text("Open document")
           Spacer()
@@ -54,7 +55,7 @@ struct VisionSettingsView: View {
         .subtitle()
       }
 
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
         Toggle(
           "Tint window with page background",
           isOn: $defaults.tintWindowWithPageBackground)
@@ -65,7 +66,7 @@ struct VisionSettingsView: View {
         .subtitle()
       }
 
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
         LabeledContent {
           MyPicker(model: appModel.colorSchemes)
         } label: {
@@ -79,7 +80,7 @@ struct VisionSettingsView: View {
         .subtitle()
       }
 
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
         Toggle("Show status bar", isOn: $defaults.showsStatusBar)
         Text("""
           Adds a thin bar at the bottom of each document window with \
@@ -88,7 +89,7 @@ struct VisionSettingsView: View {
         .subtitle()
       }
 
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
         LabeledContent("Reading speed") {
           Stepper(
             value: $defaults.readingWordsPerMinute,
@@ -119,15 +120,17 @@ struct VisionSettingsView: View {
         Text("Template")
       }
 
-      Toggle(
-        "Allow per-window processor, template, and color-scheme overrides",
-        isOn: $defaults.enablePerDocumentOverrides)
-      Text("""
-        Adds Format-menu entries to each window so an individual \
-        document can override the global template or color scheme \
-        without changing the defaults.
-        """)
-      .subtitle()
+      VStack(alignment: .leading, spacing: subtitleSpacing) {
+        Toggle(
+          "Allow per-window processor, template, and color-scheme overrides",
+          isOn: $defaults.enablePerDocumentOverrides)
+        Text("""
+          Adds Format-menu entries to each window so an individual \
+          document can override the global template or color scheme \
+          without changing the defaults.
+          """)
+        .subtitle()
+      }
     }
   }
 
