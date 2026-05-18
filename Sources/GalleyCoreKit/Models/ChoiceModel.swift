@@ -318,7 +318,7 @@ where Element: RestorableChoiceValue
   public init(
     source: Element.Source,
     persistent: String?,
-    notifier: @escaping @MainActor (String) -> Void
+    notifier: @escaping @MainActor (String) -> Void = { _ in }
   ) {
     self.source = source
     self.notifier = notifier
@@ -452,6 +452,26 @@ where Element: ChoiceValueEnvelopeProtocol
 /// the loop converges in one round-trip.
 @MainActor
 @discardableResult
+public func bindPersistent<Choice, Defaults>(
+  _ choice: Choice,
+  label: String = "",
+  property: ReferenceWritableKeyPath<Defaults, String?>
+) -> [Cancelable]
+where Choice: ChoiceModel & AnyObject,
+      Defaults: GalleyDefaults
+{
+  bindPersistent(
+    choice,
+    label: label,
+    read: { Defaults.shared[keyPath: property] },
+    write: {
+      Defaults.shared[keyPath: property] = $0
+      DefaultsBroadcast.post()
+    })
+}
+
+@MainActor
+@discardableResult
 public func bindPersistent<Choice>(
   _ choice: Choice,
   label: String = "",
@@ -550,10 +570,10 @@ private func logBindInboundSettled(
 // MARK: - Concrete flavor
 
 public typealias ConcreteChoiceModel<Element, Source>
-  = Choice<Element>
+= Choice<Element>
 where Element: ChoiceValueEnvelopeProtocol & RestorableChoiceValue & Sendable,
-      Source: ChoiceModelSource<Element.Value>,
-      Element.Source == Source
+Source: ChoiceModelSource<Element.Value>,
+Element.Source == Source
 
 // MARK: - Scene flavor
 
@@ -683,5 +703,5 @@ where Choice: ChoiceModelEnvelope
 }
 
 public typealias SceneChoice<Source>
-  = Choice<SceneChoiceValueEnvelope<Source>>
+= Choice<SceneChoiceValueEnvelope<Source>>
 where Source: ChoiceModelEnvelope & Hashable

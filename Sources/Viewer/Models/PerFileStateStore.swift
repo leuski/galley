@@ -14,11 +14,13 @@ struct PerFileState: Codable, Equatable, Sendable {
   var templatePersistent: String?
   var showsTOC: Bool?
   /// visionOS-only per-document color-scheme override. `nil` means
-  /// "use the global default." macOS never writes here — its
-  /// presentation tracks the system appearance directly. The field
-  /// stays in shared shape so Codable round-trips through the
-  /// suite-shared plist remain stable across platforms.
-  var documentColorScheme: DocumentColorScheme?
+  /// "use the global default." Serialized form (same envelope as
+  /// `templatePersistent`) so the scene's `SceneColorSchemeChoice`
+  /// reads it directly. macOS never writes here — its presentation
+  /// tracks the system appearance directly. The field stays in
+  /// shared shape so Codable round-trips through the suite-shared
+  /// plist remain stable across platforms.
+  var colorSchemePersistent: String?
 
   var isEmpty: Bool {
     pageZoom == nil
@@ -26,7 +28,7 @@ struct PerFileState: Codable, Equatable, Sendable {
       && rendererPersistent == nil
       && templatePersistent == nil
       && showsTOC == nil
-      && documentColorScheme == nil
+      && colorSchemePersistent == nil
   }
 
   /// Keying strategy:

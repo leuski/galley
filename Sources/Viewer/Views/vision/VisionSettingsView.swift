@@ -66,17 +66,12 @@ struct VisionSettingsView: View {
       }
 
       VStack(alignment: .leading, spacing: 4) {
-        HStack {
+        LabeledContent {
+          colorSchemeMenu(
+            title: "Color Scheme",
+            appModel: appModel)
+        } label: {
           Text("Color scheme")
-          Spacer()
-          Picker(selection: $defaults.documentColorScheme) {
-            ForEach(DocumentColorScheme.allCases) { scheme in
-              Text(scheme.displayName).tag(scheme)
-            }
-          } label: { EmptyView() }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .fixedSize()
         }
         Text("""
           Drives the WebView color scheme for rendered documents. \

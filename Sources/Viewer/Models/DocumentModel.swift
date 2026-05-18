@@ -64,6 +64,13 @@ final class DocumentModel {
   /// later picks up overrides discovered during state restoration.
   let templates: SceneTemplateChoice
   let processors: SceneProcessorChoice
+  /// Per-window color-scheme override. Same `.global(...)` /
+  /// `.local(...)` shape as `templates` / `processors`: `.global` means
+  /// "follow the AppModel's pick"; `.local` pins a specific scheme.
+  /// visionOS-only in practice — macOS scenes adopt the system
+  /// appearance directly — but the field is uniform across platforms
+  /// so `DocumentModel`'s init signature stays simple.
+  let colorSchemes: SceneColorSchemeChoice
 
   /// The URL the model is currently bound to. Set at construction
   /// from the WindowGroup's URL and updated synchronously at the
@@ -243,21 +250,12 @@ final class DocumentModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
-  /// Per-document color-scheme override slot. `nil` means "use the
-  /// global default" (`Defaults.shared.documentColorScheme`, visionOS
-  /// only). Gated by `enablePerDocumentOverrides` at read time the
-  /// same way template/processor per-doc choices are. macOS does
-  /// not surface this — it tracks the system appearance directly —
-  /// but the field exists in shared code so the constructor stays
-  /// uniform.
-  var documentColorScheme: DocumentColorScheme?
-
   init(
     initialURL: URL,
     appModel: AppModel,
     templatePersistent: String?,
     processorPersistent: String?,
-    documentColorSchemePersistent: DocumentColorScheme? = nil,
+    colorSchemePersistent: String? = nil,
     kind: Kind
   ) {
     self.kind = kind
@@ -265,7 +263,6 @@ final class DocumentModel {
     self.history = [initialURL]
     self.currentIndex = 0
     self.appModel = appModel
-    self.documentColorScheme = documentColorSchemePersistent
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
       persistent: templatePersistent
@@ -278,6 +275,12 @@ final class DocumentModel {
     ) { name in
       DisplacementNotifier.post(kind: .processor, displaced: name)
     }
+    // Color-scheme catalog is static — same no-op notifier reasoning
+    // as `AppModel.colorSchemes`.
+    self.colorSchemes = SceneColorSchemeChoice(
+      source: appModel.colorSchemes,
+      persistent: colorSchemePersistent
+    ) { _ in }
 
     let box = TemplateBox()
     self.templateBox = box

@@ -211,6 +211,7 @@ private struct DocumentScreen: View {
       colorSchemeMenu(
         title: "Color Scheme",
         globalTitle: "Global Color Scheme",
+        appModel: appModel,
         documentModel: model)
       Button {
         openWindow(id: VisionWindowID.settings)
@@ -254,7 +255,7 @@ private struct DocumentScreen: View {
       appModel: appModel,
       templatePersistent: perFile.templatePersistent,
       processorPersistent: perFile.rendererPersistent,
-      documentColorSchemePersistent: perFile.documentColorScheme,
+      colorSchemePersistent: perFile.colorSchemePersistent,
       kind: .document)
     model = created
     return created
@@ -266,8 +267,8 @@ private struct DocumentScreen: View {
 /// per-document renderer / template / color-scheme — or to the
 /// override gate itself — re-renders the WebView so the user
 /// doesn't have to hit Reload manually. visionOS-only knobs like
-/// `documentColorScheme` (no system-appearance fallback) are wired
-/// here too; macOS tracks the system appearance directly.
+/// the color-scheme choice (no system-appearance fallback) are
+/// wired here too; macOS tracks the system appearance directly.
 private struct VisionChangeHandlers: ViewModifier {
   let model: DocumentModel
   let appModel: AppModel
@@ -277,13 +278,13 @@ private struct VisionChangeHandlers: ViewModifier {
     content
       .onChange(of: appModel.processors.selected) { reload() }
       .onChange(of: appModel.templates.selected) { reload() }
+      .onChange(of: appModel.colorSchemes.selected) { reload() }
       .onChange(of: Defaults.shared.enablePerDocumentOverrides) { reload() }
-      .onChange(of: Defaults.shared.documentColorScheme) { reload() }
       .onChange(of: model.templates.persistent) { _, _ in reload() }
       .onChange(of: model.processors.persistent) { _, _ in reload() }
-      .onChange(of: model.documentColorScheme) { _, new in
+      .onChange(of: model.colorSchemes.persistent) { _, new in
         Defaults.shared.perFileStateStore[model.documentURL]
-          .documentColorScheme = new
+          .colorSchemePersistent = new
         reload()
       }
   }

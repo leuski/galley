@@ -12,6 +12,7 @@ final class AppModel {
 
   let templates: TemplateChoice
   let processors: ProcessorChoice
+  let colorSchemes: ColorSchemeChoice
 
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
@@ -54,6 +55,13 @@ final class AppModel {
         Self.notify(.processor, name)
       }
 
+    // Color-scheme catalog is static (`light`/`dark`) so the
+    // displacement notifier is a no-op — the catalog can't lose a
+    // case at runtime the way templates or processors can.
+    self.colorSchemes = ColorSchemeChoice(
+      source: ColorSchemeStore.shared,
+      persistent: Defaults.shared.colorScheme)
+
     // Darwin-notification bridge: `UserDefaults.didChangeNotification`
     // is process-local, so the Server (a near-idle menu-bar app) never
     // wakes up to re-read the shared suite when the Viewer writes.
@@ -66,19 +74,15 @@ final class AppModel {
     persistenceTokens = bindPersistent(
       templates,
       label: "Viewer.template",
-      read: { Defaults.shared.template },
-      write: {
-        Defaults.shared.template = $0
-        DefaultsBroadcast.post()
-      })
+      property: \Defaults.template)
     + bindPersistent(
       processors,
       label: "Viewer.processor",
-      read: { Defaults.shared.renderer },
-      write: {
-        Defaults.shared.renderer = $0
-        DefaultsBroadcast.post()
-      })
+      property: \Defaults.renderer)
+    + bindPersistent(
+      colorSchemes,
+      label: "Viewer.colorScheme",
+      property: \Defaults.colorScheme)
 
     // Log every ObservableDefaults notification arriving in this
     // process — that's the signal bindPersistent's inbound side

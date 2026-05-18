@@ -37,12 +37,10 @@ extension DocumentModel {
   /// the global default applies. visionOS-only — macOS adopts the
   /// system appearance directly.
   var resolvedColorScheme: ColorScheme {
-    if Defaults.shared.enablePerDocumentOverrides,
-       let scheme = documentColorScheme
-    {
-      return scheme.colorScheme
+    if Defaults.shared.enablePerDocumentOverrides {
+      return colorSchemes.selected.value.colorScheme
     }
-    return Defaults.shared.documentColorScheme.colorScheme
+    return appModel.colorSchemes.selected.value.colorScheme
   }
 #endif
 

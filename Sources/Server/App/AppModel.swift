@@ -73,19 +73,11 @@ final class AppModel {
     persistenceTokens = bindPersistent(
       templates,
       label: "Server.template",
-      read: { Defaults.shared.template },
-      write: {
-        Defaults.shared.template = $0
-        DefaultsBroadcast.post()
-      })
+      property: \Defaults.template)
     + bindPersistent(
       processors,
       label: "Server.processor",
-      read: { Defaults.shared.renderer },
-      write: {
-        Defaults.shared.renderer = $0
-        DefaultsBroadcast.post()
-      })
+      property: \Defaults.renderer)
 
     NotificationCenter.default.addObserver(
       forName: UserDefaults.didChangeNotification,

@@ -69,13 +69,16 @@ final class Defaults: GalleyRenderDefaults {
 
 #if os(macOS)
   @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
-#else
-  /// Default color scheme for newly-opened documents on visionOS.
-  /// Drives `DocumentModel.resolvedColorScheme`; per-document
-  /// overrides (gated by `enablePerDocumentOverrides`) live in
-  /// `PerFileState.documentColorScheme`.
-  @DefaultsKey var documentColorScheme: DocumentColorScheme = .light
 #endif
+
+  /// Persisted (serialized) form of the global color-scheme choice.
+  /// `nil` keeps the catalog default (`ColorSchemeStore.defaultValue`,
+  /// i.e. `.light`). Mirror of the template/renderer keys — the
+  /// concrete `ColorSchemeChoice` reads through here at boot, and
+  /// `AppModel` writes back via `bindPersistent`. Stored on both
+  /// platforms so the shared plist round-trips cleanly; only visionOS
+  /// surfaces the setting in UI.
+  @DefaultsKey var colorScheme: String?
 
   @MainActor static let shared = Defaults()
 

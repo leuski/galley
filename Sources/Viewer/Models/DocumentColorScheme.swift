@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GalleyCoreKit
 import SwiftUI
 
 /// User-controllable color scheme for a rendered document. visionOS
@@ -21,7 +22,8 @@ import SwiftUI
 /// which lets the same on-disk plist round-trip cleanly through the
 /// Server (macOS) suite.
 enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
-                         Hashable, Sendable
+                         Hashable, Sendable,
+                         CustomLocalizedStringResourceConvertible
 {
   case light
   case dark
@@ -30,7 +32,7 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
 
   /// User-facing name. Strings live in the per-target catalog so each
   /// shipped locale can translate independently.
-  var displayName: LocalizedStringResource {
+  var localizedStringResource: LocalizedStringResource {
     switch self {
     case .light: "Light"
     case .dark:  "Dark"
@@ -45,4 +47,9 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
     case .dark:  .dark
     }
   }
+}
+
+extension DocumentColorScheme: ChoiceValueProtocol {
+  typealias PersistentID = String
+  var persistentID: String { rawValue }
 }
