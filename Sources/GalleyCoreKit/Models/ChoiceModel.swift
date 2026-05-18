@@ -95,6 +95,11 @@ public protocol SectionedChoiceValue {
   var isAvailable: Bool { get }
 }
 
+public extension SectionedChoiceValue {
+  var section: Int { 0 }
+  var isAvailable: Bool { true }
+}
+
 public protocol ChoiceValueEnvelopeProtocol<Value>: ChoiceValue
 {
   associatedtype Value: ChoiceValueProtocol

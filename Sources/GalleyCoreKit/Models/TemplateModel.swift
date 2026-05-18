@@ -23,7 +23,6 @@ public struct TemplateChoiceValue: ChoiceValueEnvelopeProtocol<Template> {
 }
 
 extension TemplateChoiceValue: SectionedChoiceValue {
-  public var isAvailable: Bool { true }
   /// Section by source index — bundled templates and user templates
   /// render in distinct menu groups. Production has 0 = bundle and
   /// 1 = user; future sources (e.g. team-shared dirs) get their own

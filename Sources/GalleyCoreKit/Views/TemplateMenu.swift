@@ -18,6 +18,7 @@ where Model: ChoiceModel & AnyObject & Observable,
   public var body: some View {
     Menu(title, systemImage: "doc.richtext") {
       MenuCore(model: model)
+#if os(macOS)
       Divider()
       Button(
         LocalizedStringResource(
@@ -25,6 +26,7 @@ where Model: ChoiceModel & AnyObject & Observable,
         systemImage: "folder") {
           TemplateStore.shared.revealFolder()
         }
+#endif
     }
   }
 }

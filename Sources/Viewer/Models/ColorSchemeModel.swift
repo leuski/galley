@@ -9,7 +9,8 @@ import Foundation
 import GalleyCoreKit
 import Observation
 
-struct ColorSchemeChoiceValue: ChoiceValueEnvelopeProtocol<DocumentColorScheme>
+struct ColorSchemeChoiceValue: ChoiceValueEnvelopeProtocol<DocumentColorScheme>,
+                               SectionedChoiceValue
 {
   nonisolated let value: Value
 
@@ -21,14 +22,6 @@ struct ColorSchemeChoiceValue: ChoiceValueEnvelopeProtocol<DocumentColorScheme>
   /// catalog extraction picks them up — same pattern as
   /// `TemplateChoiceValue.name`.
   var name: LocalizedStringResource { value.localizedStringResource }
-}
-
-extension ColorSchemeChoiceValue: SectionedChoiceValue {
-  var isAvailable: Bool { true }
-  /// Single section — both cases are always available and there's no
-  /// bundled-vs-user split. Returning a constant keeps `MenuCore`
-  /// happy without surfacing a divider.
-  var section: Int { 0 }
 }
 
 extension ColorSchemeChoiceValue: RestorableChoiceValue {
