@@ -385,7 +385,7 @@ final class DocumentModel {
   /// (cmd-click bridge handler, File > Open in Editor menu item)
   /// don't need to platform-guard at the call site.
   func openInEditor(line: Int? = nil) async {
-    #if os(macOS)
+#if os(macOS)
     let url = documentURL
     let resolvedLine: Int?
     if let line {
@@ -398,9 +398,9 @@ final class DocumentModel {
       fileURL: url,
       line: resolvedLine,
       logger: logger)
-    #else
+#else
     _ = line
-    #endif
+#endif
   }
 
   /// Find the smallest source line of any block currently in (or
@@ -414,8 +414,8 @@ final class DocumentModel {
   /// wraps it in an async function and captures a top-level `return`,
   /// so the script must NOT be wrapped in an IIFE.
   private static let topmostVisibleSourceLineScript: String =
-    Bundle.main.requiredString(
-      forResource: "topmostVisibleSourceLine", withExtension: "js")
+  Bundle.main.requiredString(
+    forResource: "topmostVisibleSourceLine", withExtension: "js")
 
   private func topmostVisibleSourceLine() async -> Int? {
     do {
@@ -549,7 +549,7 @@ final class DocumentModel {
       report(
         failure: error, context: "rename",
         message: String(localized:
-          "Rename failed: \(error.localizedDescription)"),
+                          "Rename failed: \(error.localizedDescription)"),
         lifetime: .ephemeral)
       throw error
     }
@@ -639,8 +639,8 @@ final class DocumentModel {
     // back to the page after load. Best-effort: a nil/throwing read
     // (e.g. very first render) just leaves us at the top.
     let savedScrollY: Double = preserveScroll
-      ? await currentScrollY() ?? 0
-      : 0
+    ? await currentScrollY() ?? 0
+    : 0
 
     do {
       let source = try await Self.readSource(at: url)
