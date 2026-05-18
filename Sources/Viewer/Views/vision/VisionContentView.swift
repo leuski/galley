@@ -11,16 +11,16 @@ import WebKit
 /// has no URL yet, and `DocumentScreen` once both `AppModel` and a
 /// `fileURL` are available.
 struct VisionContentView: View {
-  let fileURL: URL?
+  @Binding var fileURL: URL?
   let boot: AppBoot
 
   var body: some View {
     Group {
       if let model = boot.model {
-        if let fileURL {
-          DocumentScreen(fileURL: fileURL, appModel: model)
+        if let url = fileURL {
+          DocumentScreen(fileURL: url, appModel: model)
         } else {
-          WelcomeScreen()
+          WelcomeScreen(fileURL: $fileURL)
         }
       } else {
         ProgressView()
@@ -33,10 +33,11 @@ struct VisionContentView: View {
 /// Landing surface shown when the WindowGroup binding has no URL.
 /// Hosts a single "Open Document…" button that drives
 /// `.fileImporter` — the visionOS-native way to pick a `.md` file
-/// from Files.app. Picked URLs are dispatched into a new document
-/// window via `\.openWindow`.
+/// from Files.app. Picking a file rebinds the WindowGroup's URL
+/// binding so the *current* window flips from welcome to document,
+/// rather than spawning a second window.
 private struct WelcomeScreen: View {
-  @Environment(\.openWindow) private var openWindow
+  @Binding var fileURL: URL?
   @State private var isFilePickerPresented = false
 
   var body: some View {
@@ -70,7 +71,10 @@ private struct WelcomeScreen: View {
       // never releasing — visionOS file pickers grant the scope per
       // session.
       _ = url.startAccessingSecurityScopedResource()
-      openWindow(value: url)
+      // Rebind this window's URL slot. The parent view's `if let`
+      // flips to `DocumentScreen` on the next layout pass — no
+      // second window spawned.
+      fileURL = url
     }
   }
 }
@@ -103,7 +107,7 @@ private struct DocumentScreen: View {
   }
 
   /// The visible WebView plus all per-window chrome: TOC sidebar,
-  /// find bar, status bar, plus a single detail-side toolbar with
+  /// find bar, status bar, plus a bottom-ornament toolbar with
   /// navigation, view controls, template / color-scheme pickers,
   /// and a Settings entry point.
   @ViewBuilder
@@ -127,7 +131,7 @@ private struct DocumentScreen: View {
     // background when the user opts in. `ContainerBackgroundPlacement`
     // values like `.window` and `.navigation` are unavailable on
     // visionOS — `.background(_:)` on the NavigationSplitView is the
-    // visionOS-supported surface for this. The floating toolbar
+    // visionOS-supported surface for this. The floating bottom
     // ornament is system-managed glass and stays clean; only the
     // underlying content surface picks up the tint.
     .background(
@@ -140,10 +144,10 @@ private struct DocumentScreen: View {
     // `BackgroundColorBridge` reports the new bg; the chrome tint
     // follows in one frame.
     .preferredColorScheme(model.resolvedColorScheme)
-    .onChange(of: model.documentColorScheme) { _, new in
-      Defaults.shared.perFileStateStore[model.documentURL]
-        .documentColorScheme = new
-    }
+    .modifier(VisionChangeHandlers(
+      model: model,
+      appModel: appModel,
+      reload: { Task { await model.reload() } }))
   }
 
   @ViewBuilder
@@ -170,29 +174,27 @@ private struct DocumentScreen: View {
       }
       .onAppear { wireLinkBridge(model: model) }
       // Toolbar attaches to the detail content so every item lands
-      // in the detail's title bar — without this, items with
-      // `placement: .navigation` go to the sidebar column instead.
+      // in the detail's ornament — without this, items with
+      // navigation placements go to the sidebar column instead.
       .toolbar { toolbarContent(model: model) }
   }
 
-  /// Detail-side toolbar layout. Three groups:
+  /// Bottom-ornament toolbar. visionOS renders
+  /// `ToolbarItemPlacement.bottomOrnament` as a floating glass pill
+  /// below the window — system-managed material, hit-test margins,
+  /// and spacing. The previous title-bar toolbar is gone.
+  /// Three logical groups:
   ///   - Navigation cluster (back/forward/reload).
-  ///   - View controls cluster (TOC toggle, zoom controls, find,
-  ///     status-bar toggle).
-  ///   - Format cluster (template menu, color-scheme menu) plus
-  ///     the Settings entry.
-  /// Each group uses `.primaryAction` placement so all items land
-  /// trailing in the detail title bar. Zoom is wrapped in a
-  /// `ControlGroup` so the three buttons compose visually as one
-  /// stepper.
+  ///   - View controls (TOC toggle, zoom, find, status-bar toggle).
+  ///   - Format cluster (template + color-scheme menus) + Settings.
+  /// Zoom is wrapped in a `ControlGroup` so the three buttons compose
+  /// visually as one stepper.
   @ToolbarContentBuilder
   private func toolbarContent(model: DocumentModel) -> some ToolbarContent {
-    ToolbarItemGroup(placement: .navigation) {
+    ToolbarItemGroup(placement: .bottomOrnament) {
       Action.back(model).toolbarItem(imageOnly: true)
       Action.forward(model).toolbarItem(imageOnly: true)
       Action.reload(model).toolbarItem(imageOnly: true)
-    }
-    ToolbarItemGroup(placement: .primaryAction) {
       Action.toggleTOC(model).toolbarItem(imageOnly: true)
       ControlGroup {
         Action.zoomOut(model).toolbarItem(imageOnly: true)
@@ -256,6 +258,34 @@ private struct DocumentScreen: View {
       kind: .document)
     model = created
     return created
+  }
+}
+
+/// Live-reload triggers for the visionOS document view. Mirrors the
+/// macOS `ChangeHandlers` modifier: any change to the global or
+/// per-document renderer / template / color-scheme — or to the
+/// override gate itself — re-renders the WebView so the user
+/// doesn't have to hit Reload manually. visionOS-only knobs like
+/// `documentColorScheme` (no system-appearance fallback) are wired
+/// here too; macOS tracks the system appearance directly.
+private struct VisionChangeHandlers: ViewModifier {
+  let model: DocumentModel
+  let appModel: AppModel
+  let reload: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: appModel.processors.selected) { reload() }
+      .onChange(of: appModel.templates.selected) { reload() }
+      .onChange(of: Defaults.shared.enablePerDocumentOverrides) { reload() }
+      .onChange(of: Defaults.shared.documentColorScheme) { reload() }
+      .onChange(of: model.templates.persistent) { _, _ in reload() }
+      .onChange(of: model.processors.persistent) { _, _ in reload() }
+      .onChange(of: model.documentColorScheme) { _, new in
+        Defaults.shared.perFileStateStore[model.documentURL]
+          .documentColorScheme = new
+        reload()
+      }
   }
 }
 

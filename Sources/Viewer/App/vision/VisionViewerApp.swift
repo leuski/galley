@@ -21,7 +21,7 @@ struct VisionViewerApp: App {
 
   var body: some Scene {
     WindowGroup(for: URL.self) { $fileURL in
-      VisionContentView(fileURL: fileURL, boot: boot)
+      VisionContentView(fileURL: $fileURL, boot: boot)
     }
 
     // Single settings window. visionOS has no `Settings { ... }`
