@@ -197,8 +197,12 @@ final class DocumentModel {
   /// toggle puts sidebar content below the tab bar instead of
   /// extending up under it. `BeforeFirstDrawAccessor` collapses it
   /// pre-paint when `savedShowsTOC` says the user wanted it closed.
+#if os(macOS)
   var showsTOC: Bool = true
-
+#else
+  // we are handling sidebar differently on other platforms
+  var showsTOC: Bool = false
+#endif
   /// One-shot guard for the pre-first-draw sidebar collapse. `false`
   /// means "the user wanted TOC closed for this bind — collapse on
   /// the next `viewWillDraw`." `true` means "leave the sidebar
@@ -246,6 +250,22 @@ final class DocumentModel {
   /// view-local `@State` on `DocumentView`, seeded via `.onChange`
   /// when this flips true.
   var isRenameRequested: Bool = false
+
+#if os(visionOS)
+  // The pin holds only while the sidebar is showing OR during the
+  // toggle-off animation. While the TOC is hidden, the pin is nil and
+  // the WebView fills the window (so the user can resize freely);
+  // `liveDetailWidth` tracks the current width via GeometryReader so we
+  // know what to pin to on the next toggle-on. On toggle, we capture
+  // `liveDetailWidth` into `pinnedDetailWidth` BEFORE flipping
+  // `showsTOC` — this fixes the layout target so `.contentSize`
+  // resizability has a definite ideal width and the window grows or
+  // shrinks by exactly the sidebar's width. On toggle-off we delay the
+  // pin release until the animation completes so the window can shrink
+  // back before the WebView starts filling again.
+  var pinnedDetailWidth: CGFloat?
+  var liveDetailWidth: CGFloat = 0
+#endif
 
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
@@ -691,6 +711,17 @@ final class DocumentModel {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
   }
 
+  func willToggleTOC() {
+#if os(visionOS)
+    pinnedDetailWidth = pinnedDetailWidth ?? liveDetailWidth
+#endif
+  }
+
+  func didToggleTOC() {
+#if os(visionOS)
+    pinnedDetailWidth = nil
+#endif
+  }
 }
 
 /// Reference holder so the URL scheme handler — which captures the

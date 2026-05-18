@@ -25,6 +25,7 @@ struct VisionViewerApp: App {
       VisionContentView(fileURL: $fileURL, boot: boot)
         .environment(recents)
     }
+    .windowResizability(.contentSize)
 
     // Single settings window. visionOS has no `Settings { ... }`
     // scene type — instead we expose a regular `Window` reached via

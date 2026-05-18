@@ -17,3 +17,18 @@ public func withAnimationAsNeeded<Result>(
     try withAnimation(animation, body)
   }
 }
+
+public func withAnimationAsNeeded<Result>(
+  _ reduceMotion: Bool,
+  _ animation: Animation? = .default,
+  _ body: () throws -> Result,
+  completion: @escaping () -> Void) rethrows -> Result
+{
+  if reduceMotion {
+    let result = try body()
+    completion()
+    return result
+  } else {
+    return try withAnimation(animation, body, completion: completion)
+  }
+}

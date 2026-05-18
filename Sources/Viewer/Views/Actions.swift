@@ -294,7 +294,12 @@ extension Action {
       image: "sidebar.left",
       perform: { reduceMotion in
         guard let model else { return }
-        withAnimationAsNeeded(reduceMotion) { model.showsTOC.toggle() }
+        model.willToggleTOC()
+        withAnimationAsNeeded(reduceMotion) {
+          model.showsTOC.toggle()
+        } completion: {
+          model.didToggleTOC()
+        }
       },
       shortcut: .init("1", modifiers: [.command, .control]),
       accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
