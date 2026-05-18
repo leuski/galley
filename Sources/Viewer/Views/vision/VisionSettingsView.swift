@@ -51,7 +51,7 @@ struct VisionSettingsView: View {
           Applies when opening files via Files.app or a deep link \
           while another document window is already open.
           """)
-          .subtitle()
+        .subtitle()
       }
 
       VStack(alignment: .leading, spacing: 4) {
@@ -62,14 +62,12 @@ struct VisionSettingsView: View {
           Paints the page background color behind the window glass \
           so the toolbar and sidebar pick up the template tint.
           """)
-          .subtitle()
+        .subtitle()
       }
 
       VStack(alignment: .leading, spacing: 4) {
         LabeledContent {
-          colorSchemeMenu(
-            title: "Color Scheme",
-            appModel: appModel)
+          MyPicker(model: appModel.colorSchemes)
         } label: {
           Text("Color scheme")
         }
@@ -78,7 +76,7 @@ struct VisionSettingsView: View {
           Templates that respond to `prefers-color-scheme` swap their \
           CSS variant accordingly.
           """)
-          .subtitle()
+        .subtitle()
       }
 
       VStack(alignment: .leading, spacing: 4) {
@@ -87,7 +85,7 @@ struct VisionSettingsView: View {
           Adds a thin bar at the bottom of each document window with \
           word count, character count, and estimated reading time.
           """)
-          .subtitle()
+        .subtitle()
       }
 
       VStack(alignment: .leading, spacing: 4) {
@@ -105,7 +103,7 @@ struct VisionSettingsView: View {
           Words per minute used to estimate reading time in the \
           status bar.
           """)
-          .subtitle()
+        .subtitle()
       }
     }
   }
@@ -116,9 +114,7 @@ struct VisionSettingsView: View {
   private var markdownSection: some View {
     Section("Markdown") {
       LabeledContent {
-        templateMenu(
-          title: "Template",
-          appModel: appModel)
+        MyPicker(model: appModel.templates)
       } label: {
         Text("Template")
       }
@@ -131,7 +127,7 @@ struct VisionSettingsView: View {
         document can override the global template or color scheme \
         without changing the defaults.
         """)
-        .subtitle()
+      .subtitle()
     }
   }
 
@@ -141,6 +137,20 @@ struct VisionSettingsView: View {
   /// behave identically to `.newWindow` and confuse the user.
   private var visionOpenBehaviors: [OpenBehavior] {
     OpenBehavior.allCases.filter { $0 != .newTab }
+  }
+}
+
+struct MyPicker<Choice>: View
+where Choice: ChoiceModel & Observable & AnyObject,
+      Choice.Element: SectionedChoiceValue
+{
+  @Bindable var model: Choice
+
+  var body: some View {
+    Picker("", selection: $model.selected) {
+      MenuCore(model: model)
+    }
+    .labelsHidden()
   }
 }
 

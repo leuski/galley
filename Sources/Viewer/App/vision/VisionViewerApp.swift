@@ -39,6 +39,7 @@ struct VisionViewerApp: App {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
+    .windowResizability(.contentSize)
     .restorationBehavior(.disabled)
     .defaultSize(width: 640, height: 720)
   }
