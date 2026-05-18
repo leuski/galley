@@ -711,13 +711,37 @@ final class DocumentModel {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
   }
 
-  func willToggleTOC() {
+  func tocColumnVisibility(reduceMotion: Bool)
+  -> Binding<NavigationSplitViewVisibility>
+  {
+    Binding(
+      get: { [weak self] in self?.showsTOC == true ? .all : .detailOnly },
+      set: { [weak self] newValue in
+        self?.setShowsTOC(newValue != .detailOnly, reduceMotion: reduceMotion)
+      }
+    )
+  }
+
+  func toggleTOC(reduceMotion: Bool) {
+    setShowsTOC(!showsTOC, reduceMotion: reduceMotion)
+  }
+
+  func setShowsTOC(_ value: Bool, reduceMotion: Bool) {
+    willToggleTOC()
+    withAnimationAsNeeded(reduceMotion) {
+      showsTOC = value
+    } completion: {
+      self.didToggleTOC()
+    }
+  }
+
+  private func willToggleTOC() {
 #if os(visionOS)
     pinnedDetailWidth = pinnedDetailWidth ?? liveDetailWidth
 #endif
   }
 
-  func didToggleTOC() {
+  private func didToggleTOC() {
 #if os(visionOS)
     pinnedDetailWidth = nil
 #endif

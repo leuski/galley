@@ -182,13 +182,9 @@ struct DocumentView: View {
   /// the tab bar bisecting it.
   @ViewBuilder
   private var splitView: some View {
-    NavigationSplitView(columnVisibility: Binding(
-      get: { model.showsTOC ? .all : .detailOnly },
-      set: { newValue in
-        let next = newValue != .detailOnly
-        withAnimationAsNeeded(reduceMotion) { model.showsTOC = next }
-      }
-    )) {
+    NavigationSplitView(
+      columnVisibility: model.tocColumnVisibility(reduceMotion: reduceMotion))
+    {
       TOCSidebar(model: model)
 //        .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
