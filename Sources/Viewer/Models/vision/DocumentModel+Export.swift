@@ -83,8 +83,22 @@ extension DocumentModel {
       }
     }
 
-    let destination = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString)
+    // Write into a fresh UUID-named subdirectory so the visible
+    // filename can be the document's own name without colliding when
+    // the user exports two same-named files. The share sheet's Save
+    // to Files / AirDrop destinations use the file's basename — the
+    // `FileRepresentation.suggestedFileName` hint isn't always
+    // honored once `SentTransferredFile(_:allowAccessingOriginalFile:
+    // true)` lets the recipient touch the file directly.
+    let baseName = documentURL
+      .deletingPathExtension()
+      .lastPathComponent
+    let dir = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: dir, withIntermediateDirectories: true)
+    let destination = dir
+      .appendingPathComponent(baseName)
       .appendingPathExtension("pdf")
     try data.write(to: destination, options: .atomic)
     return destination
