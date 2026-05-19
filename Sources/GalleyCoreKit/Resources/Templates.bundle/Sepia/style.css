@@ -79,7 +79,7 @@ hr {
 table {
     border-collapse: collapse;
     display: block;
-    width: max-content;
+    width: auto;
     max-width: 100%;
     overflow-x: auto;
 }
