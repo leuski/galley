@@ -22,6 +22,7 @@ struct VisionContentView: View {
             fileURL: url,
             appModel: model,
             bindingFileURL: $fileURL)
+          .navigationSplitViewStyle(.balanced)
         } else {
           WelcomeScreen(fileURL: $fileURL)
         }
@@ -66,6 +67,7 @@ private struct WelcomeScreen: View {
         recentsList
       }
     }
+    .frame(minWidth: 600, minHeight: 800)
     .padding(40)
     .fileImporter(
       isPresented: $isFilePickerPresented,
@@ -192,25 +194,32 @@ private struct DocumentScreen: View {
   /// and a Settings entry point.
   @ViewBuilder
   private func documentChrome(model: DocumentModel) -> some View {
-    NavigationSplitView(columnVisibility: Binding(
-      get: { model.showsTOC ? .all : .detailOnly },
-      set: { newValue in
-        let next = newValue != .detailOnly
-        withAnimationAsNeeded(reduceMotion) { model.showsTOC = next }
+    HStack(spacing: 0) {
+      if model.showsTOC {
+        VStack(alignment: .leading) {
+          TOCSidebar(model: model)
+            .padding(.top, 16)
+        }
+          .frame(width: 340)
+          .transition(.move(edge: .leading).combined(with: .opacity))
       }
-    )) {
-      TOCSidebar(model: model)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 240)
-    } detail: {
       detailContent(model: model)
+        .frame(minWidth: 700, minHeight: 900)
+        .background(
+          GeometryReader { proxy in
+            Color.clear
+              .onChange(of: proxy.size.width, initial: true) { _, width in
+                model.liveDetailWidth = width
+              }
+          }
+        )
+        .frame(width: model.pinnedDetailWidth)
     }
-    .navigationSplitViewStyle(.balanced)
-    .navigationTitle(navigationTitle(for: model))
     .focusedSceneValue(\.documentModel, model)
     // Tint the content area (sidebar + detail) with the page
     // background when the user opts in. `ContainerBackgroundPlacement`
     // values like `.window` and `.navigation` are unavailable on
-    // visionOS — `.background(_:)` on the NavigationSplitView is the
+    // visionOS — `.background(_:)` on the chrome HStack is the
     // visionOS-supported surface for this. The floating bottom
     // ornament is system-managed glass and stays clean; only the
     // underlying content surface picks up the tint.
@@ -257,9 +266,6 @@ private struct DocumentScreen: View {
         }
       }
       .onAppear { wireLinkBridge(model: model) }
-      // Toolbar attaches to the detail content so every item lands
-      // in the detail's ornament — without this, items with
-      // navigation placements go to the sidebar column instead.
       .toolbar { toolbarContent(model: model) }
   }
 

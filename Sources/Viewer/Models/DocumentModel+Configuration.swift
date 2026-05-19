@@ -25,6 +25,7 @@ extension DocumentModel {
     templateBox: TemplateBox
   ) -> WebPage.Configuration {
     var configuration = WebPage.Configuration()
+    configuration.defaultNavigationPreferences.preferredContentMode = .desktop
     let controller = configuration.userContentController
     controller.add(editorBridge, name: EditorBridge.messageName)
     controller.add(linkBridge, name: LinkBridge.messageName)
