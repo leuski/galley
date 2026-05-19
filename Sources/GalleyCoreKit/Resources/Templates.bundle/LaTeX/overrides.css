@@ -7,6 +7,8 @@
 
 :root { color-scheme: light dark; }
 
+body { overflow-wrap: anywhere; }
+
 .mermaid { display: block; margin: 1rem auto; text-align: center; }
 
 @media print {

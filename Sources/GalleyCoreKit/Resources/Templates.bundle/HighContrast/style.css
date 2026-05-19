@@ -3,7 +3,7 @@
 
 :root { color-scheme: light; }
 
-html { font-size: 17px; background: #fff; }
+html { font-size: 17px; background: #fff; -webkit-text-size-adjust: 100%; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
@@ -15,6 +15,7 @@ body {
     margin: 2.5rem auto;
     padding: 0 1.5rem;
     font-weight: 500;
+    overflow-wrap: anywhere;
 }
 
 a {
@@ -76,7 +77,13 @@ blockquote {
 img { max-width: 100%; border: 1px solid #000; }
 hr { border: 0; height: 3px; background: #000; margin: 1.6em 0; }
 
-table { border-collapse: collapse; }
+table {
+    border-collapse: collapse;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+}
 th, td {
     border: 2px solid #000;
     padding: 0.5rem 0.85rem;

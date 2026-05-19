@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="theme-color" content="#fafbfc"
-          media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#292929"
-          media="(prefers-color-scheme: dark)">
-    <title>#TITLE#</title>
-    <base href="#BASE#">
-    <link rel="stylesheet" href="LaTeX/vendor.css">
-    <link rel="stylesheet" href="LaTeX/overrides.css">
-    <script>
-      // Vendor ships `.latex-dark` as an opt-in class. Apply it on
-      // <html> when the system is dark so dark mode follows the OS
-      // without us having to mirror palette values into overrides.css.
-      if (matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('latex-dark');
-      }
-    </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="theme-color" content="#fafbfc"
+        media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#292929"
+        media="(prefers-color-scheme: dark)">
+  <title>#TITLE#</title>
+  <base href="#BASE#">
+  <link rel="stylesheet" href="LaTeX/vendor.css">
+  <link rel="stylesheet" href="LaTeX/overrides.css">
+  <script>
+    // Vendor ships `.latex-dark` as an opt-in class. Apply it on
+    // <html> when the system is dark so dark mode follows the OS
+    // without us having to mirror palette values into overrides.css.
+    if (matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('latex-dark');
+    }
+  </script>
 </head>
 <body>
 <article>

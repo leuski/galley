@@ -17,6 +17,9 @@ html, body {
     padding: 0;
     background: #ffffff;
 }
+
+body { overflow-wrap: anywhere; }
+
 @media (prefers-color-scheme: dark) {
     html, body { background: #0d1117; }
 }
