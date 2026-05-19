@@ -23,10 +23,14 @@ body {
     max-width: 38rem;
     margin: 3rem auto;
     padding: 0 1.75rem;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
-a { color: var(--sepia-link); text-decoration: underline; }
+a {
+    color: var(--sepia-link);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
 a:hover { text-decoration: none; }
 
 h1, h2, h3, h4, h5, h6 {
@@ -80,7 +84,7 @@ table {
     border-collapse: collapse;
     display: block;
     width: auto;
-    max-width: 100%;
+    max-width: max-content;
     overflow-x: auto;
 }
 th, td {

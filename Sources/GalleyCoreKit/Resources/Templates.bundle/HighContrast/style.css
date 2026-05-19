@@ -15,7 +15,7 @@ body {
     margin: 2.5rem auto;
     padding: 0 1.5rem;
     font-weight: 500;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
 a {
@@ -23,6 +23,7 @@ a {
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 2px;
+    overflow-wrap: anywhere;
 }
 a:focus { outline: 3px solid #000; outline-offset: 2px; }
 
@@ -81,7 +82,7 @@ table {
     border-collapse: collapse;
     display: block;
     width: auto;
-    max-width: 100%;
+    max-width: max-content;
     overflow-x: auto;
 }
 th, td {

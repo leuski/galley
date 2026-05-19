@@ -38,7 +38,7 @@ body {
     line-height: 2;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
 article {
@@ -103,6 +103,7 @@ table + p {
 a {
     color: var(--accent);
     text-decoration: none;
+    overflow-wrap: anywhere;
 }
 a:hover { text-decoration: underline; }
 

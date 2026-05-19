@@ -18,7 +18,12 @@ html, body {
     background: #ffffff;
 }
 
-body { overflow-wrap: anywhere; }
+body { overflow-wrap: break-word; }
+.markdown-body a { overflow-wrap: anywhere; }
+.markdown-body table {
+    width: auto;
+    max-width: max-content;
+}
 
 @media (prefers-color-scheme: dark) {
     html, body { background: #0d1117; }

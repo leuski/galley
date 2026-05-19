@@ -23,7 +23,8 @@ html { background-color: #fffff8; }
     html { background-color: #151515; }
 }
 
-body { overflow-wrap: anywhere; }
+body { overflow-wrap: break-word; }
+a { overflow-wrap: anywhere; }
 
 /* 2. Measure — mirror Tufte's `section >` widths onto `article >` */
 

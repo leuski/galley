@@ -6,8 +6,9 @@ body {
     max-width: 48rem;
     margin: 2rem auto;
     padding: 0 1.25rem;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
+a { overflow-wrap: anywhere; }
 pre, code { font-family: ui-monospace, SF Mono, Menlo, monospace; }
 pre {
     background: color-mix(in srgb, currentColor 8%, transparent);
@@ -31,7 +32,7 @@ table {
     border-collapse: collapse;
     display: block;
     width: auto;
-    max-width: 100%;
+    max-width: max-content;
     overflow-x: auto;
 }
 th, td {
