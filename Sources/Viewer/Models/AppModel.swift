@@ -2,6 +2,7 @@ import Foundation
 import GalleyCoreKit
 import SwiftUI
 import os
+import ALFoundation
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -155,12 +156,18 @@ final class AppBoot {
   }
 
 #if os(macOS)
-  /// Compare our Galley.app hash with whatever the running Server
-  /// published. If they disagree, terminate and relaunch the Server.
-  /// We do this *before* constructing `AppModel` so the bindPersistent
-  /// observers aren't installed during the kill window — the stale
-  /// Server can't get one last clobber in by reconciling defaults
-  /// against its (smaller) catalog.
+  /// Compare our Galley.app hash with whatever each running Server
+  /// published. Terminate every Server whose `bundleURL` is not the
+  /// `Galley Server.app` inside *this* Galley.app, plus any whose
+  /// published hash doesn't match ours. If we ended up with no Server
+  /// (because we killed all of them, or there were none to begin with
+  /// but the hash diverged), relaunch the canonical one.
+  ///
+  /// Why walk *all* running Servers, not just `.first`: across dev
+  /// rebuilds and across the launchctl-managed path vs. Xcode's
+  /// `NSWorkspace.open`, multiple Server pids accumulate. The earlier
+  /// `runningServers.first` reap left the others in place, and a
+  /// stale one could still publish hashes / hold the port file open.
   ///
   /// The "stale Server" failure mode is real: the Server is the
   /// menu-bar process that owns its own `TemplateChoice`, hooked to
@@ -171,63 +178,115 @@ final class AppBoot {
   /// to default and the inbound observer mirrors that back to
   /// storage, undoing the Viewer's pick on every change.
   private static func restartServerIfStale() async {
-    let bundleID = "net.leuski.galley.server"
+    guard let serverBundle = Bundle.main.serverBundle
+    else {
+      defaultsLog.error("""
+        Galley Server.app missing inside this Galley.app — \
+        cannot relaunch Server
+        """)
+      return
+    }
+
+    guard let bundleID = serverBundle.bundleIdentifier
+    else {
+      defaultsLog.error("""
+        Galley Server.app missing bundle identifier
+        """)
+      return
+    }
+
+    let canonicalServerURL = serverBundle.bundleURL.safe
+
     let runningServers = NSRunningApplication
       .runningApplications(withBundleIdentifier: bundleID)
-    guard let runningServer = runningServers.first else { return }
 
+    let myHash: String
     do {
-      let myHash = try await GalleyAppHash.compute(at: Bundle.main.bundleURL)
-      let theirHash = SharedSuiteDefaults.suite.string(
-        forKey: SharedSuiteDefaults.serverGalleyHashKey)
-      // Missing-hash case is the first launch after this validation
-      // shipped, where the running Server pre-dates the publish
-      // logic. Treat it the same as a mismatch: restart so the new
-      // Server can publish and we converge from then on.
-      if let theirHash, theirHash == myHash { return }
-
-      defaultsLog.notice("""
-        Galley.app hash mismatch with running Server (\
-        ours=\(myHash.prefix(8), privacy: .public)… \
-        theirs=\(theirHash?.prefix(8) ?? "nil", privacy: .public)…) — \
-        restarting Server
-        """)
-
-      // Drop the published hash before terminating so a re-read
-      // during the kill window doesn't re-trigger this branch.
-      SharedSuiteDefaults.suite.removeObject(
-        forKey: SharedSuiteDefaults.serverGalleyHashKey)
-
-      runningServer.terminate()
-      // Poll up to 5s for the process to exit. terminate() is
-      // asynchronous; we don't want to relaunch until the old PID
-      // is gone or NSWorkspace will treat it as a no-op activation.
-      for _ in 0..<50 {
-        if NSRunningApplication
-          .runningApplications(withBundleIdentifier: bundleID).isEmpty {
-          break
-        }
-        try? await Task.sleep(nanoseconds: 100_000_000)
-      }
-
-      let serverURL = Bundle.main.bundleURL
-        .appending(path: "Contents/Resources/Galley Server.app")
-      guard FileManager.default.fileExists(atPath: serverURL.path) else {
-        defaultsLog.error("""
-          Galley Server.app missing inside this Galley.app — \
-          cannot relaunch Server
-          """)
-        return
-      }
-      let configuration = NSWorkspace.OpenConfiguration()
-      configuration.activates = false
-      _ = try await NSWorkspace.shared.openApplication(
-        at: serverURL, configuration: configuration)
+      myHash = try await GalleyAppHash.compute(at: Bundle.main.bundleURL)
     } catch {
       defaultsLog.error("""
-        Server staleness check failed: \
+        Server staleness check failed to hash Galley.app: \
         \(error.localizedDescription, privacy: .public)
         """)
+      return
+    }
+    let theirHash = Defaults.shared.serverGalleyHash
+
+    let hashMatches: Bool = {
+      guard let theirHash else { return false }
+      return theirHash == myHash
+    }()
+
+    // Partition: a Server is "stale" if its bundleURL points outside
+    // the canonical bundled location. If every running Server points
+    // at the canonical path AND the published hash matches, we have
+    // nothing to do.
+    let staleServers = runningServers.filter {
+      $0.bundleURL?.safe != canonicalServerURL
+    }
+    if staleServers.isEmpty && hashMatches { return }
+
+    defaultsLog.notice("""
+      Reaping Server processes (stale=\(staleServers.count, privacy: .public) \
+      total=\(runningServers.count, privacy: .public) \
+      hashMatch=\(hashMatches, privacy: .public)) ours=\
+      \(myHash.prefix(8), privacy: .public)… theirs=\
+      \(theirHash?.prefix(8) ?? "nil", privacy: .public)…
+      """)
+
+    // Drop the published hash before terminating so a re-read during
+    // the kill window doesn't re-trigger this branch.
+    Defaults.shared.serverGalleyHash = nil
+
+    // Reap every stale Server, plus all of them if the hash diverged
+    // (we don't know which one is publishing the wrong hash).
+    let toReap = hashMatches ? staleServers : runningServers
+    for running in toReap { running.terminate() }
+
+    // Poll up to 5s for the reaped pids to exit. terminate() is
+    // asynchronous; relaunching before they're gone makes
+    // NSWorkspace.openApplication a no-op activation.
+    await Self.waitForExit(
+      pids: Set(toReap.map { app in app.processIdentifier }),
+      bundleID: bundleID)
+
+    // If at least one canonical-path Server survived the reap and the
+    // hash was the only mismatch, the survivor will republish on its
+    // next AppModel.init — nothing more to do.
+    let survivors = NSRunningApplication
+      .runningApplications(withBundleIdentifier: bundleID)
+    if !survivors.isEmpty { return }
+
+    // Prefer `launchctl kickstart -k` when the agent is installed:
+    // launchd serializes through one source of truth, so calling it
+    // twice in quick succession still produces exactly one running
+    // process. `NSWorkspace.openApplication` racing against itself
+    // (typical when two Galley.apps run on the same login) is the
+    // origin of the duplicate-Server bug we're closing here. If the
+    // agent isn't bootstrapped we fall through to openApplication.
+    if await ActiveServerAgent.shared.kickstart() { return }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = false
+    do {
+      _ = try await NSWorkspace.shared.openApplication(
+        at: canonicalServerURL, configuration: configuration)
+    } catch {
+      defaultsLog.error("""
+        Server relaunch failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
+  }
+
+  private static func waitForExit(
+    pids: Set<Int32>, bundleID: String
+  ) async {
+    for _ in 0..<50 {
+      let stillRunning = NSRunningApplication
+        .runningApplications(withBundleIdentifier: bundleID)
+        .map { app in app.processIdentifier }
+      if stillRunning.allSatisfy({ !pids.contains($0) }) { break }
+      try? await Task.sleep(nanoseconds: 100_000_000)
     }
   }
 #endif
