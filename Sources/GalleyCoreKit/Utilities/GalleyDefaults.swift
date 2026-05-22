@@ -24,28 +24,13 @@ public let bundleIdentifier = Bundle.main.bundleIdentifier
 ?? GalleyConstants.suiteName
 
 public enum GalleyConstants {
-  public static let defaultHost: String = "127.0.0.1"
-  public static let settingsURL: URL = "galley://settings"
-
-  /// Build a `galley://settings` URL aimed at a specific Settings tab.
-  /// `nil` returns the bare `settingsURL` (no tab preference).
-  public static func settingsURL(tab: SettingsTab?) -> URL {
-    guard let tab else { return settingsURL }
-    var components = URLComponents()
-    components.scheme = "galley"
-    components.host = "settings"
-    components.queryItems = [URLQueryItem(name: "tab", value: tab.rawValue)]
-    guard let url = components.url else {
-      preconditionFailure("settingsURL components produced no URL")
-    }
-    return url
-  }
+  public static let defaultHost = "127.0.0.1"
 
   /// Bundle id of the Viewer app, which doubles as the shared
   /// `UserDefaults` suite identifier (the Server opens it explicitly,
   /// the Viewer reaches it as `.standard`) and the shared Application
   /// Support folder name.
-  public static let suiteName: String = "net.leuski.galley"
+  public static let suiteName = "net.leuski.galley"
 
   /// Shared `~/Library/Application Support/net.leuski.galley/`. Used
   /// by both apps so user-defined templates and any other shared

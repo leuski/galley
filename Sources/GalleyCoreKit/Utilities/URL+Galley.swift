@@ -10,51 +10,28 @@ public enum SettingsTab: String, Sendable, CaseIterable {
   case server
 }
 
-/// Outcome of normalizing a single inbound URL.
-public enum GalleyURLAction: Sendable, Equatable {
-  /// `galley://settings[?tab=<id>]` — caller should invoke
-  /// `openSettings()` and, if `tab` is non-nil, switch the Settings
-  /// scene to that pane.
-  case openSettings(SettingsTab?)
-  /// Plain document open. `scrollLine` carries any `?line=N` from
-  /// the source `galley://path?line=N` URL; nil for non-galley
-  /// inbound URLs.
-  case document(URL, scrollLine: Int?)
-  /// Could not be parsed; caller should log and pass through to the
-  /// default open path.
-  case unparseable(URL)
-}
+public struct DocumentTarget: Sendable, Equatable, Codable,
+                                  CustomStringConvertible
+{
+  public let url: URL
+  public let scrollLine: Int?
 
-/// Pure normalization of inbound URLs from `application(_:open:)` and
-/// the custom `galley://` scheme into the canonical file URL the
-/// dispatch pipeline expects.
-///
-/// `galley://settings` is recognized and surfaced separately so the
-/// caller can route it to SwiftUI's `openSettings()` instead of
-/// trying to open it as a document.
+  public var description: String {
+    "\(url)\(scrollLine.map(\.description) ?? "")"
+  }
 
-public extension URL {
-  var galleyAction: GalleyURLAction {
-    let scheme = scheme?.lowercased()
-    guard scheme == "galley" else {
-      return .document(self, scrollLine: nil)
-    }
-    let components = URLComponents(
-      url: self,
-      resolvingAgainstBaseURL: false)
-    if host?.lowercased() == "settings" {
-      let tab = components?.queryItems?
-        .first(where: { $0.name == "tab" })
-        .flatMap { $0.value }
-        .flatMap { SettingsTab(rawValue: $0.lowercased()) }
-      return .openSettings(tab)
-    }
+  public init(url: URL, scrollLine: Int? = nil) {
+    self.url = url
+    self.scrollLine = scrollLine
+  }
+
+  public init?(components: URLComponents?) {
     guard let components else {
-      return .unparseable(self)
+      return nil
     }
     let path = components.path
     guard !path.isEmpty else {
-      return .unparseable(self)
+      return nil
     }
     let fileURL = URL(fileURLWithPath: path)
     let line = components.queryItems?
@@ -62,7 +39,94 @@ public extension URL {
       .flatMap { $0.value }
       .flatMap(Int.init)
       .flatMap { $0 > 0 ? $0 : nil }
-    return .document(fileURL, scrollLine: line)
+    self.init(url: fileURL, scrollLine: line)
+  }
+
+  public func url(scheme: String) -> URL {
+    var components = URLComponents()
+    components.scheme = scheme
+    components.path = url.path
+    if let line = scrollLine {
+      components.queryItems = [URLQueryItem(name: "line", value: "\(line)")]
+    }
+    guard let url = components.url else {
+      preconditionFailure("settingsURL components produced no URL")
+    }
+    return url
+  }
+}
+
+/// Outcome of normalizing a single inbound URL.
+public enum GalleyRequest: Sendable, Equatable, CustomStringConvertible {
+  /// `galley://settings[?tab=<id>]` — caller should invoke
+  /// `openSettings()` and, if `tab` is non-nil, switch the Settings
+  /// scene to that pane.
+  case openSettings(SettingsTab?)
+  /// Plain document open. `scrollLine` carries any `?line=N` from
+  /// the source `galley://path?line=N` URL; nil for non-galley
+  /// inbound URLs.
+  case document(DocumentTarget)
+
+  public var description: String {
+    url.absoluteString
+  }
+
+  private static let scheme: String = "galley"
+  private static let settingsHost: String = "settings"
+
+  public var url: URL {
+    switch self {
+    case .document(let info):
+      guard info.url.isFileURL else {
+        return info.url
+      }
+      return info.url(scheme: Self.scheme)
+
+    case .openSettings(let tab):
+      var components = URLComponents()
+      components.scheme = Self.scheme
+      components.host = Self.settingsHost
+      if let tab {
+        components.queryItems = [URLQueryItem(name: "tab", value: tab.rawValue)]
+      }
+      guard let url = components.url else {
+        preconditionFailure("settingsURL components produced no URL")
+      }
+      return url
+    }
+  }
+
+  private static func parse(_ url: URL) -> GalleyRequest? {
+    guard url.scheme?.lowercased() == Self.scheme else {
+      return .document(.init(url: url))
+    }
+    let components = URLComponents(
+      url: url,
+      resolvingAgainstBaseURL: false)
+    if url.host?.lowercased() == Self.settingsHost {
+      let tab = components?.queryItems?
+        .first(where: { $0.name == "tab" })
+        .flatMap { $0.value }
+        .flatMap { SettingsTab(rawValue: $0.lowercased()) }
+      return .openSettings(tab)
+    }
+    return DocumentTarget.init(components: components)
+      .map { target in .document(target) }
+  }
+
+  public init?(from url: URL) {
+    if let action = Self.parse(url) {
+      self = action
+    } else {
+      return nil
+    }
+  }
+}
+
+public extension URL {
+
+  var galleyRequest: GalleyRequest? {
+    GalleyRequest(from: self)
   }
 
   /// Resolves the kit framework's bundled templates folder.
