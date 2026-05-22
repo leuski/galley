@@ -1,4 +1,5 @@
 import GalleyCoreKit
+import ALFoundation
 import XCTest
 
 /// UI tests against the real Galley app — no behavior gating on
@@ -204,8 +205,7 @@ final class UITests: XCTestCase {
       "# Hello from seed\n\nBody text.",
       fileName: "Seed.md")
     addTeardownBlock {
-      try? FileManager.default.removeItem(
-        at: fileURL.deletingLastPathComponent())
+      try? fileURL.parent.remove()
     }
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
 
@@ -266,8 +266,7 @@ final class UITests: XCTestCase {
       fileName: "Persistent.md",
       ignorePersistedState: false)
     addTeardownBlock {
-      try? FileManager.default.removeItem(
-        at: fileURL.deletingLastPathComponent())
+      try? fileURL.parent.remove()
     }
     XCTAssertTrue(
       app1.wait(for: .runningForeground, timeout: 5),
@@ -449,8 +448,7 @@ final class UITests: XCTestCase {
       "# Menu test fixture\n",
       fileName: fileName)
     addTeardownBlock {
-      try? FileManager.default.removeItem(
-        at: fileURL.deletingLastPathComponent())
+      try? fileURL.parent.remove()
     }
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
     let visible = waitForHittableWindow(
