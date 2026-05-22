@@ -88,6 +88,13 @@ final class Defaults: GalleyRenderDefaults {
   /// surfaces the setting in UI.
   @DefaultsKey var colorScheme: String?
 
+  /// Hash of the Galley.app bundle the Server saw at its launch.
+  /// Published by the Server (via the shared `net.leuski.galley`
+  /// plist), read by the Viewer on its launch to detect a stale
+  /// Server. Cleared by the Viewer before terminating a stale Server
+  /// so a re-read during the kill window doesn't re-trigger the reap.
+  @DefaultsKey var serverGalleyHash: String?
+
   @MainActor static let shared = Defaults()
 
   /// Synchronize the `@ObservableDefaults` macro's per-property cache
