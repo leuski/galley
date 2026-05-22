@@ -6,7 +6,8 @@ internal import ALFoundation
 /// Exercises the on-disk handshake between Galley Server (writer)
 /// and its consumers (readers — Viewer probe, Quicklook, BBEdit
 /// browser scripts). Touches the real files at
-/// `~/Library/Application Support/net.leuski.galley.localized/server-<scheme>-port`,
+/// `~/Library/Application Support/net.leuski.galley.localized/
+/// server-<scheme>-port`,
 /// so the suite is serialized and snapshots each scheme's file on
 /// entry / restores on exit, to avoid clobbering a running Server.
 @Suite("ServerPortFile", .serialized)

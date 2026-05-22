@@ -25,7 +25,7 @@ struct ServerPreviewEndToEndTests {
     try FileManager.default.createDirectory(
       at: dir, withIntermediateDirectories: true)
     let file = dir.appendingPathComponent("Hello.md")
-    try contents.data(using: .utf8)!.write(to: file)
+    try Data(contents.utf8).write(to: file)
     return file
   }
 
@@ -53,8 +53,9 @@ struct ServerPreviewEndToEndTests {
         try? await Task.sleep(for: .milliseconds(50))
       }
     }
-    Issue.record(
-      "Server did not reach .running within 3s; final state \(controller.state)")
+    Issue.record("""
+      Server did not reach .running within 3s; final state \(controller.state)
+      """)
     controller.stop()
     return nil
   }
@@ -86,7 +87,8 @@ struct ServerPreviewEndToEndTests {
   @Test("GET /preview/<tempfile> returns 200 + rendered HTML")
   func rendersTempMarkdown() async throws {
     let file = try makeTempMarkdownFile()
-    defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+    let dir = file.deletingLastPathComponent()
+    defer { try? FileManager.default.removeItem(at: dir) }
 
     guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }
@@ -129,7 +131,7 @@ struct ServerPreviewEndToEndTests {
     defer { try? FileManager.default.removeItem(at: dir) }
 
     let file = dir.appendingPathComponent("My Notes.md")
-    try "# Spaced\n\nText\n".data(using: .utf8)!.write(to: file)
+    try Data("# Spaced\n\nText\n".utf8).write(to: file)
 
     guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }

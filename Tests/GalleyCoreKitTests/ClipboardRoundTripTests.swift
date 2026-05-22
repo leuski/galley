@@ -135,12 +135,24 @@ struct ClipboardRoundTripTests {
     let fullString = attributed.string as NSString
     let markerRange = fullString.range(of: markerSubstring)
     guard markerRange.location != NSNotFound else { return false }
-    let attrs = attributed.attributes(at: markerRange.location, effectiveRange: nil)
+    let attrs = attributed.attributes(
+      at: markerRange.location, effectiveRange: nil)
     guard let font = attrs[.font] as? NSFont else { return false }
     return font.fontDescriptor.symbolicTraits.contains(trait)
   }
 
   // MARK: - Parameterized tests
+
+  private static let bodyMarkers: [String] = [
+    "Heading One", "Heading Two", "Heading Three",
+    "Heading Four", "Heading Five", "Heading Six",
+    "bold marker text", "italic marker text", "inline code marker",
+    "fenced code marker line one", "fenced code marker line two",
+    "unordered alpha", "unordered beta", "unordered gamma",
+    "ordered uno", "ordered dos", "ordered tres",
+    "A blockquote marker.", "Galley link marker",
+    "cell one a", "cell one b", "cell two a", "cell two b"
+  ]
 
   @Test(
     "HTML round trip preserves structural invariants",
@@ -155,32 +167,7 @@ struct ClipboardRoundTripTests {
       attributed.length > 0,
       "Empty NSAttributedString from template \(template.id)")
 
-    let bodyMarkers = [
-      "Heading One",
-      "Heading Two",
-      "Heading Three",
-      "Heading Four",
-      "Heading Five",
-      "Heading Six",
-      "bold marker text",
-      "italic marker text",
-      "inline code marker",
-      "fenced code marker line one",
-      "fenced code marker line two",
-      "unordered alpha",
-      "unordered beta",
-      "unordered gamma",
-      "ordered uno",
-      "ordered dos",
-      "ordered tres",
-      "A blockquote marker.",
-      "Galley link marker",
-      "cell one a",
-      "cell one b",
-      "cell two a",
-      "cell two b"
-    ]
-    for marker in bodyMarkers {
+    for marker in Self.bodyMarkers {
       #expect(
         plain.contains(marker),
         "Template \(template.id) lost \(marker) in clipboard round trip")
@@ -221,12 +208,18 @@ struct ClipboardRoundTripTests {
     }()
     #expect(
       linkURL?.absoluteString == "https://galley.example/path",
-      "Template \(template.id) lost the link href; got \(String(describing: linkURL))")
+      """
+      Template \(template.id) lost the link href; \
+      got \(String(describing: linkURL))
+      """)
 
     let sizes = Self.pointSizes(in: attributed)
     #expect(
       sizes.count >= 2,
-      "Template \(template.id) collapsed all headings to body size; sizes=\(sizes)")
+      """
+      Template \(template.id) collapsed all headings to body size; \
+      sizes=\(sizes)
+      """)
 
     let inputBodyLength = Self.fixtureMarkdown.count
     #expect(
@@ -260,7 +253,10 @@ struct ClipboardRoundTripTests {
     let prefix = String(data: rtfData.prefix(5), encoding: .ascii)
     #expect(
       prefix == "{\\rtf",
-      "Template \(template.id) produced non-RTF data; prefix=\(String(describing: prefix))")
+      """
+      Template \(template.id) produced non-RTF data; \
+      prefix=\(String(describing: prefix))
+      """)
 
     let reparsed = try NSAttributedString(
       data: rtfData,

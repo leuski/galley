@@ -73,13 +73,13 @@ struct HistorySnapshotTests {
 
   @Test("Equatable is structural over urls and currentIndex")
   func equatable() {
-    let a = HistorySnapshot(urls: [urlA, urlB], currentIndex: 1)
-    let b = HistorySnapshot(urls: [urlA, urlB], currentIndex: 1)
-    let c = HistorySnapshot(urls: [urlA, urlB], currentIndex: 0)
-    let d = HistorySnapshot(urls: [urlA], currentIndex: 0)
-    #expect(a == b)
-    #expect(a != c)
-    #expect(a != d)
+    let snapA = HistorySnapshot(urls: [urlA, urlB], currentIndex: 1)
+    let snapB = HistorySnapshot(urls: [urlA, urlB], currentIndex: 1)
+    let snapC = HistorySnapshot(urls: [urlA, urlB], currentIndex: 0)
+    let snapD = HistorySnapshot(urls: [urlA], currentIndex: 0)
+    #expect(snapA == snapB)
+    #expect(snapA != snapC)
+    #expect(snapA != snapD)
   }
 
   /// Negative `currentIndex` is preserved in the encoded form so that
@@ -182,12 +182,12 @@ struct PerFileStateDictTests {
   @Test("Distinct URLs are distinct slots")
   func distinctURLsAreDistinct() {
     var dict: [String: PerFileState] = [:]
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    dict[a].pageZoom = 1.0
-    dict[b].pageZoom = 2.0
-    #expect(dict[a].pageZoom == 1.0)
-    #expect(dict[b].pageZoom == 2.0)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    dict[urlA].pageZoom = 1.0
+    dict[urlB].pageZoom = 2.0
+    #expect(dict[urlA].pageZoom == 1.0)
+    #expect(dict[urlB].pageZoom == 2.0)
   }
 
   @Test("Reading a never-written URL returns the empty default")
@@ -200,10 +200,10 @@ struct PerFileStateDictTests {
   @Test("Mutating one slot does not bleed into another")
   func slotsAreIndependent() {
     var dict: [String: PerFileState] = [:]
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    dict[a].showsTOC = true
-    #expect(dict[b].showsTOC == nil)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    dict[urlA].showsTOC = true
+    #expect(dict[urlB].showsTOC == nil)
   }
 }
 
@@ -321,14 +321,14 @@ struct WindowDispatcherTests {
   @Test("Pre-install URLs are buffered and replayed on install in order")
   func preInstallBuffering() {
     let dispatcher = WindowDispatcher()
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    let c = URL(fileURLWithPath: "/tmp/c.md")
-    dispatcher.handleOpenURLs([a, b])
-    dispatcher.enqueueAtLaunch(c)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    let urlC = URL(fileURLWithPath: "/tmp/c.md")
+    dispatcher.handleOpenURLs([urlA, urlB])
+    dispatcher.enqueueAtLaunch(urlC)
     var observed: [URL] = []
     dispatcher.install { observed.append($0) }
-    #expect(observed == [a, b, c])
+    #expect(observed == [urlA, urlB, urlC])
   }
 
   @Test("install returns true when there were pending URLs")
@@ -933,8 +933,8 @@ struct BindPlanTests {
     // override path doesn't trigger. The interpreter's
     // `model.restore` call will itself reject the snapshot
     // (currentIndex bounds-check) and short-circuit.
-    if case .restore(let s, _, _) = plan.action {
-      #expect(s.currentURL == nil)
+    if case .restore(let snap, _, _) = plan.action {
+      #expect(snap.currentURL == nil)
     } else {
       Issue.record("Expected .restore, got \(plan.action)")
     }

@@ -25,12 +25,12 @@ struct PendingScrollLinesTests {
   @Test("Different URLs are tracked independently")
   func independentURLs() {
     var lines = PendingScrollLines()
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    lines.stash(10, for: a)
-    lines.stash(20, for: b)
-    #expect(lines.consume(for: a) == 10)
-    #expect(lines.consume(for: b) == 20)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    lines.stash(10, for: urlA)
+    lines.stash(20, for: urlB)
+    #expect(lines.consume(for: urlA) == 10)
+    #expect(lines.consume(for: urlB) == 20)
   }
 
   @Test("Last stash wins for the same URL")

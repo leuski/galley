@@ -15,26 +15,26 @@ struct LaunchURLBufferTests {
   @Test("Appends preserve order")
   func appendsPreserveOrder() {
     var buffer = LaunchURLBuffer()
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    let c = URL(fileURLWithPath: "/tmp/c.md")
-    buffer.append(a)
-    buffer.append(b)
-    buffer.append(c)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    let urlC = URL(fileURLWithPath: "/tmp/c.md")
+    buffer.append(urlA)
+    buffer.append(urlB)
+    buffer.append(urlC)
     #expect(buffer.count == 3)
-    #expect(buffer.pending == [a, b, c])
+    #expect(buffer.pending == [urlA, urlB, urlC])
   }
 
   @Test("Drain returns FIFO snapshot and clears")
   func drainReturnsAndClears() {
     var buffer = LaunchURLBuffer()
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    buffer.append(a)
-    buffer.append(b)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    buffer.append(urlA)
+    buffer.append(urlB)
 
     let drained = buffer.drain()
-    #expect(drained == [a, b])
+    #expect(drained == [urlA, urlB])
     #expect(buffer.isEmpty)
     #expect(buffer.pending == [])
   }
@@ -49,12 +49,12 @@ struct LaunchURLBufferTests {
   @Test("Re-append after drain works")
   func reAppendAfterDrain() {
     var buffer = LaunchURLBuffer()
-    let a = URL(fileURLWithPath: "/tmp/a.md")
-    let b = URL(fileURLWithPath: "/tmp/b.md")
-    buffer.append(a)
+    let urlA = URL(fileURLWithPath: "/tmp/a.md")
+    let urlB = URL(fileURLWithPath: "/tmp/b.md")
+    buffer.append(urlA)
     _ = buffer.drain()
-    buffer.append(b)
-    #expect(buffer.pending == [b])
+    buffer.append(urlB)
+    #expect(buffer.pending == [urlB])
   }
 
   @Test("Buffer copies are independent (value semantics)")

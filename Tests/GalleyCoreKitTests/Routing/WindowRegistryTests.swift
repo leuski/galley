@@ -206,13 +206,13 @@ struct WindowRegistryTests {
   func matchingDuplicates() {
     var registry = WindowRegistry()
     let url = URL(fileURLWithPath: "/tmp/dup.md")
-    let a = ids.next()
-    let b = ids.next()
-    registry.register(WindowRecord(id: a, currentURL: url))
-    registry.register(WindowRecord(id: b, currentURL: url))
+    let idA = ids.next()
+    let idB = ids.next()
+    registry.register(WindowRecord(id: idA, currentURL: url))
+    registry.register(WindowRecord(id: idB, currentURL: url))
     let match = registry.registration(matching: url)
     #expect(match != nil)
-    #expect(match?.id == a || match?.id == b)
+    #expect(match?.id == idA || match?.id == idB)
   }
 
   /// `registration` ignores records whose currentURL points at a
