@@ -20,9 +20,13 @@ enum Routes {
   /// expected to hit — used for DNS-rebinding host-header checks and
   /// for generating absolute URLs during template rewriting. It is
   /// invoked at request time because the bound port is unknown until
-  /// the listener is up.
+  /// the listener is up. `extraAllowedHostsProvider` widens the
+  /// Host-header allowlist beyond the loopback aliases — used by the
+  /// Kosmos bridge to admit the Mac's `.local` hostname when an AVP
+  /// peer is connected. Returning an empty set keeps loopback-only.
   static func makeRouter(
     hostURLProvider: @Sendable @escaping () async -> URL?,
+    extraAllowedHostsProvider: @Sendable @escaping () async -> Set<String>,
     selectedTemplateProvider: @Sendable @escaping () async -> Template,
     rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
@@ -33,12 +37,23 @@ enum Routes {
       guard let hostURL = await hostURLProvider() else {
         return HTTPResponses.unavailable()
       }
-      if let denied = guardRequest(request, hostURL: hostURL) {
+      if let denied = guardRequest(
+        request, hostURL: hostURL,
+        extra: await extraAllowedHostsProvider())
+      {
         return denied
       }
+      // For the template `origin` we use the host the request
+      // actually arrived on (its `Host` header) — NOT the listener's
+      // own URL, which hardcodes 127.0.0.1 and only works for
+      // loopback callers. Otherwise the rendered HTML's `<base href>`
+      // (and any relative asset URLs the template emits — fonts in
+      // CSS, images via `url(...)`) point at 127.0.0.1 on whoever's
+      // viewing, including AVP, where nothing is listening.
+      let originURL = templateOriginURL(for: request, fallback: hostURL)
       return await previewOrAssetResponse(
         request: request,
-        hostURL: hostURL,
+        hostURL: originURL,
         selectedTemplate: await selectedTemplateProvider(),
         renderer: await rendererProvider())
     }
@@ -47,7 +62,10 @@ enum Routes {
       guard let hostURL = await hostURLProvider() else {
         return HTTPResponses.unavailable()
       }
-      if let denied = guardRequest(request, hostURL: hostURL) {
+      if let denied = guardRequest(
+        request, hostURL: hostURL,
+        extra: await extraAllowedHostsProvider())
+      {
         return denied
       }
       return await templateAssetResponse(request: request)
@@ -57,7 +75,10 @@ enum Routes {
       guard let hostURL = await hostURLProvider() else {
         return HTTPResponses.unavailable()
       }
-      if let denied = guardRequest(request, hostURL: hostURL) {
+      if let denied = guardRequest(
+        request, hostURL: hostURL,
+        extra: await extraAllowedHostsProvider())
+      {
         return denied
       }
       return eventsResponse(request: request, watcher: watcher)
@@ -67,7 +88,10 @@ enum Routes {
       guard let hostURL = await hostURLProvider() else {
         return HTTPResponses.unavailable()
       }
-      if let denied = guardRequest(request, hostURL: hostURL) {
+      if let denied = guardRequest(
+        request, hostURL: hostURL,
+        extra: await extraAllowedHostsProvider())
+      {
         return denied
       }
       return Response(
@@ -338,16 +362,20 @@ enum Routes {
   /// Rejects requests whose `Host` header is not a loopback alias on the
   /// expected port (DNS-rebinding defence) or that originate from another
   /// site (`Sec-Fetch-Site: cross-site` / `same-site`). Returns nil when
-  /// the request is acceptable.
+  /// the request is acceptable. `extra` widens the allowlist with
+  /// additional hostnames (e.g., `"this-mac.local"`) when a paired
+  /// Kosmos peer is connected.
   static func guardRequest(
-    _ request: Request, hostURL: URL) -> Response?
-  {
+    _ request: Request,
+    hostURL: URL,
+    extra: Set<String> = []
+  ) -> Response? {
     let expectedPort = hostURL.port ?? defaultPort(forScheme: hostURL.scheme)
     // HTTP/1.1 carries Host in the request line authority; Hummingbird
     // surfaces it via `head.authority`. `HTTPField.Name.host` is marked
     // unavailable in swift-http-types in favour of this accessor.
     let hostHeader = request.head.authority ?? ""
-    if !isHostAllowed(hostHeader, expectedPort: expectedPort) {
+    if !isHostAllowed(hostHeader, expectedPort: expectedPort, extra: extra) {
       return HTTPResponses.forbidden(
         String(localized: "Host header not allowed", bundle: .galleyServerKit))
     }
@@ -364,13 +392,16 @@ enum Routes {
   /// Internal (not `private`) so unit tests can drive the loopback host
   /// allowlist directly without constructing a full `Request`.
   static func isHostAllowed(
-    _ value: String, expectedPort: Int) -> Bool
-  {
+    _ value: String,
+    expectedPort: Int,
+    extra: Set<String> = []
+  ) -> Bool {
     let trimmed = value.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty,
           let url = URL(string: "http://\(trimmed)/")
     else { return false }
-    let allowed: Set<String> = ["127.0.0.1", "localhost", "::1"]
+    var allowed: Set<String> = ["127.0.0.1", "localhost", "::1"]
+    allowed.formUnion(extra.map { $0.lowercased() })
     guard let host = url.host?.lowercased(), allowed.contains(host)
     else { return false }
     return (url.port ?? 80) == expectedPort
@@ -378,6 +409,25 @@ enum Routes {
 
   private static func defaultPort(forScheme scheme: String?) -> Int {
     scheme?.lowercased() == "https" ? 443 : 80
+  }
+
+  /// Build the origin URL the rendered HTML should use as its
+  /// `<base href>` from the request's own `Host` header and the
+  /// scheme of the listener that's about to compose the response.
+  /// Falls back to the listener's own URL (`hostURL`) if the request
+  /// has no authority. Public visibility kept private — only routes
+  /// use it.
+  ///
+  /// `hostURL.scheme` is the source-of-truth for which listener
+  /// (HTTP vs HTTPS) accepted the request, since `Host` headers
+  /// don't carry the scheme.
+  static func templateOriginURL(
+    for request: Request, fallback hostURL: URL
+  ) -> URL {
+    guard let authority = request.head.authority, !authority.isEmpty
+    else { return hostURL }
+    let scheme = hostURL.scheme ?? "http"
+    return URL(string: "\(scheme)://\(authority)") ?? hostURL
   }
 
   private static func generateNonce() -> String {

@@ -5,7 +5,11 @@ import HummingbirdTLS
 import NIOCore
 import NIOSSL
 import NIOPosix
+import os
 import GalleyCoreKit
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "PreviewServer")
 
 /// Lifecycle controller for the Galley preview HTTP server. Runs on
 /// Hummingbird; binds to `127.0.0.1` on an OS-assigned port and writes
@@ -20,7 +24,7 @@ import GalleyCoreKit
 /// automatically.
 ///
 /// `state.running(url:)` always reports the HTTP URL; the HTTPS
-/// channel surfaces through `ServerPortFile.endpointURL(for: .https)`.
+/// channel surfaces through `ServerPortFile.https.endpointURL`.
 @Observable
 @MainActor
 public final class PreviewServerController {
@@ -30,7 +34,40 @@ public final class PreviewServerController {
     case failed(message: String)
   }
 
+  /// Network surface the listener exposes.
+  /// - `.loopback`: bind `127.0.0.1`; only loopback Host headers are
+  ///   accepted. Default; matches the long-standing behavior.
+  /// - `.lanReachable`: bind dual-stack `::` (accepts both IPv4 and
+  ///   IPv6 — most macOS-relevant peers reach us via IPv6, including
+  ///   AVP over AWDL and any global-IPv6 path when IPv4 collides on
+  ///   iPhone-hotspot CGNAT); `extraAllowedHostnames` widens the
+  ///   Host-header allowlist (e.g., LAN IP literals) so a paired
+  ///   Kosmos peer can reach the server.
+  public enum BindMode: Equatable, Sendable {
+    case loopback
+    case lanReachable(extraAllowedHostnames: Set<String>)
+
+    var hostString: String {
+      switch self {
+      // `::` enables IPV6_V6ONLY=false on Apple platforms (NIO default
+      // for IPv6 bootstrap on Darwin), so a single listener handles
+      // both IPv4 and IPv6 traffic. Binding `0.0.0.0` would miss IPv6
+      // and break peers reaching us via a global / link-local v6.
+      case .loopback: return GalleyConstants.defaultHost
+      case .lanReachable: return "::"
+      }
+    }
+
+    var extraAllowedHostnames: Set<String> {
+      switch self {
+      case .loopback: return []
+      case .lanReachable(let names): return names
+      }
+    }
+  }
+
   public private(set) var state: State = .stopped
+  public private(set) var bindMode: BindMode = .loopback
 
   @ObservationIgnored private var httpTask: Task<Void, Never>?
   @ObservationIgnored private var httpsTask: Task<Void, Never>?
@@ -50,6 +87,19 @@ public final class PreviewServerController {
     self.rendererProvider = rendererProvider
   }
 
+  /// Switch the listener between loopback-only and LAN-reachable modes.
+  /// Stops the current listener (cancelling in-flight requests),
+  /// records the new mode, and starts a fresh listener with the
+  /// matching bind host + Host-header allowlist. No-op if the mode is
+  /// already current.
+  public func setBindMode(_ newMode: BindMode) {
+    guard newMode != bindMode else { return }
+    bindMode = newMode
+    if state != .stopped {
+      start()
+    }
+  }
+
   /// Starts the HTTP listener (always) and, if cert + key PEM files
   /// exist in Application Support, an HTTPS listener alongside it.
   /// Both listeners share the same routes; each one reports its
@@ -60,12 +110,20 @@ public final class PreviewServerController {
     let templateProvider = selectedTemplateProvider
     let renderProvider = rendererProvider
     let watcher = self.watcher
+    // HTTP serves only the same-machine same-user trust domain — the
+    // Mac Viewer's loopback render path. We pin it to 127.0.0.1
+    // regardless of bindMode so it's never reachable over LAN, even
+    // when HTTPS flips to dual-stack `::` for an AVP peer.
+    let httpBindHost = GalleyConstants.defaultHost
+    let httpsBindHost = bindMode.hostString
+    let extraHosts = bindMode.extraAllowedHostnames
 
     let httpBoundPort = BoundPort()
     let httpRouter = Routes.makeRouter(
       hostURLProvider: {
         await Self.endpointURL(scheme: "http", port: httpBoundPort.load())
       },
+      extraAllowedHostsProvider: { extraHosts },
       selectedTemplateProvider: templateProvider,
       rendererProvider: renderProvider,
       watcher: watcher)
@@ -73,7 +131,7 @@ public final class PreviewServerController {
     let httpApp = Application(
       router: httpRouter,
       configuration: .init(
-        address: .hostname(GalleyConstants.defaultHost, port: 0),
+        address: .hostname(httpBindHost, port: 0),
         serverName: nil),
       onServerRunning: { @Sendable channel in
         guard let portInt = channel.localAddress?.port,
@@ -84,9 +142,26 @@ public final class PreviewServerController {
         let endpoint = Self.endpointURL(scheme: "http", port: port)
         await MainActor.run {
           do {
-            try ServerPortFile.write(port, for: .http)
+            // Locked write: the `.http` port file doubles as the
+            // single-instance sentinel. If another Galley Server is
+            // already running on this user account, this throws
+            // `LockedByAnotherProcess` and we tear down the listener
+            // we just bound — ServerApp's NSRunningApplication guard
+            // catches most duplicates, this catches the rest.
+            try ServerPortFile.http.write(port, lock: true)
             if let endpoint { self.state = .running(url: endpoint) }
+          } catch is ServerPortFile.LockedByAnotherProcess {
+            // Tear down the listener we just bound, then publish
+            // the failure. `stop()` resets state to `.stopped`, so
+            // the failed-state assignment has to come after it.
+            self.stop()
+            self.state = .failed(message: String(
+              localized: """
+                Another Galley Server is already running on this user account.
+                """,
+              bundle: .galleyServerKit))
           } catch {
+            self.stop()
             self.state = .failed(message: String(
               localized:
                 "Cannot write port file: \(error.localizedDescription)",
@@ -99,9 +174,14 @@ public final class PreviewServerController {
       do {
         try await httpApp.run()
       } catch is CancellationError {
-        // normal shutdown
+        // `start()` called `stop()` which cancelled us in order to
+        // hand the slot to a fresh task that has already bound and
+        // written its own port file. Bail out before publishStopped
+        // wipes that fresh state.
+        return
       } catch {
         await self?.publishFailure(error.localizedDescription)
+        return
       }
       await self?.publishStopped()
     }
@@ -109,6 +189,8 @@ public final class PreviewServerController {
     if let tlsConfiguration = Self.tryLoadTLSConfiguration() {
       httpsTask = startTLSListener(
         tlsConfiguration: tlsConfiguration,
+        bindHost: httpsBindHost,
+        extraHosts: extraHosts,
         templateProvider: templateProvider,
         renderProvider: renderProvider,
         watcher: watcher)
@@ -121,6 +203,8 @@ public final class PreviewServerController {
   /// consumers fall back via `ServerPortFile.preferredEndpointURL`.
   private func startTLSListener(
     tlsConfiguration: TLSConfiguration,
+    bindHost: String,
+    extraHosts: Set<String>,
     templateProvider: @escaping @Sendable () async -> Template,
     renderProvider: @escaping @Sendable () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
@@ -130,6 +214,7 @@ public final class PreviewServerController {
       hostURLProvider: {
         await Self.endpointURL(scheme: "https", port: boundPort.load())
       },
+      extraAllowedHostsProvider: { extraHosts },
       selectedTemplateProvider: templateProvider,
       rendererProvider: renderProvider,
       watcher: watcher)
@@ -140,19 +225,23 @@ public final class PreviewServerController {
         router: router,
         server: try .tls(.http1(), tlsConfiguration: tlsConfiguration),
         configuration: .init(
-          address: .hostname(GalleyConstants.defaultHost, port: 0),
+          address: .hostname(bindHost, port: 0),
           serverName: nil),
         onServerRunning: { @Sendable channel in
           guard let portInt = channel.localAddress?.port,
                 let port = UInt16(exactly: portInt)
           else { return }
           await boundPort.store(port)
-          try? ServerPortFile.write(port, for: .https)
+          try? ServerPortFile.https.write(port)
         })
     } catch {
       // `.tls(...)` failed (e.g. invalid certificate chain). Continue
       // serving HTTP only; clear any stale .https entry.
-      ServerPortFile.clear(for: .https)
+      log.error("""
+        HTTPS listener configuration failed; HTTP-only: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+      ServerPortFile.https.clear()
       return nil
     }
 
@@ -160,17 +249,26 @@ public final class PreviewServerController {
       do {
         try await httpsApp.run()
       } catch is CancellationError {
-        // normal shutdown
+        // Cancelled because a new listener is taking over — that one
+        // has already written the fresh `.https` port file. Bail out
+        // before we erase it.
+        return
       } catch {
-        // HTTPS failure is non-fatal for the HTTP listener.
+        // HTTPS listener died mid-run. HTTP keeps serving, but cert-
+        // pinned consumers (Viewer's WebPage, Quicklook fallback)
+        // will silently fall back to HTTP. Surface in logs.
+        log.error("""
+          HTTPS listener exited with error: \
+          \(error.localizedDescription, privacy: .public)
+          """)
       }
-      ServerPortFile.clear(for: .https)
+      ServerPortFile.https.clear()
     }
   }
 
   public func stop() {
-    ServerPortFile.clear(for: .http)
-    ServerPortFile.clear(for: .https)
+    ServerPortFile.http.clear()
+    ServerPortFile.https.clear()
     httpTask?.cancel()
     httpsTask?.cancel()
     httpTask = nil
@@ -180,16 +278,16 @@ public final class PreviewServerController {
 
   nonisolated private func publishStopped() async {
     await MainActor.run {
-      ServerPortFile.clear(for: .http)
-      ServerPortFile.clear(for: .https)
+      ServerPortFile.http.clear()
+      ServerPortFile.https.clear()
       self.state = .stopped
     }
   }
 
   nonisolated private func publishFailure(_ message: String) async {
     await MainActor.run {
-      ServerPortFile.clear(for: .http)
-      ServerPortFile.clear(for: .https)
+      ServerPortFile.http.clear()
+      ServerPortFile.https.clear()
       self.state = .failed(message: message)
     }
   }
@@ -231,6 +329,10 @@ public final class PreviewServerController {
         certificateChain: certs.map { .certificate($0) },
         privateKey: .privateKey(key))
     } catch {
+      log.error("""
+        TLS configuration load failed (HTTPS disabled): \
+        \(error.localizedDescription, privacy: .public)
+        """)
       return nil
     }
   }
