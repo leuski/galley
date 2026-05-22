@@ -143,27 +143,12 @@ private final class NavigationProxy: NSObject, WKNavigationDelegate {
     finish(.failure(error))
   }
 
-  /// Pin Galley Server's self-signed HTTPS cert. When
-  /// `ServerPortFile.preferredEndpointURL` returns `https://…`,
-  /// `WKWebView` would otherwise reject the connection on default
-  /// trust evaluation. Match against the SHA-256 pin instead. Any
-  /// non-matching cert or missing pin file cancels the challenge,
-  /// triggering the existing `didFailProvisionalNavigation` path
-  /// which falls back to in-process rendering.
-  func webView(
-    _ webView: WKWebView,
-    didReceive challenge: URLAuthenticationChallenge
-  ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-    guard
-      challenge.protectionSpace.authenticationMethod
-        == NSURLAuthenticationMethodServerTrust,
-      let serverTrust = challenge.protectionSpace.serverTrust
-    else {
-      return (.performDefaultHandling, nil)
-    }
-    if PinnedCertificate.matches(serverTrust: serverTrust) {
-      return (.useCredential, URLCredential(trust: serverTrust))
-    }
-    return (.cancelAuthenticationChallenge, nil)
-  }
+  // Quicklook hits `http://127.0.0.1:<port>/…` via
+  // `ServerPortFile.preferredEndpointURL`, which now prefers HTTP.
+  // No TLS challenge fires on the happy path, so no challenge
+  // delegate is wired here. If the Server is HTTPS-only (HTTP
+  // listener failed to bind), default trust evaluation rejects the
+  // self-signed cert, navigation fails, and `loadFromServer`'s
+  // catch block falls back to in-process rendering — same end
+  // state as today.
 }
