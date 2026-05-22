@@ -3,6 +3,11 @@ import os
 import GalleyCoreKit
 import ALFoundation
 
+private let launchctl: URL = "/bin/launchctl"
+private let logger = Logger(
+  subsystem: bundleIdentifier,
+  category: "LaunchctlServerAgent")
+
 /// Drop-in alternative to ``ServerAgent`` that bypasses
 /// `SMAppService` and registers the embedded server as a classic
 /// per-user `LaunchAgent` in `~/Library/LaunchAgents/`.
@@ -24,13 +29,30 @@ import ALFoundation
 /// - No `KeepAlive`. If AMFI or the helper itself rejects the
 ///   spawn, launchd lets it stay dead — better a non-running server
 ///   than a fast respawn loop that churns ControlCenter.
-enum LaunchctlServerAgent {
+struct LaunchctlServerAgent {
   /// Label used both as the launchd service name and the plist
   /// filename (`<label>.plist`). Matches ``ServerAgent`` so the two
   /// implementations can't both be active in the same domain.
-  static let label = "net.leuski.galley.server"
+  let label: String
+  /// Absolute path the plist's `Program` key must match for the
+  /// installed agent to actually launch this build's server. Derived
+  /// from the running `Bundle.main`, so it follows wherever the user
+  /// has put `Galley.app`.
+  private let helperBinaryPath: String
 
-  static var isEnabled: Bool {
+  init?() {
+    guard
+      let bundle = Bundle.main.serverBundle,
+      let label = bundle.bundleIdentifier,
+      let helperBinaryPath = bundle.executableURL?.path
+    else {
+      return nil
+    }
+    self.label = label
+    self.helperBinaryPath = helperBinaryPath
+  }
+
+  var isEnabled: Bool {
     get async {
       guard FileManager.default.fileExists(atPath: plistURL.path) else {
         return false
@@ -42,7 +64,7 @@ enum LaunchctlServerAgent {
   /// Returns the resulting enabled state. On failure, returns the
   /// current state and logs the error.
   @discardableResult
-  static func setEnabled(_ enabled: Bool) async -> Bool {
+  func setEnabled(_ enabled: Bool) async -> Bool {
     do {
       if enabled {
         try await install()
@@ -59,7 +81,7 @@ enum LaunchctlServerAgent {
   /// binary that no longer matches the current `Galley.app` bundle
   /// (the user moved the app), rewrite the plist and re-bootstrap.
   /// No-op when the agent isn't installed.
-  static func validateAndRepair() async {
+  func validateAndRepair() async {
     guard FileManager.default.fileExists(atPath: plistURL.path) else {
       return
     }
@@ -70,13 +92,14 @@ enum LaunchctlServerAgent {
     logger.info("""
       Plist program path drifted (was \
       \(installed ?? "nil", privacy: .public), \
-      now \(expected, privacy: .public)) — rewriting and re-bootstrapping.
+      now \(expected, privacy: .public)) \
+      — rewriting and re-bootstrapping.
       """)
     do {
       try writePlist()
       if await isLoadedInLaunchd {
-        _ = try? await launchctl("bootout", serviceTarget)
-        let result = try await launchctl(
+        try? await launchctl.exec("bootout", serviceTarget)
+        let result = try await launchctl.execAndCapture(
           "bootstrap", domain, plistURL.path(percentEncoded: false))
         if result.terminationStatus != 0 {
           logger.error("""
@@ -94,15 +117,37 @@ enum LaunchctlServerAgent {
     }
   }
 
+  /// Idempotent restart: `launchctl kickstart -k <serviceTarget>`.
+  /// `-k` kills the running instance before relaunching, so two
+  /// invocations in a row produce exactly one running process. Use
+  /// in preference to `NSWorkspace.openApplication` on the relaunch
+  /// path — `openApplication` can race itself and spawn duplicates;
+  /// launchctl serializes through launchd. Returns true on success,
+  /// false when the service isn't bootstrapped (caller can fall
+  /// back to a plain spawn).
+  @discardableResult
+  func kickstart() async -> Bool {
+    let result = try? await launchctl.execAndCapture(
+      "kickstart", "-k", serviceTarget)
+    guard let result, result.terminationStatus == 0 else {
+      // Exit 113 = "service not found" — the user hasn't enabled the
+      // Login Item, so there's nothing to kickstart. Expected; the
+      // caller falls back to `NSWorkspace.openApplication`. Don't
+      // spam the log with that case.
+      if result?.terminationStatus != 113 {
+        logger.notice("""
+          kickstart returned non-zero (status=\
+          \(result?.terminationStatus ?? -1, privacy: .public)): \
+          \(result?.error ?? "<no launchctl>", privacy: .public)
+          """)
+      }
+      return false
+    }
+    return true
+  }
+
   // MARK: - Private
-
-  private static let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "LaunchctlServerAgent")
-
-  private static let launchctlURL = URL(fileURLWithPath: "/bin/launchctl")
-
-  private static var domain: String {
+  private var domain: String {
     "gui/\(getuid())"
   }
 
@@ -112,28 +157,17 @@ enum LaunchctlServerAgent {
   /// of this file did — boots out the *entire* user GUI domain,
   /// terminating WindowServer/Dock/Finder/ControlCenter etc. and
   /// logging the user out. Don't.
-  private static var serviceTarget: String {
+  private var serviceTarget: String {
     "\(domain)/\(label)"
   }
 
-  private static var plistURL: URL {
+  private var plistURL: URL {
     URL.libraryDirectory
       .appending(path: "LaunchAgents", directoryHint: .isDirectory)
       .appending(path: "\(label).plist")
   }
 
-  /// Absolute path the plist's `Program` key must match for the
-  /// installed agent to actually launch this build's server. Derived
-  /// from the running `Bundle.main`, so it follows wherever the user
-  /// has put `Galley.app`.
-  private static var helperBinaryPath: String {
-    Bundle.main.bundleURL
-      .appending(path: "Contents/Resources/Galley Server.app")
-      .appending(path: "Contents/MacOS/Galley Server")
-      .path(percentEncoded: false)
-  }
-
-  private static var installedProgram: String? {
+  private var installedProgram: String? {
     guard
       let data = try? Data(contentsOf: plistURL),
       let dict = try? PropertyListSerialization.propertyList(
@@ -142,23 +176,23 @@ enum LaunchctlServerAgent {
     return dict["Program"] as? String
   }
 
-  private static var isLoadedInLaunchd: Bool {
+  private var isLoadedInLaunchd: Bool {
     get async {
-      let result = try? await launchctl("print", serviceTarget)
+      let result = try? await launchctl.execAndCapture("print", serviceTarget)
       return result?.terminationStatus == 0
     }
   }
 
-  private static func install() async throws {
+  private func install() async throws {
     // bootout first so install can also act as "switch to a fresh
     // registration" — useful when the bundle path or plist contents
     // have changed since the previous bootstrap. The benign
     // "service-not-found" exit is ignored.
-    _ = try? await launchctl("bootout", serviceTarget)
+    try? await launchctl.exec("bootout", serviceTarget)
 
     try writePlist()
 
-    let result = try await launchctl(
+    let result = try await launchctl.execAndCapture(
       "bootstrap", domain, plistURL.path(percentEncoded: false))
     guard result.terminationStatus == 0 else {
       throw AgentError.bootstrapFailed(
@@ -167,14 +201,14 @@ enum LaunchctlServerAgent {
     }
   }
 
-  private static func uninstall() async throws {
-    _ = try? await launchctl("bootout", serviceTarget)
+  private func uninstall() async throws {
+    try? await launchctl.exec("bootout", serviceTarget)
     if FileManager.default.fileExists(atPath: plistURL.path) {
       try FileManager.default.removeItem(at: plistURL)
     }
   }
 
-  private static func writePlist() throws {
+  private func writePlist() throws {
     // Deliberately *no* `KeepAlive`. If the helper crashes or AMFI
     // rejects the spawn, launchd will not respawn it. A failed
     // spawn-loop with KeepAlive churns ControlCenter's status-item
@@ -184,31 +218,18 @@ enum LaunchctlServerAgent {
       "Program": helperBinaryPath,
       "RunAtLoad": true
     ]
-    let data = try PropertyListSerialization.data(
-      fromPropertyList: plist,
-      format: .xml,
-      options: 0)
-    try FileManager.default.createDirectory(
-      at: plistURL.deletingLastPathComponent(),
-      withIntermediateDirectories: true)
-    try data.write(to: plistURL, options: .atomic)
+    try plistURL.parent.createDirectory()
+    try PropertyListSerialization
+      .data(
+        fromPropertyList: plist,
+        format: .xml,
+        options: 0)
+      .write(to: plistURL, options: .atomic)
   }
 
   // MARK: - launchctl
 
-  /// Thin wrapper around `Process.runAndCapture` for `/bin/launchctl`
-  /// invocations. Exists so callers don't repeat the executable URL
-  /// and the cast to `[ProcessArgument]`.
-  @discardableResult
-  private static func launchctl(
-    _ args: String...
-  ) async throws -> Process.ProcessResult {
-    try await Process.runAndCapture(
-      launchctlURL,
-      with: args as [ProcessArgument])
-  }
-
-  private static func logToggleFailed(enabled: Bool, error: any Error) {
+  private func logToggleFailed(enabled: Bool, error: any Error) {
     logger.error("""
       Failed to \(enabled ? "install" : "uninstall") server agent: \
       \(error.localizedDescription, privacy: .public)
@@ -227,5 +248,12 @@ enum LaunchctlServerAgent {
           """
       }
     }
+  }
+}
+
+extension Bundle {
+  public var serverBundle: Bundle? {
+    url(forResource: "Galley Server", withExtension: "app")
+      .flatMap { url in Bundle(url: url) }
   }
 }

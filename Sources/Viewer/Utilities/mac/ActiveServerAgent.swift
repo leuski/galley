@@ -1,11 +1,17 @@
+import AppKit
 import Foundation
+import Observation
 
-/// Single swap point for the server-agent backend. Exposes an async
-/// API even when the underlying impl is synchronous, so callers don't
-/// have to know which one is in use.
+/// Single swap point for the server-agent backend. Exposes
+/// `isEnabled` as an observable property so SwiftUI views can
+/// `@Bindable` against it or just read it in `body` and get
+/// automatic re-evaluation; async mutations update `isEnabled`
+/// before returning.
 ///
-/// To switch backends, change the bodies of these two members. Don't
-/// change `ServerSettingsView` or `ViewerApp`.
+/// To switch backends, swap `backend` for another type that
+/// implements the same surface (`isEnabled`, `setEnabled`,
+/// `validateAndRepair`). Don't change `ServerSettingsView` or
+/// `ViewerApp`.
 ///
 /// ## Backends
 ///
@@ -33,21 +39,74 @@ import Foundation
 /// Galley is running. LaunchServices handles parent-identity
 /// correctly, AMFI is happy, no plist on disk, no path drift.
 /// Trade-off: the server lives only as long as Galley does.
-enum ActiveServerAgent {
-  static var isEnabled: Bool {
-    get async {
-      await LaunchctlServerAgent.isEnabled
-    }
+@MainActor
+@Observable
+final class ActiveServerAgent {
+  static let shared = ActiveServerAgent()
+
+  /// Observed by SwiftUI. Mirrors the backend's persisted state;
+  /// kept in sync by `refresh()` at construction and after every
+  /// mutating call.
+  private(set) var isEnabled: Bool = false
+
+  @ObservationIgnored
+  private let backend = LaunchctlServerAgent()
+
+  private init() {
+    // Hydrate from launchd on first access. Fire-and-forget — the
+    // initial `false` is the right default when nothing is
+    // installed, and views re-evaluate as soon as the async load
+    // returns.
+    Task { await refresh() }
   }
 
+  func refresh() async {
+    isEnabled = await backend?.isEnabled ?? false
+  }
+
+  /// Toggle Login-Item registration. When `enabled == false`, also
+  /// terminates any currently running Server process: the toggle is
+  /// the user's "Server on / off" switch, not a Login-Item-only
+  /// affordance. Without the explicit terminate, a Server launched
+  /// outside launchd (e.g. via `NSWorkspace.openApplication` from
+  /// the relaunch path, or a manual Finder launch) survives the
+  /// toggle-off and the menu-bar icon stays visible, which reads as
+  /// a broken switch.
   @discardableResult
-  static func setEnabled(_ enabled: Bool) async -> Bool {
-    await LaunchctlServerAgent.setEnabled(enabled)
+  func setEnabled(_ enabled: Bool) async -> Bool {
+    let actual = await backend?.setEnabled(enabled) ?? false
+    if !enabled {
+      terminateRunningServers()
+    }
+    isEnabled = actual
+    return actual
   }
 
-  /// Forwarded for `ViewerApp.init`. No-op for backends that don't
-  /// need launch-time path validation.
-  static func validateAndRepair() async {
-    await LaunchctlServerAgent.validateAndRepair()
+  /// Call once per launch. No-op for backends that don't need
+  /// launch-time path validation.
+  func validateAndRepair() async {
+    await backend?.validateAndRepair()
+    await refresh()
+  }
+
+  /// Forwarded to the backend. Returns `true` when the service was
+  /// kickstarted; `false` when the backend isn't bootstrapped and
+  /// the caller should fall back to `NSWorkspace.openApplication`.
+  @discardableResult
+  func kickstart() async -> Bool {
+    await backend?.kickstart() ?? false
+  }
+
+  /// Politely terminate every `net.leuski.galley.server` process
+  /// owned by this user. `terminate()` sends `NSWorkspace`'s
+  /// quit-application Apple event, which the menu-bar `MenuBarExtra`
+  /// honors cleanly.
+  private func terminateRunningServers() {
+    guard let bundleID = backend?.label else { return }
+    let running = NSRunningApplication
+      .runningApplications(withBundleIdentifier: bundleID)
+    for app in running {
+      app.terminate()
+    }
   }
 }

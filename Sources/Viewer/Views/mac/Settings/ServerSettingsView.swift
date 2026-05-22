@@ -1,39 +1,21 @@
+import ALFoundation
 import SwiftUI
 import GalleyCoreKit
 
 struct ServerSettingsView: View {
-  @State private var serverStatus = ServerStatusModel()
+  @Environment(KosmosViewerService.self) private var kosmos
 
-  /// Mirrors `ActiveServerAgent.isEnabled` as @State so SwiftUI
-  /// tracks changes. The agents are static enums (not Observable
-  /// sources) — without this @State, flipping the toggle wouldn't
-  /// re-evaluate the probe key and the `.task(id:)` loop wouldn't
-  /// restart, leaving the pill stuck at "Disabled".
-  ///
-  /// Initialised to `false`; the real value is loaded async in
-  /// `body`'s `.task` because `ActiveServerAgent.isEnabled` is async.
-  @State private var serverEnabled: Bool = false
+  private let agent = ActiveServerAgent.shared
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       LabeledContent {
-        ServerStatusPill(status: serverStatus.status)
+        ServerStatusPill(status: pillStatus)
         Toggle("Server", isOn: serverEnabledBinding)
           .toggleStyle(.switch)
           .labelsHidden()
       } label: {
         Text("Server")
-      }
-      .task(id: serverEnabled) {
-        await serverStatus.run(enabled: serverEnabled) {
-          ServerPortFile.preferredEndpointURL
-        }
-      }
-      .task {
-        // Load the real agent state once on appear. Subsequent
-        // changes flow through `serverEnabledBinding` so we don't
-        // need to re-poll.
-        serverEnabled = await ActiveServerAgent.isEnabled
       }
       Text("""
           When on, the background server makes documents available in any \
@@ -44,26 +26,34 @@ struct ServerSettingsView: View {
     }
   }
 
+  /// Pill is "is the Server actually reachable right now?", not "is
+  /// the Login Item registered?". Those are independent — a Server
+  /// launched outside launchd (e.g. via the relaunch fallback or a
+  /// manual Finder launch) is still running even with the toggle
+  /// off. Showing `.disabled` in that case made the toggle look
+  /// broken because turning it off didn't grey out the pill.
+  ///
+  /// Truth table now:
+  /// - peer connected → `.running` (regardless of toggle)
+  /// - no peer + toggle on → `.notResponding` (concerning — the
+  ///   user asked for it to run; it isn't)
+  /// - no peer + toggle off → `.stopped` (matches intent)
+  private var pillStatus: ServerStatus {
+    if kosmos.isServerPeerConnected {
+      let fallback = URL(string: "http://127.0.0.1")
+        !! "compile-time-constant http://127.0.0.1 should parse"
+      let url = ServerPortFile.http.endpointURL ?? fallback
+      return .running(url)
+    }
+    return agent.isEnabled ? .notResponding : .stopped
+  }
+
   private var serverEnabledBinding: Binding<Bool> {
     Binding(
-      get: { serverEnabled },
+      get: { agent.isEnabled },
       set: { newValue in
-        // Optimistic flip so the pill starts probing immediately for
-        // the requested state. setEnabled is async; reconcile when
-        // it returns. If the registration failed the post-call state
-        // disagrees and we revert the toggle.
-        serverEnabled = newValue
-        Task {
-          let actual = await ActiveServerAgent.setEnabled(newValue)
-          if actual != newValue {
-            serverEnabled = actual
-          }
-        }
+        Task { await agent.setEnabled(newValue) }
       }
     )
   }
-}
-
-#Preview {
-  ServerSettingsView()
 }
