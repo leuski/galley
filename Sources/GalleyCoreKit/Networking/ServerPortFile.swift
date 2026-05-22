@@ -13,10 +13,11 @@ private let log = Logger(
 ///
 /// One file per scheme: `server-http-port` is always present when
 /// the HTTP listener is up; `server-https-port` is published only
-/// when the (planned) HTTPS listener is also bound. Consumers that
-/// can speak either protocol prefer HTTPS via
-/// `preferredEndpointURL`; tools that explicitly want plain HTTP
-/// (the Safari / Chrome scripts) read `.http` directly.
+/// when the HTTPS listener is also bound. The HTTP listener is
+/// loopback-only (`127.0.0.1`) regardless of bind mode, so same-
+/// machine consumers (Viewer, Quicklook, BBEdit scripts) read HTTP
+/// via `preferredEndpointURL`. HTTPS is reserved for the LAN-
+/// reachable Kosmos bridge path consumed by AVP.
 ///
 /// Single integer in plain text — no JSON, no framing — so the
 /// bundled AppleScript / shell scripts can read it with one line.
@@ -91,11 +92,14 @@ public enum ServerPortFile {
     return components.url
   }
 
-  /// HTTPS endpoint if it's published, otherwise HTTP. Use this
-  /// from consumers (Viewer, Quicklook) that can speak either
-  /// protocol and prefer the pinned channel when it's available.
+  /// HTTP endpoint if it's published, otherwise HTTPS. Use this
+  /// from same-machine consumers (Viewer, Quicklook, BBEdit scripts)
+  /// that hit the loopback Server — HTTP is the canonical loopback
+  /// path now that the Server pins its HTTP listener to `127.0.0.1`
+  /// independent of LAN mode. HTTPS is a legacy fallback for the
+  /// rare case where HTTP failed to bind but HTTPS came up.
   /// Returns nil only when neither file is present.
   public static var preferredEndpointURL: URL? {
-    endpointURL(for: .https) ?? endpointURL(for: .http)
+    endpointURL(for: .http) ?? endpointURL(for: .https)
   }
 }
