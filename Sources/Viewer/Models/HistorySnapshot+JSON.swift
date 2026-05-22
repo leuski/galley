@@ -1,4 +1,9 @@
 import Foundation
+import GalleyCoreKit
+import os
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "HistorySnapshot")
 
 /// JSON-string adapter on `HistorySnapshot` for `@SceneStorage`.
 /// SwiftUI's scene storage hands us a `String`; the stored shape is
@@ -14,7 +19,16 @@ extension HistorySnapshot {
   /// encoder failure — which would imply a non-Codable URL,
   /// currently impossible with `Foundation.URL`.
   func encodedAsJSON() -> String? {
-    guard let data = try? JSONEncoder().encode(self) else { return nil }
+    let data: Data
+    do {
+      data = try JSONEncoder().encode(self)
+    } catch {
+      log.error("""
+        HistorySnapshot encode failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+      return nil
+    }
     return String(data: data, encoding: .utf8)
   }
 
@@ -23,12 +37,18 @@ extension HistorySnapshot {
   /// undecodable JSON (corrupt or schema-incompatible store), or
   /// empty `urls` array (semantically equivalent to "no snapshot").
   static func decode(json text: String) -> HistorySnapshot? {
-    guard !text.isEmpty,
-          let data = text.data(using: .utf8),
-          let snapshot = try? JSONDecoder().decode(
-            HistorySnapshot.self, from: data),
-          !snapshot.urls.isEmpty
+    guard !text.isEmpty, let data = text.data(using: .utf8)
     else { return nil }
-    return snapshot
+    let snapshot: HistorySnapshot
+    do {
+      snapshot = try JSONDecoder().decode(HistorySnapshot.self, from: data)
+    } catch {
+      log.debug("""
+        HistorySnapshot decode failed (treating as empty): \
+        \(error.localizedDescription, privacy: .public)
+        """)
+      return nil
+    }
+    return snapshot.urls.isEmpty ? nil : snapshot
   }
 }

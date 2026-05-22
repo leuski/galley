@@ -372,7 +372,13 @@ where Element: RestorableChoiceValue
       } catch AnyChoiceValueDecodingError.missingValue(let name) {
         notifier(name)
       } catch {
-        // ignore the rest
+        // Corrupt or unexpectedly-shaped persisted value. Fall through
+        // to the resident-check below (which resets to the default and
+        // notifies), but keep the underlying decode error visible.
+        log.error("""
+          Persisted choice decode failed: \
+          \(error.localizedDescription, privacy: .public)
+          """)
       }
     }
 

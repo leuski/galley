@@ -1,6 +1,11 @@
 import Foundation
+import GalleyCoreKit
 import Observation
+import os
 import WebKit
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "FindSession")
 
 /// Per-window find-text session — owns the query, options, match
 /// counters, and the visibility / dismissal flags driven by the
@@ -141,6 +146,10 @@ final class FindSession: SearchModel {
       matchCount = count
       matchIndex = index
     } catch {
+      log.debug("""
+        performSearch JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
       matchCount = 0
       matchIndex = -1
     }
@@ -155,6 +164,10 @@ final class FindSession: SearchModel {
       matchIndex = decodeIntScalar(value) ?? matchIndex
     } catch {
       // Leave index unchanged on JS error — UI stays consistent.
+      log.debug("""
+        findNext JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
     }
   }
 
@@ -167,6 +180,10 @@ final class FindSession: SearchModel {
       matchIndex = decodeIntScalar(value) ?? matchIndex
     } catch {
       // Leave index unchanged on JS error — UI stays consistent.
+      log.debug("""
+        findPrevious JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
     }
   }
 

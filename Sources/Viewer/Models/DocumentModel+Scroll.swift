@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 import WebKit
 
 extension DocumentModel {
@@ -80,6 +81,10 @@ extension DocumentModel {
       if let number = value as? NSNumber { return number.doubleValue }
       return nil
     } catch {
+      logger.debug("""
+        currentScrollY JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
       return nil
     }
   }

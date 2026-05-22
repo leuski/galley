@@ -1,8 +1,12 @@
 import AppKit
 import GalleyCoreKit
+import os
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "DocumentView")
 
 /// The viewer surface for a single document window. Mounted by
 /// `ContentView` only when both the WindowGroup binding has resolved
@@ -354,6 +358,13 @@ struct DocumentView: View {
         recents.record(newURL)
         if fileURL != newURL { fileURL = newURL }
       } catch {
+        // `renameCurrentDocument` already posted a notice banner via
+        // `report(failure:)`. Beep matches the prior NSAlert UX; log
+        // the underlying error so support reports retain context.
+        log.error("""
+          Rename failed for \(model.documentURL.path, privacy: .private): \
+          \(error.localizedDescription, privacy: .public)
+          """)
         NSSound.beep()
       }
     }

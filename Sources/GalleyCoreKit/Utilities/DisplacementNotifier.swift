@@ -4,7 +4,11 @@
 //
 
 import Foundation
+import os
 import UserNotifications
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "DisplacementNotifier")
 
 /// Posts user-facing notifications when a previously-selected
 /// processor or template is no longer available and we've snapped
@@ -17,7 +21,14 @@ public enum DisplacementNotifier {
   /// authorized.
   public static func requestAuthorization() async {
     let center = UNUserNotificationCenter.current()
-    _ = try? await center.requestAuthorization(options: [.alert, .sound])
+    do {
+      _ = try await center.requestAuthorization(options: [.alert, .sound])
+    } catch {
+      log.warning("""
+        Notification authorization request failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
   }
 
   public enum Kind: Sendable {
@@ -67,6 +78,14 @@ public enum DisplacementNotifier {
       identifier: UUID().uuidString,
       content: content,
       trigger: nil)
-    _ = try? await UNUserNotificationCenter.current().add(request)
+    do {
+      try await UNUserNotificationCenter.current().add(request)
+    } catch {
+      log.error("""
+        Failed to post displacement notification for \
+        \(displaced, privacy: .public): \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
   }
 }

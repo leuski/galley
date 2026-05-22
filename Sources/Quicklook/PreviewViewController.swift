@@ -2,6 +2,10 @@ import AppKit
 import Quartz
 import WebKit
 import GalleyCoreKit
+import os
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "QuicklookPreview")
 
 /// Quick Look preview for Markdown files.
 ///
@@ -43,6 +47,10 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         return
       } catch {
         // Fall through to in-process render.
+        log.debug("""
+          QuickLook server path failed; falling back in-process: \
+          \(error.localizedDescription, privacy: .public)
+          """)
       }
     }
     try await loadInProcess(file: url)

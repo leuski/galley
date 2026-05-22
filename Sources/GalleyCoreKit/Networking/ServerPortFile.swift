@@ -1,5 +1,9 @@
 import Foundation
 import ALFoundation
+import os
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "ServerPortFile")
 
 /// The on-disk handshake between Galley Server and its consumers
 /// (the Viewer's probe loop, Quicklook, the bundled BBEdit browser
@@ -62,7 +66,17 @@ public enum ServerPortFile {
   /// so stale values don't outlive the process; safe to call when
   /// the file doesn't exist.
   public static func clear(for scheme: Scheme) {
-    try? FileManager.default.removeItem(at: url(for: scheme))
+    let target = url(for: scheme)
+    do {
+      try FileManager.default.removeItem(at: target)
+    } catch CocoaError.fileNoSuchFile {
+      // Already absent — expected on first stop or repeat clears.
+    } catch {
+      log.debug("""
+        Couldn't remove \(target.lastPathComponent, privacy: .public): \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
   }
 
   /// `http://127.0.0.1:<port>/` / `https://127.0.0.1:<port>/` for

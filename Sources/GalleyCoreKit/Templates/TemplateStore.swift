@@ -1,9 +1,13 @@
 import Foundation
 import Observation
 import ALFoundation
+import os
 #if os(macOS)
 import AppKit
 #endif
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "TemplateStore")
 
 @Observable
 @MainActor
@@ -93,10 +97,23 @@ public final class TemplateStore {
 
     for (index, dir) in directoryURLs.enumerated() {
       let listingDir = dir.safe
-      let contents = (try? manager.contentsOfDirectory(
-        at: listingDir,
-        includingPropertiesForKeys: [.isDirectoryKey],
-        options: [.skipsHiddenFiles])) ?? []
+      let contents: [URL]
+      do {
+        contents = try manager.contentsOfDirectory(
+          at: listingDir,
+          includingPropertiesForKeys: [.isDirectoryKey],
+          options: [.skipsHiddenFiles])
+      } catch CocoaError.fileReadNoSuchFile {
+        // Directory hasn't been created yet — expected for the user
+        // templates dir on a fresh install.
+        contents = []
+      } catch {
+        log.error("""
+          Templates dir \(listingDir.path, privacy: .private) unreadable: \
+          \(error.localizedDescription, privacy: .public)
+          """)
+        contents = []
+      }
 
       let nameResourceProvider = makeNameResourceProvider(forSource: index)
       let entries: [Template] = contents.compactMap { url in

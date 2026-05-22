@@ -63,8 +63,28 @@ extension DocumentModel {
     lifetime: DocumentNotice.Lifetime
   ) {
     let description = error.localizedDescription
-    logger.error(
-      "\(context, privacy: .public) failed: \(description, privacy: .public)")
+    // Include the underlying NSError code + domain on the log line.
+    // `localizedDescription` alone hides the discriminating data when
+    // the error is a typed Swift enum that wraps an NSError — e.g.
+    // `WebKit.WebPage.NavigationError error 0` prints the case index
+    // rather than the actual `NSURLErrorDomain` code we need to tell
+    // host-not-found from cert-pin-rejected.
+    let nsError = error as NSError
+    let typeName = String(reflecting: type(of: error))
+    let reflected = String(reflecting: error)
+    let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+    let underlyingPart = underlying.map {
+      " underlyingDomain=\($0.domain) underlyingCode=\($0.code)"
+    } ?? ""
+    logger.error("""
+      \(context, privacy: .public) failed: \
+      \(description, privacy: .public) \
+      type=\(typeName, privacy: .public) \
+      domain=\(nsError.domain, privacy: .public) \
+      code=\(nsError.code, privacy: .public)\
+      \(underlyingPart, privacy: .public) \
+      reflected=\(reflected, privacy: .public)
+      """)
     report(message ?? description, lifetime: lifetime)
   }
 
