@@ -3,6 +3,7 @@ import SwiftUI
 import GalleyCoreKit
 import GalleyServerKit
 import os
+import ALFoundation
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -21,6 +22,7 @@ private let defaultsLog = Logger(
 final class Defaults: GalleyRenderDefaults {
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
+  @DefaultsKey var serverGalleyHash: String?
 
   @MainActor static let shared = Defaults()
 }
@@ -33,6 +35,7 @@ final class AppModel {
   let templates: TemplateChoice
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
+  @ObservationIgnored let kosmos: KosmosLink
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
   init() {
@@ -59,6 +62,9 @@ final class AppModel {
       rendererProvider: { [weak processors] in
         await processors?.selected.value.renderer
       })
+    self.kosmos = KosmosLink(
+      server: self.server,
+      identityStore: BridgeIdentityProvisioning.store)
 
     // Bidirectional sync with the shared `net.leuski.galley.shared`
     // suite. Outbound: menu-bar picks here surface in the Viewer
@@ -105,16 +111,12 @@ final class AppModel {
   /// containing app bundle is three levels up.)
   private func publishGalleyAppHash() {
     let serverBundle = Bundle.main.bundleURL
-    let galleyApp = serverBundle
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
+    let galleyApp = serverBundle.parent.parent.parent
     Task.detached(priority: .userInitiated) {
       do {
         let hash = try await GalleyAppHash.compute(at: galleyApp)
         await MainActor.run {
-          SharedSuiteDefaults.suite.set(
-            hash, forKey: SharedSuiteDefaults.serverGalleyHashKey)
+          Defaults.shared.serverGalleyHash = hash
           DefaultsBroadcast.post()
         }
       } catch {
@@ -157,6 +159,9 @@ final class AppModel {
 
   private func startServer() {
     server.start()
+    // Begin Kosmos advertising once HTTP is up so the bound port file
+    // is populated before the first peer can hit `BridgeAdvertisement`.
+    kosmos.start()
   }
 }
 
@@ -173,6 +178,12 @@ final class AppBoot {
     // responds. Fire it in parallel and let it resolve whenever.
     Task { await DisplacementNotifier.requestAuthorization() }
     Task { @MainActor in
+      // Materialize the HTTPS cert + key before AppModel kicks off
+      // the preview server. PreviewServer.start() reads the PEMs
+      // synchronously from Application Support; if they exist, HTTPS
+      // comes up alongside HTTP. We do this on every boot so a cert
+      // approaching expiry gets rotated automatically.
+      await BridgeIdentityProvisioning.ensure()
       await ProcessorStore.shared.discover()
       self.model = AppModel()
     }

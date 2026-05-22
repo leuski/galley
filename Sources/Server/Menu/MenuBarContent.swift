@@ -29,8 +29,7 @@ struct MenuBarContent: View {
       Divider()
 
       Button("Settings…") {
-        NSWorkspace.shared.open(
-          GalleyConstants.settingsURL(tab: .server))
+        NSWorkspace.shared.open(GalleyRequest.openSettings(.server).url)
       }
       .accessibilityIdentifier(ServerA11yID.MenuBar.settings)
     }
