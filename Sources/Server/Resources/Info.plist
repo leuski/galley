@@ -2,12 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>NSLocalNetworkUsageDescription</key>
-  <string>This app uses the local network to discover and connect your computer and Vision Pro.</string>
-  <key>NSBonjourServices</key>
-  <array>
-    <string>_kosmos._tcp</string>
-  </array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -24,15 +18,23 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>net.leuski.galley</string>
+			<string>net.leuski.galley.server</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>galley</string>
+				<string>galley-bridge</string>
 			</array>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 		</dict>
 	</array>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_kosmos._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Galley uses the local network to discover and connect to your Apple Vision Pro for streaming markdown previews.</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -60,14 +62,5 @@
 			</dict>
 		</dict>
 	</array>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationPreferredDefaultSceneSessionRole</key>
-		<string>UIWindowSceneSessionRoleApplication</string>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<true/>
-		<key>UISceneConfigurations</key>
-		<dict/>
-	</dict>
 </dict>
 </plist>
