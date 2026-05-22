@@ -96,7 +96,7 @@ struct PendingScrollLinesTests {
   }
 
   /// Negative and zero lines are accepted at this layer (the value
-  /// type is dumb storage). The `galleyAction` parser is what drops
+  /// type is dumb storage). The `galleyRequest` parser is what drops
   /// non-positive values before they reach us. Pin that contract.
   @Test("Stash accepts any Int — caller is responsible for positivity")
   func storesAnyInt() {

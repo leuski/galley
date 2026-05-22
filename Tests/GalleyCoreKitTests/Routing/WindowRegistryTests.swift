@@ -157,7 +157,7 @@ struct WindowRegistryTests {
     var original = WindowRegistry()
     let id = ids.next()
     original.register(WindowRecord(id: id))
-    var snapshot = original
+    let snapshot = original
     let other = ids.next()
     original.register(WindowRecord(id: other))
     #expect(snapshot.all.count == 1)

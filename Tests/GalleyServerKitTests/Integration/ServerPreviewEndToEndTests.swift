@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import GalleyCoreKit
+internal import ALFoundation
 @testable import GalleyServerKit
 
 /// End-to-end tests that actually bind a TCP socket and round-trip
@@ -87,8 +88,7 @@ struct ServerPreviewEndToEndTests {
   @Test("GET /preview/<tempfile> returns 200 + rendered HTML")
   func rendersTempMarkdown() async throws {
     let file = try makeTempMarkdownFile()
-    let dir = file.deletingLastPathComponent()
-    defer { try? FileManager.default.removeItem(at: dir) }
+    defer { try? file.parent.remove() }
 
     guard let (controller, host) = await startReadyController() else { return }
     defer { Task { @MainActor in await cleanup(controller) } }

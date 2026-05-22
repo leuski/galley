@@ -8,41 +8,41 @@ internal import ALFoundation
 /// browser scripts). Touches the real files at
 /// `~/Library/Application Support/net.leuski.galley.localized/
 /// server-<scheme>-port`,
-/// so the suite is serialized and snapshots each scheme's file on
-/// entry / restores on exit, to avoid clobbering a running Server.
+/// so the suite is serialized and snapshots each file on entry /
+/// restores on exit, to avoid clobbering a running Server.
 @Suite("ServerPortFile", .serialized)
 struct ServerPortFileTests {
-  /// Snapshot any pre-existing values for every scheme so a running
+  /// Snapshot any pre-existing values for every file so a running
   /// Server's ports survive the test run.
-  private static func snapshot() -> [ServerPortFile.Scheme: Data] {
-    var result: [ServerPortFile.Scheme: Data] = [:]
-    for scheme in ServerPortFile.Scheme.allCases {
-      if let data = try? Data(contentsOf: ServerPortFile.url(for: scheme)) {
-        result[scheme] = data
+  private static func snapshot() -> [ServerPortFile: Data] {
+    var result: [ServerPortFile: Data] = [:]
+    for file in ServerPortFile.all {
+      if let data = try? Data(contentsOf: file.url) {
+        result[file] = data
       }
     }
     return result
   }
 
-  private static func restore(_ snapshot: [ServerPortFile.Scheme: Data]) {
-    for scheme in ServerPortFile.Scheme.allCases {
-      if let data = snapshot[scheme] {
-        try? data.write(to: ServerPortFile.url(for: scheme))
+  private static func restore(_ snapshot: [ServerPortFile: Data]) {
+    for file in ServerPortFile.all {
+      if let data = snapshot[file] {
+        try? data.write(to: file.url)
       } else {
-        ServerPortFile.clear(for: scheme)
+        file.clear()
       }
     }
   }
 
   @Test("write then read round-trips per scheme", arguments: [
-    ServerPortFile.Scheme.http, .https
+    ServerPortFile.http, .https
   ])
-  func roundTrip(scheme: ServerPortFile.Scheme) throws {
+  func roundTrip(file: ServerPortFile) throws {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    try ServerPortFile.write(54321, for: scheme)
-    #expect(ServerPortFile.read(for: scheme) == 54321)
+    try file.write(54321)
+    #expect(file.read() == 54321)
   }
 
   @Test("clear removes the file; read returns nil")
@@ -50,9 +50,9 @@ struct ServerPortFileTests {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    try ServerPortFile.write(12345, for: .http)
-    ServerPortFile.clear(for: .http)
-    #expect(ServerPortFile.read(for: .http) == nil)
+    try ServerPortFile.http.write(12345)
+    ServerPortFile.http.clear()
+    #expect(ServerPortFile.http.read() == nil)
   }
 
   @Test("scheme files are independent")
@@ -60,11 +60,11 @@ struct ServerPortFileTests {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    ServerPortFile.clear(for: .http)
-    ServerPortFile.clear(for: .https)
-    try ServerPortFile.write(11111, for: .http)
-    #expect(ServerPortFile.read(for: .http) == 11111)
-    #expect(ServerPortFile.read(for: .https) == nil)
+    ServerPortFile.http.clear()
+    ServerPortFile.https.clear()
+    try ServerPortFile.http.write(11111)
+    #expect(ServerPortFile.http.read() == 11111)
+    #expect(ServerPortFile.https.read() == nil)
   }
 
   @Test("malformed file reads as nil, not a crash")
@@ -74,10 +74,10 @@ struct ServerPortFileTests {
 
     try GalleyConstants.applicationSupportDirectory.createDirectory()
     try "not-a-port\n".write(
-      to: ServerPortFile.url(for: .http),
+      to: ServerPortFile.http.url,
       atomically: true,
       encoding: .utf8)
-    #expect(ServerPortFile.read(for: .http) == nil)
+    #expect(ServerPortFile.http.read() == nil)
   }
 
   @Test("endpointURL builds scheme://127.0.0.1:<port>/ from the file")
@@ -85,14 +85,14 @@ struct ServerPortFileTests {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    try ServerPortFile.write(60000, for: .http)
-    let url = ServerPortFile.endpointURL(for: .http)
+    try ServerPortFile.http.write(60000)
+    let url = ServerPortFile.http.endpointURL
     #expect(url?.scheme == "http")
     #expect(url?.host == "127.0.0.1")
     #expect(url?.port == 60000)
 
-    try ServerPortFile.write(60443, for: .https)
-    let secure = ServerPortFile.endpointURL(for: .https)
+    try ServerPortFile.https.write(60443)
+    let secure = ServerPortFile.https.endpointURL
     #expect(secure?.scheme == "https")
     #expect(secure?.port == 60443)
   }
@@ -102,30 +102,30 @@ struct ServerPortFileTests {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    ServerPortFile.clear(for: .http)
-    #expect(ServerPortFile.endpointURL(for: .http) == nil)
+    ServerPortFile.http.clear()
+    #expect(ServerPortFile.http.endpointURL == nil)
   }
 
-  @Test("preferredEndpointURL picks HTTPS when both are present")
-  func preferredPicksHTTPS() throws {
+  @Test("preferredEndpointURL picks HTTP when both are present")
+  func preferredPicksHTTP() throws {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    try ServerPortFile.write(20000, for: .http)
-    try ServerPortFile.write(20443, for: .https)
-    #expect(ServerPortFile.preferredEndpointURL?.scheme == "https")
-    #expect(ServerPortFile.preferredEndpointURL?.port == 20443)
+    try ServerPortFile.http.write(20000)
+    try ServerPortFile.https.write(20443)
+    #expect(ServerPortFile.preferredEndpointURL?.scheme == "http")
+    #expect(ServerPortFile.preferredEndpointURL?.port == 20000)
   }
 
-  @Test("preferredEndpointURL falls back to HTTP when HTTPS is absent")
+  @Test("preferredEndpointURL falls back to HTTPS when HTTP is absent")
   func preferredFallsBack() throws {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    ServerPortFile.clear(for: .https)
-    try ServerPortFile.write(20000, for: .http)
-    #expect(ServerPortFile.preferredEndpointURL?.scheme == "http")
-    #expect(ServerPortFile.preferredEndpointURL?.port == 20000)
+    ServerPortFile.http.clear()
+    try ServerPortFile.https.write(20443)
+    #expect(ServerPortFile.preferredEndpointURL?.scheme == "https")
+    #expect(ServerPortFile.preferredEndpointURL?.port == 20443)
   }
 
   @Test("preferredEndpointURL is nil when neither file exists")
@@ -133,8 +133,8 @@ struct ServerPortFileTests {
     let snap = Self.snapshot()
     defer { Self.restore(snap) }
 
-    ServerPortFile.clear(for: .http)
-    ServerPortFile.clear(for: .https)
+    ServerPortFile.http.clear()
+    ServerPortFile.https.clear()
     #expect(ServerPortFile.preferredEndpointURL == nil)
   }
 }
