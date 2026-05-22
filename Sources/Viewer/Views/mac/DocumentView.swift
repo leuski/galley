@@ -4,6 +4,7 @@ import os
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+import ALFoundation
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentView")
@@ -155,7 +156,7 @@ struct DocumentView: View {
         }
       }
       .fileDialogDefaultDirectory(
-        model.documentURL.deletingLastPathComponent())
+        model.documentURL.parent)
     // No `id:` — `replaceDocument` drives in-window URL changes
     // directly through `model.bind(to:)`, so re-firing on every
     // `fileURL` write would be wasted work that the early-return

@@ -67,13 +67,13 @@ struct BootstrapDispatchModifier: ViewModifier {
               .makeKeyAndOrderFront(nil)
           }
         }
-        switch url.galleyAction {
+        switch url.galleyRequest {
         case .openSettings:
           break
-        case .document(let fileURL, _):
-          recents.record(fileURL)
-        case .unparseable(let original):
-          recents.record(original)
+        case .document(let info):
+          recents.record(info.url)
+        case .none:
+          recents.record(url)
         }
       }
   }
