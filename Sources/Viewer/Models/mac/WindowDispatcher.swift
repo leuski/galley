@@ -111,10 +111,10 @@ final class WindowDispatcher {
     onSettingsRequested: (SettingsTab?) -> Void = { _ in }
   ) {
     for url in urls {
-      switch url.galleyAction {
+      switch url.galleyRequest {
       case .openSettings(let tab):
         onSettingsRequested(tab)
-      case .document(let fileURL, let line):
+      case .document(let info):
         // Help docs route to the singleton Help window — never
         // registered with the routing system, never tab-merged,
         // never recorded in Open Recent (the latter is enforced
@@ -122,18 +122,18 @@ final class WindowDispatcher {
         // `helpHandler` isn't installed yet (pre-launch race),
         // fall through to the regular dispatch path rather than
         // dropping the URL.
-        if fileURL.isInMainBundle, let helpHandler {
-          currentHelpURL = fileURL
+        if info.url.isInMainBundle, let helpHandler {
+          currentHelpURL = info.url
           helpHandler()
           continue
         }
-        if let line {
-          pendingScrolls.stash(line, for: fileURL)
+        if let line = info.scrollLine {
+          pendingScrolls.stash(line, for: info.url)
         }
-        dispatch(fileURL)
-      case .unparseable(let original):
-        logUnparseableURL(original)
-        dispatch(original)
+        dispatch(info.url)
+      case .none:
+        logUnparseableURL(url)
+        dispatch(url)
       }
     }
   }
@@ -315,16 +315,18 @@ final class WindowDispatcher {
   func openAsTabs(_ urls: [URL], onto host: NSWindow) {
     guard let openHandler else { return }
     for url in urls {
-      switch url.galleyAction {
+      switch url.galleyRequest {
       case .openSettings:
         continue
-      case .document(let fileURL, let line):
-        if let line { pendingScrolls.stash(line, for: fileURL) }
-        pendingTabHosts.append((url: fileURL, host: host))
-        openHandler(fileURL)
-      case .unparseable(let original):
-        pendingTabHosts.append((url: original, host: host))
-        openHandler(original)
+      case .document(let info):
+        if let line = info.scrollLine {
+          pendingScrolls.stash(line, for: info.url)
+        }
+        pendingTabHosts.append((url: info.url, host: host))
+        openHandler(info.url)
+      case .none:
+        pendingTabHosts.append((url: url, host: host))
+        openHandler(url)
       }
     }
   }

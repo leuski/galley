@@ -13,7 +13,7 @@ extension DocumentModel {
   /// Build the `WebPage.Configuration`: register every script-message
   /// handler, inject the user scripts each bridge needs, and wire the
   /// custom URL scheme that resolves template-bundled assets through
-  /// `templateBox`. Static so it can run before `self` is fully
+  /// `templateProvider`. Static so it can run before `self` is fully
   /// initialized; pure plumbing — no closures capture the model.
   static func makeConfiguration(
     editorBridge: EditorBridge,
@@ -22,7 +22,7 @@ extension DocumentModel {
     tocBridge: TOCBridge,
     statsBridge: StatsBridge,
     backgroundBridge: BackgroundColorBridge,
-    templateBox: TemplateBox
+    templateProvider: @escaping @MainActor @Sendable () -> Template
   ) -> WebPage.Configuration {
     var configuration = WebPage.Configuration()
     configuration.defaultNavigationPreferences.preferredContentMode = .desktop
@@ -93,11 +93,12 @@ extension DocumentModel {
       forMainFrameOnly: true))
 #endif
     // Custom URL scheme so template-bundled assets (CSS, fonts,
-    // images) resolve from disk through the SwiftUI WebView. Reads
-    // the active template at request time via `templateBox`, kept
-    // current by `renderCurrent` on every render.
-    let handler = PreviewSchemeHandler(
-      templateProvider: { templateBox.template ?? .default })
+    // images) resolve from disk through the SwiftUI WebView. The
+    // provider closure reads the live template selection on every
+    // asset request, so a mid-session template switch is reflected
+    // in the next `/template/<id>/<file>` lookup without any
+    // explicit invalidation.
+    let handler = PreviewSchemeHandler(templateProvider: templateProvider)
     configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
     return configuration
   }

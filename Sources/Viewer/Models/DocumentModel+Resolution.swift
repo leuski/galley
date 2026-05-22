@@ -24,11 +24,21 @@ extension DocumentModel {
     ?? SwiftMarkdownRenderer()
   }
 
-  func resolvedTemplate() -> Template {
+  /// Static so the scheme-handler closure built in `init` (before
+  /// `self` is fully initialized) can call this with captured
+  /// reference-type properties instead of going through `self`.
+  static func resolveTemplate(
+    templates: SceneTemplateChoice,
+    appModel: AppModel
+  ) -> Template {
     if Defaults.shared.enablePerDocumentOverrides == true {
       return templates.selected.value
     }
     return appModel.templates.selected.value
+  }
+
+  func resolvedTemplate() -> Template {
+    Self.resolveTemplate(templates: templates, appModel: appModel)
   }
 
 #if !os(macOS)

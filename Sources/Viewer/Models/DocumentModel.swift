@@ -1,9 +1,11 @@
 import Foundation
 import GalleyCoreKit
+import KosmosWebView
 import Observation
 import os
 import SwiftUI
 import WebKit
+import ALFoundation
 
 /// Per-document state for the native viewer. Owns the WebPage, the
 /// file watcher, and the editor bridge. Renderer and template come
@@ -40,7 +42,6 @@ final class DocumentModel {
   @ObservationIgnored private let statsBridge = StatsBridge()
   @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
   @ObservationIgnored let appModel: AppModel
-  @ObservationIgnored private let templateBox: TemplateBox
 
   /// Chrome reads through this. Drives off `renderedTemplate()` —
   /// the template *actually painted* in the WebView right now — so
@@ -302,8 +303,12 @@ final class DocumentModel {
       persistent: colorSchemePersistent
     ) { _ in }
 
-    let box = TemplateBox()
-    self.templateBox = box
+    // Capture the choice envelopes (reference types) into locals so
+    // the scheme-handler closure can read the live template selection
+    // without needing `self` — which isn't usable yet because `page`
+    // is still uninitialized below.
+    let templatesRef = self.templates
+    let appModelRef = self.appModel
     self.page = WebPage(
       configuration: Self.makeConfiguration(
         editorBridge: bridge,
@@ -312,18 +317,18 @@ final class DocumentModel {
         tocBridge: tocBridge,
         statsBridge: statsBridge,
         backgroundBridge: backgroundBridge,
-        templateBox: box),
-      // Pin the Galley Server HTTPS cert. Most loads are
-      // in-process via `x-galley://local`, but any HTTPS asset that
-      // resolves to the server (template-rewritten URLs, future
-      // server-driven loads) gets validated against
-      // `server-cert.pem` instead of the user's keychain.
-      navigationDecider: ServerCertificatePinner())
+        templateProvider: {
+          Self.resolveTemplate(
+            templates: templatesRef, appModel: appModelRef)
+        }),
+      // Pin AVP↔Mac LAN HTTPS against the Kosmos-published cert
+      // SHA-256. Loopback consumers (Mac Viewer rendering local
+      // files in-process, Quicklook hitting `http://127.0.0.1`)
+      // never reach a TLS challenge, so the pinner is inert there.
+      // On visionOS this is the validator for every `loadRemote`
+      // against the bridge's `https://<lan-host>` baseURL.
+      navigationDecider: KosmosCertPinner())
     self.find = FindSession(page: self.page)
-    // Seed the scheme handler's template pointer. `renderCurrent`
-    // updates it again on every render — this seed only matters for
-    // asset requests that might fire before the first render.
-    self.templateBox.template = resolvedTemplate()
 
     wireBridges()
   }
@@ -446,6 +451,10 @@ final class DocumentModel {
       if let number = value as? NSNumber { return number.intValue }
       return nil
     } catch {
+      logger.debug("""
+        topmostVisibleSourceLine JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
       return nil
     }
   }
@@ -561,8 +570,7 @@ final class DocumentModel {
           trimmed != oldURL.lastPathComponent
     else { return oldURL }
 
-    let newURL = oldURL.deletingLastPathComponent()
-      .appendingPathComponent(trimmed)
+    let newURL = oldURL.parent / trimmed
     do {
       try FileManager.default.moveItem(at: oldURL, to: newURL)
     } catch {
@@ -649,11 +657,20 @@ final class DocumentModel {
     clearRenderBoundNotice()
 
     let url = documentURL
+
+    // Server-hosted URLs (the AVP Kosmos path): the bridge already
+    // returns rendered HTML from `/preview/<path>`. Running that
+    // response through `readSource` + the Markdown renderer would
+    // feed template HTML to a Markdown parser and bake an empty page.
+    // Hand the URL straight to WebPage instead — the Server picked
+    // the template, owns livereload (via SSE), and is the renderer.
+    if !url.isFileURL {
+      await loadRemote(url: url, preserveScroll: preserveScroll)
+      return
+    }
+
     let renderer = resolvedRenderer()
     let template = resolvedTemplate()
-    // Keep the scheme handler's template pointer current — the user
-    // may have switched templates since the last bind.
-    templateBox.template = template
 
     // Snapshot scroll position *before* re-rendering so we can hand it
     // back to the page after load. Best-effort: a nil/throwing read
@@ -698,6 +715,32 @@ final class DocumentModel {
       }
     } catch {
       report(failure: error, context: "render", lifetime: .renderBound)
+    }
+  }
+
+  private func loadRemote(url: URL, preserveScroll: Bool) async {
+    let savedScrollY: Double = preserveScroll
+      ? await currentScrollY() ?? 0
+      : 0
+    do {
+      for try await _ in page.load(URLRequest(url: url)) {}
+      // Source-line jumps (`galley://...?line=N`) don't translate to
+      // a remote render — the Server hasn't surfaced source positions
+      // over the wire. Drop the request so a stray value doesn't
+      // chase the next file-URL bind.
+      pendingScrollLine = nil
+      if let y = pendingScrollY {
+        pendingScrollY = nil
+        if y > 0 {
+          currentScrollY = y
+          await restoreScrollY(y)
+        }
+      } else if savedScrollY > 0 {
+        await restoreScrollY(savedScrollY)
+      }
+      await find.reapplyIfActive()
+    } catch {
+      report(failure: error, context: "navigation", lifetime: .renderBound)
     }
   }
 
@@ -746,13 +789,4 @@ final class DocumentModel {
     pinnedDetailWidth = nil
 #endif
   }
-}
-
-/// Reference holder so the URL scheme handler — which captures the
-/// box at WebPage creation time, before appModel are injected —
-/// always sees the latest template. DocumentModel updates `template`
-/// in `bindSettings(_:)` and at the start of every render.
-@MainActor
-final class TemplateBox {
-  var template: Template?
 }
