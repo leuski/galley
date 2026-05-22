@@ -1,5 +1,5 @@
 {
-  "originHash" : "80f84f9ad997a3a86a2cf9e1e2faca19bb5c36bc2716ecb0ed1d3f2b38dd45e4",
+  "originHash" : "8e445f105c2ed762bd35790911a30a6a84ee32d37e56bdbc4d6ea4295b417e4d",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "277e5db5b6d348270088e6ee8e8fa2539bae603d",
         "version" : "2.23.0"
+      }
+    },
+    {
+      "identity" : "loom",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/EthanLipnik/Loom.git",
+      "state" : {
+        "revision" : "8971febf105898760bcc5f462da4b3aa44954fe2",
+        "version" : "1.8.15"
       }
     },
     {
@@ -206,6 +215,15 @@
       "state" : {
         "revision" : "81cc18264f92cd307ff98430f89372711d4f6fe9",
         "version" : "1.43.0"
+      }
+    },
+    {
+      "identity" : "swift-nio-ssh",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-nio-ssh.git",
+      "state" : {
+        "revision" : "1a915a324afefd4031e396e81a0e210178621be8",
+        "version" : "0.13.0"
       }
     },
     {

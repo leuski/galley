@@ -10,11 +10,21 @@
 		62564F322FA857A400FF0F84 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62564F312FA857A400FF0F84 /* Quartz.framework */; };
 		62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 62564F302FA857A400FF0F84 /* Quicklook.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
+		628053992FBFEC0600A02808 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
+		629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050B00000000CADD7B01 /* KosmosWebView */; };
+		62913F252FBC3F9400088C1F /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050700000000CADD7B01 /* KosmosCore */; };
+		62913F262FBC3F9400088C1F /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050900000000CADD7B01 /* KosmosTransport */; };
+		629150E02FBFCE2700088C1F /* HummingbirdCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62913BA12FBC3B9A00088C1F /* HummingbirdCore */; };
+		62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050100000000CADD7B01 /* KosmosBridge */; };
+		62A0050400000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050300000000CADD7B01 /* KosmosCore */; };
+		62A0050600000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050500000000CADD7B01 /* KosmosTransport */; };
+		62A1000100000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
+		62A1000300000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A1000400000000CADD7B01 /* ALFoundation */; };
+		62A1000500000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000600000000CADD7B01 /* KosmosCore */; };
+		62A1000700000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000800000000CADD7B01 /* KosmosTransport */; };
 		62CC3C6E2FA7BA440018F091 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62CC3C6F2FA7BA440018F091 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		62D5E0A52FA5BE7800CADD72 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
 		62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
-		62D5E44A2FA5D95400CADD72 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); };
 		62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E49C2FA5D9D900CADD72 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49B2FA5D9D900CADD72 /* Markdown */; };
 		62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49E2FA5D9F100CADD72 /* Hummingbird */; };
@@ -149,6 +159,7 @@
 		62564F312FA857A400FF0F84 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
 		626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Galley Server.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		629139DD2FBC37CD00088C1F /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		62B8B6E52FB92DF9004FB681 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		62CC3C5F2FA7B8F90018F091 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D5CA192FA048F000CADD72 /* Galley.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Galley.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -163,6 +174,13 @@
 				Info.plist,
 			);
 			target = 62564F2F2FA857A400FF0F84 /* Quicklook */;
+		};
+		629150AD2FBD78A200088C1F /* Exceptions for "Server" folder in "Server" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Info.plist,
+			);
+			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
 		};
 		62B8BEAD2FB96756004FB681 /* Exceptions for "Viewer" folder in "Viewer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -239,6 +257,9 @@
 		};
 		62D5D5292FA1673B00CADD72 /* Server */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				629150AD2FBD78A200088C1F /* Exceptions for "Server" folder in "Server" target */,
+			);
 			path = Server;
 			sourceTree = "<group>";
 		};
@@ -286,6 +307,10 @@
 			files = (
 				62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */,
 				62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */,
+				62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */,
+				62A0050400000000CADD7B01 /* KosmosCore in Frameworks */,
+				62A0050600000000CADD7B01 /* KosmosTransport in Frameworks */,
+				62A1000100000000CADD7B01 /* ALFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -296,6 +321,8 @@
 				62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */,
 				62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */,
 				62FE000300000000CADD7201 /* ALFoundation in Frameworks */,
+				62A1000500000000CADD7B01 /* KosmosCore in Frameworks */,
+				62A1000700000000CADD7B01 /* KosmosTransport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,9 +338,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				62913F262FBC3F9400088C1F /* KosmosTransport in Frameworks */,
+				62913F252FBC3F9400088C1F /* KosmosCore in Frameworks */,
+				629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */,
 				62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62D5E4B62FA5DB9200CADD72 /* ALFoundation in Frameworks */,
-				62D5E44A2FA5D95400CADD72 /* GalleyServerKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -331,9 +360,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				629150E02FBFCE2700088C1F /* HummingbirdCore in Frameworks */,
 				62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */,
 				62D5E4A12FA5D9F100CADD72 /* HummingbirdTLS in Frameworks */,
+				62A1000300000000CADD7B01 /* ALFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -391,6 +422,7 @@
 		62D5E0FF2FA5C53400CADD72 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				629139DD2FBC37CD00088C1F /* WebKit.framework */,
 				62564F312FA857A400FF0F84 /* Quartz.framework */,
 			);
 			name = Frameworks;
@@ -451,6 +483,9 @@
 			buildRules = (
 			);
 			dependencies = (
+				629139D22FBC365F00088C1F /* PBXTargetDependency */,
+				629139D42FBC365F00088C1F /* PBXTargetDependency */,
+				629139D62FBC365F00088C1F /* PBXTargetDependency */,
 				62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
@@ -458,6 +493,10 @@
 			);
 			name = Server;
 			packageProductDependencies = (
+				62A0050100000000CADD7B01 /* KosmosBridge */,
+				62A0050300000000CADD7B01 /* KosmosCore */,
+				62A0050500000000CADD7B01 /* KosmosTransport */,
+				62A1000200000000CADD7B01 /* ALFoundation */,
 			);
 			productName = "Galley Server";
 			productReference = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */;
@@ -482,6 +521,8 @@
 			name = Tests;
 			packageProductDependencies = (
 				62FE000400000000CADD7201 /* ALFoundation */,
+				62A1000600000000CADD7B01 /* KosmosCore */,
+				62A1000800000000CADD7B01 /* KosmosTransport */,
 			);
 			productName = GalleyTests;
 			productReference = 626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */;
@@ -523,10 +564,14 @@
 				62D5E0A82FA5BFB000CADD72 /* Compile AppleScripts */,
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
 				62564F432FA857A400FF0F84 /* Embed Foundation Extensions */,
+				62D5E0AA2FA5BFB000CADD72 /* Strip Frameworks from nested Server.app */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				629139D82FBC367000088C1F /* PBXTargetDependency */,
+				629139DA2FBC367000088C1F /* PBXTargetDependency */,
+				629139DC2FBC367000088C1F /* PBXTargetDependency */,
 				62B8BEAF2FB96B6A004FB681 /* PBXTargetDependency */,
 				62D5E7692FA5E20100CADD72 /* PBXTargetDependency */,
 				62564F3D2FA857A400FF0F84 /* PBXTargetDependency */,
@@ -537,6 +582,9 @@
 			name = Viewer;
 			packageProductDependencies = (
 				62D5E4B52FA5DB9200CADD72 /* ALFoundation */,
+				62A0050700000000CADD7B01 /* KosmosCore */,
+				62A0050900000000CADD7B01 /* KosmosTransport */,
+				62A0050B00000000CADD7B01 /* KosmosWebView */,
 			);
 			productName = Galley;
 			productReference = 62D5CA192FA048F000CADD72 /* Galley.app */;
@@ -554,6 +602,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				62913BA02FBC39AE00088C1F /* PBXTargetDependency */,
 				62D5E4A32FA5DA0600CADD72 /* PBXTargetDependency */,
 				62D5E4A52FA5DA0600CADD72 /* PBXTargetDependency */,
 			);
@@ -593,6 +642,8 @@
 			packageProductDependencies = (
 				62D5E49E2FA5D9F100CADD72 /* Hummingbird */,
 				62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */,
+				62913BA12FBC3B9A00088C1F /* HummingbirdCore */,
+				62A1000400000000CADD7B01 /* ALFoundation */,
 			);
 			productName = GalleyServerKit;
 			productReference = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */;
@@ -648,6 +699,7 @@
 				62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 				62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */,
 				62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */,
+				629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 626E8D502F9DD1C700BD51F9 /* Products */;
@@ -698,7 +750,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				62D5E0A52FA5BE7800CADD72 /* Galley Server.app in Resources */,
+				628053992FBFEC0600A02808 /* Galley Server.app in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -756,6 +808,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/Scripts/compile-applescripts.sh\"\n";
+		};
+		62D5E0AA2FA5BFB000CADD72 /* Strip Frameworks from nested Server.app */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Frameworks from nested Server.app";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Only applies to the macOS slice; visionOS has no nested Server.app\nif [ \"$PLATFORM_NAME\" != \"macosx\" ]; then exit 0; fi\nSERVER_APP=\"$CODESIGNING_FOLDER_PATH/Contents/Resources/Galley Server.app\"\nif [ ! -d \"$SERVER_APP\" ]; then\n    echo \"warning: Strip frameworks: nested Galley Server.app not found at $SERVER_APP, skipping.\"\n    exit 0\nfi\nFRAMEWORKS_DIR=\"$SERVER_APP/Contents/Frameworks\"\nif [ -d \"$FRAMEWORKS_DIR\" ]; then\n    echo \"Strip frameworks: removing $(ls \"$FRAMEWORKS_DIR\" | wc -l | tr -d ' ') frameworks from nested Galley Server.app\"\n    rm -rf \"$FRAMEWORKS_DIR\"\nfi\nif [ \"$CODE_SIGNING_ALLOWED\" != \"NO\" ]; then\n    echo \"Strip frameworks: re-signing nested Galley Server.app\"\n    codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --preserve-metadata=identifier,entitlements,flags --timestamp=none \"$SERVER_APP\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -824,6 +895,49 @@
 			isa = PBXTargetDependency;
 			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
 			targetProxy = 62564F462FA857C400FF0F84 /* PBXContainerItemProxy */;
+		};
+		629139D22FBC365F00088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
+			productRef = 629139D12FBC365F00088C1F /* KosmosBridge */;
+		};
+		629139D42FBC365F00088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
+			productRef = 629139D32FBC365F00088C1F /* KosmosCore */;
+		};
+		629139D62FBC365F00088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
+			productRef = 629139D52FBC365F00088C1F /* KosmosTransport */;
+		};
+		629139D82FBC367000088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				xros,
+			);
+			productRef = 629139D72FBC367000088C1F /* KosmosCore */;
+		};
+		629139DA2FBC367000088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				xros,
+			);
+			productRef = 629139D92FBC367000088C1F /* KosmosTransport */;
+		};
+		629139DC2FBC367000088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 629139DB2FBC367000088C1F /* KosmosWebView */;
+		};
+		62913BA02FBC39AE00088C1F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 62913B9F2FBC39AE00088C1F /* ObservableDefaults */;
 		};
 		62B8BEAF2FB96B6A004FB681 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1074,7 +1188,8 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/Server/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1082,7 +1197,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley.server;
 				PRODUCT_NAME = "Galley Server";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
@@ -1096,7 +1210,8 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/Server/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1104,7 +1219,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley.server;
 				PRODUCT_NAME = "Galley Server";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
@@ -1193,7 +1307,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -1225,7 +1338,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -1237,8 +1349,10 @@
 		62D5E43C2FA5D93700CADD72 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = FS73MHCS98;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -1251,6 +1365,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyCoreKit;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "macosx xros xrsimulator";
@@ -1267,8 +1382,10 @@
 		62D5E43D2FA5D93700CADD72 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = FS73MHCS98;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -1281,6 +1398,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyCoreKit;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "macosx xros xrsimulator";
@@ -1297,8 +1415,10 @@
 		62D5E44D2FA5D95400CADD72 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = FS73MHCS98;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -1311,6 +1431,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyServerKit;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1324,8 +1445,10 @@
 		62D5E44E2FA5D95400CADD72 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = FS73MHCS98;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -1338,6 +1461,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyServerKit;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1425,6 +1549,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Kosmos;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1461,6 +1592,96 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		629139D12FBC365F00088C1F /* KosmosBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosBridge;
+		};
+		629139D32FBC365F00088C1F /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		629139D52FBC365F00088C1F /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
+		629139D72FBC367000088C1F /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		629139D92FBC367000088C1F /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
+		629139DB2FBC367000088C1F /* KosmosWebView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosWebView;
+		};
+		62913B9F2FBC39AE00088C1F /* ObservableDefaults */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */;
+			productName = ObservableDefaults;
+		};
+		62913BA12FBC3B9A00088C1F /* HummingbirdCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = HummingbirdCore;
+		};
+		62A0050100000000CADD7B01 /* KosmosBridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosBridge;
+		};
+		62A0050300000000CADD7B01 /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		62A0050500000000CADD7B01 /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
+		62A0050700000000CADD7B01 /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		62A0050900000000CADD7B01 /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
+		62A0050B00000000CADD7B01 /* KosmosWebView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosWebView;
+		};
+		62A1000200000000CADD7B01 /* ALFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
+			productName = ALFoundation;
+		};
+		62A1000400000000CADD7B01 /* ALFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
+			productName = ALFoundation;
+		};
+		62A1000600000000CADD7B01 /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		62A1000800000000CADD7B01 /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
 		62D5E49B2FA5D9D900CADD72 /* Markdown */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */;
