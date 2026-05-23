@@ -67,8 +67,19 @@ public final class PreviewServerController {
     }
   }
 
-  public private(set) var state: State = .stopped
+  public private(set) var state: State = .stopped {
+    didSet { stateContinuation.yield(state) }
+  }
   public private(set) var bindMode: BindMode = .loopback
+
+  /// Emits every `state` transition. Use to await a specific
+  /// transition (e.g. the first `.running` after a fresh `start()`)
+  /// without polling. Single-consumer by design; callers that need
+  /// fan-out should layer their own broadcaster on top.
+  @ObservationIgnored
+  public let stateChanges: AsyncStream<State>
+  @ObservationIgnored
+  private let stateContinuation: AsyncStream<State>.Continuation
 
   @ObservationIgnored private var httpTask: Task<Void, Never>?
   @ObservationIgnored private var httpsTask: Task<Void, Never>?
@@ -86,6 +97,9 @@ public final class PreviewServerController {
   ) {
     self.selectedTemplateProvider = selectedTemplateProvider
     self.rendererProvider = rendererProvider
+    let (stream, continuation) = AsyncStream<State>.makeStream()
+    self.stateChanges = stream
+    self.stateContinuation = continuation
   }
 
   /// Switch the listener between loopback-only and LAN-reachable modes.

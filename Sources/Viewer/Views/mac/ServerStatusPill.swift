@@ -30,7 +30,6 @@ struct ServerStatusPill: View {
   /// which gives translators two separate strings to work with.
   private var labelText: Text {
     switch status {
-    case .unknown:        return Text("Checking…")
     case .disabled:       return Text("Disabled")
     case .starting:       return Text("Starting…")
     case .running(let url):
@@ -38,18 +37,15 @@ struct ServerStatusPill: View {
       // separator; port numbers are identifiers, not quantities.
       return Text(
         "Running on :\(url.port ?? 0, format: .number.grouping(.never))")
-    case .stopped:        return Text("Not running")
     case .notResponding:  return Text("Not responding")
     }
   }
 
   private var tintColor: Color {
     switch status {
-    case .unknown:        return .gray
     case .disabled:       return Color.gray.opacity(0.5)
     case .starting:       return .yellow
     case .running:        return .green
-    case .stopped:        return .red
     case .notResponding:  return .orange
     }
   }
@@ -58,11 +54,9 @@ struct ServerStatusPill: View {
 #Preview {
   VStack(alignment: .leading, spacing: 8) {
     let url: URL = "http://127.0.0.1:8089"
-    ServerStatusPill(status: .unknown)
     ServerStatusPill(status: .disabled)
     ServerStatusPill(status: .starting)
     ServerStatusPill(status: .running(url))
-    ServerStatusPill(status: .stopped)
     ServerStatusPill(status: .notResponding)
   }
   .padding()

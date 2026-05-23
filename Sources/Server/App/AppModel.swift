@@ -159,9 +159,27 @@ final class AppModel {
 
   private func startServer() {
     server.start()
-    // Begin Kosmos advertising once HTTP is up so the bound port file
-    // is populated before the first peer can hit `BridgeAdvertisement`.
-    kosmos.start()
+    // Wait for the HTTP listener to actually bind before starting
+    // Kosmos so the loopback URL — including the OS-assigned port —
+    // can ride in the peer's advertisement metadata. Mac Viewer reads
+    // it from `PeerInfo.galleyHTTPURL` for the Settings pill, so there
+    // is no second port-discovery channel from the Viewer's side.
+    // `.failed` is also a terminal signal — start Kosmos anyway so
+    // peers can still discover liveness, just without a URL.
+    Task { [server, kosmos] in
+      for await state in server.stateChanges {
+        switch state {
+        case .running(let url):
+          kosmos.start(httpURL: url)
+          return
+        case .failed:
+          kosmos.start(httpURL: nil)
+          return
+        case .stopped:
+          continue
+        }
+      }
+    }
   }
 }
 

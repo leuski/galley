@@ -91,6 +91,14 @@ final class KosmosViewerService {
   /// Drives the Server-status pill.
   var isServerPeerConnected: Bool { serverPeer != nil }
 
+  /// HTTP base URL the Server published in its peer metadata at
+  /// advertise time. `nil` until the Server peer appears with a URL
+  /// in metadata. Drives the port number shown in `.running` pill text.
+  var serverPeerHTTPURL: URL? {
+    guard let id = serverPeer, let info = peers[id] else { return nil }
+    return info.galleyHTTPURL
+  }
+
   /// Drives the "Show on Vision Pro" menu enabledness.
   var isAVPReachable: Bool { avpPeer != nil }
 
@@ -197,7 +205,9 @@ final class KosmosViewerService {
 
     let summary = snapshot.values
       .map { info in
-        "\(info.id.description)[role=\(info.galleyRole?.rawValue ?? "nil")]"
+        let role = info.galleyRole?.rawValue ?? "nil"
+        let url = info.galleyHTTPURL?.absoluteString ?? "-"
+        return "\(info.id.description)[role=\(role) url=\(url)]"
       }
       .sorted()
       .joined(separator: ", ")

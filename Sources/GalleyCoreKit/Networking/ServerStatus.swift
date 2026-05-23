@@ -1,32 +1,31 @@
 import Foundation
 
-/// Reachability of the Markdown Preview Server, as observed from a
-/// client (the Viewer's settings pane). Distinct from
-/// `PreviewServerController.State`, which is the server's own
-/// in-process view.
+/// State of the Galley Server as reported through Kosmos, used by the
+/// Settings-pane status pill. The transitions are driven by two
+/// independent signals — Kosmos peer presence (truth of "is running")
+/// and `ActiveServerAgent.isEnabled` (truth of "user wants it on") —
+/// plus a 5-second grace window after the user expresses intent so we
+/// don't flash a red "not responding" state during normal launch.
 public enum ServerStatus: Equatable, Sendable {
-  /// No probe has completed yet.
-  case unknown
-
-  /// The user has the toggle off; we are not probing.
+  /// No Kosmos signal and the user has not enabled the Server. The
+  /// expected steady state when the user has never turned Galley's
+  /// Server on.
   case disabled
 
-  /// The probe just started and the server has not yet answered;
-  /// `.stopped`/`.notResponding` during this initial grace window are
-  /// reported as `.starting` so the UI doesn't flash a red "Not
-  /// running" state during normal launch.
+  /// User intent is on (LaunchAgent registered, or the user just
+  /// flipped the toggle) but Kosmos hasn't reported the Server peer
+  /// yet. Limited to the 5-second grace window after intent went on;
+  /// after that, transitions to `.notResponding`.
   case starting
 
-  /// `GET /` returned a 2xx response. The associated URL is the host
-  /// that responded, suitable for "Running on :8089"-style display.
+  /// Server peer is connected via Kosmos. The associated URL is the
+  /// Server's loopback HTTP base URL, published in its peer metadata —
+  /// the pill shows the port from it.
   case running(URL)
 
-  /// Connection refused — nothing is bound on this port. This is the
-  /// expected state when the Server agent failed to launch.
-  case stopped
-
-  /// Anything else: timeout, non-2xx response, transport error.
-  /// Distinct from `.stopped` so callers can surface a different hint
-  /// ("did the server hang?" vs "did it never start?").
+  /// User intent is on, the grace window has elapsed, and Kosmos
+  /// still doesn't see the Server peer. Something is wrong — the
+  /// LaunchAgent failed to spawn, the process crashed, Local Network
+  /// permission is denied, etc.
   case notResponding
 }

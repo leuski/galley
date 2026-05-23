@@ -80,11 +80,16 @@ final class KosmosLink {
     self.deviceID = loadOrMakeGalleyDeviceID(role: .server)
   }
 
-  /// Begin advertising. Idempotent.
-  func start() {
+  /// Begin advertising. Idempotent. `httpURL` is the Server's loopback
+  /// HTTP base URL once the listener has bound; it's published in the
+  /// peer's Kosmos metadata so the Mac Viewer's pill can read the port
+  /// for display without a side-channel file lookup. `nil` means the
+  /// HTTP listener never came up — peers can still discover liveness
+  /// but won't see a URL.
+  func start(httpURL: URL?) {
     guard bootstrapTask == nil else { return }
     bootstrapTask = Task { [weak self] in
-      await self?.bootstrap()
+      await self?.bootstrap(httpURL: httpURL)
     }
   }
 
@@ -180,9 +185,13 @@ final class KosmosLink {
 
   // MARK: - Bootstrap
 
-  private func bootstrap() async {
+  private func bootstrap(httpURL: URL?) async {
+    var metadata: [String: String] = [:]
+    if let httpURL {
+      metadata[GalleyKosmosMetadataKey.httpURL] = httpURL.absoluteString
+    }
     let (client, link) = await makeGalleyKosmosClient(
-      role: .server, deviceID: deviceID)
+      role: .server, deviceID: deviceID, extraMetadata: metadata)
     self.client = client
     self.link = link
 

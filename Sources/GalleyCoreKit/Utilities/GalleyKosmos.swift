@@ -47,6 +47,16 @@ public func loadOrMakeGalleyDeviceID(role: GalleyKosmosRole) -> UUID {
   KosmosClient.persistentDeviceID(forKey: role.deviceIDKey)
 }
 
+/// Galley-specific Kosmos peer-metadata keys. Keep in sync with the
+/// accessors on `PeerInfo` below — the keys are the wire shape.
+public enum GalleyKosmosMetadataKey {
+  /// Server's loopback HTTP base URL (`http://127.0.0.1:<port>`),
+  /// published once the listener has bound. Consumers read it via
+  /// `PeerInfo.galleyHTTPURL` to display the port without needing
+  /// `ServerPortFile`.
+  public static let httpURL = "galley.http-url"
+}
+
 /// Construct a Loom-backed `KosmosClient` for the given Galley
 /// surface. Pump is already running on return so registrations land
 /// before any peer connects. Caller registers handlers and then
@@ -54,20 +64,29 @@ public func loadOrMakeGalleyDeviceID(role: GalleyKosmosRole) -> UUID {
 public func makeGalleyKosmosClient(
   role: GalleyKosmosRole,
   deviceID: UUID,
-  deviceName: String? = nil
+  deviceName: String? = nil,
+  extraMetadata: [String: String] = [:]
 ) async -> (client: KosmosClient, link: LoomKosmosLink) {
   await KosmosClient.makeLoomBacked(
     role: role.rawValue,
     product: "galley",
     deviceID: deviceID,
     deviceName: deviceName ?? role.defaultDeviceName,
-    deviceType: role.loomDeviceType)
+    deviceType: role.loomDeviceType,
+    extraMetadata: extraMetadata)
 }
 
 extension PeerInfo {
   /// `kosmos.role` metadata mapped back to the typed enum.
   public var galleyRole: GalleyKosmosRole? {
     role.flatMap(GalleyKosmosRole.init)
+  }
+
+  /// HTTP base URL the Server published in its advertisement
+  /// metadata. `nil` for non-server peers, for servers that haven't
+  /// finished binding yet, or when the metadata is malformed.
+  public var galleyHTTPURL: URL? {
+    metadata[GalleyKosmosMetadataKey.httpURL].flatMap(URL.init(string:))
   }
 }
 

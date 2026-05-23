@@ -7,23 +7,37 @@ struct ServerSettingsView: View {
 
   private let agent = ActiveServerAgent.shared
 
-  /// User-visible toggle position. Mirrors `kosmos.isServerPeerConnected`
-  /// in steady state, but holds the user's intent during the gap
-  /// between "user clicked" and "Kosmos sees the new peer state."
-  /// Without this, the Binding's `get` would return the old kosmos
-  /// value the instant the user clicks, and SwiftUI would snap the
-  /// toggle back — making it look unclickable.
+  /// Number of seconds we tolerate "intent on, no Kosmos peer yet"
+  /// before flipping the pill from `.starting` to `.notResponding`.
+  /// Long enough to cover a normal launchd-bootstrap + HTTP-bind +
+  /// Kosmos-advertise round-trip; short enough that a genuine
+  /// failure surfaces while the user is still looking at the pane.
+  private static let graceSeconds: Duration = .seconds(5)
+
+  /// User-visible toggle position. Drives Toggle directly so a click
+  /// takes effect synchronously (no snap-back while Kosmos catches
+  /// up). Reconciled with `peerConnected || agentEnabled` via
+  /// `.onChange` below.
   @State private var toggleIntent: Bool = false
 
+  /// True after the grace window has elapsed since intent went on
+  /// without Kosmos seeing the peer. Reset to false whenever the
+  /// inputs change via `.task(id:)`.
+  @State private var graceExpired: Bool = false
+
   var body: some View {
-    // Pill is fed straight from Kosmos. Toggle uses local intent
-    // state (see `toggleIntent`), kept in sync with Kosmos via
-    // `.onChange` below.
     let peerConnected = kosmos.isServerPeerConnected
+    let serverURL = kosmos.serverPeerHTTPURL
+    let agentEnabled = agent.isEnabled
+    let status = Self.computeStatus(
+      peerConnected: peerConnected,
+      serverURL: serverURL,
+      agentEnabled: agentEnabled,
+      graceExpired: graceExpired)
 
     VStack(alignment: .leading, spacing: 4) {
       LabeledContent {
-        ServerStatusPill(status: pillStatus(peerConnected: peerConnected))
+        ServerStatusPill(status: status)
         Toggle("Server", isOn: toggleBinding)
           .toggleStyle(.switch)
           .labelsHidden()
@@ -37,39 +51,73 @@ struct ServerSettingsView: View {
           form this computer.
           """).subtitle()
     }
-    .onAppear { toggleIntent = peerConnected }
+    .onAppear { toggleIntent = peerConnected || agentEnabled }
     .onChange(of: peerConnected) { _, new in
-      // Reconcile the toggle with reality when Kosmos peer state
-      // changes for *any* reason — user-driven (toggle just fired
-      // `setEnabled`) or external (server crashed, was launched by
-      // Finder, etc.). The Binding's `set` updates `toggleIntent`
-      // directly, so this assignment is a no-op for user-initiated
-      // changes and the source-of-truth update for everything else.
-      toggleIntent = new
+      toggleIntent = new || agentEnabled
+    }
+    .onChange(of: agentEnabled) { _, new in
+      toggleIntent = peerConnected || new
+    }
+    // The grace timer keys off the *condition* that should be graced —
+    // "intent on, no peer yet". When that's true we sleep the grace
+    // window then flip `graceExpired`. Any other transition (peer
+    // connects, intent goes off) re-fires `.task(id:)` and cancels
+    // the in-flight sleep, resetting `graceExpired` to false. So
+    // `graceExpired == true` only ever means "we waited the full
+    // window for *this* attempt and Kosmos still hasn't seen the peer."
+    .task(id: needsGrace(
+      agentEnabled: agentEnabled, peerConnected: peerConnected
+    )) {
+      graceExpired = false
+      guard needsGrace(
+        agentEnabled: agentEnabled, peerConnected: peerConnected)
+      else { return }
+      try? await Task.sleep(for: Self.graceSeconds)
+      if !Task.isCancelled {
+        graceExpired = true
+      }
     }
   }
 
-  /// Pill state is derived from Kosmos peer presence alone:
-  /// - peer connected → `.running`
-  /// - no peer       → `.stopped`
-  ///
-  /// If Kosmos can't find the Server peer while the Server process is
-  /// running, that's a Kosmos-level bug — fix it in the link, not by
-  /// layering in secondary signals here.
-  private func pillStatus(peerConnected: Bool) -> ServerStatus {
-    guard peerConnected else { return .stopped }
-    let fallback = URL(string: "http://127.0.0.1")
-      !! "compile-time-constant http://127.0.0.1 should parse"
-    let url = ServerPortFile.http.endpointURL ?? fallback
-    return .running(url)
+  /// Pure state-machine: combine the two observable inputs and the
+  /// grace-window state into a single pill status. Exposed as a
+  /// static func so it's straightforward to unit-test if needed.
+  static func computeStatus(
+    peerConnected: Bool,
+    serverURL: URL?,
+    agentEnabled: Bool,
+    graceExpired: Bool
+  ) -> ServerStatus {
+    // Peer presence wins — if Kosmos sees the Server, the Server is
+    // up regardless of LaunchAgent state (it might have been launched
+    // by Finder, manually, or the user just toggled on and the agent
+    // landed before the URL did).
+    if peerConnected, let url = serverURL {
+      return .running(url)
+    }
+    if peerConnected {
+      // Peer connected but no URL in metadata yet — shouldn't happen
+      // with the Server publishing on bind, but treat as still
+      // coming up rather than green-with-missing-info.
+      return .starting
+    }
+    if !agentEnabled {
+      return .disabled
+    }
+    return graceExpired ? .notResponding : .starting
   }
 
-  /// Two-way binding for the toggle. Read from local intent (so the
-  /// user's click takes immediate visual effect); write updates the
-  /// intent *and* kicks off `agent.setEnabled`, which manages
-  /// LaunchAgent registration + terminates the running Server on
-  /// toggle-off. Kosmos peer state then catches up asynchronously
-  /// and `.onChange(of: peerConnected)` reconciles the intent.
+  /// True when the grace timer should be running — intent is on but
+  /// Kosmos doesn't see the peer yet.
+  private func needsGrace(agentEnabled: Bool, peerConnected: Bool) -> Bool {
+    agentEnabled && !peerConnected
+  }
+
+  /// Toggle reads local intent (immediate visual feedback) and writes
+  /// through `agent.setEnabled`, which manages LaunchAgent
+  /// registration + terminates the running Server on toggle-off.
+  /// Kosmos peer state then catches up asynchronously and the
+  /// `.onChange` handlers reconcile.
   private var toggleBinding: Binding<Bool> {
     Binding(
       get: { toggleIntent },
