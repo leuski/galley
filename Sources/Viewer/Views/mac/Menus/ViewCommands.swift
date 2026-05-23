@@ -30,3 +30,14 @@ struct ViewCommands: Commands {
     }
   }
 }
+
+struct WindowCommands: Commands {
+  var kosmos: KosmosViewerService
+  @FocusedValue(\.documentModel) private var model
+
+  var body: some Commands {
+    CommandGroup(before: .windowArrangement) {
+      Action.showOnVisionPro(model, kosmos: kosmos).menuItem()
+    }
+  }
+}

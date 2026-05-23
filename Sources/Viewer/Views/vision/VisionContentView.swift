@@ -4,6 +4,7 @@ import GalleyCoreKit
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+import ALFoundation
 
 /// Document-window content view for visionOS. Boot-gated wrapper:
 /// shows a progress spinner while async catalog discovery is in
@@ -118,7 +119,7 @@ private struct WelcomeScreen: View {
             VStack(alignment: .leading, spacing: 2) {
               Text(url.lastPathComponent)
                 .font(.body)
-              Text(url.deletingLastPathComponent().path)
+              Text(url.parent.path)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

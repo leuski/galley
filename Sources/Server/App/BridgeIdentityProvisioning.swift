@@ -1,5 +1,6 @@
 import Foundation
 import GalleyCoreKit
+import GalleyServerKit
 import KosmosBridge
 import os
 
@@ -21,7 +22,13 @@ enum BridgeIdentityProvisioning {
   /// `BridgeAdvertisement`. Wrapping a value to keep it `let`.
   static let store: BridgeIdentityStore = BridgeIdentityStore(
     directory: GalleyConstants.applicationSupportDirectory,
-    commonName: "Galley Server")
+    commonName: "Galley Server",
+    configuration: {
+      var config = BridgeIdentityStore.Configuration.default
+      config.certificateFilename = GalleyConstants.serverCertificateFilename
+      config.privateKeyFilename = GalleyConstants.serverPrivateKeyFilename
+      return config
+    }())
 
   /// Ensures the cert + key files exist on disk before the preview
   /// server starts. Logs but never throws — a failure here means HTTPS

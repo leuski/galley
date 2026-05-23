@@ -71,6 +71,10 @@ public enum ViewerA11yID {
     public static let templateItem = "viewer.rendering.template.item"
   }
 
+  public enum WindowMenu {
+    public static let showOnVisionPro = "viewer.window.showOnVisionPro"
+  }
+
   // MARK: Settings
 
   public enum Settings {

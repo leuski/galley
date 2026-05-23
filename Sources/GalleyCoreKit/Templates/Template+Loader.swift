@@ -75,7 +75,7 @@ extension Template {
     nameResource: LocalizedStringResource? = nil
   ) {
     self.init(
-      entryURL: sourceURL.appendingPathComponent(name),
+      entryURL: sourceURL / name,
       sourceIndex: sourceIndex,
       nameResource: nameResource)
   }

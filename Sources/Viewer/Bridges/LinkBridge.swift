@@ -5,6 +5,7 @@ import Foundation
 import GalleyCoreKit
 import WebKit
 import os
+import ALFoundation
 
 /// Handles plain-click on `<a href>` elements inside the rendered
 /// preview: resolves relative paths against the current document, and
@@ -187,7 +188,7 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     }
 
     guard let documentURL else { return nil }
-    let baseDir = documentURL.deletingLastPathComponent()
+    let baseDir = documentURL.parent
 
     // Strip a query/fragment for path resolution; webkit handles them
     // again on the loaded doc (we only care about which file to open).

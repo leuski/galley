@@ -1,9 +1,13 @@
 #if os(macOS)
 import AppKit
 import GalleyCoreKit
+import os
 import SwiftUI
 import UniformTypeIdentifiers
 import ALFoundation
+
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "MacViewerApp")
 
 @main
 struct MacViewerApp: App {
@@ -11,18 +15,33 @@ struct MacViewerApp: App {
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()
+  @State private var kosmos: KosmosViewerService
 
   private static func createApplicationSupportDirectory() {
     let localized = GalleyConstants
       .applicationSupportDirectory / ".localized" / "en.strings"
     guard !localized.itemExists else { return }
-    try? localized.parent.createDirectory()
+    do {
+      try localized.parent.createDirectory()
+    } catch {
+      log.warning("""
+        Couldn't create .localized dir: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
     let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
     ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
     ?? ProcessInfo.processInfo.processName
-    try? """
-    "\(GalleyConstants.suiteName)" = "\(appName)";
-    """.write(to: localized, atomically: true, encoding: .utf8)
+    do {
+      try """
+      "\(GalleyConstants.suiteName)" = "\(appName)";
+      """.write(to: localized, atomically: true, encoding: .utf8)
+    } catch {
+      log.warning("""
+        Couldn't seed en.strings: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    }
   }
 
   init() {
@@ -40,7 +59,7 @@ struct MacViewerApp: App {
     // record pointing at a stale location. Detect and repair before
     // any UI reflects stale state. No-op when nothing is installed.
     // Fire-and-forget: scenes don't need to wait on it.
-    Task { await ActiveServerAgent.validateAndRepair() }
+    Task { await ActiveServerAgent.shared.validateAndRepair() }
     let args = LaunchArguments.fromProcess()
     let dispatcher = WindowDispatcher()
     if let seed = args.seedFile {
@@ -50,6 +69,11 @@ struct MacViewerApp: App {
       dispatcher.enqueueAtLaunch(seed)
     }
     _dispatcher = State(wrappedValue: dispatcher)
+    // Start the Kosmos surface so the peer set populates by the
+    // time the menu / pill consult it. Independent of `AppBoot`.
+    let kosmos = KosmosViewerService()
+    kosmos.start()
+    _kosmos = State(wrappedValue: kosmos)
   }
 
   var body: some Scene {
@@ -107,6 +131,7 @@ struct MacViewerApp: App {
       if let model = boot.model {
         FormatCommands(appModel: model)
       }
+      WindowCommands(kosmos: kosmos)
       HelpCommands(dispatcher: dispatcher)
     }
 
@@ -136,6 +161,7 @@ struct MacViewerApp: App {
     Settings {
       if let model = boot.model {
         SettingsView(appModel: model)
+          .environment(kosmos)
       } else {
         ProgressView("Starting…")
           .padding()

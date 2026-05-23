@@ -7,6 +7,7 @@ import NIOSSL
 import NIOPosix
 import os
 import GalleyCoreKit
+import ALFoundation
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "PreviewServer")
@@ -315,8 +316,8 @@ public final class PreviewServerController {
   /// fails, so a bad cert disables HTTPS without crashing the app.
   private static func tryLoadTLSConfiguration() -> TLSConfiguration? {
     let dir = GalleyConstants.applicationSupportDirectory
-    let certURL = dir.appendingPathComponent("server-cert.pem")
-    let keyURL = dir.appendingPathComponent("server-key.pem")
+    let certURL = dir / GalleyConstants.serverCertificateFilename
+    let keyURL = dir / GalleyConstants.serverPrivateKeyFilename
     let files = FileManager.default
     guard files.isReadableFile(atPath: certURL.path),
           files.isReadableFile(atPath: keyURL.path)
@@ -347,4 +348,9 @@ private actor BoundPort {
   private var port: UInt16 = 0
   func load() -> UInt16 { port }
   func store(_ value: UInt16) { port = value }
+}
+
+public extension GalleyConstants {
+  static let serverCertificateFilename = "server-cert.pem"
+  static let serverPrivateKeyFilename = "server-key.pem"
 }

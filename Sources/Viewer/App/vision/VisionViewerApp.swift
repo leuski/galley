@@ -15,6 +15,8 @@ import SwiftUI
 struct VisionViewerApp: App {
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
+  @State private var kosmos = KosmosVisionService()
+  @Environment(\.scenePhase) private var scenePhase
 
   init() {
     Defaults.warmCache()
@@ -24,6 +26,8 @@ struct VisionViewerApp: App {
     WindowGroup(for: URL.self) { $fileURL in
       VisionContentView(fileURL: $fileURL, boot: boot)
         .environment(recents)
+        .environment(kosmos)
+        .modifier(KosmosClientLifecycleBridge(kosmos: kosmos))
     }
     .windowResizability(.contentSize)
 
@@ -45,6 +49,35 @@ struct VisionViewerApp: App {
     .windowResizability(.contentSize)
     .restorationBehavior(.disabled)
     .defaultSize(width: 640, height: 720)
+  }
+}
+
+/// Capture the document `WindowGroup`'s `openWindow` environment so
+/// the Kosmos client can route incoming `OpenURL` messages into a new
+/// document window. Also forwards `scenePhase` transitions to the
+/// client so the Mac peer learns when AVP suspends/resumes.
+///
+/// The view itself renders nothing — it lives in the content tree
+/// purely to access the `openWindow` environment that's only
+/// available inside a SwiftUI body.
+private struct KosmosClientLifecycleBridge: ViewModifier {
+  @Bindable var kosmos: KosmosVisionService
+  @Environment(\.openWindow) private var openWindow
+
+  // Scene-phase observation is intentionally absent. On visionOS,
+  // `.background` fires for focus loss / dim-out / window close in
+  // ways that don't correspond to true app suspension — and the
+  // Kosmos session itself is a strictly better reachability signal:
+  // if AVP can receive a message, it's reachable. Publishing
+  // `AppWillSuspend` from a noisy phase change just disables the
+  // Mac-side menu while an AVP window is plainly visible.
+
+  func body(content: Content) -> some View {
+    content
+      .onAppear {
+        kosmos.start()
+        kosmos.onOpenURL = { url in openWindow(value: url) }
+      }
   }
 }
 #endif

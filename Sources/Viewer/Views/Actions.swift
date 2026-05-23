@@ -27,9 +27,11 @@ struct Action {
   let isEnabled: @MainActor () -> Bool
   let shortcut: KeyboardShortcut?
   let accessibilityID: String
+  let help: (@MainActor () -> LocalizedStringResource)?
 
   init(
     title: @escaping @MainActor () -> LocalizedStringResource,
+    help: (@MainActor () -> LocalizedStringResource)? = nil,
     image: String,
     perform: @escaping @MainActor (_ reduceMotion: Bool) -> Void,
     isEnabled: @escaping @MainActor () -> Bool = { true },
@@ -42,6 +44,7 @@ struct Action {
     self.isEnabled = isEnabled
     self.shortcut = shortcut
     self.accessibilityID = accessibilityID
+    self.help = help
   }
 
   init(
@@ -80,10 +83,13 @@ struct Action {
     )
   }
 
+  var shortcutString: String {
+    shortcut.map { shortcut in " (\(Self.format(shortcut)))" } ?? ""
+  }
+
   func helpLabel() -> LocalizedStringResource {
-    let title = self.title()
-    guard let shortcut else { return title }
-    return "\(title) (\(Self.format(shortcut)))"
+    if let help { return help() }
+    return "\(self.title())\(shortcutString)"
   }
 
   // Standard macOS glyph order: ⌃⌥⇧⌘ then key.
@@ -301,6 +307,34 @@ extension Action {
     )
   }
 }
+
+#if os(macOS)
+extension Action {
+  static func showOnVisionPro(
+    _ model: DocumentModel?,
+    kosmos: KosmosViewerService) -> Action
+  {
+    Action(
+      title: { "Show on Vision Pro" },
+      help: {
+        kosmos.isAVPReachable
+        ? "Open this document on the connected Vision Pro."
+        : "No Vision Pro is currently paired with the bridge."
+      },
+      image: "visionpro",
+      perform: { _ in
+        model?.showOnVisionPro(kosmos: kosmos)
+      },
+      isEnabled: {
+        kosmos.isAVPReachable
+        && model?.documentURL.isFileURL == true
+      },
+      shortcut: .init("3", modifiers: [.command, .control]),
+      accessibilityID: ViewerA11yID.WindowMenu.showOnVisionPro
+    )
+  }
+}
+#endif
 
 /// Menu rendering for an `Action`. Dedicated View so `@Environment` for
 /// reduce-motion can be threaded into the action closure without each

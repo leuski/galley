@@ -57,7 +57,7 @@ public struct Template: Sendable, Identifiable,
 
   public func resolveAsset(file: String) -> URL? {
     let directoryURL = self.directoryURL.safe
-    let candidate = directoryURL.appendingPathComponent(file).safe
+    let candidate = (directoryURL / file).safe
     return candidate.path.hasPrefix(directoryURL.path.appendingSlash)
       ? candidate : nil
   }
