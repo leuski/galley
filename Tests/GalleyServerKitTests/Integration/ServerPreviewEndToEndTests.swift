@@ -20,12 +20,9 @@ struct ServerPreviewEndToEndTests {
   private func makeTempMarkdownFile(
     contents: String = "# Hello\n\nWorld\n"
   ) throws -> URL {
-    let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent(
-        "galley-e2e-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: dir, withIntermediateDirectories: true)
-    let file = dir.appendingPathComponent("Hello.md")
+    let dir = URL.temporaryDirectory / "galley-e2e-\(UUID().uuidString)"
+    try dir.createDirectory()
+    let file = dir / "Hello.md"
     try Data(contents.utf8).write(to: file)
     return file
   }
@@ -123,14 +120,11 @@ struct ServerPreviewEndToEndTests {
 
   @Test("Path with a space in it round-trips correctly")
   func pathWithSpaceRoundTrips() async throws {
-    let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent(
-        "galley-e2e-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: dir, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: dir) }
+    let dir = URL.temporaryDirectory / "galley-e2e-\(UUID().uuidString)"
+    try dir.createDirectory()
+    defer { try? dir.remove() }
 
-    let file = dir.appendingPathComponent("My Notes.md")
+    let file = dir / "My Notes.md"
     try Data("# Spaced\n\nText\n".utf8).write(to: file)
 
     guard let (controller, host) = await startReadyController() else { return }

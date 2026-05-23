@@ -74,20 +74,18 @@ private func waitFor(
 
 @MainActor
 private func makeTempDir() -> URL {
-  let tmp = URL.temporaryDirectory.appending(
-    path: "ChoiceObservationTests-\(UUID().uuidString)")
-  try? FileManager.default.createDirectory(
-    at: tmp, withIntermediateDirectories: true)
+  let tmp = URL.temporaryDirectory
+  / "ChoiceObservationTests-\(UUID().uuidString)"
+  try? tmp.createDirectory()
   return tmp
 }
 
 @MainActor
 private func writeFolderTemplate(at root: URL, name: String) throws {
-  let folder = root.appending(path: name)
-  try FileManager.default.createDirectory(
-    at: folder, withIntermediateDirectories: true)
+  let folder = root / name
+  try folder.createDirectory()
   try "<html></html>".write(
-    to: folder.appending(path: "Template.html"),
+    to: folder / "Template.html",
     atomically: true, encoding: .utf8)
 }
 
@@ -100,7 +98,7 @@ struct TemplateStoreObservationTests {
   @Test("reload() picks up a newly added folder template")
   func reloadPicksUpNewTemplate() throws {
     let tmp = makeTempDir()
-    defer { try? FileManager.default.removeItem(at: tmp) }
+    defer { try? tmp.remove() }
     let store = TemplateStore(directoryURLs: [tmp])
 
     #expect(store.templates.isEmpty)
@@ -115,12 +113,12 @@ struct TemplateStoreObservationTests {
   @Test("reload() drops a deleted folder template")
   func reloadDropsDeletedTemplate() throws {
     let tmp = makeTempDir()
-    defer { try? FileManager.default.removeItem(at: tmp) }
+    defer { try? tmp.remove() }
     try writeFolderTemplate(at: tmp, name: "Doomed")
     let store = TemplateStore(directoryURLs: [tmp])
     #expect(store.templates.count == 1)
 
-    try FileManager.default.removeItem(at: tmp.appending(path: "Doomed"))
+    try tmp.appending(path: "Doomed").remove()
     store.reload()
 
     #expect(store.templates.isEmpty)
@@ -131,8 +129,8 @@ struct TemplateStoreObservationTests {
     let bundleSim = makeTempDir()
     let userSim = makeTempDir()
     defer {
-      try? FileManager.default.removeItem(at: bundleSim)
-      try? FileManager.default.removeItem(at: userSim)
+      try? bundleSim.remove()
+      try? userSim.remove()
     }
     try writeFolderTemplate(at: bundleSim, name: "Default")
     try writeFolderTemplate(at: userSim, name: "Default")

@@ -13,6 +13,7 @@ import GalleyCoreKit
 import UniformTypeIdentifiers
 import WebKit
 import os
+import ALFoundation
 
 extension DocumentModel {
   // MARK: - Print / Export
@@ -42,9 +43,7 @@ extension DocumentModel {
   }
 
   func exportPDF() async throws -> URL {
-    let destination = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString)
-      .appendingPathExtension("pdf")
+    let destination = URL.temporaryDirectory / "\(UUID().uuidString).pdf"
     let host = Self.makeOffscreenHostWindow()
     try await runPrintOperation(
       jobTitle: documentURL.lastPathComponent,

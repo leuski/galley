@@ -92,49 +92,46 @@ public final class TemplateStore {
   }
 
   public func reload() {
-    let manager = FileManager.default
-    var discovered: [Template] = []
-
-    for (index, dir) in directoryURLs.enumerated() {
-      let listingDir = dir.safe
-      let contents: [URL]
+    func dirContents(at dir: URL) -> [URL] {
       do {
-        contents = try manager.contentsOfDirectory(
-          at: listingDir,
+        return try dir.contentsOfDirectory(
           includingPropertiesForKeys: [.isDirectoryKey],
           options: [.skipsHiddenFiles])
       } catch CocoaError.fileReadNoSuchFile {
         // Directory hasn't been created yet — expected for the user
         // templates dir on a fresh install.
-        contents = []
+        return []
       } catch {
         log.error("""
-          Templates dir \(listingDir.path, privacy: .private) unreadable: \
+          Templates dir \(dir.safe.path, privacy: .private) unreadable: \
           \(error.localizedDescription, privacy: .public)
           """)
-        contents = []
+        return []
       }
-
-      let nameResourceProvider = makeNameResourceProvider(forSource: index)
-      let entries: [Template] = contents.compactMap { url in
-        Template(
-          entryURL: url,
-          sourceIndex: index,
-          nameResource: nameResourceProvider(url.lastPathComponent))
-      }
-      discovered.append(contentsOf: entries)
     }
 
-    let sorted = discovered.sorted {
-      // Group by source first (so bundled appear before user), then
-      // by display name within the source.
-      if $0.sourceIndex != $1.sourceIndex {
-        return $0.sourceIndex < $1.sourceIndex
+    let sorted = directoryURLs
+      .enumerated()
+      .flatMap { index, dir in
+        let nameResourceProvider = makeNameResourceProvider(forSource: index)
+        return dirContents(at: dir)
+          .compactMap { url in
+          Template(
+            entryURL: url,
+            sourceIndex: index,
+            nameResource: nameResourceProvider(url.lastPathComponent))
+        }
       }
-      return String(localized: $0.name)
-        .localizedCaseInsensitiveCompare(
-          String(localized: $1.name)) == .orderedAscending
-    }
+      .sorted {
+        // Group by source first (so bundled appear before user), then
+        // by display name within the source.
+        if $0.sourceIndex != $1.sourceIndex {
+          return $0.sourceIndex < $1.sourceIndex
+        }
+        return String(localized: $0.name)
+          .localizedCaseInsensitiveCompare(
+            String(localized: $1.name)) == .orderedAscending
+      }
 
     if sorted.map(\.id) != templates.map(\.id) {
       templates = sorted

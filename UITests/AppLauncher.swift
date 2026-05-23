@@ -1,3 +1,4 @@
+internal import ALFoundation
 import XCTest
 
 /// Helpers for launching the Viewer app under deterministic test
@@ -101,11 +102,9 @@ enum AppLauncher {
     file: StaticString = #file,
     line: UInt = #line
   ) throws -> (app: XCUIApplication, fileURL: URL) {
-    let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("uitest-\(UUID().uuidString)")
-    try FileManager.default.createDirectory(
-      at: dir, withIntermediateDirectories: true)
-    let fileURL = dir.appendingPathComponent(fileName)
+    let dir = URL.temporaryDirectory / "uitest-\(UUID().uuidString)"
+    try dir.createDirectory()
+    let fileURL = dir / fileName
     try markdownContent.write(to: fileURL, atomically: true, encoding: .utf8)
     let app = launchClean(
       extraArgs: ["--seed-file", fileURL.path],

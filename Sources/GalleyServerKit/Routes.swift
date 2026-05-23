@@ -155,13 +155,6 @@ enum Routes {
     template: Template,
     renderer: any MarkdownRenderer
   ) async -> Response {
-    guard FileManager.default.isReadableFile(atPath: documentURL.path) else {
-      return HTTPResponses.notFound(
-        String(
-          localized: "Cannot read \(documentURL.path)",
-          bundle: .galleyServerKit))
-    }
-
     let source: String
     do {
       source = try String(contentsOf: documentURL, encoding: .utf8)
@@ -212,12 +205,6 @@ enum Routes {
   }
 
   private static func serveFile(at url: URL) -> Response {
-    guard FileManager.default.isReadableFile(atPath: url.path) else {
-      return HTTPResponses.notFound(
-        String(
-          localized: "File not found: \(url.path)",
-          bundle: .galleyServerKit))
-    }
     let data: Data
     do {
       data = try Data(contentsOf: url)

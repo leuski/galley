@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Testing
+internal import ALFoundation
 @testable import GalleyCoreKit
 
 /// Regression coverage for the rich-text clipboard path documented in
@@ -56,10 +57,8 @@ struct ClipboardRoundTripTests {
     """
 
   nonisolated private static func bundledTemplates() -> [Template] {
-    let manager = FileManager.default
     let dir = URL.bundleTemplatesDirectoryURL
-    let contents = (try? manager.contentsOfDirectory(
-      at: dir,
+    let contents = (try? URL.bundleTemplatesDirectoryURL.contentsOfDirectory(
       includingPropertiesForKeys: nil,
       options: [.skipsHiddenFiles])) ?? []
     let templates = contents

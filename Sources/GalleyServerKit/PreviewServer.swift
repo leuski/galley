@@ -50,10 +50,10 @@ public final class PreviewServerController {
 
     var hostString: String {
       switch self {
-      // `::` enables IPV6_V6ONLY=false on Apple platforms (NIO default
-      // for IPv6 bootstrap on Darwin), so a single listener handles
-      // both IPv4 and IPv6 traffic. Binding `0.0.0.0` would miss IPv6
-      // and break peers reaching us via a global / link-local v6.
+        // `::` enables IPV6_V6ONLY=false on Apple platforms (NIO default
+        // for IPv6 bootstrap on Darwin), so a single listener handles
+        // both IPv4 and IPv6 traffic. Binding `0.0.0.0` would miss IPv6
+        // and break peers reaching us via a global / link-local v6.
       case .loopback: return GalleyConstants.defaultHost
       case .lanReachable: return "::"
       }
@@ -125,69 +125,70 @@ public final class PreviewServerController {
     let templateProvider = selectedTemplateProvider
     let renderProvider = rendererProvider
     let watcher = self.watcher
+    let extraHosts = bindMode.extraAllowedHostnames
+
     // HTTP serves only the same-machine same-user trust domain — the
     // Mac Viewer's loopback render path. We pin it to 127.0.0.1
     // regardless of bindMode so it's never reachable over LAN, even
     // when HTTPS flips to dual-stack `::` for an AVP peer.
-    let httpBindHost = GalleyConstants.defaultHost
-    let httpsBindHost = bindMode.hostString
-    let extraHosts = bindMode.extraAllowedHostnames
+    httpTask = startHTTPListener(
+      bindHost: GalleyConstants.defaultHost,
+      extraHosts: extraHosts,
+      templateProvider: templateProvider,
+      renderProvider: renderProvider,
+      watcher: watcher)
 
-    let httpBoundPort = BoundPort()
-    let httpRouter = Routes.makeRouter(
+    if let tlsConfiguration = Self.tryLoadTLSConfiguration() {
+      httpsTask = startTLSListener(
+        tlsConfiguration: tlsConfiguration,
+        bindHost: bindMode.hostString,
+        extraHosts: extraHosts,
+        templateProvider: templateProvider,
+        renderProvider: renderProvider,
+        watcher: watcher)
+    }
+  }
+
+  /// Spins up the HTTP listener and returns the task running it.
+  /// Mirrors `startTLSListener` so both listeners follow the same
+  /// build-router → build-app → spawn-task shape.
+  private func startHTTPListener(
+    bindHost: String,
+    extraHosts: Set<String>,
+    templateProvider: @escaping @Sendable () async -> Template,
+    renderProvider: @escaping @Sendable () async -> (any MarkdownRenderer)?,
+    watcher: DocumentWatcher
+  ) -> Task<Void, Never> {
+    let boundPort = BoundPort()
+    let router = Routes.makeRouter(
       hostURLProvider: {
-        await Self.endpointURL(scheme: "http", port: httpBoundPort.load())
+        await Self.endpointURL(scheme: "http", port: boundPort.load())
       },
       extraAllowedHostsProvider: { extraHosts },
       selectedTemplateProvider: templateProvider,
       rendererProvider: renderProvider,
       watcher: watcher)
 
-    let httpApp = Application(
-      router: httpRouter,
+    let app = Application(
+      router: router,
       configuration: .init(
-        address: .hostname(httpBindHost, port: 0),
+        address: .hostname(bindHost, port: 0),
         serverName: nil),
       onServerRunning: { @Sendable channel in
         guard let portInt = channel.localAddress?.port,
               let port = UInt16(exactly: portInt) else {
           return
         }
-        await httpBoundPort.store(port)
+        await boundPort.store(port)
         let endpoint = Self.endpointURL(scheme: "http", port: port)
         await MainActor.run {
-          do {
-            // Locked write: the `.http` port file doubles as the
-            // single-instance sentinel. If another Galley Server is
-            // already running on this user account, this throws
-            // `LockedByAnotherProcess` and we tear down the listener
-            // we just bound — ServerApp's NSRunningApplication guard
-            // catches most duplicates, this catches the rest.
-            try ServerPortFile.http.write(port, lock: true)
-            if let endpoint { self.state = .running(url: endpoint) }
-          } catch is ServerPortFile.LockedByAnotherProcess {
-            // Tear down the listener we just bound, then publish
-            // the failure. `stop()` resets state to `.stopped`, so
-            // the failed-state assignment has to come after it.
-            self.stop()
-            self.state = .failed(message: String(
-              localized: """
-                Another Galley Server is already running on this user account.
-                """,
-              bundle: .galleyServerKit))
-          } catch {
-            self.stop()
-            self.state = .failed(message: String(
-              localized:
-                "Cannot write port file: \(error.localizedDescription)",
-              bundle: .galleyServerKit))
-          }
+          self.publishHTTPBound(port: port, endpoint: endpoint)
         }
       })
 
-    httpTask = Task { [weak self] in
+    return Task { [weak self] in
       do {
-        try await httpApp.run()
+        try await app.run()
       } catch is CancellationError {
         // `start()` called `stop()` which cancelled us in order to
         // hand the slot to a fresh task that has already bound and
@@ -200,15 +201,38 @@ public final class PreviewServerController {
       }
       await self?.publishStopped()
     }
+  }
 
-    if let tlsConfiguration = Self.tryLoadTLSConfiguration() {
-      httpsTask = startTLSListener(
-        tlsConfiguration: tlsConfiguration,
-        bindHost: httpsBindHost,
-        extraHosts: extraHosts,
-        templateProvider: templateProvider,
-        renderProvider: renderProvider,
-        watcher: watcher)
+  /// Called from the HTTP listener's `onServerRunning` once the port
+  /// is known. Writes the `.http` port file (locked — it doubles as
+  /// the single-instance sentinel) and publishes the running URL, or
+  /// tears the listener down with a localized failure message.
+  private func publishHTTPBound(port: UInt16, endpoint: URL?) {
+    do {
+      // Locked write: the `.http` port file doubles as the
+      // single-instance sentinel. If another Galley Server is
+      // already running on this user account, this throws
+      // `LockedByAnotherProcess` and we tear down the listener
+      // we just bound — ServerApp's NSRunningApplication guard
+      // catches most duplicates, this catches the rest.
+      try ServerPortFile.http.write(port, lock: true)
+      if let endpoint { self.state = .running(url: endpoint) }
+    } catch is ServerPortFile.LockedByAnotherProcess {
+      // Tear down the listener we just bound, then publish
+      // the failure. `stop()` resets state to `.stopped`, so
+      // the failed-state assignment has to come after it.
+      self.stop()
+      self.state = .failed(message: String(
+        localized: """
+          Another Galley Server is already running on this user account.
+          """,
+        bundle: .galleyServerKit))
+    } catch {
+      self.stop()
+      self.state = .failed(message: String(
+        localized:
+          "Cannot write port file: \(error.localizedDescription)",
+        bundle: .galleyServerKit))
     }
   }
 
@@ -332,10 +356,6 @@ public final class PreviewServerController {
     let dir = GalleyConstants.applicationSupportDirectory
     let certURL = dir / GalleyConstants.serverCertificateFilename
     let keyURL = dir / GalleyConstants.serverPrivateKeyFilename
-    let files = FileManager.default
-    guard files.isReadableFile(atPath: certURL.path),
-          files.isReadableFile(atPath: keyURL.path)
-    else { return nil }
 
     do {
       let certs = try NIOSSLCertificate.fromPEMFile(certURL.path)
