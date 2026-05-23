@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import ALFoundation
 
 /// Identity check for the Viewer ↔ Server contract. Both apps embed
 /// the same `GalleyCoreKit` framework binary, the same
@@ -26,47 +27,24 @@ public enum GalleyAppHash {
     }.value
   }
 
+  static let separator = Data([0])
+
   static func computeSync(at root: URL) throws -> String {
-    let manager = FileManager.default
-    let rootPath = root.standardizedFileURL.path
-    guard manager.fileExists(atPath: rootPath) else {
-      throw CocoaError(.fileNoSuchFile)
-    }
-
-    let keys: [URLResourceKey] = [.isRegularFileKey]
-    guard let enumerator = manager.enumerator(
-      at: root,
-      includingPropertiesForKeys: keys,
-      options: [])
-    else {
-      throw CocoaError(.fileReadUnknown)
-    }
-
-    var entries: [(relativePath: String, url: URL)] = []
-    for case let url as URL in enumerator {
-      let isFile = (try? url.resourceValues(
-        forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-      guard isFile else { continue }
-      let absolute = url.standardizedFileURL.path
-      let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-      let relative = absolute.hasPrefix(prefix)
-        ? String(absolute.dropFirst(prefix.count))
-        : absolute
-      entries.append((relative, url))
-    }
-    entries.sort { $0.relativePath < $1.relativePath }
-
-    var hasher = SHA256()
-    let separator = Data([0])
-    for entry in entries {
+    try root.enumerator(
+      includingPropertiesForKeys: [.isRegularFileKey],
+      options: [.producesRelativePathURLs])
+    .filter(\.isRegularFile)
+    .map { url in (relativePath: url.relativePath, url: url) }
+    .sorted { $0.relativePath < $1.relativePath }
+    .reduce(into: SHA256()) { hasher, entry in
       hasher.update(data: Data(entry.relativePath.utf8))
-      hasher.update(data: separator)
+      hasher.update(data: Self.separator)
       let data = try Data(contentsOf: entry.url, options: .mappedIfSafe)
       hasher.update(data: data)
-      hasher.update(data: separator)
+      hasher.update(data: Self.separator)
     }
-    return hasher.finalize()
-      .map { String(format: "%02x", $0) }
-      .joined()
+    .finalize()
+    .map { String(format: "%02x", $0) }
+    .joined()
   }
 }

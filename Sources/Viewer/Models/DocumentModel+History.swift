@@ -2,6 +2,7 @@
 import AppKit
 #endif
 import Foundation
+import ALFoundation
 
 extension DocumentModel {
   var canGoBack: Bool { currentIndex > 0 }

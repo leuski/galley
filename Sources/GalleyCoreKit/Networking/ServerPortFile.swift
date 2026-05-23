@@ -237,7 +237,7 @@ public struct ServerPortFile: Hashable, Sendable {
       }
 
       do {
-        try FileManager.default.removeItem(at: target)
+        try target.remove()
       } catch CocoaError.fileNoSuchFile {
         // Already absent — expected on first stop or repeat clears.
       } catch {

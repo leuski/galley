@@ -572,7 +572,7 @@ final class DocumentModel {
 
     let newURL = oldURL.parent / trimmed
     do {
-      try FileManager.default.moveItem(at: oldURL, to: newURL)
+      try oldURL.move(to: newURL)
     } catch {
       report(
         failure: error, context: "rename",

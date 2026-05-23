@@ -11,6 +11,7 @@ import GalleyCoreKit
 import UIKit
 import UniformTypeIdentifiers
 import WebKit
+import ALFoundation
 
 extension DocumentModel {
   // MARK: - PDF export
@@ -90,16 +91,9 @@ extension DocumentModel {
     // `FileRepresentation.suggestedFileName` hint isn't always
     // honored once `SentTransferredFile(_:allowAccessingOriginalFile:
     // true)` lets the recipient touch the file directly.
-    let baseName = documentURL
-      .deletingPathExtension()
-      .lastPathComponent
-    let dir = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: dir, withIntermediateDirectories: true)
-    let destination = dir
-      .appendingPathComponent(baseName)
-      .appendingPathExtension("pdf")
+    let dir = URL.temporaryDirectory / UUID().uuidString
+    try dir.createDirectory()
+    let destination = dir / "\(documentURL.fileName).pdf"
     try data.write(to: destination, options: .atomic)
     return destination
   }

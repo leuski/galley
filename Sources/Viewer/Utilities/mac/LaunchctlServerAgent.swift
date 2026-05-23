@@ -54,7 +54,7 @@ struct LaunchctlServerAgent {
 
   var isEnabled: Bool {
     get async {
-      guard FileManager.default.fileExists(atPath: plistURL.path) else {
+      guard plistURL.itemExists else {
         return false
       }
       return await isLoadedInLaunchd
@@ -82,7 +82,7 @@ struct LaunchctlServerAgent {
   /// (the user moved the app), rewrite the plist and re-bootstrap.
   /// No-op when the agent isn't installed.
   func validateAndRepair() async {
-    guard FileManager.default.fileExists(atPath: plistURL.path) else {
+    guard plistURL.itemExists else {
       return
     }
     let expected = helperBinaryPath
@@ -203,8 +203,8 @@ struct LaunchctlServerAgent {
 
   private func uninstall() async throws {
     try? await launchctl.exec("bootout", serviceTarget)
-    if FileManager.default.fileExists(atPath: plistURL.path) {
-      try FileManager.default.removeItem(at: plistURL)
+    if plistURL.itemExists {
+      try plistURL.remove()
     }
   }
 
