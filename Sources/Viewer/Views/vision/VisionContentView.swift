@@ -159,6 +159,7 @@ private struct DocumentScreen: View {
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(RecentDocumentsModel.self) private var recents
+  @Environment(KosmosVisionService.self) private var kosmos
 
   var body: some View {
     Group {
@@ -490,7 +491,8 @@ private struct DocumentScreen: View {
       templatePersistent: perFile.templatePersistent,
       processorPersistent: perFile.rendererPersistent,
       colorSchemePersistent: perFile.colorSchemePersistent,
-      kind: .document)
+      kind: .document,
+      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.httpTunnel))
     model = created
     return created
   }
@@ -527,6 +529,9 @@ private struct VisionChangeHandlers: ViewModifier {
 /// Identifiers for the visionOS-only auxiliary scenes.
 enum VisionWindowID {
   static let settings = "settings"
+  /// Invisible anchor scene that keeps the app process alive across
+  /// document-window close. See `VisionViewerApp` for rationale.
+  static let home = "home"
 }
 
 #endif

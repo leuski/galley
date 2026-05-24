@@ -22,7 +22,8 @@ extension DocumentModel {
     tocBridge: TOCBridge,
     statsBridge: StatsBridge,
     backgroundBridge: BackgroundColorBridge,
-    templateProvider: @escaping @MainActor @Sendable () -> Template
+    templateProvider: @escaping @MainActor @Sendable () -> Template,
+    kosmosTunnel: KosmosTunnelClientRef? = nil
   ) -> WebPage.Configuration {
     var configuration = WebPage.Configuration()
     configuration.defaultNavigationPreferences.preferredContentMode = .desktop
@@ -100,8 +101,35 @@ extension DocumentModel {
     // explicit invalidation.
     let handler = PreviewSchemeHandler(templateProvider: templateProvider)
     configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
+
+#if os(visionOS)
+    // AVP renders Mac-hosted documents by tunneling each WebKit fetch
+    // through Kosmos via the `galley://` scheme. The handler holds a
+    // reference to the shared `HTTPTunnelAVPClient` owned by
+    // `KosmosVisionService`.
+    if let kosmosTunnel = kosmosTunnel?.client {
+      let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
+      configuration.urlSchemeHandlers[KosmosTunnelSchemeHandler.scheme]
+        = tunnelHandler
+    }
+#endif
+
     return configuration
   }
+}
+
+/// Type-erased holder so the (visionOS-only) tunnel-client type
+/// doesn't leak into the shared `makeConfiguration` signature on
+/// macOS. The macOS slice ignores the parameter; visionOS reads the
+/// inner client and registers the scheme handler.
+struct KosmosTunnelClientRef {
+#if os(visionOS)
+  let client: HTTPTunnelAVPClient
+#else
+  /// macOS keeps the type around for source compatibility but
+  /// can't construct it.
+  var client: Never? { nil }
+#endif
 }
 
 #if !os(macOS)

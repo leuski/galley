@@ -39,8 +39,8 @@ final class KosmosViewerService {
   @ObservationIgnored private var client: KosmosClient?
   @ObservationIgnored private var link: LoomKosmosLink?
 
-  @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
-  @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
+  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
+  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
 
   init() {
     self.deviceID = loadOrMakeGalleyDeviceID(role: .macViewer)
@@ -51,13 +51,11 @@ final class KosmosViewerService {
     guard bootstrapTask == nil else { return }
     bootstrapTask = Task { [weak self] in
       await self?.bootstrap()
-    }
+    }.token
   }
 
   func stop() async {
-    bootstrapTask?.cancel()
     bootstrapTask = nil
-    peerWatchTask?.cancel()
     peerWatchTask = nil
     if let client {
       await client.stop()
@@ -197,7 +195,7 @@ final class KosmosViewerService {
           self?.applyPeerSnapshot(snapshot)
         }
       }
-    }
+    }.token
   }
 
   private func applyPeerSnapshot(_ snapshot: [PeerID: PeerInfo]) {

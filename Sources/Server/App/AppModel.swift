@@ -62,9 +62,7 @@ final class AppModel {
       rendererProvider: { [weak processors] in
         await processors?.selected.value.renderer
       })
-    self.kosmos = KosmosLink(
-      server: self.server,
-      identityStore: BridgeIdentityProvisioning.store)
+    self.kosmos = KosmosLink(server: self.server)
 
     // Bidirectional sync with the shared `net.leuski.galley.shared`
     // suite. Outbound: menu-bar picks here surface in the Viewer
@@ -196,12 +194,6 @@ final class AppBoot {
     // responds. Fire it in parallel and let it resolve whenever.
     Task { await DisplacementNotifier.requestAuthorization() }
     Task { @MainActor in
-      // Materialize the HTTPS cert + key before AppModel kicks off
-      // the preview server. PreviewServer.start() reads the PEMs
-      // synchronously from Application Support; if they exist, HTTPS
-      // comes up alongside HTTP. We do this on every boot so a cert
-      // approaching expiry gets rotated automatically.
-      await BridgeIdentityProvisioning.ensure()
       await ProcessorStore.shared.discover()
       self.model = AppModel()
     }

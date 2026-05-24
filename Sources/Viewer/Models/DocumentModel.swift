@@ -1,6 +1,5 @@
 import Foundation
 import GalleyCoreKit
-import KosmosWebView
 import Observation
 import OSLog
 import SwiftUI
@@ -277,7 +276,8 @@ final class DocumentModel {
     templatePersistent: String?,
     processorPersistent: String?,
     colorSchemePersistent: String? = nil,
-    kind: Kind
+    kind: Kind,
+    kosmosTunnel: KosmosTunnelClientRef? = nil
   ) {
     self.kind = kind
     self.documentURL = initialURL
@@ -320,19 +320,8 @@ final class DocumentModel {
         templateProvider: {
           Self.resolveTemplate(
             templates: templatesRef, appModel: appModelRef)
-        }),
-      // Pin AVP↔Mac LAN HTTPS against the Kosmos-published cert
-      // SHA-256. Inert on every current code path:
-      //   - Mac Viewer rendering local files in-process: file://, no
-      //     TLS challenge.
-      //   - Quicklook: `http://127.0.0.1`, no TLS challenge.
-      //   - visionOS: `http://127.0.0.1:<proxyPort>` via
-      //     `AVPHTTPProxy`, no TLS challenge to WebKit. The proxy's
-      //     `NWConnection` is what terminates TLS to the Mac Server
-      //     and pins via the same `PinnedCertPolicy`.
-      // Left attached so that any future code path that does load a
-      // bridge URL directly inherits the pin automatically.
-      navigationDecider: KosmosCertPinner())
+        },
+        kosmosTunnel: kosmosTunnel))
     self.find = FindSession(page: self.page)
 
     wireBridges()

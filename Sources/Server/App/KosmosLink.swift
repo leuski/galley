@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 import GalleyCoreKit
 import GalleyServerKit
-import KosmosBridge
 import KosmosCore
 import KosmosTransport
 import Observation
@@ -49,8 +48,12 @@ final class KosmosLink {
   @ObservationIgnored private var client: KosmosClient?
   @ObservationIgnored private var link: LoomKosmosLink?
 
-  @ObservationIgnored private let identityStore: BridgeIdentityStore
   @ObservationIgnored private let server: PreviewServerController
+
+  /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
+  /// peers and streams responses chunkwise from the local Hummingbird
+  /// HTTP listener over Kosmos.
+  @ObservationIgnored private let httpTunnel: HTTPTunnelMacHandler
 
   /// Per-window state for files currently delegated to AVP.
   struct OpenWindow {
@@ -77,22 +80,19 @@ final class KosmosLink {
   /// its message queue.
   @ObservationIgnored private var peerResumed: [PeerID: Bool] = [:]
 
-  @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
-  @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
-  @ObservationIgnored
-  private var closeWindowSubscriptionTask: Task<Void, Never>?
-  @ObservationIgnored
-  private var suspendSubscriptionTask: Task<Void, Never>?
-  @ObservationIgnored
-  private var resumeSubscriptionTask: Task<Void, Never>?
+  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
+  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
+  @ObservationIgnored private var closeWindowSubscription: SubscriptionToken?
+  @ObservationIgnored private var suspendSubscription: SubscriptionToken?
+  @ObservationIgnored private var resumeSubscription: SubscriptionToken?
+  @ObservationIgnored private var proxyRequestSubscription: SubscriptionToken?
+  @ObservationIgnored private var proxyCancelSubscription: SubscriptionToken?
 
-  init(
-    server: PreviewServerController,
-    identityStore: BridgeIdentityStore
-  ) {
+  init(server: PreviewServerController) {
     self.server = server
-    self.identityStore = identityStore
     self.deviceID = loadOrMakeGalleyDeviceID(role: .server)
+    self.httpTunnel = HTTPTunnelMacHandler(
+      upstreamBaseProvider: { ServerPortFile.http.endpointURL })
   }
 
   /// Begin advertising. Idempotent. `httpURL` is the Server's loopback
@@ -105,20 +105,18 @@ final class KosmosLink {
     guard bootstrapTask == nil else { return }
     bootstrapTask = Task { [weak self] in
       await self?.bootstrap(httpURL: httpURL)
-    }
+    }.token
   }
 
   func stop() {
-    bootstrapTask?.cancel()
     bootstrapTask = nil
-    peerWatchTask?.cancel()
     peerWatchTask = nil
-    closeWindowSubscriptionTask?.cancel()
-    closeWindowSubscriptionTask = nil
-    suspendSubscriptionTask?.cancel()
-    suspendSubscriptionTask = nil
-    resumeSubscriptionTask?.cancel()
-    resumeSubscriptionTask = nil
+    closeWindowSubscription = nil
+    suspendSubscription = nil
+    resumeSubscription = nil
+    proxyRequestSubscription = nil
+    proxyCancelSubscription = nil
+    httpTunnel.stop()
     for (_, window) in openOnAVP {
       window.watchTask.cancel()
     }
@@ -142,75 +140,23 @@ final class KosmosLink {
   func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
     guard
       let client,
-      let resolved = await resolveAVPDispatch(fileURL: fileURL)
-    else { return false }
-    let windowID = trackOpenWindow(
-      fileURL: fileURL.target.url,
-      peerID: resolved.visionPeer,
-      client: client)
-    publishOpenDocument(
-      fileURL: fileURL,
-      identity: resolved.identity,
-      previewURL: resolved.previewURL,
-      windowID: windowID,
-      client: client)
-    return true
-  }
-
-  /// Bundle of resolved preconditions returned by
-  /// `resolveAVPDispatch`. Kept as a named type instead of a 3-tuple
-  /// for readability and SwiftLint's large_tuple rule.
-  private struct ResolvedDispatch {
-    let visionPeer: PeerID
-    let identity: BridgeIdentity
-    let previewURL: URL
-  }
-
-  /// Preconditions for an AVP dispatch: a reachable vision peer, a
-  /// bridge identity, and an HTTPS-only preview URL on the LAN. Logs
-  /// the failure mode and returns nil when any one is missing.
-  private func resolveAVPDispatch(
-    fileURL: GalleyBridgeRequest
-  ) async -> ResolvedDispatch? {
-    guard let visionPeer = firstReachableVisionPeer() else {
+      let visionPeer = firstReachableVisionPeer()
+    else {
       log.notice("""
         Cannot dispatch — no reachable vision peer for \
         \(fileURL, privacy: .public)
         """)
-      return nil
+      return false
     }
-    let identity: BridgeIdentity
-    do {
-      identity = try await identityStore.currentIdentity()
-    } catch {
-      log.error("""
-        Cannot dispatch — bridge identity unavailable: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-      return nil
-    }
-    let reachable = LANHostDiscovery.reachableHosts()
-    let lanHost = BridgeURLBuilder.preferredAVPHost(from: reachable)
-    let httpsPort = ServerPortFile.https.read()
-    guard let base = BridgeURLBuilder.avpDocumentURL(
-      host: lanHost,
-      httpsPort: httpsPort,
-      compose: Self.composeLANURL)
-    else {
-      let hostStr = lanHost ?? "nil"
-      let portStr = httpsPort.map(String.init) ?? "nil"
-      log.error("""
-        Cannot dispatch — HTTPS not bound on LAN \
-        (host=\(hostStr, privacy: .public) \
-        httpsPort=\(portStr, privacy: .public)). \
-        Refusing HTTP fallback — HTTP listener is loopback-only.
-        """)
-      return nil
-    }
-    return ResolvedDispatch(
-      visionPeer: visionPeer,
-      identity: identity,
-      previewURL: base.appendingPreview(fileURL.target.url))
+    let windowID = trackOpenWindow(
+      fileURL: fileURL.target.url,
+      peerID: visionPeer,
+      client: client)
+    publishOpenDocument(
+      fileURL: fileURL,
+      windowID: windowID,
+      client: client)
+    return true
   }
 
   /// Allocates the per-window state and subscribes the watcher to the
@@ -243,34 +189,23 @@ final class KosmosLink {
   /// the corresponding diagnostic log line.
   private func publishOpenDocument(
     fileURL: GalleyBridgeRequest,
-    identity: BridgeIdentity,
-    previewURL: URL,
     windowID: KosmosCore.WindowID,
     client: KosmosClient
   ) {
-    // `httpsURL` already targets the publisher's preferred host (AWDL
-    // for AVP). `hostCandidates` is the full reachable list so
-    // receivers that can't dial the AWDL form (notably the visionOS
-    // simulator) can fall back to a Bonjour or LAN-IP candidate that
-    // shares the same HTTPS port and path.
-    let candidates = LANHostDiscovery.reachableHosts()
+    // The data plane rides Kosmos via `ProxyHTTPRequest` — AVP
+    // synthesizes its own `galley://preview/<path>` URL from
+    // `documentPath` and tunnels each subresource fetch back through
+    // the `HTTPTunnelMacHandler` over Kosmos.
     let message = OpenDocument(
       docID: windowID,
-      httpsURL: previewURL,
-      hostCandidates: candidates,
-      certificateSHA256: identity.certificateSHA256,
+      documentPath: fileURL.target.url.path,
       displayName: fileURL.target.url.lastPathComponent,
       scrollLineHint: fileURL.target.scrollLine,
       openBehavior: .newWindow)
-    let pinHex = identity.certificateSHA256.map {
-      String(format: "%02x", $0)
-    }.joined()
     log.notice("""
       → PUBLISH OpenDocument doc=\(windowID, privacy: .public) \
-      url=\(previewURL.absoluteString, privacy: .public) \
-      name=\(message.displayName, privacy: .public) \
-      certSHA256=\(pinHex, privacy: .public) \
-      file=\(fileURL, privacy: .public)
+      path=\(message.documentPath, privacy: .public) \
+      name=\(message.displayName, privacy: .public)
       """)
     Task { [weak client] in
       await client?.publish(message)
@@ -356,46 +291,45 @@ final class KosmosLink {
           self?.handlePeersChanged(snapshot)
         }
       }
-    }
+    }.token
   }
 
   private func startSubscriptions(client: KosmosClient) {
-    closeWindowSubscriptionTask = Task { [weak self] in
-      let stream = client.subscribe(CloseWindow.self)
-      for await (sender, message) in stream {
+    closeWindowSubscription = client
+      .subscribe(CloseWindow.self) { [weak self] sender, message in
         log.notice("""
           ← RECV CloseWindow from=\(sender.description, privacy: .public) \
           window=\(message.windowID, privacy: .public)
           """)
-        await MainActor.run {
-          self?.handleCloseWindow(message)
-        }
+        self?.handleCloseWindow(message)
       }
-    }
 
-    suspendSubscriptionTask = Task { [weak self] in
-      let stream = client.subscribe(AppWillSuspend.self)
-      for await (sender, _) in stream {
+    suspendSubscription = client
+      .subscribe(AppWillSuspend.self) { [weak self] sender, _ in
         log.notice("""
           ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
           """)
-        await MainActor.run {
-          self?.setPeerResumed(sender, resumed: false)
-        }
+        self?.setPeerResumed(sender, resumed: false)
       }
-    }
 
-    resumeSubscriptionTask = Task { [weak self] in
-      let stream = client.subscribe(AppDidResume.self)
-      for await (sender, _) in stream {
+    resumeSubscription = client
+      .subscribe(AppDidResume.self) { [weak self] sender, _ in
         log.notice("""
           ← RECV AppDidResume from=\(sender.description, privacy: .public)
           """)
-        await MainActor.run {
-          self?.setPeerResumed(sender, resumed: true)
-        }
+        self?.setPeerResumed(sender, resumed: true)
       }
-    }
+
+    proxyRequestSubscription = client
+      .subscribe(ProxyHTTPRequest.self) { [weak self, weak client] _, request in
+        guard let self, let client else { return }
+        self.httpTunnel.handleRequest(request, client: client)
+      }
+
+    proxyCancelSubscription = client
+      .subscribe(ProxyHTTPCancel.self) { [weak self] _, message in
+        self?.httpTunnel.handleCancel(message)
+      }
   }
 
   private func setPeerResumed(_ peer: PeerID, resumed: Bool) {
@@ -457,22 +391,14 @@ final class KosmosLink {
     // if its app weren't running).
     peerResumed[peer] = true
     updateReachabilityFlag()
-
-    // Widen the Server's Host-header allowlist to admit the same LAN
-    // hosts we'll later carry as `hostCandidates` on each
-    // `OpenDocument`. No separate advertisement message — every
-    // `OpenDocument` ships the cert pin and the candidate list inline.
-    let extras = Set(LANHostDiscovery.reachableHosts())
-    server.setBindMode(.lanReachable(extraAllowedHostnames: extras))
+    // No bind-mode flip: the Mac HTTP listener stays loopback-only
+    // for AVP and every other consumer. AVP traffic rides the
+    // Kosmos tunnel via `HTTPTunnelMacHandler`.
   }
 
   private func onVisionPeerLeft(_ peer: PeerID) {
     log.notice("Vision peer left: \(peer.description, privacy: .public)")
     peerResumed.removeValue(forKey: peer)
-    let stillHaveVision = peerRoles.contains { $0.value == .visionViewer }
-    if !stillHaveVision {
-      server.setBindMode(.loopback)
-    }
     updateReachabilityFlag()
 
     // Migrate windows that were on this peer back to Mac.
@@ -512,15 +438,6 @@ final class KosmosLink {
     isAVPReachable = firstReachableVisionPeer() != nil
   }
 
-  /// Adapter between `BridgeURLBuilder.Composer` (unlabeled, UInt16
-  /// port) and `LANHostDiscovery.composeURL` (labeled, Int port). Kept
-  /// here so the builder stays free of the IPv6-bracketing dep.
-  private static func composeLANURL(
-    _ scheme: String, _ host: String, _ port: UInt16
-  ) -> URL? {
-    LANHostDiscovery.composeURL(
-      scheme: scheme, host: host, port: Int(port))
-  }
 }
 
 /// Pure normalization of inbound URLs from `application(_:open:)` and

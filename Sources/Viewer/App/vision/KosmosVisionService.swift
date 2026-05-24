@@ -3,7 +3,6 @@ import Foundation
 import GalleyCoreKit
 import KosmosCore
 import KosmosTransport
-import KosmosWebView
 import Observation
 import OSLog
 import SwiftUI
@@ -16,6 +15,13 @@ private let log = Logger(
 /// subscribes to bridge messages (open-document, content changes), and
 /// publishes lifecycle to the bridge so the Mac can gate AVP
 /// reachability on suspend / resume.
+///
+/// Also owns the AVP end of the HTTP tunnel — every `galley://` URL
+/// the WebView fetches becomes a `ProxyHTTPRequest` Kosmos broadcast,
+/// and the response chunks are routed back through
+/// `HTTPTunnelAVPClient`. The service is the single subscription point
+/// for the two response message types so we don't spin up a per-request
+/// subscription.
 @MainActor
 @Observable
 final class KosmosVisionService {
@@ -24,23 +30,22 @@ final class KosmosVisionService {
   /// on it.
   private(set) var peers: [PeerID: PeerInfo] = [:]
 
+  /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
+  /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
+  /// the `galley://` scheme.
+  let httpTunnel: HTTPTunnelAVPClient
+
   @ObservationIgnored private let deviceID: UUID
   @ObservationIgnored private var client: KosmosClient?
   @ObservationIgnored private var link: LoomKosmosLink?
 
-  /// Loopback HTTP proxy that fronts the Mac Server. We rewrite the
-  /// `httpsURL` in each `OpenDocument` into
-  /// `http://127.0.0.1:<proxyPort>/...` before handing it to SwiftUI —
-  /// WebKit on visionOS rejects URLs whose host carries an IPv6 zone
-  /// identifier. The proxy terminates the TLS to the upstream and
-  /// applies the Kosmos cert pin.
-  @ObservationIgnored private let proxy = AVPHTTPProxy()
-
-  @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
-  @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
-  @ObservationIgnored private var openURLSubscription: Task<Void, Never>?
-  @ObservationIgnored private var openDocumentSubscription: Task<Void, Never>?
-  @ObservationIgnored private var contentChangeSubscription: Task<Void, Never>?
+  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
+  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
+  @ObservationIgnored private var openURLSubscription: SubscriptionToken?
+  @ObservationIgnored private var openDocumentSubscription: SubscriptionToken?
+  @ObservationIgnored private var contentChangeSubscription: SubscriptionToken?
+  @ObservationIgnored private var proxyHeadSubscription: SubscriptionToken?
+  @ObservationIgnored private var proxyChunkSubscription: SubscriptionToken?
 
   /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
   /// by the app to call `openWindow(value: url)`. The service holds
@@ -57,28 +62,26 @@ final class KosmosVisionService {
 
   init() {
     self.deviceID = loadOrMakeGalleyDeviceID(role: .visionViewer)
+    self.httpTunnel = HTTPTunnelAVPClient(client: nil)
   }
 
   /// Begin advertising and browsing. Idempotent.
   func start() {
     guard bootstrapTask == nil else { return }
-    proxy.start()
     bootstrapTask = Task { [weak self] in
       await self?.bootstrap()
-    }
+    }.token
   }
 
   func stop() async {
-    bootstrapTask?.cancel()
     bootstrapTask = nil
-    peerWatchTask?.cancel()
     peerWatchTask = nil
-    openURLSubscription?.cancel()
     openURLSubscription = nil
-    openDocumentSubscription?.cancel()
     openDocumentSubscription = nil
-    contentChangeSubscription?.cancel()
     contentChangeSubscription = nil
+    proxyHeadSubscription = nil
+    proxyChunkSubscription = nil
+    httpTunnel.stopAll()
     if let client {
       await client.stop()
     }
@@ -86,14 +89,12 @@ final class KosmosVisionService {
     link = nil
     reloadHandlers.removeAll()
     openWindows.removeAll()
-    KosmosPinnedCertSource.update(nil)
     peers = [:]
-    proxy.stop()
   }
 
   /// Notify the Mac that AVP is about to suspend (`scenePhase`
-  /// transitioned to `.background` — typically the user closed all
-  /// AVP Galley windows, or took the headset off). Mac side flips the
+  /// transitioned to `.background` — typically the user closed the
+  /// last AVP Galley window including the anchor). Mac side flips the
   /// per-peer resumed flag and falls back to local Galley.app for
   /// subsequent opens until `publishResume` fires.
   func publishSuspend() {
@@ -155,6 +156,7 @@ final class KosmosVisionService {
       role: .visionViewer, deviceID: deviceID)
     self.client = client
     self.link = link
+    httpTunnel.attach(client: client)
 
     startPeerWatch(client: client)
     startSubscriptions(client: client)
@@ -177,41 +179,39 @@ final class KosmosVisionService {
           self?.peers = snapshot
         }
       }
-    }
+    }.token
   }
 
   private func startSubscriptions(client: KosmosClient) {
-    openURLSubscription = Task { [weak self] in
-      let stream = client.subscribe(OpenURL.self)
-      for await (_, message) in stream {
-        await MainActor.run {
-          self?.handleOpenURL(message)
-        }
+    openURLSubscription = client
+      .subscribe(OpenURL.self) { [weak self] _, message in
+        self?.handleOpenURL(message)
       }
-    }
 
-    openDocumentSubscription = Task { [weak self] in
-      let stream = client.subscribe(OpenDocument.self)
-      for await (sender, message) in stream {
-        await MainActor.run {
-          self?.handleOpenDocument(message, from: sender)
-        }
+    openDocumentSubscription = client
+      .subscribe(OpenDocument.self) { [weak self] sender, message in
+        self?.handleOpenDocument(message, from: sender)
       }
-    }
 
-    contentChangeSubscription = Task { [weak self] in
-      let stream = client.subscribe(WindowContentChanged.self)
-      for await (sender, message) in stream {
+    contentChangeSubscription = client
+      .subscribe(WindowContentChanged.self) { [weak self] sender, message in
         log.notice("""
           ← RECV WindowContentChanged \
           from=\(sender.description, privacy: .public) \
           window=\(message.windowID, privacy: .public)
           """)
-        await MainActor.run {
-          self?.reloadHandlers[message.windowID]?()
-        }
+        self?.reloadHandlers[message.windowID]?()
       }
-    }
+
+    proxyHeadSubscription = client
+      .subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
+        self?.httpTunnel.handle(head)
+      }
+
+    proxyChunkSubscription = client
+      .subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
+        self?.httpTunnel.handle(chunk)
+      }
   }
 
   private func handleOpenURL(_ message: OpenURL) {
@@ -226,117 +226,25 @@ final class KosmosVisionService {
   private func handleOpenDocument(
     _ message: OpenDocument, from sender: PeerID
   ) {
-    let pinHex = message.certificateSHA256.map {
-      String(format: "%02x", $0)
-    }.joined()
-    let candidates = message.hostCandidates.joined(separator: ",")
     log.notice("""
       ← RECV OpenDocument from=\(sender.description, privacy: .public) \
       doc=\(message.docID, privacy: .public) \
-      url=\(message.httpsURL.absoluteString, privacy: .public) \
+      path=\(message.documentPath, privacy: .public) \
       name=\(message.displayName, privacy: .public) \
-      certSHA256=\(pinHex, privacy: .public) \
-      hostCandidates=\(candidates, privacy: .public) \
       scrollLineHint=\(message.scrollLineHint ?? -1, privacy: .public) \
       behavior=\(message.openBehavior.rawValue, privacy: .public)
       """)
-    // Apply the cert pin BEFORE we hand the URL to SwiftUI's
-    // openWindow. `KosmosPinnedCertSource` is read by the in-process
-    // `AVPHTTPProxy`'s TLS verify block (and historically by
-    // `KosmosCertPinner` for the WebView's direct TLS challenge, now
-    // inert on visionOS — WebKit only ever sees loopback HTTP).
-    KosmosPinnedCertSource.update(message.certificateSHA256)
-    let host = Self.pickUpstreamHost(
-      preferred: message.httpsURL.host(percentEncoded: false),
-      candidates: message.hostCandidates)
-    guard let host else {
-      log.error("""
-        No dialable host in OpenDocument for \
-        \(message.httpsURL.absoluteString, privacy: .public)
-        """)
-      return
-    }
-    configureProxy(
-      host: host,
-      portFrom: message.httpsURL,
-      certSHA256: message.certificateSHA256)
-    Task { [weak self] in
-      guard let self else { return }
-      guard let routed = await self.proxy
-        .awaitRewrittenURL(for: message.httpsURL)
-      else {
-        log.error("""
-          Proxy never became ready; dropping OpenDocument for \
-          \(message.httpsURL.absoluteString, privacy: .public)
-          """)
-        return
-      }
-      self.openWindows[message.docID] = routed
-      self.onOpenURL?(routed)
-    }
-  }
-
-  /// Pure host-selection policy. Receivers pick a host they can
-  /// actually dial.
-  ///
-  /// Strategy on both real AVP and the visionOS simulator: prefer
-  /// the first non-AWDL candidate (Bonjour, global IPv6, ULA, LAN
-  /// IPv4) — these route through interfaces the Mac's HTTPS listener
-  /// actually accepts ingress on. AWDL-zoned IPv6 (`fe80::…%awdl0`)
-  /// is treated as last-resort because:
-  ///
-  /// - Simulator: no AWDL interface at all — dials route via `lo0`
-  ///   and time out.
-  /// - Real AVP: empirically, dials to the Mac's AWDL-zoned host
-  ///   get TCP `RST`. Hummingbird's listener doesn't enable
-  ///   `NWParameters.includePeerToPeer`, so the kernel refuses
-  ///   AWDL ingress even though the listener is bound to `::`.
-  ///
-  /// `preferred` (the Mac's pick on the `OpenDocument.httpsURL`) is
-  /// ignored when AWDL-zoned, since the Mac biases that toward AWDL
-  /// for the AWDL-only scenario which we no longer support without
-  /// a peer-to-peer listener.
-  ///
-  /// Returns nil only when every candidate is AWDL-zoned (would
-  /// mean the Mac has no Bonjour, global IPv6, ULA, or LAN IPv4
-  /// host — degenerate).
-  nonisolated static func pickUpstreamHost(
-    preferred: String?,
-    candidates: [String]
-  ) -> String? {
-    if let preferred, !BridgeURLBuilder.isAWDLZonedHost(preferred) {
-      return preferred
-    }
-    if let nonAWDL = candidates.first(
-      where: { !BridgeURLBuilder.isAWDLZonedHost($0) })
-    {
-      return nonAWDL
-    }
-    // Last resort: every candidate is AWDL. Hand back the original
-    // preferred (or first candidate) so the caller still has an
-    // address to attempt; the dial will likely fail but we don't
-    // silently drop the open.
-    return preferred ?? candidates.first
-  }
-
-  /// Set the proxy's upstream from `(host, port-from-URL, cert)`. The
-  /// host is decided by `pickUpstreamHost`; the port comes from the
-  /// `OpenDocument` URL, which is authoritatively HTTPS.
-  private func configureProxy(
-    host: String, portFrom url: URL, certSHA256: Data
-  ) {
-    guard
-      let port = url.port,
-      let upstreamPort = UInt16(exactly: port)
+    guard let url = KosmosTunnelScheme.previewURL(
+      forFile: message.documentPath)
     else {
       log.error("""
-        Cannot extract port from URL: \
-        \(url.absoluteString, privacy: .public)
+        Cannot build galley:// URL for path \
+        \(message.documentPath, privacy: .public)
         """)
       return
     }
-    proxy.setUpstream(
-      host: host, port: upstreamPort, certSHA256: certSHA256)
+    openWindows[message.docID] = url
+    onOpenURL?(url)
   }
 }
 #endif

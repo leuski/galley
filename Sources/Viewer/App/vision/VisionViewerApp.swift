@@ -2,10 +2,12 @@
 import GalleyCoreKit
 import SwiftUI
 
-/// visionOS entry point for Galley. Far simpler than the macOS
-/// counterpart — no AppDelegate, no welcome bootstrap scene, no
-/// `LaunchArguments` parsing, no `WindowDispatcher` (every URL
-/// arrives via `WindowGroup`'s value binding).
+/// visionOS entry point for Galley. Simpler than the macOS counterpart
+/// (no AppDelegate, no `WindowDispatcher`), but matches its
+/// "invisible anchor scene" pattern: a `Window("home")` always spawns
+/// at launch and stays alive across document-window close so the OS
+/// doesn't suspend the app while it's still the right routing target
+/// for Mac → AVP opens.
 ///
 /// `Defaults.warmCache()` must run before the first SwiftUI layout
 /// pass so the first WebKit-driven `UserDefaults.didChangeNotification`
@@ -16,18 +18,44 @@ struct VisionViewerApp: App {
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos = KosmosVisionService()
-  @Environment(\.scenePhase) private var scenePhase
 
   init() {
     Defaults.warmCache()
   }
 
   var body: some Scene {
+    // Always-alive anchor scene. visionOS suspends apps with zero
+    // visible scenes, which kills the Kosmos client and prevents
+    // any further Mac → AVP routing until the user manually
+    // re-launches the app. The anchor avoids that by keeping at
+    // least one scene present.
+    //
+    // Visually: `.plain` window style + a `Color.clear` body + a
+    // 1×1 frame collapses the volume to as small as visionOS will
+    // render. The user can move it out of view; we don't insist
+    // on `.persistentSystemOverlays(.hidden)` or anything that
+    // forces it to be undismissable.
+    //
+    // Functionally: this scene owns the kosmos lifecycle —
+    // `kosmos.start()`, the `openWindow` capture for inbound
+    // `OpenDocument` deliveries, and the `scenePhase` lifecycle
+    // publishing. The document `WindowGroup` below only renders
+    // document content; if it has no live instances (user closed
+    // everything), the anchor still captures opens and spawns fresh
+    // doc windows.
+    Window("Galley", id: VisionWindowID.home) {
+      HomeAnchorView()
+        .environment(kosmos)
+        .modifier(KosmosClientLifecycleBridge(kosmos: kosmos))
+    }
+    .windowStyle(.plain)
+    .windowResizability(.contentSize)
+    .defaultSize(width: 1, height: 1)
+
     WindowGroup(for: URL.self) { $fileURL in
       VisionContentView(fileURL: $fileURL, boot: boot)
         .environment(recents)
         .environment(kosmos)
-        .modifier(KosmosClientLifecycleBridge(kosmos: kosmos))
     }
     .windowResizability(.contentSize)
 
@@ -52,31 +80,51 @@ struct VisionViewerApp: App {
   }
 }
 
+/// Body of the invisible anchor scene. `Color.clear` + a 1×1 frame
+/// makes the volume effectively invisible; `accessibilityHidden`
+/// keeps it out of the VoiceOver rotor.
+private struct HomeAnchorView: View {
+  var body: some View {
+    Color.clear
+      .frame(width: 1, height: 1)
+      .accessibilityHidden(true)
+  }
+}
+
 /// Capture the document `WindowGroup`'s `openWindow` environment so
-/// the Kosmos client can route incoming `OpenURL` messages into a new
-/// document window. Also forwards `scenePhase` transitions to the
-/// client so the Mac peer learns when AVP suspends/resumes.
+/// the Kosmos client can route incoming `OpenURL` / `OpenDocument`
+/// messages into a new document window. Also forwards `scenePhase`
+/// transitions to the client so the Mac peer learns when AVP is
+/// actually serviceable.
 ///
-/// The view itself renders nothing — it lives in the content tree
-/// purely to access the `openWindow` environment that's only
-/// available inside a SwiftUI body.
+/// Attached to the always-alive `Window("home")` anchor (not to
+/// individual document windows). That way the captured `openWindow`
+/// action remains valid even after the user closes every document
+/// window — the anchor stays mounted, so the closure is callable
+/// indefinitely. With the modifier attached to a doc window, closing
+/// the last doc window would unmount the view, leaving
+/// `kosmos.onOpenURL` pointing at a stale action that quietly
+/// no-ops on the next Mac dispatch.
 private struct KosmosClientLifecycleBridge: ViewModifier {
   @Bindable var kosmos: KosmosVisionService
   @Environment(\.openWindow) private var openWindow
-
-  // Scene-phase observation is intentionally absent. On visionOS,
-  // `.background` fires for focus loss / dim-out / window close in
-  // ways that don't correspond to true app suspension — and the
-  // Kosmos session itself is a strictly better reachability signal:
-  // if AVP can receive a message, it's reachable. Publishing
-  // `AppWillSuspend` from a noisy phase change just disables the
-  // Mac-side menu while an AVP window is plainly visible.
+  @Environment(\.scenePhase) private var scenePhase
 
   func body(content: Content) -> some View {
     content
       .onAppear {
         kosmos.start()
         kosmos.onOpenURL = { url in openWindow(value: url) }
+      }
+      .onChange(of: scenePhase, initial: false) { _, newPhase in
+        switch newPhase {
+        case .active, .inactive:
+          kosmos.publishResume()
+        case .background:
+          kosmos.publishSuspend()
+        @unknown default:
+          break
+        }
       }
   }
 }

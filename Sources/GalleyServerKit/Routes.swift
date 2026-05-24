@@ -405,16 +405,16 @@ enum Routes {
   /// has no authority. Public visibility kept private — only routes
   /// use it.
   ///
-  /// `hostURL.scheme` is the source-of-truth for which listener
-  /// (HTTP vs HTTPS) accepted the request, since `Host` headers
-  /// don't carry the scheme.
+  /// `hostURL.scheme` is the source-of-truth for the listener's
+  /// scheme, since `Host` headers don't carry it.
   ///
-  /// `X-Galley-Origin` overrides this when present. That header is
-  /// set by the AVP-side loopback HTTP proxy (`AVPHTTPProxy`) so the
-  /// rendered HTML's `<base href>` points at the proxy's loopback
-  /// origin instead of the upstream LAN authority — without it,
-  /// sub-resource fetches (CSS, JS, images) bypass the proxy. Not a
-  /// security boundary: `<base href>` only steers the browser's
+  /// `X-Galley-Origin` overrides this when present. The AVP-side
+  /// `HTTPTunnelMacHandler` sets it so the rendered HTML's
+  /// `<base href>` points at the WebView's `galley://` origin
+  /// instead of the loopback authority — without it, sub-resource
+  /// fetches (CSS, JS, images) would resolve against
+  /// `http://127.0.0.1:<port>/` and bypass the scheme handler. Not
+  /// a security boundary: `<base href>` only steers the browser's
   /// outbound fetches, and the host-header guard already gated the
   /// caller. Use the header strictly for origin composition.
   static func templateOriginURL(
