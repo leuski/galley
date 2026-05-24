@@ -67,10 +67,24 @@ final class KosmosLink {
   /// Current peer role mirror, driven by `client.peers`.
   @ObservationIgnored private var peerRoles: [PeerID: GalleyKosmosRole] = [:]
 
+  /// Per-peer "is this peer's app currently resumed?" flag. Set to
+  /// `true` on join (peers are assumed reachable until they say
+  /// otherwise), `false` on `AppWillSuspend`, `true` on `AppDidResume`.
+  /// Read by `firstReachableVisionPeer` to gate routing — a suspended
+  /// AVP looks like a connected peer at the Kosmos level (the TCP
+  /// socket lingers when visionOS suspends the app with no scenes),
+  /// so we need an in-band signal to know it's not actually draining
+  /// its message queue.
+  @ObservationIgnored private var peerResumed: [PeerID: Bool] = [:]
+
   @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
   @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
   @ObservationIgnored
   private var closeWindowSubscriptionTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var suspendSubscriptionTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var resumeSubscriptionTask: Task<Void, Never>?
 
   init(
     server: PreviewServerController,
@@ -101,11 +115,16 @@ final class KosmosLink {
     peerWatchTask = nil
     closeWindowSubscriptionTask?.cancel()
     closeWindowSubscriptionTask = nil
+    suspendSubscriptionTask?.cancel()
+    suspendSubscriptionTask = nil
+    resumeSubscriptionTask?.cancel()
+    resumeSubscriptionTask = nil
     for (_, window) in openOnAVP {
       window.watchTask.cancel()
     }
     openOnAVP.removeAll()
     peerRoles.removeAll()
+    peerResumed.removeAll()
     if let client {
       Task { await client.stop() }
     }
@@ -296,11 +315,16 @@ final class KosmosLink {
   public static func dispatchOpenURL(
     _ url: GalleyBridgeRequest, with kosmos: KosmosLink?) async -> Bool
   {
-    let dispatched = await kosmos?.dispatchOpenURLToAVP(url) ?? false
-    if !dispatched {
-      Self.openInLocalGalleyApp(url)
+    // AVP reachable over Kosmos → dispatch and we're done.
+    // Otherwise (no peer, or peer suspended per `peerResumed`) the
+    // doc opens in local Galley.app. AVP shows up automatically the
+    // next time the user activates Galley on AVP — the peer reconnects
+    // and subsequent opens land there again.
+    if await kosmos?.dispatchOpenURLToAVP(url) == true {
+      return true
     }
-    return dispatched
+    Self.openInLocalGalleyApp(url)
+    return false
   }
 
   private func registerHandlers(client: KosmosClient) async {
@@ -348,6 +372,35 @@ final class KosmosLink {
         }
       }
     }
+
+    suspendSubscriptionTask = Task { [weak self] in
+      let stream = client.subscribe(AppWillSuspend.self)
+      for await (sender, _) in stream {
+        log.notice("""
+          ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
+          """)
+        await MainActor.run {
+          self?.setPeerResumed(sender, resumed: false)
+        }
+      }
+    }
+
+    resumeSubscriptionTask = Task { [weak self] in
+      let stream = client.subscribe(AppDidResume.self)
+      for await (sender, _) in stream {
+        log.notice("""
+          ← RECV AppDidResume from=\(sender.description, privacy: .public)
+          """)
+        await MainActor.run {
+          self?.setPeerResumed(sender, resumed: true)
+        }
+      }
+    }
+  }
+
+  private func setPeerResumed(_ peer: PeerID, resumed: Bool) {
+    peerResumed[peer] = resumed
+    updateReachabilityFlag()
   }
 
   // MARK: - Peer state
@@ -397,6 +450,12 @@ final class KosmosLink {
 
   private func onVisionPeerJoined(_ peer: PeerID) async {
     log.notice("Vision peer joined: \(peer.description, privacy: .public)")
+    // Assume the AVP is resumed when it first connects. Subsequent
+    // `AppWillSuspend` / `AppDidResume` lifecycle messages correct
+    // this; in their absence "connected = resumed" is the right
+    // default (the peer wouldn't have completed the Kosmos handshake
+    // if its app weren't running).
+    peerResumed[peer] = true
     updateReachabilityFlag()
 
     // Widen the Server's Host-header allowlist to admit the same LAN
@@ -409,6 +468,7 @@ final class KosmosLink {
 
   private func onVisionPeerLeft(_ peer: PeerID) {
     log.notice("Vision peer left: \(peer.description, privacy: .public)")
+    peerResumed.removeValue(forKey: peer)
     let stillHaveVision = peerRoles.contains { $0.value == .visionViewer }
     if !stillHaveVision {
       server.setBindMode(.loopback)
@@ -437,15 +497,15 @@ final class KosmosLink {
 
   // MARK: - Helpers
 
-  /// First `visionViewer` peer in the snapshot. Reachability is
-  /// purely peer-set membership now — if AVP's Kosmos session is up,
-  /// AVP can receive messages, period. Earlier code gated on
-  /// `AppWillSuspend` / `AppDidResume` lifecycle messages, but
-  /// visionOS scene phase fires `.background` for plain focus loss
-  /// and would disable the menu while a viewer window was still
-  /// visible. Removed.
+  /// First `visionViewer` peer that's connected AND currently
+  /// resumed. Suspended peers (AVP whose scenes are all gone — the
+  /// OS suspended the process even though the Kosmos TCP socket
+  /// lingers) are excluded so dispatches don't land in a process
+  /// that can't drain its message queue.
   private func firstReachableVisionPeer() -> PeerID? {
-    peerRoles.first { _, role in role == .visionViewer }?.key
+    peerRoles.first { id, role in
+      role == .visionViewer && peerResumed[id] == true
+    }?.key
   }
 
   private func updateReachabilityFlag() {

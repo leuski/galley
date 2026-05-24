@@ -91,6 +91,37 @@ final class KosmosVisionService {
     proxy.stop()
   }
 
+  /// Notify the Mac that AVP is about to suspend (`scenePhase`
+  /// transitioned to `.background` — typically the user closed all
+  /// AVP Galley windows, or took the headset off). Mac side flips the
+  /// per-peer resumed flag and falls back to local Galley.app for
+  /// subsequent opens until `publishResume` fires.
+  func publishSuspend() {
+    let message = AppWillSuspend(
+      appID: Self.galleyAppID,
+      deviceID: DeviceID(deviceID))
+    log.notice("→ PUBLISH AppWillSuspend")
+    Task { [weak client] in
+      await client?.publish(message)
+    }
+  }
+
+  /// Notify the Mac that AVP is serviceable again.
+  func publishResume() {
+    let message = AppDidResume(
+      appID: Self.galleyAppID,
+      deviceID: DeviceID(deviceID))
+    log.notice("→ PUBLISH AppDidResume")
+    Task { [weak client] in
+      await client?.publish(message)
+    }
+  }
+
+  /// Galley's wire AppID. Reverse-DNS, matches the Server's bundle
+  /// identifier (the Server is the bridge — `appID` identifies the
+  /// product, not the publishing endpoint).
+  private static let galleyAppID = AppID(GalleyConstants.suiteName)
+
   /// Notify the Mac that the user closed a window on AVP.
   func notifyWindowClosed(_ windowID: KosmosCore.WindowID) {
     openWindows.removeValue(forKey: windowID)
@@ -246,30 +277,46 @@ final class KosmosVisionService {
   }
 
   /// Pure host-selection policy. Receivers pick a host they can
-  /// actually dial:
+  /// actually dial.
   ///
-  /// - Real AVP keeps `preferred` (the AWDL-zoned IPv6 the Mac chose),
-  ///   the only form that resolves over AWDL when Bonjour can't.
-  /// - visionOS simulator skips AWDL-zoned hosts (no AWDL interface;
-  ///   dials route through `lo0` and time out) and walks
-  ///   `candidates` for the first non-AWDL entry — typically a
-  ///   Bonjour `<name>.local` the simulator's mDNS can resolve.
+  /// Strategy on both real AVP and the visionOS simulator: prefer
+  /// the first non-AWDL candidate (Bonjour, global IPv6, ULA, LAN
+  /// IPv4) — these route through interfaces the Mac's HTTPS listener
+  /// actually accepts ingress on. AWDL-zoned IPv6 (`fe80::…%awdl0`)
+  /// is treated as last-resort because:
   ///
-  /// Returns nil only when the simulator can't find a single
-  /// non-AWDL candidate, which would mean the Mac has no Bonjour or
-  /// non-AWDL LAN host at all.
+  /// - Simulator: no AWDL interface at all — dials route via `lo0`
+  ///   and time out.
+  /// - Real AVP: empirically, dials to the Mac's AWDL-zoned host
+  ///   get TCP `RST`. Hummingbird's listener doesn't enable
+  ///   `NWParameters.includePeerToPeer`, so the kernel refuses
+  ///   AWDL ingress even though the listener is bound to `::`.
+  ///
+  /// `preferred` (the Mac's pick on the `OpenDocument.httpsURL`) is
+  /// ignored when AWDL-zoned, since the Mac biases that toward AWDL
+  /// for the AWDL-only scenario which we no longer support without
+  /// a peer-to-peer listener.
+  ///
+  /// Returns nil only when every candidate is AWDL-zoned (would
+  /// mean the Mac has no Bonjour, global IPv6, ULA, or LAN IPv4
+  /// host — degenerate).
   nonisolated static func pickUpstreamHost(
     preferred: String?,
     candidates: [String]
   ) -> String? {
-    #if targetEnvironment(simulator)
     if let preferred, !BridgeURLBuilder.isAWDLZonedHost(preferred) {
       return preferred
     }
-    return candidates.first { !BridgeURLBuilder.isAWDLZonedHost($0) }
-    #else
+    if let nonAWDL = candidates.first(
+      where: { !BridgeURLBuilder.isAWDLZonedHost($0) })
+    {
+      return nonAWDL
+    }
+    // Last resort: every candidate is AWDL. Hand back the original
+    // preferred (or first candidate) so the caller still has an
+    // address to attempt; the dial will likely fail but we don't
+    // silently drop the open.
     return preferred ?? candidates.first
-    #endif
   }
 
   /// Set the proxy's upstream from `(host, port-from-URL, cert)`. The

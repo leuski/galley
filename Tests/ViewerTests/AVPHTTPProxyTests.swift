@@ -213,40 +213,65 @@ struct AVPHTTPProxyURLRewriteTests {
   }
 }
 
-@Suite("KosmosVisionService.pickUpstreamHost (simulator)")
+@Suite("KosmosVisionService.pickUpstreamHost")
 struct KosmosVisionServiceHostPickerTests {
-  /// These tests compile only for the simulator slice of the visionOS
-  /// build — the policy itself is `#if`-gated.
-  @Test("simulator skips AWDL-zoned preferred and falls through to candidates")
-  func simulatorSkipsAWDL() {
+  /// Policy is uniform across simulator and real AVP now: prefer
+  /// non-AWDL candidates because Hummingbird's listener doesn't
+  /// enable `NWParameters.includePeerToPeer`, so the Mac kernel
+  /// refuses AWDL ingress on real AVP just as the simulator has
+  /// no AWDL interface at all.
+  @Test("AWDL-zoned preferred falls through to candidates")
+  func skipsAWDLPreferred() {
     let host = KosmosVisionService.pickUpstreamHost(
       preferred: "fe80::1%awdl0",
       candidates: ["mercury.local", "fe80::1%awdl0", "192.168.1.20"])
     #expect(host == "mercury.local")
   }
 
-  @Test("simulator returns nil when every candidate is AWDL-zoned")
-  func simulatorRefusesAWDLOnly() {
+  @Test("AWDL-only candidates: returns AWDL as last resort")
+  func awdlOnlyLastResort() {
     let host = KosmosVisionService.pickUpstreamHost(
       preferred: "fe80::1%awdl0",
       candidates: ["fe80::1%awdl0", "fe80::2%awdl1"])
-    #expect(host == nil)
+    // Every candidate is AWDL — the proxy will attempt and likely
+    // fail, but we don't silently drop the open.
+    #expect(host == "fe80::1%awdl0")
   }
 
-  @Test("simulator keeps preferred when it isn't AWDL-zoned")
-  func simulatorKeepsNonAWDLPreferred() {
+  @Test("Non-AWDL preferred is kept verbatim")
+  func keepsNonAWDLPreferred() {
     let host = KosmosVisionService.pickUpstreamHost(
       preferred: "mercury.local",
       candidates: ["fe80::1%awdl0"])
     #expect(host == "mercury.local")
   }
 
-  @Test("simulator with nil preferred uses first non-AWDL candidate")
-  func simulatorNilPreferred() {
+  @Test("Nil preferred falls back to the first non-AWDL candidate")
+  func nilPreferred() {
     let host = KosmosVisionService.pickUpstreamHost(
       preferred: nil,
       candidates: ["fe80::1%awdl0", "192.168.1.20"])
     #expect(host == "192.168.1.20")
+  }
+
+  @Test("Mac's real reachableHosts list picks Bonjour first")
+  func realWorldOrdering() {
+    // Replays the actual `hostCandidates` shape we see in production
+    // (Bonjour + global IPv6 + ULA + AWDL + utun tunnels + LAN IPv4).
+    let candidates = [
+      "mercury.local",
+      "2607:fb91:20c6:45e5:1c38:4bfb:8b5c:dde3",
+      "2607:fb91:20c6:45e5:5555:41e1:3e8e:cc1f",
+      "fd31:d953:181e::2",
+      "fd9d:e59:67d::2",
+      "fe80::ec1e:81ff:fe21:cff9%awdl0",
+      "fe80::fc2b:b996:8aae:8818%utun0",
+      "192.0.0.2"
+    ]
+    let host = KosmosVisionService.pickUpstreamHost(
+      preferred: "fe80::ec1e:81ff:fe21:cff9%awdl0",
+      candidates: candidates)
+    #expect(host == "mercury.local")
   }
 }
 #endif
