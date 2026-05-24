@@ -131,11 +131,13 @@ struct BridgeURLBuilderAVPDocumentURLTests {
 
   @Test("Host missing → nil regardless of port")
   func hostMissing() {
+    let recorder = RecordingComposer()
     let url = BridgeURLBuilder.avpDocumentURL(
       host: nil,
       httpsPort: 57772,
-      compose: RecordingComposer().compose)
+      compose: recorder.compose)
     #expect(url == nil)
+    #expect(recorder.calls.isEmpty)
   }
 
   @Test("IPv6 host is passed through to the composer verbatim")
@@ -178,21 +180,25 @@ struct BridgeURLBuilderAdvertisementURLTests {
 
   @Test("Both ports missing → nil")
   func bothMissing() {
+    let recorder = RecordingComposer()
     let url = BridgeURLBuilder.advertisementURL(
       host: "mercury.local",
       httpPort: nil,
       httpsPort: nil,
-      compose: RecordingComposer().compose)
+      compose: recorder.compose)
     #expect(url == nil)
+    #expect(recorder.calls.isEmpty)
   }
 
   @Test("Host missing → nil regardless of ports")
   func hostMissing() {
+    let recorder = RecordingComposer()
     let url = BridgeURLBuilder.advertisementURL(
       host: nil,
       httpPort: 57127,
       httpsPort: 57772,
-      compose: RecordingComposer().compose)
+      compose: recorder.compose)
     #expect(url == nil)
+    #expect(recorder.calls.isEmpty)
   }
 }

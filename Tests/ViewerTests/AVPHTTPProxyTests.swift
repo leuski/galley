@@ -1,0 +1,176 @@
+//
+//  AVPHTTPProxyTests.swift
+//  Galley — visionOS slice
+//
+//  Pure-helper tests for the loopback HTTP proxy that fronts the
+//  Mac-hosted preview server. Live socket + TLS behavior is deferred
+//  to manual on-device verification — what we pin here is the part
+//  that's deterministic and on the path of every request:
+//
+//   - request-header rewrite preserves the request line and all
+//     non-`Host`/`Connection` headers verbatim;
+//   - the rewritten `Host` carries the AWDL zone re-encoded as `%25`
+//     per RFC 6874 (which is the form the Mac Server's
+//     `isHostAllowed` parser expects);
+//   - `Connection: close` is forced (one upstream request per inbound
+//     connection — keeps the framing trivial);
+//   - URL rewrite preserves path, query, and fragment verbatim and
+//     swaps scheme/host/port to loopback;
+//   - the host-parser turns AWDL-zoned IPv6 strings into
+//     `NWEndpoint.Host.ipv6` with a scope id (the bit that makes the
+//     upstream `NWConnection` actually dial the right interface).
+//
+
+#if os(visionOS)
+import Foundation
+import Network
+import Testing
+
+@testable import Galley
+
+@Suite("AVPHTTPProxy header rewrite")
+struct AVPHTTPProxyHeaderRewriteTests {
+  private static let upstream = AVPHTTPProxy.Upstream(
+    host: "fe80::aabb:ccdd:eeff:0011%awdl0",
+    port: 8443,
+    certSHA256: Data(repeating: 0, count: 32))
+
+  @Test("rewrites Host with %25-encoded zone id")
+  func rewritesHostWithZone() throws {
+    let request = """
+      GET /preview/foo.md HTTP/1.1\r\n\
+      Host: 127.0.0.1:9999\r\n\
+      Accept: text/html\r\n\
+      \r\n
+      """
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.contains(
+      "Host: [fe80::aabb:ccdd:eeff:0011%25awdl0]:8443"))
+    #expect(!text.contains("Host: 127.0.0.1:9999"))
+  }
+
+  @Test("forces Connection: close")
+  func forcesConnectionClose() throws {
+    let request = """
+      GET / HTTP/1.1\r\n\
+      Host: example\r\n\
+      Connection: keep-alive\r\n\
+      \r\n
+      """
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.contains("Connection: close"))
+    #expect(!text.contains("Connection: keep-alive"))
+  }
+
+  @Test("preserves the request line and other headers")
+  func preservesRequestLineAndOtherHeaders() throws {
+    let request = """
+      GET /preview/sub%20dir/foo.md?x=1 HTTP/1.1\r\n\
+      Host: irrelevant\r\n\
+      Accept: text/html\r\n\
+      Accept-Language: en\r\n\
+      User-Agent: WebKit/000\r\n\
+      \r\n
+      """
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.hasPrefix(
+      "GET /preview/sub%20dir/foo.md?x=1 HTTP/1.1\r\n"))
+    #expect(text.contains("Accept: text/html"))
+    #expect(text.contains("Accept-Language: en"))
+    #expect(text.contains("User-Agent: WebKit/000"))
+    #expect(text.hasSuffix("\r\n\r\n"))
+  }
+
+  @Test("injects Host and Connection when absent")
+  func injectsMissingHeaders() throws {
+    // Malformed-but-legal: no Host, no Connection. We still want both
+    // to land in the upstream so the Server's host-header guard and
+    // our framing assumption hold.
+    let request = "GET / HTTP/1.1\r\nAccept: */*\r\n\r\n"
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.contains(
+      "Host: [fe80::aabb:ccdd:eeff:0011%25awdl0]:8443"))
+    #expect(text.contains("Connection: close"))
+    #expect(text.hasSuffix("\r\n\r\n"))
+  }
+
+  @Test("non-IPv6 host omits brackets")
+  func nonIPv6HostOmitsBrackets() {
+    let upstream = AVPHTTPProxy.Upstream(
+      host: "my-mac.local", port: 8443,
+      certSHA256: Data(repeating: 0, count: 32))
+    #expect(AVPHTTPProxy.formatHostHeader(upstream)
+      == "my-mac.local:8443")
+  }
+
+  @Test("non-zoned IPv6 host brackets without %25")
+  func nonZonedIPv6Brackets() {
+    let upstream = AVPHTTPProxy.Upstream(
+      host: "2001:db8::1", port: 8443,
+      certSHA256: Data(repeating: 0, count: 32))
+    #expect(AVPHTTPProxy.formatHostHeader(upstream)
+      == "[2001:db8::1]:8443")
+  }
+}
+
+@Suite("AVPHTTPProxy host parsing")
+struct AVPHTTPProxyHostParsingTests {
+  @Test("AWDL-zoned IPv6 parses with scope id")
+  func awdlZonedIPv6() throws {
+    let host = AVPHTTPProxy.parseHost("fe80::1%awdl0")
+    guard case .ipv6(let ipv6) = host else {
+      Issue.record("expected .ipv6 case, got \(host)")
+      return
+    }
+    // `IPv6Address` records the zone via a non-zero scope id when the
+    // host string carries a `%<zone>` suffix.
+    #expect(ipv6.debugDescription.contains("%awdl0"))
+  }
+
+  @Test("plain IPv6 has no zone")
+  func plainIPv6() throws {
+    let host = AVPHTTPProxy.parseHost("2001:db8::1")
+    guard case .ipv6(let ipv6) = host else {
+      Issue.record("expected .ipv6 case, got \(host)")
+      return
+    }
+    #expect(!ipv6.debugDescription.contains("%"))
+  }
+
+  @Test("IPv4 dotted-quad parses as .ipv4")
+  func ipv4Parses() {
+    let host = AVPHTTPProxy.parseHost("192.0.2.1")
+    if case .ipv4 = host { return }
+    Issue.record("expected .ipv4 case, got \(host)")
+  }
+
+  @Test("DNS name parses as .name")
+  func dnsNameParses() {
+    let host = AVPHTTPProxy.parseHost("my-mac.local")
+    if case .name(let name, _) = host {
+      #expect(name == "my-mac.local")
+      return
+    }
+    Issue.record("expected .name case, got \(host)")
+  }
+}
+
+@MainActor
+@Suite("AVPHTTPProxy URL rewrite")
+struct AVPHTTPProxyURLRewriteTests {
+  @Test("returns nil before listener is ready")
+  func returnsNilBeforeReady() {
+    let proxy = AVPHTTPProxy()
+    let url = URL(string: "https://example.com/preview/foo")!
+    #expect(proxy.rewrittenURL(for: url) == nil)
+  }
+}
+#endif

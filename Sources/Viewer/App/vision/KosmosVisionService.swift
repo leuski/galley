@@ -33,6 +33,14 @@ final class KosmosVisionService {
   @ObservationIgnored private var client: KosmosClient?
   @ObservationIgnored private var link: LoomKosmosLink?
 
+  /// Loopback HTTP proxy that fronts the Mac Server. We rewrite every
+  /// AWDL-zoned `httpsURL` in `OpenDocument` / `BridgeAdvertisement`
+  /// into `http://127.0.0.1:<proxyPort>/...` before handing it to
+  /// SwiftUI — WebKit on visionOS rejects URLs whose host carries an
+  /// IPv6 zone identifier. The proxy terminates the TLS to the
+  /// upstream and applies the Kosmos cert pin.
+  @ObservationIgnored private let proxy = AVPHTTPProxy()
+
   @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
   @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
   @ObservationIgnored private var bridgeAdSubscription: Task<Void, Never>?
@@ -60,6 +68,7 @@ final class KosmosVisionService {
   /// Begin advertising and browsing. Idempotent.
   func start() {
     guard bootstrapTask == nil else { return }
+    proxy.start()
     bootstrapTask = Task { [weak self] in
       await self?.bootstrap()
     }
@@ -88,6 +97,7 @@ final class KosmosVisionService {
     KosmosPinnedCertSource.update(nil)
     pinnedCertSHA256 = nil
     peers = [:]
+    proxy.stop()
   }
 
   /// Notify the Mac that the user closed a window on AVP.
@@ -196,6 +206,9 @@ final class KosmosVisionService {
   ) {
     KosmosPinnedCertSource.update(advertisement.certificateSHA256)
     pinnedCertSHA256 = advertisement.certificateSHA256
+    configureProxy(
+      from: advertisement.baseURL,
+      certSHA256: advertisement.certificateSHA256)
     let pinHex = advertisement.certificateSHA256.map {
       String(format: "%02x", $0)
     }.joined()
@@ -232,16 +245,49 @@ final class KosmosVisionService {
       behavior=\(message.openBehavior.rawValue, privacy: .public)
       """)
     // Apply the cert pin BEFORE we hand the URL to SwiftUI's
-    // openWindow. WebKit will fire an auth challenge during the
-    // navigation, and `KosmosCertPinner` reads
-    // `KosmosPinnedCertSource.current` at challenge time — racing a
-    // separate `BridgeAdvertisement` message lost the cert in
-    // practice when the AVP-side subscription registration hadn't
-    // completed yet. Shipping the cert with the URL closes that race.
+    // openWindow. `KosmosPinnedCertSource` is read by the in-process
+    // `AVPHTTPProxy`'s TLS verify block (and historically by
+    // `KosmosCertPinner` for the WebView's direct TLS challenge, now
+    // inert on visionOS — WebKit only ever sees loopback HTTP).
+    // Shipping the cert with the URL closes the bridge-ad race.
     KosmosPinnedCertSource.update(message.certificateSHA256)
     pinnedCertSHA256 = message.certificateSHA256
-    openWindows[message.docID] = message.httpsURL
-    onOpenURL?(message.httpsURL)
+    configureProxy(
+      from: message.httpsURL, certSHA256: message.certificateSHA256)
+    Task { [weak self] in
+      guard let self else { return }
+      guard let routed = await self.proxy
+        .awaitRewrittenURL(for: message.httpsURL)
+      else {
+        log.error("""
+          Proxy never became ready; dropping OpenDocument for \
+          \(message.httpsURL.absoluteString, privacy: .public)
+          """)
+        return
+      }
+      self.openWindows[message.docID] = routed
+      self.onOpenURL?(routed)
+    }
+  }
+
+  /// Lift `(host, port, certSHA256)` from a Mac-published URL and feed
+  /// it to the loopback proxy. Called from both `BridgeAdvertisement`
+  /// and `OpenDocument`; later wins, idempotent if the upstream hasn't
+  /// changed.
+  private func configureProxy(from url: URL, certSHA256: Data) {
+    guard
+      let host = url.host(percentEncoded: false),
+      let port = url.port,
+      let upstreamPort = UInt16(exactly: port)
+    else {
+      log.error("""
+        Cannot configure proxy from URL with no host/port: \
+        \(url.absoluteString, privacy: .public)
+        """)
+      return
+    }
+    proxy.setUpstream(
+      host: host, port: upstreamPort, certSHA256: certSHA256)
   }
 }
 #endif

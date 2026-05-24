@@ -55,7 +55,7 @@ struct WebKitZoneIDRejectionTests {
 
     var caught: (any Error)?
     do {
-      for try await _ in page.load(url) { }
+      for try await _ in page.load(URLRequest(url: url)) { }
     } catch {
       caught = error
     }
