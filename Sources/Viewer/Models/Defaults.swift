@@ -8,7 +8,7 @@
 import Foundation
 import GalleyCoreKit
 import SwiftUI
-import os
+import OSLog
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
 /// (catalog discovery + persisted ID), template store, server config,

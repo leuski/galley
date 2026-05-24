@@ -1,7 +1,7 @@
 import Foundation
 import GalleyCoreKit
 import Observation
-import os
+import OSLog
 import WebKit
 
 private let log = Logger(

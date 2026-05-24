@@ -1,6 +1,6 @@
 import Foundation
 import GalleyCoreKit
-import os
+import OSLog
 import WebKit
 
 /// Receives two kinds of messages from a user script that walks the

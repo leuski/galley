@@ -1,7 +1,7 @@
 import Foundation
 import GalleyCoreKit
 import WebKit
-import os
+import OSLog
 import ALFoundation
 
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible

@@ -5,9 +5,10 @@
 //  Created by Anton Leuski on 5/22/26.
 //
 
+#if os(macOS)
 import Foundation
 import GalleyCoreKit
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentModel+AVP")
@@ -48,3 +49,4 @@ extension DocumentModel {
     }
   }
 }
+#endif

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 import ALFoundation
-import os
+import OSLog
 #if os(macOS)
 import AppKit
 #endif

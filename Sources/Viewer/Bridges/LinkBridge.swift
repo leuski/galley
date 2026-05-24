@@ -4,7 +4,7 @@ import AppKit
 import Foundation
 import GalleyCoreKit
 import WebKit
-import os
+import OSLog
 import ALFoundation
 
 /// Handles plain-click on `<a href>` elements inside the rendered

@@ -5,7 +5,7 @@ import HummingbirdTLS
 import NIOCore
 import NIOSSL
 import NIOPosix
-import os
+import OSLog
 import GalleyCoreKit
 import ALFoundation
 

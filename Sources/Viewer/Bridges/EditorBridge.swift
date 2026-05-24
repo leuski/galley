@@ -1,6 +1,6 @@
 import Foundation
 import WebKit
-import os
+import OSLog
 import GalleyCoreKit
 
 /// Receives `{ "line": <Int> }` messages from the rendered preview and

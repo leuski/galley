@@ -1,6 +1,6 @@
 import Foundation
 import WebKit
-import os
+import OSLog
 import GalleyCoreKit
 
 /// Receives `{ "y": <Double> }` messages from a debounced scroll

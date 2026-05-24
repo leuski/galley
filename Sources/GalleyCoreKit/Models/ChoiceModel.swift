@@ -7,7 +7,7 @@
 
 import SwiftUI
 import ALFoundation
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "Defaults")

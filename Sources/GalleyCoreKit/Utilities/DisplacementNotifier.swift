@@ -4,7 +4,7 @@
 //
 
 import Foundation
-import os
+import OSLog
 import UserNotifications
 
 private let log = Logger(

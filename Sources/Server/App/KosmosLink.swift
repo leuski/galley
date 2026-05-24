@@ -6,7 +6,7 @@ import KosmosBridge
 import KosmosCore
 import KosmosTransport
 import Observation
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "KosmosLink")

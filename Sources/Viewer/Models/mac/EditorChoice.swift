@@ -5,7 +5,7 @@ import Foundation
 import GalleyCoreKit
 import ALFoundation
 import Observation
-import os
+import OSLog
 
 /// Disambiguates from ALFoundation's `Logger` type (also imported here
 /// for `Process.runAndCapture`). The rest of the file uses `Logger`

@@ -1,6 +1,6 @@
 import AppKit
 import GalleyCoreKit
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "ServerAppDelegate")

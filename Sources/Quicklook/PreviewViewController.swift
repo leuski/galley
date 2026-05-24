@@ -2,7 +2,7 @@ import AppKit
 import Quartz
 import WebKit
 import GalleyCoreKit
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "QuicklookPreview")

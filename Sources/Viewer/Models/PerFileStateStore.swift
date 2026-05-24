@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import os
+import OSLog
 import GalleyCoreKit
 
 /// Persisted view-state Galley remembers about each previously-seen

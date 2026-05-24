@@ -1,6 +1,6 @@
 import Foundation
 import GalleyCoreKit
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "HistorySnapshot")

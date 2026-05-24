@@ -1,5 +1,5 @@
 import Foundation
-import os
+import OSLog
 import GalleyCoreKit
 import ALFoundation
 

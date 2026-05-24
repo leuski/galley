@@ -1,5 +1,5 @@
 import Foundation
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "Defaults")

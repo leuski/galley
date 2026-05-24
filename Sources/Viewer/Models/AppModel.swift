@@ -1,7 +1,7 @@
 import Foundation
 import GalleyCoreKit
 import SwiftUI
-import os
+import OSLog
 import ALFoundation
 
 private let defaultsLog = Logger(

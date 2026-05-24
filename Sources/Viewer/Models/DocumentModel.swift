@@ -2,7 +2,7 @@ import Foundation
 import GalleyCoreKit
 import KosmosWebView
 import Observation
-import os
+import OSLog
 import SwiftUI
 import WebKit
 import ALFoundation
@@ -322,11 +322,16 @@ final class DocumentModel {
             templates: templatesRef, appModel: appModelRef)
         }),
       // Pin AVP↔Mac LAN HTTPS against the Kosmos-published cert
-      // SHA-256. Loopback consumers (Mac Viewer rendering local
-      // files in-process, Quicklook hitting `http://127.0.0.1`)
-      // never reach a TLS challenge, so the pinner is inert there.
-      // On visionOS this is the validator for every `loadRemote`
-      // against the bridge's `https://<lan-host>` baseURL.
+      // SHA-256. Inert on every current code path:
+      //   - Mac Viewer rendering local files in-process: file://, no
+      //     TLS challenge.
+      //   - Quicklook: `http://127.0.0.1`, no TLS challenge.
+      //   - visionOS: `http://127.0.0.1:<proxyPort>` via
+      //     `AVPHTTPProxy`, no TLS challenge to WebKit. The proxy's
+      //     `NWConnection` is what terminates TLS to the Mac Server
+      //     and pins via the same `PinnedCertPolicy`.
+      // Left attached so that any future code path that does load a
+      // bridge URL directly inherits the pin automatically.
       navigationDecider: KosmosCertPinner())
     self.find = FindSession(page: self.page)
 

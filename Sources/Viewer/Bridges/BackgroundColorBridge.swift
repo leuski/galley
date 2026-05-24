@@ -1,6 +1,6 @@
 import Foundation
 import GalleyCoreKit
-import os
+import OSLog
 import SwiftUI
 import WebKit
 

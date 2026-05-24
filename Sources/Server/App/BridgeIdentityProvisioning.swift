@@ -2,7 +2,7 @@ import Foundation
 import GalleyCoreKit
 import GalleyServerKit
 import KosmosBridge
-import os
+import OSLog
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "BridgeIdentity")

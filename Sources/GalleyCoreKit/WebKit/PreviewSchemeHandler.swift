@@ -1,6 +1,6 @@
 import Foundation
 import WebKit
-import os
+import OSLog
 import ALFoundation
 
 /// Custom URL scheme that lets an in-process `WKWebView` resolve the

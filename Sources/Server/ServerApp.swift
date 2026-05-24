@@ -10,7 +10,7 @@ import Darwin
 import SwiftUI
 import GalleyCoreKit
 import GalleyServerKit
-import os
+import OSLog
 
 private let bootLog = Logger(
   subsystem: bundleIdentifier, category: "ServerApp")

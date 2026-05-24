@@ -1,7 +1,7 @@
 #if os(macOS)
 import AppKit
 import GalleyCoreKit
-import os
+import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 import ALFoundation

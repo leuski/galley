@@ -3,7 +3,7 @@
 import AppKit
 import GalleyCoreKit
 import Observation
-import os
+import OSLog
 import SwiftUI
 
 /// Owns the routing state and AppKit-bridge for inbound document URLs.

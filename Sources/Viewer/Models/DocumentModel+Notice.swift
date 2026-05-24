@@ -1,5 +1,5 @@
 import Foundation
-import os
+import OSLog
 
 /// User-facing notice surfaced by `DocumentModel.notice`. The
 /// `lifetime` discriminates two clear-rules:

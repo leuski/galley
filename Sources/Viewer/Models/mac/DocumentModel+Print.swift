@@ -12,7 +12,7 @@ import CoreTransferable
 import GalleyCoreKit
 import UniformTypeIdentifiers
 import WebKit
-import os
+import OSLog
 import ALFoundation
 
 extension DocumentModel {
