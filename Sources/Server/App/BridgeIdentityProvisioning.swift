@@ -18,8 +18,8 @@ private let log = Logger(
 /// change to GalleyServerKit.
 enum BridgeIdentityProvisioning {
   /// One process-wide store, shared between cert provisioning at boot
-  /// and the Kosmos link that publishes the cert SHA in
-  /// `BridgeAdvertisement`. Wrapping a value to keep it `let`.
+  /// and the Kosmos link that attaches the cert SHA to every
+  /// `OpenDocument`. Wrapping a value to keep it `let`.
   static let store: BridgeIdentityStore = BridgeIdentityStore(
     directory: GalleyConstants.applicationSupportDirectory,
     commonName: "Galley Server",

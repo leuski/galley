@@ -15,11 +15,12 @@ private let log = Logger(
 /// mirror, and the per-window state for files currently displayed on
 /// AVP. Built but not started by `AppModel.init`;
 /// `AppModel.startServer()` calls `start()` after the preview server
-/// is up so we have a port to advertise.
+/// is up so we have a port to publish on each `OpenDocument`.
 ///
 /// When a `visionViewer` peer joins: switch the preview server to
-/// LAN-reachable mode, publish `BridgeAdvertisement` so AVP knows
-/// the cert pin + base URL.
+/// LAN-reachable mode so AVP can dial the Server. Every subsequent
+/// `OpenDocument` message ships the cert pin and the full LAN host
+/// candidate list inline — no separate advertisement step.
 ///
 /// When the last `visionViewer` peer leaves: revert to loopback,
 /// walk the open-window set, and re-open each on the local
@@ -228,9 +229,16 @@ final class KosmosLink {
     windowID: KosmosCore.WindowID,
     client: KosmosClient
   ) {
+    // `httpsURL` already targets the publisher's preferred host (AWDL
+    // for AVP). `hostCandidates` is the full reachable list so
+    // receivers that can't dial the AWDL form (notably the visionOS
+    // simulator) can fall back to a Bonjour or LAN-IP candidate that
+    // shares the same HTTPS port and path.
+    let candidates = LANHostDiscovery.reachableHosts()
     let message = OpenDocument(
       docID: windowID,
       httpsURL: previewURL,
+      hostCandidates: candidates,
       certificateSHA256: identity.certificateSHA256,
       displayName: fileURL.target.url.lastPathComponent,
       scrollLineHint: fileURL.target.scrollLine,
@@ -391,44 +399,12 @@ final class KosmosLink {
     log.notice("Vision peer joined: \(peer.description, privacy: .public)")
     updateReachabilityFlag()
 
+    // Widen the Server's Host-header allowlist to admit the same LAN
+    // hosts we'll later carry as `hostCandidates` on each
+    // `OpenDocument`. No separate advertisement message — every
+    // `OpenDocument` ships the cert pin and the candidate list inline.
     let extras = Set(LANHostDiscovery.reachableHosts())
     server.setBindMode(.lanReachable(extraAllowedHostnames: extras))
-
-    do {
-      let identity = try await identityStore.currentIdentity()
-      guard let base = BridgeURLBuilder.advertisementURL(
-        host: LANHostDiscovery.reachableHosts().first,
-        httpPort: ServerPortFile.http.read(),
-        httpsPort: ServerPortFile.https.read(),
-        compose: Self.composeLANURL)
-      else {
-        log.error("No LAN base URL to advertise.")
-        return
-      }
-      let advertisement = BridgeAdvertisement(
-        certificateSHA256: identity.certificateSHA256,
-        baseURL: base)
-      let allowedHosts = LANHostDiscovery.reachableHosts()
-        .joined(separator: ",")
-      let pinHex = identity.certificateSHA256.map {
-        String(format: "%02x", $0)
-      }.joined()
-      log.notice("""
-        → PUBLISH BridgeAdvertisement \
-        base=\(base.absoluteString, privacy: .public) \
-        certSHA256=\(pinHex, privacy: .public) \
-        allowedHosts=\(allowedHosts, privacy: .public)
-        """)
-      // Broadcast — peers that don't care (Mac Viewer) just ignore.
-      // The vision peer's subscribe(BridgeAdvertisement.self) picks
-      // it up regardless of when it joined relative to the publish.
-      await client?.publish(advertisement)
-    } catch {
-      log.error("""
-        BridgeAdvertisement publish failed: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
   }
 
   private func onVisionPeerLeft(_ peer: PeerID) {

@@ -408,11 +408,48 @@ enum Routes {
   /// `hostURL.scheme` is the source-of-truth for which listener
   /// (HTTP vs HTTPS) accepted the request, since `Host` headers
   /// don't carry the scheme.
+  ///
+  /// `X-Galley-Origin` overrides this when present. That header is
+  /// set by the AVP-side loopback HTTP proxy (`AVPHTTPProxy`) so the
+  /// rendered HTML's `<base href>` points at the proxy's loopback
+  /// origin instead of the upstream LAN authority — without it,
+  /// sub-resource fetches (CSS, JS, images) bypass the proxy. Not a
+  /// security boundary: `<base href>` only steers the browser's
+  /// outbound fetches, and the host-header guard already gated the
+  /// caller. Use the header strictly for origin composition.
   static func templateOriginURL(
     for request: Request, fallback hostURL: URL
   ) -> URL {
-    guard let authority = request.head.authority, !authority.isEmpty
-    else { return hostURL }
+    templateOriginURL(
+      originHeader: request.headers[xGalleyOriginHeader],
+      authority: request.head.authority,
+      fallback: hostURL)
+  }
+
+  private static let xGalleyOriginHeader: HTTPField.Name = {
+    guard let name = HTTPField.Name("X-Galley-Origin") else {
+      preconditionFailure("X-Galley-Origin is a valid HTTP field name")
+    }
+    return name
+  }()
+
+  /// Pure decision: same as the `Request`-flavored overload but with
+  /// the two inputs the `Request` exposes (Host authority + the
+  /// `X-Galley-Origin` header), so tests can drive it without
+  /// constructing a Hummingbird `Request`.
+  static func templateOriginURL(
+    originHeader: String?,
+    authority: String?,
+    fallback hostURL: URL
+  ) -> URL {
+    if let override = originHeader?.trimmingCharacters(in: .whitespaces),
+       !override.isEmpty,
+       let parsed = URL(string: override),
+       parsed.scheme != nil, parsed.host != nil
+    {
+      return parsed
+    }
+    guard let authority, !authority.isEmpty else { return hostURL }
     let scheme = hostURL.scheme ?? "http"
     return URL(string: "\(scheme)://\(authority)") ?? hostURL
   }

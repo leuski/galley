@@ -13,45 +13,39 @@ private let log = Logger(
 
 /// AVP-side Kosmos surface. Owns a single `KosmosTransport.KosmosClient`
 /// advertising as a `visionViewer`, mirrors the discovered peer set,
-/// subscribes to bridge messages (cert pin, open-document, content
-/// changes), and publishes lifecycle to the bridge so the Mac can
-/// gate AVP reachability on suspend / resume.
+/// subscribes to bridge messages (open-document, content changes), and
+/// publishes lifecycle to the bridge so the Mac can gate AVP
+/// reachability on suspend / resume.
 @MainActor
 @Observable
 final class KosmosVisionService {
-  /// Latest received bridge advertisement. Kept across reconnects so
-  /// cold-launches can pin-validate scene-restored URLs before the
-  /// next advertisement arrives.
-  private(set) var pinnedCertSHA256: Data?
-
   /// Snapshot of peers visible to Kosmos. Other code (settings,
   /// debugging) can observe this; the service itself doesn't branch
-  /// on it beyond surfacing the latest bridge.
+  /// on it.
   private(set) var peers: [PeerID: PeerInfo] = [:]
 
   @ObservationIgnored private let deviceID: UUID
   @ObservationIgnored private var client: KosmosClient?
   @ObservationIgnored private var link: LoomKosmosLink?
 
-  /// Loopback HTTP proxy that fronts the Mac Server. We rewrite every
-  /// AWDL-zoned `httpsURL` in `OpenDocument` / `BridgeAdvertisement`
-  /// into `http://127.0.0.1:<proxyPort>/...` before handing it to
-  /// SwiftUI — WebKit on visionOS rejects URLs whose host carries an
-  /// IPv6 zone identifier. The proxy terminates the TLS to the
-  /// upstream and applies the Kosmos cert pin.
+  /// Loopback HTTP proxy that fronts the Mac Server. We rewrite the
+  /// `httpsURL` in each `OpenDocument` into
+  /// `http://127.0.0.1:<proxyPort>/...` before handing it to SwiftUI —
+  /// WebKit on visionOS rejects URLs whose host carries an IPv6 zone
+  /// identifier. The proxy terminates the TLS to the upstream and
+  /// applies the Kosmos cert pin.
   @ObservationIgnored private let proxy = AVPHTTPProxy()
 
   @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
   @ObservationIgnored private var peerWatchTask: Task<Void, Never>?
-  @ObservationIgnored private var bridgeAdSubscription: Task<Void, Never>?
   @ObservationIgnored private var openURLSubscription: Task<Void, Never>?
   @ObservationIgnored private var openDocumentSubscription: Task<Void, Never>?
   @ObservationIgnored private var contentChangeSubscription: Task<Void, Never>?
 
-  /// Handler for incoming `OpenURL` messages — wired by the app to
-  /// call `openWindow(value: url)`. The service holds the closure
-  /// rather than owning a SwiftUI environment value because
-  /// `openWindow` is only available inside view bodies.
+  /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
+  /// by the app to call `openWindow(value: url)`. The service holds
+  /// the closure rather than owning a SwiftUI environment value
+  /// because `openWindow` is only available inside view bodies.
   @ObservationIgnored var onOpenURL: (@MainActor (URL) -> Void)?
 
   /// Per-window reload handlers. The document view registers on
@@ -79,8 +73,6 @@ final class KosmosVisionService {
     bootstrapTask = nil
     peerWatchTask?.cancel()
     peerWatchTask = nil
-    bridgeAdSubscription?.cancel()
-    bridgeAdSubscription = nil
     openURLSubscription?.cancel()
     openURLSubscription = nil
     openDocumentSubscription?.cancel()
@@ -95,7 +87,6 @@ final class KosmosVisionService {
     reloadHandlers.removeAll()
     openWindows.removeAll()
     KosmosPinnedCertSource.update(nil)
-    pinnedCertSHA256 = nil
     peers = [:]
     proxy.stop()
   }
@@ -159,15 +150,6 @@ final class KosmosVisionService {
   }
 
   private func startSubscriptions(client: KosmosClient) {
-    bridgeAdSubscription = Task { [weak self] in
-      let stream = client.subscribe(BridgeAdvertisement.self)
-      for await (sender, advertisement) in stream {
-        await MainActor.run {
-          self?.handleBridgeAdvertisement(advertisement, from: sender)
-        }
-      }
-    }
-
     openURLSubscription = Task { [weak self] in
       let stream = client.subscribe(OpenURL.self)
       for await (_, message) in stream {
@@ -201,25 +183,6 @@ final class KosmosVisionService {
     }
   }
 
-  private func handleBridgeAdvertisement(
-    _ advertisement: BridgeAdvertisement, from sender: PeerID
-  ) {
-    KosmosPinnedCertSource.update(advertisement.certificateSHA256)
-    pinnedCertSHA256 = advertisement.certificateSHA256
-    configureProxy(
-      from: advertisement.baseURL,
-      certSHA256: advertisement.certificateSHA256)
-    let pinHex = advertisement.certificateSHA256.map {
-      String(format: "%02x", $0)
-    }.joined()
-    log.notice("""
-      ← RECV BridgeAdvertisement \
-      from=\(sender.description, privacy: .public) \
-      base=\(advertisement.baseURL.absoluteString, privacy: .public) \
-      certSHA256=\(pinHex, privacy: .public)
-      """)
-  }
-
   private func handleOpenURL(_ message: OpenURL) {
     log.notice("""
       ← RECV OpenURL window=\(message.windowID, privacy: .public) \
@@ -235,12 +198,14 @@ final class KosmosVisionService {
     let pinHex = message.certificateSHA256.map {
       String(format: "%02x", $0)
     }.joined()
+    let candidates = message.hostCandidates.joined(separator: ",")
     log.notice("""
       ← RECV OpenDocument from=\(sender.description, privacy: .public) \
       doc=\(message.docID, privacy: .public) \
       url=\(message.httpsURL.absoluteString, privacy: .public) \
       name=\(message.displayName, privacy: .public) \
       certSHA256=\(pinHex, privacy: .public) \
+      hostCandidates=\(candidates, privacy: .public) \
       scrollLineHint=\(message.scrollLineHint ?? -1, privacy: .public) \
       behavior=\(message.openBehavior.rawValue, privacy: .public)
       """)
@@ -249,11 +214,21 @@ final class KosmosVisionService {
     // `AVPHTTPProxy`'s TLS verify block (and historically by
     // `KosmosCertPinner` for the WebView's direct TLS challenge, now
     // inert on visionOS — WebKit only ever sees loopback HTTP).
-    // Shipping the cert with the URL closes the bridge-ad race.
     KosmosPinnedCertSource.update(message.certificateSHA256)
-    pinnedCertSHA256 = message.certificateSHA256
+    let host = Self.pickUpstreamHost(
+      preferred: message.httpsURL.host(percentEncoded: false),
+      candidates: message.hostCandidates)
+    guard let host else {
+      log.error("""
+        No dialable host in OpenDocument for \
+        \(message.httpsURL.absoluteString, privacy: .public)
+        """)
+      return
+    }
     configureProxy(
-      from: message.httpsURL, certSHA256: message.certificateSHA256)
+      host: host,
+      portFrom: message.httpsURL,
+      certSHA256: message.certificateSHA256)
     Task { [weak self] in
       guard let self else { return }
       guard let routed = await self.proxy
@@ -270,18 +245,45 @@ final class KosmosVisionService {
     }
   }
 
-  /// Lift `(host, port, certSHA256)` from a Mac-published URL and feed
-  /// it to the loopback proxy. Called from both `BridgeAdvertisement`
-  /// and `OpenDocument`; later wins, idempotent if the upstream hasn't
-  /// changed.
-  private func configureProxy(from url: URL, certSHA256: Data) {
+  /// Pure host-selection policy. Receivers pick a host they can
+  /// actually dial:
+  ///
+  /// - Real AVP keeps `preferred` (the AWDL-zoned IPv6 the Mac chose),
+  ///   the only form that resolves over AWDL when Bonjour can't.
+  /// - visionOS simulator skips AWDL-zoned hosts (no AWDL interface;
+  ///   dials route through `lo0` and time out) and walks
+  ///   `candidates` for the first non-AWDL entry — typically a
+  ///   Bonjour `<name>.local` the simulator's mDNS can resolve.
+  ///
+  /// Returns nil only when the simulator can't find a single
+  /// non-AWDL candidate, which would mean the Mac has no Bonjour or
+  /// non-AWDL LAN host at all.
+  nonisolated static func pickUpstreamHost(
+    preferred: String?,
+    candidates: [String]
+  ) -> String? {
+    #if targetEnvironment(simulator)
+    if let preferred, !BridgeURLBuilder.isAWDLZonedHost(preferred) {
+      return preferred
+    }
+    return candidates.first { !BridgeURLBuilder.isAWDLZonedHost($0) }
+    #else
+    return preferred ?? candidates.first
+    #endif
+  }
+
+  /// Set the proxy's upstream from `(host, port-from-URL, cert)`. The
+  /// host is decided by `pickUpstreamHost`; the port comes from the
+  /// `OpenDocument` URL, which is authoritatively HTTPS.
+  private func configureProxy(
+    host: String, portFrom url: URL, certSHA256: Data
+  ) {
     guard
-      let host = url.host(percentEncoded: false),
       let port = url.port,
       let upstreamPort = UInt16(exactly: port)
     else {
       log.error("""
-        Cannot configure proxy from URL with no host/port: \
+        Cannot extract port from URL: \
         \(url.absoluteString, privacy: .public)
         """)
       return

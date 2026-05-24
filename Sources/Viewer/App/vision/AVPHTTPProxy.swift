@@ -191,11 +191,12 @@ final class AVPHTTPProxy {
   // MARK: - Inbound
 
   private func accept(inbound: NWConnection) {
-    guard let upstream else {
+    guard let upstream, let proxyPort = port else {
       // Server hasn't published a bridge yet, or we haven't received an
-      // OpenDocument. Drop the connection — WebKit will retry on its
-      // own page-load schedule.
-      log.notice("Inbound connection dropped: no upstream configured.")
+      // OpenDocument, or the listener didn't reach `.ready`. Drop the
+      // connection — WebKit will retry on its own page-load schedule.
+      log.notice(
+        "Inbound connection dropped: no upstream or listener not ready.")
       inbound.cancel()
       return
     }
@@ -203,7 +204,7 @@ final class AVPHTTPProxy {
     inbound.stateUpdateHandler = { [weak self] state in
       Task { @MainActor in
         self?.handleInboundState(
-          state, inbound: inbound, upstream: snapshot)
+          state, inbound: inbound, upstream: snapshot, proxyPort: proxyPort)
       }
     }
     inbound.start(queue: queue)
@@ -212,11 +213,14 @@ final class AVPHTTPProxy {
   private func handleInboundState(
     _ state: NWConnection.State,
     inbound: NWConnection,
-    upstream: Upstream
+    upstream: Upstream,
+    proxyPort: UInt16
   ) {
     switch state {
     case .ready:
-      readHeaders(inbound: inbound, upstream: upstream, accumulated: Data())
+      readHeaders(
+        inbound: inbound, upstream: upstream,
+        proxyPort: proxyPort, accumulated: Data())
     case .failed, .cancelled:
       inbound.cancel()
     default:
@@ -228,7 +232,8 @@ final class AVPHTTPProxy {
   /// complete (`\r\n\r\n`). Then rewrite Host + Connection and open
   /// the upstream.
   private func readHeaders(
-    inbound: NWConnection, upstream: Upstream, accumulated: Data
+    inbound: NWConnection, upstream: Upstream,
+    proxyPort: UInt16, accumulated: Data
   ) {
     inbound.receive(
       minimumIncompleteLength: 1, maximumLength: 32 * 1024
@@ -250,14 +255,15 @@ final class AVPHTTPProxy {
             inbound.cancel()
           } else {
             self.readHeaders(
-              inbound: inbound, upstream: upstream, accumulated: buffer)
+              inbound: inbound, upstream: upstream,
+              proxyPort: proxyPort, accumulated: buffer)
           }
           return
         }
         let headerBytes = buffer.prefix(upTo: end.upperBound)
         let bodyOverflow = buffer.suffix(from: end.upperBound)
         let rewritten = Self.rewriteRequestHeaders(
-          headerBytes, upstream: upstream)
+          headerBytes, upstream: upstream, proxyPort: proxyPort)
         var outboundInitial = rewritten
         outboundInitial.append(bodyOverflow)
         self.openUpstream(
@@ -371,14 +377,22 @@ final class AVPHTTPProxy {
 
   /// Rewrite an HTTP/1.1 request header block:
   ///   - Replace the `Host:` header with the upstream's authority
-  ///     (with the AWDL zone re-encoded as `%25` per RFC 6874).
+  ///     (with the AWDL zone re-encoded as `%25` per RFC 6874) so the
+  ///     Server's host-header guard admits the request.
   ///   - Force `Connection: close` so each upstream request is a
   ///     one-shot — keeps the inbound→outbound HTTP framing trivial.
+  ///   - Inject `X-Galley-Origin: http://127.0.0.1:<proxyPort>/` so
+  ///     the Server composes `<base href>` against the proxy's
+  ///     loopback origin. Without it the response embeds
+  ///     `<base href="https://<upstream>/…">` and sub-resource fetches
+  ///     (CSS, JS, images) bypass the proxy and target the upstream
+  ///     directly — which the simulator can't dial over AWDL and real
+  ///     AVP rejects under WebKit's zone-id filter.
   ///
   /// All other request lines pass through verbatim. The trailing
   /// `\r\n\r\n` is preserved.
   nonisolated static func rewriteRequestHeaders(
-    _ bytes: Data, upstream: Upstream
+    _ bytes: Data, upstream: Upstream, proxyPort: UInt16
   ) -> Data {
     guard let text = String(data: bytes, encoding: .utf8) else {
       // Non-UTF8 in the header block is malformed HTTP. Pass through
@@ -389,6 +403,8 @@ final class AVPHTTPProxy {
     var rewritten: [String] = []
     var sawHost = false
     var sawConnection = false
+    var sawOrigin = false
+    let originHeader = "X-Galley-Origin: \(formatOriginHeader(proxyPort))"
     for (index, line) in lines.enumerated() {
       if index == 0 {
         // Request line (e.g. "GET /preview/foo HTTP/1.1") — verbatim.
@@ -402,6 +418,11 @@ final class AVPHTTPProxy {
       } else if lower.hasPrefix("connection:") {
         rewritten.append("Connection: close")
         sawConnection = true
+      } else if lower.hasPrefix("x-galley-origin:") {
+        // Drop any inbound header with this name — only the proxy is
+        // allowed to set it. WebKit doesn't send it, but be defensive.
+        rewritten.append(originHeader)
+        sawOrigin = true
       } else {
         rewritten.append(line)
       }
@@ -416,7 +437,17 @@ final class AVPHTTPProxy {
     if !sawConnection {
       rewritten.insert("Connection: close", at: insertIndex)
     }
+    if !sawOrigin {
+      rewritten.insert(originHeader, at: insertIndex)
+    }
     return Data(rewritten.joined(separator: "\r\n").utf8)
+  }
+
+  /// `X-Galley-Origin` value for the proxy. The Server uses this as
+  /// the scheme/host/port of `<base href>` in rendered HTML so
+  /// sub-resource fetches stay on the proxy's loopback origin.
+  nonisolated static func formatOriginHeader(_ proxyPort: UInt16) -> String {
+    "http://127.0.0.1:\(proxyPort)/"
   }
 
   /// `Host` header value for the upstream. IPv6 hosts get bracketed

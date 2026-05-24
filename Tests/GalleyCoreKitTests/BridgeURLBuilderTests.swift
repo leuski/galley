@@ -152,53 +152,19 @@ struct BridgeURLBuilderAVPDocumentURLTests {
   }
 }
 
-@Suite("BridgeURLBuilder.advertisementURL")
-struct BridgeURLBuilderAdvertisementURLTests {
-  @Test("HTTPS preferred when both ports are present")
-  func httpsPreferred() {
-    let recorder = RecordingComposer()
-    let url = BridgeURLBuilder.advertisementURL(
-      host: "mercury.local",
-      httpPort: 57127,
-      httpsPort: 57772,
-      compose: recorder.compose)
-    #expect(url?.absoluteString == "https://mercury.local:57772")
-    #expect(recorder.calls.first?.scheme == "https")
+@Suite("BridgeURLBuilder.isAWDLZonedHost")
+struct BridgeURLBuilderAWDLZonedHostTests {
+  @Test("AWDL-zoned IPv6 is recognized")
+  func recognizesAWDL() {
+    #expect(BridgeURLBuilder.isAWDLZonedHost("fe80::1%awdl0"))
+    #expect(BridgeURLBuilder.isAWDLZonedHost("fe80::abcd%AWDL0"))
   }
 
-  @Test("HTTPS missing → falls back to HTTP for advertisement only")
-  func httpFallback() {
-    let recorder = RecordingComposer()
-    let url = BridgeURLBuilder.advertisementURL(
-      host: "mercury.local",
-      httpPort: 57127,
-      httpsPort: nil,
-      compose: recorder.compose)
-    #expect(url?.absoluteString == "http://mercury.local:57127")
-    #expect(recorder.calls.first?.scheme == "http")
-  }
-
-  @Test("Both ports missing → nil")
-  func bothMissing() {
-    let recorder = RecordingComposer()
-    let url = BridgeURLBuilder.advertisementURL(
-      host: "mercury.local",
-      httpPort: nil,
-      httpsPort: nil,
-      compose: recorder.compose)
-    #expect(url == nil)
-    #expect(recorder.calls.isEmpty)
-  }
-
-  @Test("Host missing → nil regardless of ports")
-  func hostMissing() {
-    let recorder = RecordingComposer()
-    let url = BridgeURLBuilder.advertisementURL(
-      host: nil,
-      httpPort: 57127,
-      httpsPort: 57772,
-      compose: recorder.compose)
-    #expect(url == nil)
-    #expect(recorder.calls.isEmpty)
+  @Test("Bonjour, IPv4, plain IPv6 are not AWDL-zoned")
+  func rejectsNonAWDL() {
+    #expect(!BridgeURLBuilder.isAWDLZonedHost("mercury.local"))
+    #expect(!BridgeURLBuilder.isAWDLZonedHost("192.168.1.20"))
+    #expect(!BridgeURLBuilder.isAWDLZonedHost("2001:db8::1"))
+    #expect(!BridgeURLBuilder.isAWDLZonedHost("fe80::1%en0"))
   }
 }

@@ -5,21 +5,13 @@ import Foundation
 /// decisions are independent of `LANHostDiscovery`, `ServerPortFile`,
 /// and any disk / network side-effects — callers inject the parts.
 ///
-/// The two builders intentionally encode *different* policies for the
-/// HTTPS-missing case:
-///
-/// - `avpDocumentURL` is for a Kosmos `OpenDocument` message addressed
-///   to an AVP peer. HTTPS-only. **Never falls back to HTTP**, because
-///   the Server's HTTP listener is loopback-only by design — a URL
-///   like `http://<lan-host>:<loopback-port>/...` points at a closed
-///   port from any LAN peer. The right behavior when HTTPS isn't up
-///   is to refuse to dispatch, not to produce a URL that looks
-///   plausible and silently doesn't work.
-///
-/// - `advertisementURL` is for a `BridgeAdvertisement` payload, which
-///   is informational. HTTPS preferred; HTTP is accepted so a
-///   loopback-only Server can still advertise its presence to peers
-///   that won't use the URL for data-plane traffic.
+/// `avpDocumentURL` is for a Kosmos `OpenDocument` message addressed
+/// to an AVP peer. HTTPS-only. **Never falls back to HTTP**, because
+/// the Server's HTTP listener is loopback-only by design — a URL
+/// like `http://<lan-host>:<loopback-port>/...` points at a closed
+/// port from any LAN peer. The right behavior when HTTPS isn't up
+/// is to refuse to dispatch, not to produce a URL that looks
+/// plausible and silently doesn't work.
 public enum BridgeURLBuilder {
   /// Composes a final URL from `(scheme, host, port)`. Injected so
   /// callers can plug in their own IPv6-bracketing / zone-id handling
@@ -67,22 +59,12 @@ public enum BridgeURLBuilder {
     candidates.first { isAWDLZonedHost($0) } ?? candidates.first
   }
 
-  private static func isAWDLZonedHost(_ host: String) -> Bool {
+  /// True iff `host` looks like an AWDL-zoned IPv6 link-local
+  /// (e.g. `fe80::1%awdl0`). Useful for receivers that need to skip
+  /// candidates they can't dial — the visionOS simulator has no AWDL
+  /// interface and connection attempts to such hosts route through
+  /// `lo0` and time out.
+  public static func isAWDLZonedHost(_ host: String) -> Bool {
     host.lowercased().contains("%awdl")
-  }
-
-  /// URL for a `BridgeAdvertisement` payload. HTTPS preferred,
-  /// HTTP accepted. Returns nil only when there is no host, or no
-  /// port at all.
-  public static func advertisementURL(
-    host: String?,
-    httpPort: UInt16?,
-    httpsPort: UInt16?,
-    compose: Composer
-  ) -> URL? {
-    guard let host else { return nil }
-    if let httpsPort { return compose("https", host, httpsPort) }
-    if let httpPort { return compose("http", host, httpPort) }
-    return nil
   }
 }

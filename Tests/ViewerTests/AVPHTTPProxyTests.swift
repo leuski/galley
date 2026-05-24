@@ -44,7 +44,7 @@ struct AVPHTTPProxyHeaderRewriteTests {
       \r\n
       """
     let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
-      Data(request.utf8), upstream: Self.upstream)
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
     let text = try #require(String(data: rewritten, encoding: .utf8))
     #expect(text.contains(
       "Host: [fe80::aabb:ccdd:eeff:0011%25awdl0]:8443"))
@@ -60,7 +60,7 @@ struct AVPHTTPProxyHeaderRewriteTests {
       \r\n
       """
     let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
-      Data(request.utf8), upstream: Self.upstream)
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
     let text = try #require(String(data: rewritten, encoding: .utf8))
     #expect(text.contains("Connection: close"))
     #expect(!text.contains("Connection: keep-alive"))
@@ -77,7 +77,7 @@ struct AVPHTTPProxyHeaderRewriteTests {
       \r\n
       """
     let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
-      Data(request.utf8), upstream: Self.upstream)
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
     let text = try #require(String(data: rewritten, encoding: .utf8))
     #expect(text.hasPrefix(
       "GET /preview/sub%20dir/foo.md?x=1 HTTP/1.1\r\n"))
@@ -94,7 +94,7 @@ struct AVPHTTPProxyHeaderRewriteTests {
     // our framing assumption hold.
     let request = "GET / HTTP/1.1\r\nAccept: */*\r\n\r\n"
     let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
-      Data(request.utf8), upstream: Self.upstream)
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
     let text = try #require(String(data: rewritten, encoding: .utf8))
     #expect(text.contains(
       "Host: [fe80::aabb:ccdd:eeff:0011%25awdl0]:8443"))
@@ -118,6 +118,45 @@ struct AVPHTTPProxyHeaderRewriteTests {
       certSHA256: Data(repeating: 0, count: 32))
     #expect(AVPHTTPProxy.formatHostHeader(upstream)
       == "[2001:db8::1]:8443")
+  }
+
+  @Test("injects X-Galley-Origin pointing at loopback proxy port")
+  func injectsOriginHeader() throws {
+    let request = """
+      GET /preview/foo.md HTTP/1.1\r\n\
+      Host: 127.0.0.1:9999\r\n\
+      \r\n
+      """
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.contains(
+      "X-Galley-Origin: http://127.0.0.1:54290/"))
+  }
+
+  @Test("replaces any inbound X-Galley-Origin instead of duplicating")
+  func replacesInboundOriginHeader() throws {
+    // WebKit doesn't send this header, but a malicious upstream could
+    // attempt to inject one. The proxy must always overwrite, never
+    // pass through.
+    let request = """
+      GET / HTTP/1.1\r\n\
+      Host: irrelevant\r\n\
+      X-Galley-Origin: https://attacker.example/\r\n\
+      \r\n
+      """
+    let rewritten = AVPHTTPProxy.rewriteRequestHeaders(
+      Data(request.utf8), upstream: Self.upstream, proxyPort: 54290)
+    let text = try #require(String(data: rewritten, encoding: .utf8))
+    #expect(text.contains(
+      "X-Galley-Origin: http://127.0.0.1:54290/"))
+    #expect(!text.contains("attacker.example"))
+  }
+
+  @Test("X-Galley-Origin formatter")
+  func originFormatter() {
+    #expect(AVPHTTPProxy.formatOriginHeader(54290)
+      == "http://127.0.0.1:54290/")
   }
 }
 
@@ -171,6 +210,43 @@ struct AVPHTTPProxyURLRewriteTests {
     let proxy = AVPHTTPProxy()
     let url = URL(string: "https://example.com/preview/foo")!
     #expect(proxy.rewrittenURL(for: url) == nil)
+  }
+}
+
+@Suite("KosmosVisionService.pickUpstreamHost (simulator)")
+struct KosmosVisionServiceHostPickerTests {
+  /// These tests compile only for the simulator slice of the visionOS
+  /// build — the policy itself is `#if`-gated.
+  @Test("simulator skips AWDL-zoned preferred and falls through to candidates")
+  func simulatorSkipsAWDL() {
+    let host = KosmosVisionService.pickUpstreamHost(
+      preferred: "fe80::1%awdl0",
+      candidates: ["mercury.local", "fe80::1%awdl0", "192.168.1.20"])
+    #expect(host == "mercury.local")
+  }
+
+  @Test("simulator returns nil when every candidate is AWDL-zoned")
+  func simulatorRefusesAWDLOnly() {
+    let host = KosmosVisionService.pickUpstreamHost(
+      preferred: "fe80::1%awdl0",
+      candidates: ["fe80::1%awdl0", "fe80::2%awdl1"])
+    #expect(host == nil)
+  }
+
+  @Test("simulator keeps preferred when it isn't AWDL-zoned")
+  func simulatorKeepsNonAWDLPreferred() {
+    let host = KosmosVisionService.pickUpstreamHost(
+      preferred: "mercury.local",
+      candidates: ["fe80::1%awdl0"])
+    #expect(host == "mercury.local")
+  }
+
+  @Test("simulator with nil preferred uses first non-AWDL candidate")
+  func simulatorNilPreferred() {
+    let host = KosmosVisionService.pickUpstreamHost(
+      preferred: nil,
+      candidates: ["fe80::1%awdl0", "192.168.1.20"])
+    #expect(host == "192.168.1.20")
   }
 }
 #endif
