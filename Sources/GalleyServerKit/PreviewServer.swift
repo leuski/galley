@@ -189,6 +189,11 @@ public final class PreviewServerController {
     return Task { [weak self] in
       do {
         try await app.run()
+        // Hummingbird returns normally on cooperative cancel (no
+        // CancellationError thrown); detect via Task.isCancelled so
+        // `publishStopped()` doesn't wipe the replacement listener's
+        // freshly-written port files.
+        if Task.isCancelled { return }
       } catch is CancellationError {
         // `start()` called `stop()` which cancelled us in order to
         // hand the slot to a fresh task that has already bound and
@@ -240,6 +245,13 @@ public final class PreviewServerController {
   /// HTTPS failure is intentionally non-fatal — the HTTP listener
   /// keeps serving and the `.https` port file is cleared so
   /// consumers fall back via `ServerPortFile.preferredEndpointURL`.
+  ///
+  /// Cancellation: `start()` cancels the previous task before spawning
+  /// a fresh one. Hummingbird is built on swift-service-lifecycle,
+  /// which handles cooperative cancellation by *returning normally*
+  /// from `app.run()` rather than throwing `CancellationError`. The
+  /// fall-through clear is gated on `Task.isCancelled` so we don't
+  /// race the replacement listener's freshly-written port file.
   private func startTLSListener(
     tlsConfiguration: TLSConfiguration,
     bindHost: String,
@@ -257,7 +269,6 @@ public final class PreviewServerController {
       selectedTemplateProvider: templateProvider,
       rendererProvider: renderProvider,
       watcher: watcher)
-
     let httpsApp: Application<RouterResponder<BasicRequestContext>>
     do {
       httpsApp = Application(
@@ -269,13 +280,18 @@ public final class PreviewServerController {
         onServerRunning: { @Sendable channel in
           guard let portInt = channel.localAddress?.port,
                 let port = UInt16(exactly: portInt)
-          else { return }
+          else {
+            let addrStr = String(describing: channel.localAddress)
+            log.error("""
+              HTTPS onServerRunning: channel has no usable local port \
+              (localAddress=\(addrStr, privacy: .public))
+              """)
+            return
+          }
           await boundPort.store(port)
           try? ServerPortFile.https.write(port)
         })
     } catch {
-      // `.tls(...)` failed (e.g. invalid certificate chain). Continue
-      // serving HTTP only; clear any stale .https entry.
       log.error("""
         HTTPS listener configuration failed; HTTP-only: \
         \(error.localizedDescription, privacy: .public)
@@ -287,15 +303,20 @@ public final class PreviewServerController {
     return Task {
       do {
         try await httpsApp.run()
+        // Hummingbird returns normally on cooperative cancel (no
+        // CancellationError thrown). Detect via Task.isCancelled so
+        // the fall-through clear doesn't wipe the replacement
+        // listener's freshly-written port file.
+        if Task.isCancelled { return }
+        log.error("""
+          HTTPS listener exited normally without cancellation. \
+          Hummingbird's app.run() should run forever; a normal return \
+          here means the listener stopped serving and the port file \
+          will be cleared.
+          """)
       } catch is CancellationError {
-        // Cancelled because a new listener is taking over — that one
-        // has already written the fresh `.https` port file. Bail out
-        // before we erase it.
         return
       } catch {
-        // HTTPS listener died mid-run. HTTP keeps serving, but cert-
-        // pinned consumers (Viewer's WebPage, Quicklook fallback)
-        // will silently fall back to HTTP. Surface in logs.
         log.error("""
           HTTPS listener exited with error: \
           \(error.localizedDescription, privacy: .public)

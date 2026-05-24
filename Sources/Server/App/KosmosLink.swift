@@ -120,14 +120,45 @@ final class KosmosLink {
   /// if possible. Returns true if dispatched; false if AVP is
   /// unavailable and the caller should fall back.
   func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
+    guard
+      let client,
+      let resolved = await resolveAVPDispatch(fileURL: fileURL)
+    else { return false }
+    let windowID = trackOpenWindow(
+      fileURL: fileURL.target.url,
+      peerID: resolved.visionPeer,
+      client: client)
+    publishOpenDocument(
+      fileURL: fileURL,
+      identity: resolved.identity,
+      previewURL: resolved.previewURL,
+      windowID: windowID,
+      client: client)
+    return true
+  }
+
+  /// Bundle of resolved preconditions returned by
+  /// `resolveAVPDispatch`. Kept as a named type instead of a 3-tuple
+  /// for readability and SwiftLint's large_tuple rule.
+  private struct ResolvedDispatch {
+    let visionPeer: PeerID
+    let identity: BridgeIdentity
+    let previewURL: URL
+  }
+
+  /// Preconditions for an AVP dispatch: a reachable vision peer, a
+  /// bridge identity, and an HTTPS-only preview URL on the LAN. Logs
+  /// the failure mode and returns nil when any one is missing.
+  private func resolveAVPDispatch(
+    fileURL: GalleyBridgeRequest
+  ) async -> ResolvedDispatch? {
     guard let visionPeer = firstReachableVisionPeer() else {
       log.notice("""
         Cannot dispatch — no reachable vision peer for \
         \(fileURL, privacy: .public)
         """)
-      return false
+      return nil
     }
-    guard let client else { return false }
     let identity: BridgeIdentity
     do {
       identity = try await identityStore.currentIdentity()
@@ -136,30 +167,67 @@ final class KosmosLink {
         Cannot dispatch — bridge identity unavailable: \
         \(error.localizedDescription, privacy: .public)
         """)
-      return false
+      return nil
     }
-    guard let base = lanBaseURL() else {
-      log.error("Cannot dispatch — no LAN base URL.")
-      return false
+    let reachable = LANHostDiscovery.reachableHosts()
+    let lanHost = BridgeURLBuilder.preferredAVPHost(from: reachable)
+    let httpsPort = ServerPortFile.https.read()
+    guard let base = BridgeURLBuilder.avpDocumentURL(
+      host: lanHost,
+      httpsPort: httpsPort,
+      compose: Self.composeLANURL)
+    else {
+      let hostStr = lanHost ?? "nil"
+      let portStr = httpsPort.map(String.init) ?? "nil"
+      log.error("""
+        Cannot dispatch — HTTPS not bound on LAN \
+        (host=\(hostStr, privacy: .public) \
+        httpsPort=\(portStr, privacy: .public)). \
+        Refusing HTTP fallback — HTTP listener is loopback-only.
+        """)
+      return nil
     }
-    let previewURL = base.appendingPreview(fileURL.target.url)
+    return ResolvedDispatch(
+      visionPeer: visionPeer,
+      identity: identity,
+      previewURL: base.appendingPreview(fileURL.target.url))
+  }
 
+  /// Allocates the per-window state and subscribes the watcher to the
+  /// file. Each file-change event publishes a `WindowContentChanged`
+  /// so AVP can reload the preview.
+  private func trackOpenWindow(
+    fileURL: URL,
+    peerID: PeerID,
+    client: KosmosClient
+  ) -> KosmosCore.WindowID {
     let windowID = windowIDAllocator.next()
     let watcher = server.watcher
     let watchTask = Task { [weak client] in
-      let changes = await watcher.subscribe(to: fileURL.target.url)
+      let changes = await watcher.subscribe(to: fileURL)
       for await _ in changes {
         log.notice("""
           → PUBLISH WindowContentChanged \
           window=\(windowID, privacy: .public) \
-          file=\(fileURL, privacy: .public)
+          file=\(fileURL.path, privacy: .public)
           """)
         await client?.publish(WindowContentChanged(windowID: windowID))
       }
     }
     openOnAVP[windowID] = OpenWindow(
-      fileURL: fileURL.target.url, peerID: visionPeer, watchTask: watchTask)
+      fileURL: fileURL, peerID: peerID, watchTask: watchTask)
+    return windowID
+  }
 
+  /// Builds and publishes the `OpenDocument` Kosmos message and emits
+  /// the corresponding diagnostic log line.
+  private func publishOpenDocument(
+    fileURL: GalleyBridgeRequest,
+    identity: BridgeIdentity,
+    previewURL: URL,
+    windowID: KosmosCore.WindowID,
+    client: KosmosClient
+  ) {
     let message = OpenDocument(
       docID: windowID,
       httpsURL: previewURL,
@@ -180,7 +248,6 @@ final class KosmosLink {
     Task { [weak client] in
       await client?.publish(message)
     }
-    return true
   }
 
   // MARK: - Bootstrap
@@ -329,7 +396,12 @@ final class KosmosLink {
 
     do {
       let identity = try await identityStore.currentIdentity()
-      guard let base = lanBaseURL() else {
+      guard let base = BridgeURLBuilder.advertisementURL(
+        host: LANHostDiscovery.reachableHosts().first,
+        httpPort: ServerPortFile.http.read(),
+        httpsPort: ServerPortFile.https.read(),
+        compose: Self.composeLANURL)
+      else {
         log.error("No LAN base URL to advertise.")
         return
       }
@@ -404,31 +476,14 @@ final class KosmosLink {
     isAVPReachable = firstReachableVisionPeer() != nil
   }
 
-  /// `https://<lan-host>:<port>` if HTTPS is up; HTTP otherwise. Uses
-  /// the first entry of `LANHostDiscovery.reachableHosts()` — a
-  /// Bonjour `<name>.local` when available, otherwise the highest-
-  /// ranked IP literal (IPv6 first to survive iPhone-hotspot IPv4
-  /// collisions and AWDL-only paths).
-  ///
-  /// Consumed only by the AVP-bound path (`OpenDocument` URL +
-  /// `BridgeAdvertisement`). AVP pins the cert SHA-256 via
-  /// `KosmosWebView.PinnedCertPolicy` and hands WebKit a
-  /// `URLCredential(trust:)`, so cert-hostname matching is bypassed
-  /// regardless of the cert's SAN list. Same-machine consumers use
-  /// HTTP loopback via `ServerPortFile.preferredEndpointURL` and
-  /// never see this URL.
-  private func lanBaseURL() -> URL? {
-    guard let host = LANHostDiscovery.reachableHosts().first
-    else { return nil }
-    if let port = ServerPortFile.https.read() {
-      return LANHostDiscovery.composeURL(
-        scheme: "https", host: host, port: Int(port))
-    }
-    if let port = ServerPortFile.http.read() {
-      return LANHostDiscovery.composeURL(
-        scheme: "http", host: host, port: Int(port))
-    }
-    return nil
+  /// Adapter between `BridgeURLBuilder.Composer` (unlabeled, UInt16
+  /// port) and `LANHostDiscovery.composeURL` (labeled, Int port). Kept
+  /// here so the builder stays free of the IPv6-bracketing dep.
+  private static func composeLANURL(
+    _ scheme: String, _ host: String, _ port: UInt16
+  ) -> URL? {
+    LANHostDiscovery.composeURL(
+      scheme: scheme, host: host, port: Int(port))
   }
 }
 
