@@ -21,14 +21,10 @@ struct FormatCommands: Commands {
       // and the system menu rebuilds when an override flips. NSMenu
       // doesn't pick up internal Toggle invalidations on its own.
       templateMenu(
-        title: "Template",
-        globalTitle: "Global Template",
         appModel: appModel,
         documentModel: documentModel)
 
       processorMenu(
-        title: "Markdown Processor",
-        globalTitle: "Global Markdown Processor",
         appModel: appModel,
         documentModel: documentModel)
     }

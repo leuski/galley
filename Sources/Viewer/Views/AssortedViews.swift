@@ -25,8 +25,8 @@ extension View {
 
 @ViewBuilder @MainActor
 func templateMenu(
-  title: LocalizedStringResource? = nil,
-  globalTitle: LocalizedStringResource? = nil,
+  title: LocalizedStringResource? = "Template",
+  globalTitle: LocalizedStringResource? = "Global Template",
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
@@ -42,8 +42,8 @@ func templateMenu(
 
 @ViewBuilder @MainActor
 func processorMenu(
-  title: LocalizedStringResource? = nil,
-  globalTitle: LocalizedStringResource? = nil,
+  title: LocalizedStringResource? = "Markdown Processor",
+  globalTitle: LocalizedStringResource? = "Global Markdown Processor",
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
@@ -66,8 +66,8 @@ func processorMenu(
 /// it drives the AppModel's global `ColorSchemeChoice`.
 @ViewBuilder @MainActor
 func colorSchemeMenu(
-  title: LocalizedStringResource? = nil,
-  globalTitle: LocalizedStringResource? = nil,
+  title: LocalizedStringResource? = "Color Scheme",
+  globalTitle: LocalizedStringResource? = "Global Color Scheme",
   appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {

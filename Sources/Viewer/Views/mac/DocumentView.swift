@@ -585,7 +585,6 @@ private struct RendererToolbarPicker: View {
 
   var body: some View {
     processorMenu(
-      title: "Processor",
       appModel: appModel,
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)
@@ -599,7 +598,6 @@ private struct TemplateToolbarPicker: View {
 
   var body: some View {
     templateMenu(
-      title: "Template",
       appModel: appModel,
       documentModel: docModel)
     .scaleEffect(toolbarMenuIconScale, anchor: .center)

@@ -201,8 +201,8 @@ private struct DocumentScreen: View {
           TOCSidebar(model: model)
             .padding(.top, 16)
         }
-          .frame(width: 340)
-          .transition(.move(edge: .leading).combined(with: .opacity))
+        .frame(width: 340)
+        .transition(.move(edge: .leading).combined(with: .opacity))
       }
       detailContent(model: model)
         .frame(minWidth: 700, minHeight: 900)
@@ -226,8 +226,8 @@ private struct DocumentScreen: View {
     // underlying content surface picks up the tint.
     .background(
       Defaults.shared.tintWindowWithPageBackground
-        ? model.pageBackgroundColor
-        : Color.clear)
+      ? model.pageBackgroundColor
+      : Color.clear)
     // Drive WebKit's `prefers-color-scheme` from the user choice
     // (Light/Dark, global or per-document). Templates that respect
     // the media query swap their CSS variant and the
@@ -263,7 +263,7 @@ private struct DocumentScreen: View {
           StatusBar(
             stats: model.stats,
             wordsPerMinute: Defaults.shared.readingWordsPerMinute)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+          .transition(.move(edge: .bottom).combined(with: .opacity))
         }
       }
       .onAppear { wireLinkBridge(model: model) }
@@ -379,23 +379,27 @@ private struct DocumentScreen: View {
       Divider()
 
       templateMenu(
-        title: "Template",
-        globalTitle: "Global Template",
         appModel: appModel,
         documentModel: model)
+      .disabled(!model.documentURL.isFileURL)
+      .help(
+        model.documentURL.isFileURL
+        ? ""
+        : "Rendered on Mac — change template in Galley on your Mac.")
       colorSchemeMenu(
-        title: "Color Scheme",
-        globalTitle: "Global Color Scheme",
         appModel: appModel,
         documentModel: model)
+      .disabled(!model.documentURL.isFileURL)
+      .help(
+        model.documentURL.isFileURL
+        ? ""
+        : "Rendered on Mac — change color scheme on your Mac.")
       // Processor picker only appears when there's an actual choice
       // to make. visionOS ships with the built-in Swift renderer
       // alone — external CLI processors aren't reachable — so a
       // degenerate one-row menu would just confuse users.
       if appModel.processors.values.count > 1 {
         processorMenu(
-          title: "Markdown Processor",
-          globalTitle: "Global Markdown Processor",
           appModel: appModel,
           documentModel: model)
       }
