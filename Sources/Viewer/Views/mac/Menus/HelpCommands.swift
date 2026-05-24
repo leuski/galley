@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import GalleyCoreKit
 import SwiftUI
@@ -29,3 +30,4 @@ struct HelpCommands: Commands {
     }
   }
 }
+#endif

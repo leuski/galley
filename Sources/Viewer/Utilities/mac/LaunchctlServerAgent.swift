@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import OSLog
 import GalleyCoreKit
@@ -257,3 +258,4 @@ extension Bundle {
       .flatMap { url in Bundle(url: url) }
   }
 }
+#endif

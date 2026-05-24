@@ -1,3 +1,4 @@
+#if os(macOS)
 import GalleyCoreKit
 import SwiftUI
 
@@ -50,3 +51,4 @@ extension View {
 #Preview {
   SettingsView(appModel: AppModel())
 }
+#endif

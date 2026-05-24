@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import GalleyCoreKit
 import SwiftUI
@@ -51,3 +52,4 @@ private struct BootWindowHider: NSViewRepresentable {
     }
   }
 }
+#endif

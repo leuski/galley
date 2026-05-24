@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import ObjectiveC.runtime
 
@@ -91,3 +92,4 @@ enum NewTabAction {
   private nonisolated(unsafe) static var patchedClasses = Set<String>()
   private static let lock = NSLock()
 }
+#endif

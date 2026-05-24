@@ -4,7 +4,6 @@
 //
 
 #if !os(macOS)
-
 import CoreTransferable
 import Foundation
 import GalleyCoreKit

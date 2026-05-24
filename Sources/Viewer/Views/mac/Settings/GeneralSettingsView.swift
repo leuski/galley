@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import GalleyCoreKit
 
@@ -77,3 +78,4 @@ struct GeneralSettingsView: View {
 #Preview {
   GeneralSettingsView()
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import Foundation
 import Observation
@@ -110,3 +111,4 @@ final class ActiveServerAgent {
     }
   }
 }
+#endif

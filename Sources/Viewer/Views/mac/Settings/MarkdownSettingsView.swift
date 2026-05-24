@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -352,3 +353,4 @@ struct EditorMenuCore: View {
 #Preview {
   MarkdownSettingsView(appModel: AppModel())
 }
+#endif

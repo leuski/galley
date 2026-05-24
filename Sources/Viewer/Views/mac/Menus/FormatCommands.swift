@@ -1,3 +1,4 @@
+#if os(macOS)
 import GalleyCoreKit
 import SwiftUI
 
@@ -33,3 +34,4 @@ struct FormatCommands: Commands {
     }
   }
 }
+#endif

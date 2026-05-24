@@ -1,3 +1,4 @@
+#if os(macOS)
 import ALFoundation
 import SwiftUI
 import GalleyCoreKit
@@ -128,3 +129,4 @@ struct ServerSettingsView: View {
     )
   }
 }
+#endif

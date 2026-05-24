@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import GalleyCoreKit
 import OSLog
@@ -639,3 +640,4 @@ private struct NoticeBanner: View {
     .background(.regularMaterial, in: .rect(cornerRadius: 8))
   }
 }
+#endif

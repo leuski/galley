@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -96,3 +97,4 @@ private final class PreDrawView: NSView {
     onWillDraw()
   }
 }
+#endif

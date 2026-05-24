@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import GalleyCoreKit
 import SwiftUI
@@ -88,3 +89,4 @@ extension View {
     modifier(BootstrapDispatchModifier())
   }
 }
+#endif

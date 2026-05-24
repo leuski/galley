@@ -6,7 +6,6 @@
 //
 
 #if os(macOS)
-
 import AppKit
 import CoreTransferable
 import GalleyCoreKit

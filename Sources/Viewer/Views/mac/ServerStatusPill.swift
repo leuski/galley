@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import GalleyCoreKit
 import ALFoundation
@@ -61,3 +62,4 @@ struct ServerStatusPill: View {
   }
   .padding()
 }
+#endif

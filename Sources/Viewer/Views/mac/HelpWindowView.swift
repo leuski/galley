@@ -1,3 +1,4 @@
+#if os(macOS)
 import GalleyCoreKit
 import SwiftUI
 
@@ -27,3 +28,4 @@ struct HelpWindowView: View {
     }
   }
 }
+#endif
