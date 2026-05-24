@@ -1,3 +1,4 @@
+#if os(macOS)
 internal import ALFoundation
 import XCTest
 
@@ -137,3 +138,4 @@ enum AppLauncher {
   }
 
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import GalleyServerKit
@@ -53,3 +54,4 @@ struct RoutePathDecodingTests {
     #expect(url?.path == "/tmp/note.md")
   }
 }
+#endif

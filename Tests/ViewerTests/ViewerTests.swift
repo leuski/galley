@@ -1,3 +1,4 @@
+#if os(macOS)
 //
 //  ViewerTests.swift
 //  Galley
@@ -967,3 +968,4 @@ struct DocumentStatsTests {
     #expect(stats.readingTime(wordsPerMinute: -100) == 0)
   }
 }
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import XCTest
 
 /// Captures a screenshot of the Viewer's initial state for visual
@@ -31,3 +32,4 @@ final class UITestsLaunchTests: XCTestCase {
     add(attachment)
   }
 }
+#endif

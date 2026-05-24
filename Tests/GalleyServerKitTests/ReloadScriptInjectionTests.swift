@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import GalleyServerKit
@@ -64,3 +65,4 @@ struct ReloadScriptInjectionTests {
     #expect(out.contains("location.reload()"))
   }
 }
+#endif

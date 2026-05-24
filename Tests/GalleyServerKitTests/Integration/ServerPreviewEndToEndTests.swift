@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 import GalleyCoreKit
@@ -137,3 +138,4 @@ struct ServerPreviewEndToEndTests {
     #expect(body.contains("Spaced"))
   }
 }
+#endif

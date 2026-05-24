@@ -196,6 +196,7 @@
 				App/mac/ViewerAppDelegate.swift = (macos, );
 				App/vision/KosmosVisionService.swift = (xros, );
 				App/vision/VisionViewerApp.swift = (xros, );
+				"Models/mac/DocumentModel+AVP.swift" = (macos, );
 				"Models/mac/DocumentModel+Print.swift" = (macos, );
 				Models/mac/EditorChoice.swift = (macos, );
 				Models/mac/EditorPreset.swift = (macos, );

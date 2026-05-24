@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import GalleyServerKit
@@ -44,3 +45,4 @@ struct SSEEncoderTests {
     #expect(frame == ": keepalive\n\n")
   }
 }
+#endif

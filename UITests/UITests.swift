@@ -1,5 +1,6 @@
+#if os(macOS)
 import GalleyCoreKit
-import ALFoundation
+internal import ALFoundation
 import XCTest
 
 /// UI tests against the real Galley app — no behavior gating on
@@ -519,3 +520,4 @@ final class UITests: XCTestCase {
     add(attachment)
   }
 }
+#endif

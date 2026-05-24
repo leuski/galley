@@ -1,5 +1,5 @@
 {
-  "originHash" : "8e445f105c2ed762bd35790911a30a6a84ee32d37e56bdbc4d6ea4295b417e4d",
+  "originHash" : "63640f82039d0664808e69521acdc257f63acb400d882fe13cc17ac34221c5c7",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -17,15 +17,6 @@
       "state" : {
         "revision" : "277e5db5b6d348270088e6ee8e8fa2539bae603d",
         "version" : "2.23.0"
-      }
-    },
-    {
-      "identity" : "loom",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/EthanLipnik/Loom.git",
-      "state" : {
-        "revision" : "8971febf105898760bcc5f462da4b3aa44954fe2",
-        "version" : "1.8.15"
       }
     },
     {

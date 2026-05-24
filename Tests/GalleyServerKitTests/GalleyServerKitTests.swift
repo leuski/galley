@@ -1,3 +1,4 @@
+#if os(macOS)
 import Testing
 @testable import GalleyServerKit
 
@@ -5,3 +6,4 @@ import Testing
 func galleyServerKitModuleLoads() {
   #expect(Bool(true))
 }
+#endif

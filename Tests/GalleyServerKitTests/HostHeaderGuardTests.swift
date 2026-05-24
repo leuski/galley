@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 @testable import GalleyServerKit
@@ -52,3 +53,4 @@ struct HostHeaderGuardTests {
     #expect(!Routes.isHostAllowed("   ", expectedPort: 8089))
   }
 }
+#endif

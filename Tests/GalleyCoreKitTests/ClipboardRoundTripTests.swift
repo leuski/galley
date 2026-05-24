@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import AppKit
 import Testing
@@ -266,3 +267,4 @@ struct ClipboardRoundTripTests {
       "Template \(template.id) lost body text after RTF re-parse")
   }
 }
+#endif

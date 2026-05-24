@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Testing
 import GalleyCoreKit
@@ -38,3 +39,4 @@ struct PreviewServerControllerTests {
             != PreviewServerController.State.failed(message: "y"))
   }
 }
+#endif
