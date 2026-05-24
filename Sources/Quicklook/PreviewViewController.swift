@@ -41,7 +41,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   }
 
   func preparePreviewOfFile(at url: URL) async throws {
-    if let endpoint = ServerPortFile.preferredEndpointURL {
+    if let endpoint = Defaults.shared.serverEndpointURL {
       do {
         try await loadFromServer(endpoint.appendingPreview(url))
         return
@@ -144,11 +144,8 @@ private final class NavigationProxy: NSObject, WKNavigationDelegate {
   }
 
   // Quicklook hits `http://127.0.0.1:<port>/…` via
-  // `ServerPortFile.preferredEndpointURL`, which now prefers HTTP.
-  // No TLS challenge fires on the happy path, so no challenge
-  // delegate is wired here. If the Server is HTTPS-only (HTTP
-  // listener failed to bind), default trust evaluation rejects the
-  // self-signed cert, navigation fails, and `loadFromServer`'s
-  // catch block falls back to in-process rendering — same end
-  // state as today.
+  // `Defaults.shared.serverEndpointURL`. Loopback HTTP only; no TLS
+  // challenge fires, so no challenge delegate is wired here. When
+  // the Server isn't running the URL is nil and we fall through to
+  // in-process rendering.
 }

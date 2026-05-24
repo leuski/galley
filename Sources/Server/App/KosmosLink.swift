@@ -92,7 +92,7 @@ final class KosmosLink {
     self.server = server
     self.deviceID = loadOrMakeGalleyDeviceID(role: .server)
     self.httpTunnel = HTTPTunnelMacHandler(
-      upstreamBaseProvider: { ServerPortFile.http.endpointURL })
+      upstreamBaseProvider: { Defaults.shared.serverEndpointURL })
   }
 
   /// Begin advertising. Idempotent. `httpURL` is the Server's loopback

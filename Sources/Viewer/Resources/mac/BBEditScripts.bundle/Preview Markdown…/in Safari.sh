@@ -2,20 +2,20 @@
 
 # Open the current BBEdit document in Safari via Galley Server's
 # /preview/ route. The server binds to an OS-assigned port at
-# startup and publishes it to `server-http-port`; this script reads
-# it at run time, so a Galley Server restart with a new port "just
-# works" without reinstalling scripts.
+# startup and publishes it under `serverHTTPPort` in the
+# `net.leuski.galley` defaults suite; this script reads it at run
+# time, so a Galley Server restart with a new port "just works"
+# without reinstalling scripts.
+#
+# Note: this reads another app's preference domain. The non-sandboxed
+# direct-download BBEdit can do that. The App Store BBEdit is
+# sandboxed and may be denied — same limitation as the previous
+# port-file approach, since QL-grade entitlements aren't available
+# for a one-off shell script.
 
-PORT_FILE="$HOME/Library/Application Support/net.leuski.galley.localized/server-http-port"
-
-if [ ! -r "$PORT_FILE" ]; then
-  osascript -e 'display alert "Galley Server is not running." message "Start Galley Server from its menu-bar icon and try again."'
-  exit 1
-fi
-
-PORT=$(tr -d ' \t\r\n' < "$PORT_FILE")
+PORT=$(defaults read net.leuski.galley serverHTTPPort 2>/dev/null)
 if ! [ "$PORT" -gt 0 ] 2>/dev/null; then
-  osascript -e 'display alert "Galley Server port file is malformed." message "Try restarting Galley Server."'
+  osascript -e 'display alert "Galley Server is not running." message "Start Galley Server from its menu-bar icon and try again."'
   exit 1
 fi
 

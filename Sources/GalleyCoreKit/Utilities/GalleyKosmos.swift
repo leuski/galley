@@ -52,8 +52,9 @@ public func loadOrMakeGalleyDeviceID(role: GalleyKosmosRole) -> UUID {
 public enum GalleyKosmosMetadataKey {
   /// Server's loopback HTTP base URL (`http://127.0.0.1:<port>`),
   /// published once the listener has bound. Consumers read it via
-  /// `PeerInfo.galleyHTTPURL` to display the port without needing
-  /// `ServerPortFile`.
+  /// `PeerInfo.galleyHTTPURL` so Kosmos peers don't need to dip
+  /// into the shared `net.leuski.galley` defaults just to learn the
+  /// port — same value, different transport.
   public static let httpURL = "galley.http-url"
 }
 

@@ -178,8 +178,8 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   /// this editor has no kit or the bundle is absent from the app.
   ///
   /// Shell scripts in the bundle resolve the server endpoint at run
-  /// time by reading `ServerPortFile`, so the install is a plain
-  /// copy — no port-placeholder rewriting.
+  /// time via `defaults read net.leuski.galley serverHTTPPort`, so
+  /// the install is a plain copy — no port-placeholder rewriting.
   func installScripts(to destination: URL) throws {
     guard let bundleName = scriptBundleName,
       let source = Bundle.main.url(

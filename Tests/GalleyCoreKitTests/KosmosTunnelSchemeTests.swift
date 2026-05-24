@@ -8,10 +8,11 @@ import Testing
 
 @Suite("KosmosTunnelScheme")
 struct KosmosTunnelSchemeTests {
-  @Test("name and prefix are stable")
-  func nameAndPrefix() {
+  @Test("name and origin are stable")
+  func nameAndOrigin() {
     #expect(KosmosTunnelScheme.name == "galley")
-    #expect(KosmosTunnelScheme.previewURLPrefix == "galley://preview")
+    #expect(KosmosTunnelScheme.originURL.absoluteString
+      == "galley://local")
   }
 
   @Test("preview URL for a simple absolute path")
@@ -19,7 +20,7 @@ struct KosmosTunnelSchemeTests {
     let url = try #require(KosmosTunnelScheme.previewURL(
       forFile: "/Users/x/Documents/foo.md"))
     #expect(url.absoluteString
-      == "galley://preview/Users/x/Documents/foo.md")
+      == "galley://local/preview/Users/x/Documents/foo.md")
   }
 
   @Test("path segments with spaces / unicode get percent-encoded")
@@ -27,7 +28,7 @@ struct KosmosTunnelSchemeTests {
     let url = try #require(KosmosTunnelScheme.previewURL(
       forFile: "/Users/x/Read Me.md"))
     #expect(url.absoluteString
-      == "galley://preview/Users/x/Read%20Me.md")
+      == "galley://local/preview/Users/x/Read%20Me.md")
   }
 
   @Test("relative path is rejected")

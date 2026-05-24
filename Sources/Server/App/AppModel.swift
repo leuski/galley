@@ -19,10 +19,16 @@ private let defaultsLog = Logger(
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyRenderDefaults {
+final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
   @DefaultsKey var serverGalleyHash: String?
+  /// OS-assigned port the running Server bound to, published here so
+  /// Viewer and Quicklook can compose the loopback URL via
+  /// `serverEndpointURL`. 0 means "no listener published" (Server
+  /// stopped or failed). Written by this process only; everyone else
+  /// reads.
+  @DefaultsKey var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 }
@@ -157,24 +163,41 @@ final class AppModel {
 
   private func startServer() {
     server.start()
-    // Wait for the HTTP listener to actually bind before starting
-    // Kosmos so the loopback URL — including the OS-assigned port —
-    // can ride in the peer's advertisement metadata. Mac Viewer reads
-    // it from `PeerInfo.galleyHTTPURL` for the Settings pill, so there
-    // is no second port-discovery channel from the Viewer's side.
-    // `.failed` is also a terminal signal — start Kosmos anyway so
-    // peers can still discover liveness, just without a URL.
+    // One observer covers two responsibilities, since `stateChanges`
+    // is single-consumer:
+    //
+    // 1. Publish the bound port to the shared `net.leuski.galley`
+    //    defaults on every transition. Quicklook and any future
+    //    same-machine reader compose the loopback URL through
+    //    `Defaults.shared.serverEndpointURL`. 0 means "no listener".
+    //
+    // 2. Start Kosmos exactly once, on the first `.running` /
+    //    `.failed`. The loopback URL rides in the peer's metadata so
+    //    Mac Viewer can show it without a second port-discovery
+    //    channel. `.failed` still starts Kosmos so peers see
+    //    liveness, just without a URL.
     Task { [server, kosmos] in
+      var kosmosStarted = false
       for await state in server.stateChanges {
         switch state {
         case .running(let url):
-          kosmos.start(httpURL: url)
-          return
+          let port = (url.port).flatMap { UInt16(exactly: $0) } ?? 0
+          Defaults.shared.serverHTTPPort = port
+          DefaultsBroadcast.post()
+          if !kosmosStarted {
+            kosmos.start(httpURL: url)
+            kosmosStarted = true
+          }
         case .failed:
-          kosmos.start(httpURL: nil)
-          return
+          Defaults.shared.serverHTTPPort = 0
+          DefaultsBroadcast.post()
+          if !kosmosStarted {
+            kosmos.start(httpURL: nil)
+            kosmosStarted = true
+          }
         case .stopped:
-          continue
+          Defaults.shared.serverHTTPPort = 0
+          DefaultsBroadcast.post()
         }
       }
     }

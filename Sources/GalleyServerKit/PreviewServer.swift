@@ -11,9 +11,11 @@ private let log = Logger(
   subsystem: bundleIdentifier, category: "PreviewServer")
 
 /// Lifecycle controller for the Galley preview HTTP server. Runs on
-/// Hummingbird; binds to `127.0.0.1` on an OS-assigned port and writes
-/// the bound port to `ServerPortFile` so consumers (Viewer probe,
-/// Quicklook, bundled scripts) can discover the endpoint.
+/// Hummingbird; binds to `127.0.0.1` on an OS-assigned port. Owners
+/// (the Server target's AppModel) observe `stateChanges` and publish
+/// the bound port to the shared `net.leuski.galley` defaults so
+/// consumers (Quicklook, bundled scripts, future Viewer surface) can
+/// discover the endpoint.
 ///
 /// Loopback-only by design. Same-machine consumers (Mac Viewer,
 /// Quicklook, browsers, BBEdit) reach the listener via `127.0.0.1`.
@@ -110,7 +112,7 @@ public final class PreviewServerController {
         await boundPort.store(port)
         let endpoint = Self.endpointURL(scheme: "http", port: port)
         await MainActor.run {
-          self.publishHTTPBound(port: port, endpoint: endpoint)
+          self.publishHTTPBound(endpoint: endpoint)
         }
       })
 
@@ -119,14 +121,13 @@ public final class PreviewServerController {
         try await app.run()
         // Hummingbird returns normally on cooperative cancel (no
         // CancellationError thrown); detect via Task.isCancelled so
-        // `publishStopped()` doesn't wipe the replacement listener's
-        // freshly-written port files.
+        // `publishStopped()` doesn't overwrite the replacement
+        // listener's freshly-published state.
         if Task.isCancelled { return }
       } catch is CancellationError {
         // `start()` called `stop()` which cancelled us in order to
-        // hand the slot to a fresh task that has already bound and
-        // written its own port file. Bail out before publishStopped
-        // wipes that fresh state.
+        // hand the slot to a fresh task that has already bound.
+        // Bail before publishStopped overwrites that fresh state.
         return
       } catch {
         await self?.publishFailure(error.localizedDescription)
@@ -137,40 +138,17 @@ public final class PreviewServerController {
   }
 
   /// Called from the HTTP listener's `onServerRunning` once the port
-  /// is known. Writes the `.http` port file (locked — it doubles as
-  /// the single-instance sentinel) and publishes the running URL, or
-  /// tears the listener down with a localized failure message.
-  private func publishHTTPBound(port: UInt16, endpoint: URL?) {
-    do {
-      // Locked write: the `.http` port file doubles as the
-      // single-instance sentinel. If another Galley Server is
-      // already running on this user account, this throws
-      // `LockedByAnotherProcess` and we tear down the listener
-      // we just bound — ServerApp's NSRunningApplication guard
-      // catches most duplicates, this catches the rest.
-      try ServerPortFile.http.write(port, lock: true)
-      if let endpoint { self.state = .running(url: endpoint) }
-    } catch is ServerPortFile.LockedByAnotherProcess {
-      // Tear down the listener we just bound, then publish
-      // the failure. `stop()` resets state to `.stopped`, so
-      // the failed-state assignment has to come after it.
-      self.stop()
-      self.state = .failed(message: String(
-        localized: """
-          Another Galley Server is already running on this user account.
-          """,
-        bundle: .galleyServerKit))
-    } catch {
-      self.stop()
-      self.state = .failed(message: String(
-        localized:
-          "Cannot write port file: \(error.localizedDescription)",
-        bundle: .galleyServerKit))
+  /// is known. Publishes the running URL. The port itself reaches
+  /// other processes through the shared `net.leuski.galley` defaults
+  /// — owners observe `stateChanges` and write
+  /// `Defaults.shared.serverHTTPPort` themselves.
+  private func publishHTTPBound(endpoint: URL?) {
+    if let endpoint {
+      self.state = .running(url: endpoint)
     }
   }
 
   public func stop() {
-    ServerPortFile.http.clear()
     httpTask?.cancel()
     httpTask = nil
     state = .stopped
@@ -178,14 +156,12 @@ public final class PreviewServerController {
 
   nonisolated private func publishStopped() async {
     await MainActor.run {
-      ServerPortFile.http.clear()
       self.state = .stopped
     }
   }
 
   nonisolated private func publishFailure(_ message: String) async {
     await MainActor.run {
-      ServerPortFile.http.clear()
       self.state = .failed(message: message)
     }
   }

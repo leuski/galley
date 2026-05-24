@@ -29,7 +29,7 @@ import OSLog
 /// notification) because `UserDefaults.didChangeNotification` is
 /// process-local.
 @ObservableDefaults(limitToInstance: false)
-final class Defaults: GalleyRenderDefaults {
+final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
   @DefaultsKey var enablePerDocumentOverrides: Bool = false
@@ -94,6 +94,15 @@ final class Defaults: GalleyRenderDefaults {
   /// Server. Cleared by the Viewer before terminating a stale Server
   /// so a re-read during the kill window doesn't re-trigger the reap.
   @DefaultsKey var serverGalleyHash: String?
+
+  /// OS-assigned port of the running Galley Server's HTTP listener.
+  /// Published by the Server when it binds, cleared (set to 0) when
+  /// it stops. The Viewer doesn't currently read this, but the
+  /// conformance to `GalleyNetworkDefaults` keeps the shared-suite
+  /// contract honest and surfaces `serverEndpointURL` for any future
+  /// reader. Quicklook reads the same plist through its own
+  /// `Defaults` class.
+  @DefaultsKey var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 
