@@ -578,6 +578,7 @@
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
 				62564F432FA857A400FF0F84 /* Embed Foundation Extensions */,
 				62D5E0AA2FA5BFB000CADD72 /* Strip Frameworks from nested Server.app */,
+				62D5E0AB2FA5BFB000CADD72 /* Remove Galley Server.app from build products */,
 			);
 			buildRules = (
 			);
@@ -841,7 +842,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Only applies to the macOS slice; visionOS has no nested Server.app\nif [ \"$PLATFORM_NAME\" != \"macosx\" ]; then exit 0; fi\nSERVER_APP=\"$CODESIGNING_FOLDER_PATH/Contents/Resources/Galley Server.app\"\nif [ ! -d \"$SERVER_APP\" ]; then\n    echo \"warning: Strip frameworks: nested Galley Server.app not found at $SERVER_APP, skipping.\"\n    exit 0\nfi\nFRAMEWORKS_DIR=\"$SERVER_APP/Contents/Frameworks\"\nif [ -d \"$FRAMEWORKS_DIR\" ]; then\n    echo \"Strip frameworks: removing $(ls \"$FRAMEWORKS_DIR\" | wc -l | tr -d ' ') frameworks from nested Galley Server.app\"\n    rm -rf \"$FRAMEWORKS_DIR\"\nfi\nif [ \"$CODE_SIGNING_ALLOWED\" != \"NO\" ]; then\n    echo \"Strip frameworks: re-signing nested Galley Server.app\"\n    codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --preserve-metadata=identifier,entitlements,flags --timestamp=none \"$SERVER_APP\"\nfi\n";
+			shellScript = "\"${SRCROOT}/Scripts/strip-server-frameworks.sh\"\n";
+		};
+		62D5E0AB2FA5BFB000CADD72 /* Remove Galley Server.app from build products */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Remove Galley Server.app from build products";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/Scripts/remove-server-from-products.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
