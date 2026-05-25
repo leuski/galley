@@ -492,7 +492,7 @@ private struct DocumentScreen: View {
       processorPersistent: perFile.rendererPersistent,
       colorSchemePersistent: perFile.colorSchemePersistent,
       kind: .document,
-      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.httpTunnel))
+      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.httpTunnelClient))
     model = created
     return created
   }

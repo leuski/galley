@@ -12,14 +12,14 @@
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		628053992FBFEC0600A02808 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
 		6281285D2FC4101D0059DDFF /* KosmosHTTPTunnel in Frameworks */ = {isa = PBXBuildFile; productRef = 6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */; };
+		6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
 		629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050B00000000CADD7B01 /* KosmosWebView */; };
 		62913F252FBC3F9400088C1F /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050700000000CADD7B01 /* KosmosCore */; };
 		62913F262FBC3F9400088C1F /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050900000000CADD7B01 /* KosmosTransport */; };
 		629150E02FBFCE2700088C1F /* HummingbirdCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62913BA12FBC3B9A00088C1F /* HummingbirdCore */; };
-		62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050100000000CADD7B01 /* KosmosBridge */; };
-		62A0050400000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050300000000CADD7B01 /* KosmosCore */; };
-		62A0050600000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A0050500000000CADD7B01 /* KosmosTransport */; };
-		62A1000100000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
+		62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050100000000CADD7B01 /* KosmosBridge */; };
+		62A0050400000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050300000000CADD7B01 /* KosmosCore */; };
+		62A0050600000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050500000000CADD7B01 /* KosmosTransport */; };
 		62A1000300000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A1000400000000CADD7B01 /* ALFoundation */; };
 		62A1000500000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000600000000CADD7B01 /* KosmosCore */; };
 		62A1000700000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000800000000CADD7B01 /* KosmosTransport */; };
@@ -142,16 +142,6 @@
 			files = (
 				62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */,
 				62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		62D5E43E2FA5D93700CADD72 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -313,12 +303,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */,
 				62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */,
 				62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */,
 				62A0050400000000CADD7B01 /* KosmosCore in Frameworks */,
 				62A0050600000000CADD7B01 /* KosmosTransport in Frameworks */,
-				62A1000100000000CADD7B01 /* ALFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -490,7 +480,6 @@
 				626E8D4B2F9DD1C700BD51F9 /* Sources */,
 				626E8D4C2F9DD1C700BD51F9 /* Frameworks */,
 				626E8D4D2F9DD1C700BD51F9 /* Resources */,
-				62D5E43E2FA5D93700CADD72 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -946,9 +935,6 @@
 		};
 		629139D22FBC365F00088C1F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilters = (
-				macos,
-			);
 			productRef = 629139D12FBC365F00088C1F /* KosmosBridge */;
 		};
 		629139DC2FBC367000088C1F /* PBXTargetDependency */ = {

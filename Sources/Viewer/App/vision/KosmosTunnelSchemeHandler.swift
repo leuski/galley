@@ -12,17 +12,17 @@ import WebKit
 /// resolves it against its loopback HTTP listener and streams the
 /// response back as chunks. This is the AVP side of the data plane;
 /// the actual request/response routing lives in
-/// `KosmosHTTPTunnelClient`.
+/// `Client`.
 ///
 /// Constructed once per `DocumentModel`. The reference to the shared
-/// `KosmosHTTPTunnelClient` is captured strongly here and held weakly
+/// `Client` is captured strongly here and held weakly
 /// by the client's response-routing entries, so a transient `WebPage`
 /// teardown doesn't leak.
 ///
 /// **Origin header.** The Mac's Hummingbird routes use
 /// `X-Galley-Origin: galley://local` to know which `<base href>` to
 /// emit in rendered HTML so unrewritten sub-resources resolve back to
-/// this scheme handler. The shared `KosmosHTTPTunnelClient` is
+/// this scheme handler. The shared `Client` is
 /// product-neutral and doesn't stamp it; Galley stamps it here on
 /// every outbound request.
 @MainActor
@@ -33,7 +33,7 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
   static let scheme = URLScheme(KosmosTunnelScheme.name)
   !! "Failed to make URLScheme for \(KosmosTunnelScheme.name)"
 
-  let tunnel: KosmosHTTPTunnelClient
+  let tunnel: Client
 
   nonisolated
   func reply(

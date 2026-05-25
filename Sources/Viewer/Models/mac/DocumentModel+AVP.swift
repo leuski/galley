@@ -34,7 +34,7 @@ extension DocumentModel {
         }
       } catch {
         // `String(reflecting:)` prints the enum case + payload
-        // ("KosmosClientError.linkUnavailable(\"no session…\")"),
+        // ("ClientError.linkUnavailable(\"no session…\")"),
         // which is far more useful in logs than the bridged
         // `localizedDescription` even when LocalizedError is
         // wired up. Keep both — the bridged form is what the

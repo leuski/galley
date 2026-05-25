@@ -23,14 +23,9 @@ final class KosmosViewerService: KosmosService {
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
   @ObservationIgnored private let localHostUUID: String? =
-    KosmosLocalHostID.current
+    LocalHostID.current
 
-  @ObservationIgnored private let deviceID: UUID
-  @ObservationIgnored private let host = KosmosServiceHost()
-
-  init() {
-    self.deviceID = loadOrMakeGalleyDeviceID(role: .macViewer)
-  }
+  @ObservationIgnored private let host = KosmosServiceHost(role: .macViewer)
 
   /// Begin advertising. Idempotent.
   func start() {
@@ -44,7 +39,7 @@ final class KosmosViewerService: KosmosService {
   // MARK: - KosmosService
 
   func makeLink() async -> (KosmosClient, any KosmosLink) {
-    await makeGalleyKosmosClient(role: .macViewer, deviceID: deviceID)
+    await host.makeLink(role: .macViewer)
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
@@ -62,7 +57,7 @@ final class KosmosViewerService: KosmosService {
       """)
   }
 
-  func linkStarted(_ error: (any Error)?) {
+  func linkDidStart(_ error: (any Error)?) {
     if let error {
       log.error("""
         Kosmos link failed to start: \
@@ -80,17 +75,6 @@ final class KosmosViewerService: KosmosService {
         """)
     }
   }
-
-  // MARK: - Observable passthroughs
-
-  /// Snapshot of peers visible to Kosmos.
-  var peers: [PeerID: PeerInfo] { host.peers }
-
-  /// True once `link.start()` returned successfully.
-  var isLinkRunning: Bool { host.isLinkRunning }
-
-  /// Last error encountered during `link.start()`, if any.
-  var lastStartError: String? { host.lastStartError }
 
   // MARK: - Derived state
 

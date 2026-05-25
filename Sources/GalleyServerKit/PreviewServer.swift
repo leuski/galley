@@ -20,7 +20,7 @@ private let log = Logger(
 /// Loopback-only by design. Same-machine consumers (Mac Viewer,
 /// Quicklook, browsers, BBEdit) reach the listener via `127.0.0.1`.
 /// AVP doesn't dial the HTTP listener directly — it tunnels each
-/// request over Kosmos through `KosmosHTTPTunnelResponder`, which proxies
+/// request over Kosmos through `Responder`, which proxies
 /// to this loopback endpoint on AVP's behalf. No HTTPS, no cert
 /// provisioning, no AWDL ingress concerns.
 @Observable
@@ -66,7 +66,7 @@ public final class PreviewServerController {
   }
 
   /// Starts the loopback HTTP listener. AVP traffic doesn't reach the
-  /// listener directly — `KosmosHTTPTunnelResponder` proxies Kosmos
+  /// listener directly — `Responder` proxies Kosmos
   /// `ProxyHTTPRequest` messages through the same endpoint.
   public func start() {
     stop()

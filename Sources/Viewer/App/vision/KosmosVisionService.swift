@@ -19,7 +19,7 @@ private let log = Logger(
 /// Also owns the AVP end of the HTTP tunnel — every `galley://` URL
 /// the WebView fetches becomes a `ProxyHTTPRequest` Kosmos broadcast,
 /// and the response chunks are routed back through
-/// `KosmosHTTPTunnelClient`. The service is the single subscription point
+/// `Client`. The service is the single subscription point
 /// for the two response message types so we don't spin up a per-request
 /// subscription.
 ///
@@ -32,10 +32,9 @@ final class KosmosVisionService: KosmosService {
   /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
-  let httpTunnel: KosmosHTTPTunnelClient
+  let httpTunnelClient: Client
 
-  @ObservationIgnored private let deviceID: UUID
-  @ObservationIgnored private let host = KosmosServiceHost()
+  @ObservationIgnored private let host = KosmosServiceHost(role: .visionViewer)
 
   /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
   /// by the app to call `openWindow(value: url)`. The service holds
@@ -51,8 +50,7 @@ final class KosmosVisionService: KosmosService {
   private var openWindows: [KosmosCore.WindowID: URL] = [:]
 
   init() {
-    self.deviceID = loadOrMakeGalleyDeviceID(role: .visionViewer)
-    self.httpTunnel = KosmosHTTPTunnelClient(client: nil)
+    self.httpTunnelClient = Client(client: nil)
   }
 
   /// Begin advertising and browsing. Idempotent.
@@ -61,7 +59,7 @@ final class KosmosVisionService: KosmosService {
   }
 
   func stop() async {
-    httpTunnel.stopAll()
+    httpTunnelClient.stopAll()
     reloadHandlers.removeAll()
     openWindows.removeAll()
     await host.stop()
@@ -70,44 +68,39 @@ final class KosmosVisionService: KosmosService {
   // MARK: - KosmosService
 
   func makeLink() async -> (KosmosClient, any KosmosLink) {
-    await makeGalleyKosmosClient(role: .visionViewer, deviceID: deviceID)
+    await host.makeLink(role: .visionViewer)
   }
 
   func configure(host: KosmosServiceHost, client: KosmosClient) async {
-    httpTunnel.attach(client: client)
+    httpTunnelClient.attach(client: client)
 
-    host.retain(client.subscribe(OpenURL.self) {
-      [weak self] _, message in
+    client.subscribe(OpenURL.self) { [weak self] _, message in
       self?.handleOpenURL(message)
-    })
+    }.register(with: host)
 
-    host.retain(client.subscribe(OpenDocument.self) {
-      [weak self] sender, message in
+    client.subscribe(OpenDocument.self) { [weak self] sender, message in
       self?.handleOpenDocument(message, from: sender)
-    })
+    }.register(with: host)
 
-    host.retain(client.subscribe(WindowContentChanged.self) {
-      [weak self] sender, message in
+    client.subscribe(WindowContentChanged.self) { [weak self] sender, message in
       log.notice("""
         ← RECV WindowContentChanged \
         from=\(sender.description, privacy: .public) \
         window=\(message.windowID, privacy: .public)
         """)
       self?.reloadHandlers[message.windowID]?()
-    })
+    }.register(with: host)
 
-    host.retain(client.subscribe(ProxyHTTPResponseHead.self) {
-      [weak self] _, head in
-      self?.httpTunnel.handle(head)
-    })
+    client.subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
+      self?.httpTunnelClient.handle(head)
+    }.register(with: host)
 
-    host.retain(client.subscribe(ProxyHTTPResponseChunk.self) {
-      [weak self] _, chunk in
-      self?.httpTunnel.handle(chunk)
-    })
+    client.subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
+      self?.httpTunnelClient.handle(chunk)
+    }.register(with: host)
   }
 
-  func linkStarted(_ error: (any Error)?) {
+  func linkDidStart(_ error: (any Error)?) {
     if let error {
       log.error("""
         Kosmos link failed to start: \
@@ -118,10 +111,6 @@ final class KosmosVisionService: KosmosService {
     }
   }
 
-  // MARK: - Observable passthroughs
-
-  var peers: [PeerID: PeerInfo] { host.peers }
-
   /// Notify the Mac that AVP is about to suspend (`scenePhase`
   /// transitioned to `.background` — typically the user closed the
   /// last AVP Galley window including the anchor). Mac side flips the
@@ -130,7 +119,7 @@ final class KosmosVisionService: KosmosService {
   func publishSuspend() {
     let message = AppWillSuspend(
       appID: Self.galleyAppID,
-      deviceID: DeviceID(deviceID))
+      deviceID: host.deviceID)
     log.notice("→ PUBLISH AppWillSuspend")
     if let client = host.client {
       Task { [client] in await client.publish(message) }
@@ -141,7 +130,7 @@ final class KosmosVisionService: KosmosService {
   func publishResume() {
     let message = AppDidResume(
       appID: Self.galleyAppID,
-      deviceID: DeviceID(deviceID))
+      deviceID: host.deviceID)
     log.notice("→ PUBLISH AppDidResume")
     if let client = host.client {
       Task { [client] in await client.publish(message) }

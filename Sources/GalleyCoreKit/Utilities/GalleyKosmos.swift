@@ -40,11 +40,31 @@ public enum GalleyKosmosRole: String, Sendable {
   }
 }
 
-/// Per-app persisted device identifier — thin wrapper around the
-/// generic `KosmosClient.persistentDeviceID(forKey:)` to keep the
-/// `role`-typed call site here.
-public func loadOrMakeGalleyDeviceID(role: GalleyKosmosRole) -> UUID {
-  KosmosClient.persistentDeviceID(forKey: role.deviceIDKey)
+extension KosmosServiceHost {
+  /// Per-app persisted device identifier — thin wrapper around the
+  /// generic `KosmosClient.persistentDeviceID(forKey:)` to keep the
+  /// `role`-typed call site here.
+  public convenience init(role: GalleyKosmosRole) {
+    self.init(deviceIDKey: role.deviceIDKey)
+  }
+
+  /// Construct a Loom-backed `KosmosClient` for the given Galley
+  /// surface. Pump is already running on return so registrations land
+  /// before any peer connects. Caller registers handlers and then
+  /// `try await link.start()`.
+  public func makeLink(
+    role: GalleyKosmosRole,
+    deviceName: String? = nil,
+    extraMetadata: [String: String] = [:]
+  ) async -> (client: KosmosClient, link: LoomKosmosLink) {
+    await KosmosClient.makeLoomBacked(
+      role: role.rawValue,
+      product: "galley",
+      deviceID: deviceID,
+      deviceName: deviceName ?? role.defaultDeviceName,
+      deviceType: role.loomDeviceType,
+      extraMetadata: extraMetadata)
+  }
 }
 
 /// Galley-specific Kosmos peer-metadata keys. Keep in sync with the
@@ -56,25 +76,6 @@ public enum GalleyKosmosMetadataKey {
   /// into the shared `net.leuski.galley` defaults just to learn the
   /// port — same value, different transport.
   public static let httpURL = "galley.http-url"
-}
-
-/// Construct a Loom-backed `KosmosClient` for the given Galley
-/// surface. Pump is already running on return so registrations land
-/// before any peer connects. Caller registers handlers and then
-/// `try await link.start()`.
-public func makeGalleyKosmosClient(
-  role: GalleyKosmosRole,
-  deviceID: UUID,
-  deviceName: String? = nil,
-  extraMetadata: [String: String] = [:]
-) async -> (client: KosmosClient, link: LoomKosmosLink) {
-  await KosmosClient.makeLoomBacked(
-    role: role.rawValue,
-    product: "galley",
-    deviceID: deviceID,
-    deviceName: deviceName ?? role.defaultDeviceName,
-    deviceType: role.loomDeviceType,
-    extraMetadata: extraMetadata)
 }
 
 extension PeerInfo {

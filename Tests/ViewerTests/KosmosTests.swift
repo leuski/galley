@@ -14,6 +14,13 @@
 //  `KosmosViewerService.swift` is internal to the Viewer module, so
 //  the `@testable import Galley` stays for the host-side surface.
 //
+//  Note: the host's `peers` / `isLinkRunning`
+//  observable surface is verified in the Kosmos package's own
+//  `KosmosServiceHostTests`; Galley used to re-export those as
+//  passthroughs on `KosmosLink` / `KosmosViewerService` /
+//  `KosmosVisionService`, but the passthroughs had no readers and
+//  were removed.
+//
 
 import Foundation
 import GalleyCoreKit

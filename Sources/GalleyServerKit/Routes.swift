@@ -409,7 +409,7 @@ enum Routes {
   /// scheme, since `Host` headers don't carry it.
   ///
   /// `X-Galley-Origin` overrides this when present. The AVP-side
-  /// `KosmosHTTPTunnelResponder` sets it so the rendered HTML's
+  /// `Responder` sets it so the rendered HTML's
   /// `<base href>` points at the WebView's `galley://` origin
   /// instead of the loopback authority — without it, sub-resource
   /// fetches (CSS, JS, images) would resolve against
