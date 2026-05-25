@@ -3,43 +3,42 @@ import AppKit
 import Foundation
 import Observation
 
-/// Single swap point for the server-agent backend. Exposes
-/// `isEnabled` as an observable property so SwiftUI views can
+/// SwiftUI-visible facade over the launchd-backed server agent.
+/// Exposes `isEnabled` as an observable property so views can
 /// `@Bindable` against it or just read it in `body` and get
 /// automatic re-evaluation; async mutations update `isEnabled`
 /// before returning.
 ///
-/// To switch backends, swap `backend` for another type that
-/// implements the same surface (`isEnabled`, `setEnabled`,
-/// `validateAndRepair`). Don't change `ServerSettingsView` or
-/// `ViewerApp`.
+/// The live backend is ``LaunchctlServerAgent`` (classic per-user
+/// `~/Library/LaunchAgents/`). It is the only backend currently
+/// wired in. If a future alternative is added, swap `backend` for
+/// another type that implements the same surface (`isEnabled`,
+/// `setEnabled`, `validateAndRepair`, `kickstart`) and leave
+/// `ServerSettingsView` / `MacViewerApp` untouched.
 ///
-/// ## Backends
+/// ## Why not `SMAppService`?
 ///
-/// ``ServerAgent`` (`SMAppService`)
-///   The Apple-blessed path. Surfaces in System Settings → Login
-///   Items, has a stable identity across rebuilds (via the host
-///   bundle's Team ID). On Apple-Development-signed local builds,
-///   AMFI rejects the embedded `Galley Server.app` with `Launch
-///   Constraint Violation`; combined with `KeepAlive` this can
-///   respawn-loop and destabilize the user session.
-///
-/// ``LaunchctlServerAgent`` (classic `~/Library/LaunchAgents`)
-///   Bypasses SMAppService. Sidesteps the SMAppService AMFI path,
-///   but the LWCR baked into the embedded helper still applies if
-///   present. The plist also embeds an absolute `Program` path,
-///   which goes stale if `Galley.app` moves —
-///   ``LaunchctlServerAgent/validateAndRepair()`` repairs that on
-///   launch. Plist no longer uses `KeepAlive`, so a failed spawn
-///   stays failed instead of looping.
+/// Earlier versions used `SMAppService` (Apple's blessed Login-Item
+/// API — surfaces in System Settings → Login Items, stable identity
+/// across rebuilds via the host's Team ID). On ad-hoc and
+/// Apple-Development-signed builds, AMFI rejects the embedded
+/// `Galley Server.app` with `OS_REASON_CODESIGNING / Launch
+/// Constraint Violation` when launchd spawns it through the
+/// SMAppService constraint-enforced path. Combined with
+/// `KeepAlive`, the rejected helper respawned in a tight loop and
+/// churned ControlCenter's status-item registration. Classic
+/// per-user LaunchAgents bypass that constraint check when the
+/// binary carries no LWCR of its own, which is the path
+/// ``LaunchctlServerAgent`` takes.
 ///
 /// ## Going forward
 ///
-/// The reliable option is to launch `Galley Server.app` as a child
-/// of `Galley.app` via `NSWorkspace.openApplication(...)` while
-/// Galley is running. LaunchServices handles parent-identity
-/// correctly, AMFI is happy, no plist on disk, no path drift.
-/// Trade-off: the server lives only as long as Galley does.
+/// One cleaner option is launching `Galley Server.app` as a child
+/// of `Galley.app` via `NSWorkspace.openApplication(...)` — no
+/// plist on disk, no path drift, no AMFI launch-constraint check.
+/// The blocker: Server is the AVP routing authority (LSHandler for
+/// `.md` and `galley-bridge://`) and must outlive `Galley.app`, so
+/// a child-process model is the wrong shape.
 @MainActor
 @Observable
 final class ActiveServerAgent {

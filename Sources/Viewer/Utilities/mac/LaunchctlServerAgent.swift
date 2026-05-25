@@ -9,31 +9,48 @@ private let logger = Logger(
   subsystem: bundleIdentifier,
   category: "LaunchctlServerAgent")
 
-/// Drop-in alternative to ``ServerAgent`` that bypasses
-/// `SMAppService` and registers the embedded server as a classic
-/// per-user `LaunchAgent` in `~/Library/LaunchAgents/`.
+/// Registers the embedded `Galley Server.app` as a classic per-user
+/// `LaunchAgent` in `~/Library/LaunchAgents/<label>.plist` and
+/// bootstraps it into the user GUI domain via `launchctl bootstrap
+/// gui/<UID>`. Used by ``ActiveServerAgent`` — see that type's doc
+/// comment for why this backend exists instead of `SMAppService`.
 ///
-/// `SMAppService`-spawned helpers go through AMFI's launch
-/// constraint check, which rejects ad-hoc-signed binaries with
-/// `OS_REASON_CODESIGNING / Launch Constraint Violation`. Classic
-/// user-domain `LaunchAgent`s aren't subject to that constraint when
-/// the binary itself has no LWCR, so this implementation works for
-/// builds where `Scripts/release.sh` strips the launch constraints
-/// (the redistributable zip path).
+/// The plist is written programmatically by ``writePlist()`` (not
+/// loaded from a bundle resource), so the absolute `Program` path
+/// always reflects the running `Bundle.main`. The shape on disk is
+/// minimal:
 ///
-/// Tradeoffs vs. ``ServerAgent``:
+/// ```
+/// Label     = <label>          // e.g. net.leuski.galley.server
+/// Program   = <absolute path>  // <bundle>/MacOS/Galley Server
+/// RunAtLoad = true
+/// ```
+///
+/// If the user moves `Galley.app`, the on-disk `Program` path drifts
+/// from the running bundle; ``validateAndRepair()`` detects that on
+/// launch, rewrites the plist, and re-bootstraps.
+///
+/// ## Tradeoffs
+///
 /// - The agent doesn't appear in System Settings → Login Items.
-/// - The plist embeds an absolute path to the server binary, so
-///   moving `Galley.app` invalidates the registration. Call
-///   ``validateAndRepair()`` on launch to detect that and rewrite
-///   the plist against the current bundle.
-/// - No `KeepAlive`. If AMFI or the helper itself rejects the
-///   spawn, launchd lets it stay dead — better a non-running server
-///   than a fast respawn loop that churns ControlCenter.
+/// - The plist embeds an absolute `Program` path that goes stale if
+///   `Galley.app` moves; ``validateAndRepair()`` handles that.
+/// - Deliberately no `KeepAlive`. If AMFI or the helper itself
+///   rejects the spawn, launchd lets it stay dead — better a
+///   non-running server than a respawn loop that churns
+///   ControlCenter's status-item registration.
+/// - This path works for builds where `Scripts/release.sh` re-signs
+///   ad-hoc (the redistributable zip). If the helper binary itself
+///   carries an LWCR, AMFI will still reject the spawn at the
+///   process level and there is nothing this backend can do about
+///   that.
 struct LaunchctlServerAgent {
   /// Label used both as the launchd service name and the plist
-  /// filename (`<label>.plist`). Matches ``ServerAgent`` so the two
-  /// implementations can't both be active in the same domain.
+  /// filename (`<label>.plist`). Read from the embedded server
+  /// bundle's `CFBundleIdentifier` so it matches what the helper
+  /// itself publishes (`net.leuski.galley.server`) — important for
+  /// `NSRunningApplication.runningApplications(withBundleIdentifier:)`
+  /// lookups in `ActiveServerAgent.terminateRunningServers()`.
   let label: String
   /// Absolute path the plist's `Program` key must match for the
   /// installed agent to actually launch this build's server. Derived

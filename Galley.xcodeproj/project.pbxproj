@@ -205,7 +205,6 @@
 				Resources/AppIcon.icon = (macos, );
 				Resources/mac/BBEditScripts.bundle = (macos, );
 				Resources/mac/XCodeScripts.bundle = (macos, );
-				Resources/mac/net.leuski.galley.server.plist = (macos, );
 				Utilities/mac/ActiveServerAgent.swift = (macos, );
 				Utilities/mac/LaunchctlServerAgent.swift = (macos, );
 				Views/mac/BootstrapModifier.swift = (macos, );
