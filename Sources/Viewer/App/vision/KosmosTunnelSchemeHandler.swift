@@ -2,6 +2,7 @@
 import ALFoundation
 import Foundation
 import GalleyCoreKit
+import KosmosHTTPTunnel
 import WebKit
 
 /// SwiftUI `URLSchemeHandler` for the `galley://` scheme on AVP.
@@ -10,12 +11,20 @@ import WebKit
 /// `ProxyHTTPRequest` Kosmos broadcast and tunneled to the Mac, which
 /// resolves it against its loopback HTTP listener and streams the
 /// response back as chunks. This is the AVP side of the data plane;
-/// the actual request/response routing lives in `HTTPTunnelAVPClient`.
+/// the actual request/response routing lives in
+/// `KosmosHTTPTunnelClient`.
 ///
 /// Constructed once per `DocumentModel`. The reference to the shared
-/// `HTTPTunnelAVPClient` is captured strongly here and held weakly by
-/// the client's response-routing entries, so a transient `WebPage`
+/// `KosmosHTTPTunnelClient` is captured strongly here and held weakly
+/// by the client's response-routing entries, so a transient `WebPage`
 /// teardown doesn't leak.
+///
+/// **Origin header.** The Mac's Hummingbird routes use
+/// `X-Galley-Origin: galley://local` to know which `<base href>` to
+/// emit in rendered HTML so unrewritten sub-resources resolve back to
+/// this scheme handler. The shared `KosmosHTTPTunnelClient` is
+/// product-neutral and doesn't stamp it; Galley stamps it here on
+/// every outbound request.
 @MainActor
 struct KosmosTunnelSchemeHandler: URLSchemeHandler {
   /// Force-unwrap is safe — `KosmosTunnelScheme.name` is a constant
@@ -24,15 +33,19 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
   static let scheme = URLScheme(KosmosTunnelScheme.name)
   !! "Failed to make URLScheme for \(KosmosTunnelScheme.name)"
 
-  let tunnel: HTTPTunnelAVPClient
+  let tunnel: KosmosHTTPTunnelClient
 
   nonisolated
   func reply(
     for request: URLRequest
   ) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
-    AsyncThrowingStream { continuation in
-      let task = Task { @MainActor in
-        let stream = tunnel.openTunnel(for: request)
+    var stamped = request
+    stamped.setValue(
+      KosmosTunnelScheme.originURL.absoluteString,
+      forHTTPHeaderField: "X-Galley-Origin")
+    return AsyncThrowingStream { continuation in
+      let task = Task { @MainActor [stamped] in
+        let stream = tunnel.openTunnel(for: stamped)
         do {
           for try await result in stream {
             continuation.yield(result)

@@ -11,6 +11,7 @@
 		62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 62564F302FA857A400FF0F84 /* Quicklook.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		628053992FBFEC0600A02808 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
+		6281285D2FC4101D0059DDFF /* KosmosHTTPTunnel in Frameworks */ = {isa = PBXBuildFile; productRef = 6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */; };
 		629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050B00000000CADD7B01 /* KosmosWebView */; };
 		62913F252FBC3F9400088C1F /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050700000000CADD7B01 /* KosmosCore */; };
 		62913F262FBC3F9400088C1F /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050900000000CADD7B01 /* KosmosTransport */; };
@@ -358,6 +359,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6281285D2FC4101D0059DDFF /* KosmosHTTPTunnel in Frameworks */,
 				62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */,
 				62B0000100000000CADD7B01 /* KosmosCore in Frameworks */,
 				62B0000300000000CADD7B01 /* KosmosTransport in Frameworks */,
@@ -494,8 +496,6 @@
 			);
 			dependencies = (
 				629139D22FBC365F00088C1F /* PBXTargetDependency */,
-				629139D42FBC365F00088C1F /* PBXTargetDependency */,
-				629139D62FBC365F00088C1F /* PBXTargetDependency */,
 				62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
@@ -582,8 +582,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				629139D82FBC367000088C1F /* PBXTargetDependency */,
-				629139DA2FBC367000088C1F /* PBXTargetDependency */,
 				629139DC2FBC367000088C1F /* PBXTargetDependency */,
 				62B8BEAF2FB96B6A004FB681 /* PBXTargetDependency */,
 				62D5E7692FA5E20100CADD72 /* PBXTargetDependency */,
@@ -615,6 +613,9 @@
 			buildRules = (
 			);
 			dependencies = (
+				628128572FC410160059DDFF /* PBXTargetDependency */,
+				628128592FC410160059DDFF /* PBXTargetDependency */,
+				6281285B2FC410160059DDFF /* PBXTargetDependency */,
 				62913BA02FBC39AE00088C1F /* PBXTargetDependency */,
 				62D5E4A32FA5DA0600CADD72 /* PBXTargetDependency */,
 				62D5E4A52FA5DA0600CADD72 /* PBXTargetDependency */,
@@ -629,6 +630,7 @@
 				62FA000200000000CADD7300 /* ObservableDefaults */,
 				62B0000200000000CADD7B01 /* KosmosCore */,
 				62B0000400000000CADD7B01 /* KosmosTransport */,
+				6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */,
 			);
 			productName = GalleyCoreKit;
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
@@ -930,40 +932,24 @@
 			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
 			targetProxy = 62564F462FA857C400FF0F84 /* PBXContainerItemProxy */;
 		};
+		628128572FC410160059DDFF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 628128562FC410160059DDFF /* KosmosCore */;
+		};
+		628128592FC410160059DDFF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 628128582FC410160059DDFF /* KosmosHTTPTunnel */;
+		};
+		6281285B2FC410160059DDFF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 6281285A2FC410160059DDFF /* KosmosTransport */;
+		};
 		629139D22FBC365F00088C1F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			platformFilters = (
 				macos,
 			);
 			productRef = 629139D12FBC365F00088C1F /* KosmosBridge */;
-		};
-		629139D42FBC365F00088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilters = (
-				macos,
-			);
-			productRef = 629139D32FBC365F00088C1F /* KosmosCore */;
-		};
-		629139D62FBC365F00088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilters = (
-				macos,
-			);
-			productRef = 629139D52FBC365F00088C1F /* KosmosTransport */;
-		};
-		629139D82FBC367000088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilters = (
-				xros,
-			);
-			productRef = 629139D72FBC367000088C1F /* KosmosCore */;
-		};
-		629139DA2FBC367000088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilters = (
-				xros,
-			);
-			productRef = 629139D92FBC367000088C1F /* KosmosTransport */;
 		};
 		629139DC2FBC367000088C1F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1646,30 +1632,30 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		628128562FC410160059DDFF /* KosmosCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosCore;
+		};
+		628128582FC410160059DDFF /* KosmosHTTPTunnel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosHTTPTunnel;
+		};
+		6281285A2FC410160059DDFF /* KosmosTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosTransport;
+		};
+		6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosHTTPTunnel;
+		};
 		629139D12FBC365F00088C1F /* KosmosBridge */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
 			productName = KosmosBridge;
-		};
-		629139D32FBC365F00088C1F /* KosmosCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosCore;
-		};
-		629139D52FBC365F00088C1F /* KosmosTransport */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosTransport;
-		};
-		629139D72FBC367000088C1F /* KosmosCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosCore;
-		};
-		629139D92FBC367000088C1F /* KosmosTransport */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosTransport;
 		};
 		629139DB2FBC367000088C1F /* KosmosWebView */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -6,6 +6,9 @@
 //
 
 import GalleyCoreKit
+#if os(visionOS)
+import KosmosHTTPTunnel
+#endif
 import SwiftUI
 import WebKit
 
@@ -105,7 +108,7 @@ extension DocumentModel {
 #if os(visionOS)
     // AVP renders Mac-hosted documents by tunneling each WebKit fetch
     // through Kosmos via the `galley://` scheme. The handler holds a
-    // reference to the shared `HTTPTunnelAVPClient` owned by
+    // reference to the shared `KosmosHTTPTunnelClient` owned by
     // `KosmosVisionService`.
     if let kosmosTunnel = kosmosTunnel?.client {
       let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
@@ -124,7 +127,7 @@ extension DocumentModel {
 /// inner client and registers the scheme handler.
 struct KosmosTunnelClientRef {
 #if os(visionOS)
-  let client: HTTPTunnelAVPClient
+  let client: KosmosHTTPTunnelClient
 #else
   /// macOS keeps the type around for source compatibility but
   /// can't construct it.

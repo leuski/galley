@@ -2,6 +2,7 @@
 import Foundation
 import GalleyCoreKit
 import KosmosCore
+import KosmosHTTPTunnel
 import KosmosTransport
 import Observation
 import OSLog
@@ -10,42 +11,31 @@ import SwiftUI
 private let log = Logger(
   subsystem: bundleIdentifier, category: "KosmosVisionService")
 
-/// AVP-side Kosmos surface. Owns a single `KosmosTransport.KosmosClient`
-/// advertising as a `visionViewer`, mirrors the discovered peer set,
-/// subscribes to bridge messages (open-document, content changes), and
-/// publishes lifecycle to the bridge so the Mac can gate AVP
-/// reachability on suspend / resume.
+/// AVP-side Kosmos surface. Advertises as a `visionViewer`, mirrors
+/// the discovered peer set, subscribes to bridge messages (open-document,
+/// content changes), and publishes lifecycle to the bridge so the Mac
+/// can gate AVP reachability on suspend / resume.
 ///
 /// Also owns the AVP end of the HTTP tunnel — every `galley://` URL
 /// the WebView fetches becomes a `ProxyHTTPRequest` Kosmos broadcast,
 /// and the response chunks are routed back through
-/// `HTTPTunnelAVPClient`. The service is the single subscription point
+/// `KosmosHTTPTunnelClient`. The service is the single subscription point
 /// for the two response message types so we don't spin up a per-request
 /// subscription.
+///
+/// Conforms to `KosmosService`; the `KosmosServiceHost` owns the
+/// bootstrap / peer-watch / stop boilerplate and calls back through
+/// the protocol.
 @MainActor
 @Observable
-final class KosmosVisionService {
-  /// Snapshot of peers visible to Kosmos. Other code (settings,
-  /// debugging) can observe this; the service itself doesn't branch
-  /// on it.
-  private(set) var peers: [PeerID: PeerInfo] = [:]
-
+final class KosmosVisionService: KosmosService {
   /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
-  let httpTunnel: HTTPTunnelAVPClient
+  let httpTunnel: KosmosHTTPTunnelClient
 
   @ObservationIgnored private let deviceID: UUID
-  @ObservationIgnored private var client: KosmosClient?
-  @ObservationIgnored private var link: LoomKosmosLink?
-
-  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
-  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
-  @ObservationIgnored private var openURLSubscription: SubscriptionToken?
-  @ObservationIgnored private var openDocumentSubscription: SubscriptionToken?
-  @ObservationIgnored private var contentChangeSubscription: SubscriptionToken?
-  @ObservationIgnored private var proxyHeadSubscription: SubscriptionToken?
-  @ObservationIgnored private var proxyChunkSubscription: SubscriptionToken?
+  @ObservationIgnored private let host = KosmosServiceHost()
 
   /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
   /// by the app to call `openWindow(value: url)`. The service holds
@@ -62,35 +52,75 @@ final class KosmosVisionService {
 
   init() {
     self.deviceID = loadOrMakeGalleyDeviceID(role: .visionViewer)
-    self.httpTunnel = HTTPTunnelAVPClient(client: nil)
+    self.httpTunnel = KosmosHTTPTunnelClient(client: nil)
   }
 
   /// Begin advertising and browsing. Idempotent.
   func start() {
-    guard bootstrapTask == nil else { return }
-    bootstrapTask = Task { [weak self] in
-      await self?.bootstrap()
-    }.token
+    host.start(service: self)
   }
 
   func stop() async {
-    bootstrapTask = nil
-    peerWatchTask = nil
-    openURLSubscription = nil
-    openDocumentSubscription = nil
-    contentChangeSubscription = nil
-    proxyHeadSubscription = nil
-    proxyChunkSubscription = nil
     httpTunnel.stopAll()
-    if let client {
-      await client.stop()
-    }
-    client = nil
-    link = nil
     reloadHandlers.removeAll()
     openWindows.removeAll()
-    peers = [:]
+    await host.stop()
   }
+
+  // MARK: - KosmosService
+
+  func makeLink() async -> (KosmosClient, any KosmosLink) {
+    await makeGalleyKosmosClient(role: .visionViewer, deviceID: deviceID)
+  }
+
+  func configure(host: KosmosServiceHost, client: KosmosClient) async {
+    httpTunnel.attach(client: client)
+
+    host.retain(client.subscribe(OpenURL.self) {
+      [weak self] _, message in
+      self?.handleOpenURL(message)
+    })
+
+    host.retain(client.subscribe(OpenDocument.self) {
+      [weak self] sender, message in
+      self?.handleOpenDocument(message, from: sender)
+    })
+
+    host.retain(client.subscribe(WindowContentChanged.self) {
+      [weak self] sender, message in
+      log.notice("""
+        ← RECV WindowContentChanged \
+        from=\(sender.description, privacy: .public) \
+        window=\(message.windowID, privacy: .public)
+        """)
+      self?.reloadHandlers[message.windowID]?()
+    })
+
+    host.retain(client.subscribe(ProxyHTTPResponseHead.self) {
+      [weak self] _, head in
+      self?.httpTunnel.handle(head)
+    })
+
+    host.retain(client.subscribe(ProxyHTTPResponseChunk.self) {
+      [weak self] _, chunk in
+      self?.httpTunnel.handle(chunk)
+    })
+  }
+
+  func linkStarted(_ error: (any Error)?) {
+    if let error {
+      log.error("""
+        Kosmos link failed to start: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    } else {
+      log.notice("Kosmos link started.")
+    }
+  }
+
+  // MARK: - Observable passthroughs
+
+  var peers: [PeerID: PeerInfo] { host.peers }
 
   /// Notify the Mac that AVP is about to suspend (`scenePhase`
   /// transitioned to `.background` — typically the user closed the
@@ -102,8 +132,8 @@ final class KosmosVisionService {
       appID: Self.galleyAppID,
       deviceID: DeviceID(deviceID))
     log.notice("→ PUBLISH AppWillSuspend")
-    Task { [weak client] in
-      await client?.publish(message)
+    if let client = host.client {
+      Task { [client] in await client.publish(message) }
     }
   }
 
@@ -113,8 +143,8 @@ final class KosmosVisionService {
       appID: Self.galleyAppID,
       deviceID: DeviceID(deviceID))
     log.notice("→ PUBLISH AppDidResume")
-    Task { [weak client] in
-      await client?.publish(message)
+    if let client = host.client {
+      Task { [client] in await client.publish(message) }
     }
   }
 
@@ -131,8 +161,8 @@ final class KosmosVisionService {
     log.notice("""
       → PUBLISH CloseWindow window=\(windowID, privacy: .public)
       """)
-    Task { [weak client] in
-      await client?.publish(message)
+    if let client = host.client {
+      Task { [client] in await client.publish(message) }
     }
   }
 
@@ -149,70 +179,7 @@ final class KosmosVisionService {
     reloadHandlers.removeValue(forKey: windowID)
   }
 
-  // MARK: - Bootstrap
-
-  private func bootstrap() async {
-    let (client, link) = await makeGalleyKosmosClient(
-      role: .visionViewer, deviceID: deviceID)
-    self.client = client
-    self.link = link
-    httpTunnel.attach(client: client)
-
-    startPeerWatch(client: client)
-    startSubscriptions(client: client)
-
-    do {
-      try await link.start()
-      log.notice("Kosmos link started.")
-    } catch {
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
-  }
-
-  private func startPeerWatch(client: KosmosClient) {
-    peerWatchTask = Task { [weak self] in
-      for await snapshot in client.peers {
-        await MainActor.run {
-          self?.peers = snapshot
-        }
-      }
-    }.token
-  }
-
-  private func startSubscriptions(client: KosmosClient) {
-    openURLSubscription = client
-      .subscribe(OpenURL.self) { [weak self] _, message in
-        self?.handleOpenURL(message)
-      }
-
-    openDocumentSubscription = client
-      .subscribe(OpenDocument.self) { [weak self] sender, message in
-        self?.handleOpenDocument(message, from: sender)
-      }
-
-    contentChangeSubscription = client
-      .subscribe(WindowContentChanged.self) { [weak self] sender, message in
-        log.notice("""
-          ← RECV WindowContentChanged \
-          from=\(sender.description, privacy: .public) \
-          window=\(message.windowID, privacy: .public)
-          """)
-        self?.reloadHandlers[message.windowID]?()
-      }
-
-    proxyHeadSubscription = client
-      .subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
-        self?.httpTunnel.handle(head)
-      }
-
-    proxyChunkSubscription = client
-      .subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
-        self?.httpTunnel.handle(chunk)
-      }
-  }
+  // MARK: - Inbound handling
 
   private func handleOpenURL(_ message: OpenURL) {
     log.notice("""

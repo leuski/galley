@@ -3,6 +3,7 @@ import Foundation
 import GalleyCoreKit
 import GalleyServerKit
 import KosmosCore
+import KosmosHTTPTunnel
 import KosmosTransport
 import Observation
 import OSLog
@@ -10,27 +11,28 @@ import OSLog
 private let log = Logger(
   subsystem: bundleIdentifier, category: "KosmosLink")
 
-/// One per Server process. Owns the `KosmosClient`, the peer-role
+/// One per Server process. Owns the `KosmosServiceHost`, the peer-role
 /// mirror, and the per-window state for files currently displayed on
 /// AVP. Built but not started by `AppModel.init`;
 /// `AppModel.startServer()` calls `start()` after the preview server
 /// is up so we have a port to publish on each `OpenDocument`.
 ///
-/// When a `visionViewer` peer joins: switch the preview server to
-/// LAN-reachable mode so AVP can dial the Server. Every subsequent
-/// `OpenDocument` message ships the cert pin and the full LAN host
-/// candidate list inline — no separate advertisement step.
+/// When a `visionViewer` peer joins: AVP traffic rides the Kosmos
+/// tunnel (`KosmosHTTPTunnelResponder`) — the Mac HTTP listener stays
+/// loopback-only.
 ///
-/// When the last `visionViewer` peer leaves: revert to loopback,
-/// walk the open-window set, and re-open each on the local
-/// Galley.app via `URL.galleyRequest`.
+/// When the last `visionViewer` peer leaves: walk the open-window
+/// set and re-open each on the local Galley.app via `URL.galleyRequest`.
 ///
 /// The `RouteToAVP` request from a Mac Viewer peer is dispatched
 /// through the same path Finder-opens take (`dispatchOpenURLToAVP`),
 /// so the AVP-vs-Mac decision stays in one place.
+///
+/// Boilerplate (bootstrap, peer-watch, subscription bookkeeping,
+/// stop) lives in `KosmosServiceHost`.
 @MainActor
 @Observable
-final class KosmosLink {
+final class KosmosLink: KosmosService {
   /// Any peer is currently connected. Surfaced for legacy callers
   /// (UI binding etc.); newer code should branch on `isAVPReachable`.
   private(set) var isPeerConnected: Bool = false
@@ -42,18 +44,21 @@ final class KosmosLink {
   /// HTTPS / HTTP listeners are bound. Settings-pill consumers read
   /// this. Driven by the preview server, surfaced here for
   /// convenience.
-  private(set) var isAdvertising: Bool = false
+  var isAdvertising: Bool { host.isLinkRunning }
 
   @ObservationIgnored private let deviceID: UUID
-  @ObservationIgnored private var client: KosmosClient?
-  @ObservationIgnored private var link: LoomKosmosLink?
-
+  @ObservationIgnored private let host = KosmosServiceHost()
   @ObservationIgnored private let server: PreviewServerController
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
   /// peers and streams responses chunkwise from the local Hummingbird
   /// HTTP listener over Kosmos.
-  @ObservationIgnored private let httpTunnel: HTTPTunnelMacHandler
+  @ObservationIgnored private let httpTunnel: KosmosHTTPTunnelResponder
+
+  /// Server's loopback HTTP base URL, captured at `start(httpURL:)`
+  /// time and read inside `makeLink()` to populate advertise-time
+  /// metadata. `nil` if the listener hadn't bound by `start()`.
+  @ObservationIgnored private var advertisedHTTPURL: URL?
 
   /// Per-window state for files currently delegated to AVP.
   struct OpenWindow {
@@ -67,7 +72,7 @@ final class KosmosLink {
   @ObservationIgnored private let windowIDAllocator = KosmosCore
     .WindowIDAllocator()
 
-  /// Current peer role mirror, driven by `client.peers`.
+  /// Current peer role mirror, driven by `host.peers`.
   @ObservationIgnored private var peerRoles: [PeerID: GalleyKosmosRole] = [:]
 
   /// Per-peer "is this peer's app currently resumed?" flag. Set to
@@ -80,18 +85,10 @@ final class KosmosLink {
   /// its message queue.
   @ObservationIgnored private var peerResumed: [PeerID: Bool] = [:]
 
-  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
-  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
-  @ObservationIgnored private var closeWindowSubscription: SubscriptionToken?
-  @ObservationIgnored private var suspendSubscription: SubscriptionToken?
-  @ObservationIgnored private var resumeSubscription: SubscriptionToken?
-  @ObservationIgnored private var proxyRequestSubscription: SubscriptionToken?
-  @ObservationIgnored private var proxyCancelSubscription: SubscriptionToken?
-
   init(server: PreviewServerController) {
     self.server = server
     self.deviceID = loadOrMakeGalleyDeviceID(role: .server)
-    self.httpTunnel = HTTPTunnelMacHandler(
+    self.httpTunnel = KosmosHTTPTunnelResponder(
       upstreamBaseProvider: { Defaults.shared.serverEndpointURL })
   }
 
@@ -102,20 +99,11 @@ final class KosmosLink {
   /// HTTP listener never came up — peers can still discover liveness
   /// but won't see a URL.
   func start(httpURL: URL?) {
-    guard bootstrapTask == nil else { return }
-    bootstrapTask = Task { [weak self] in
-      await self?.bootstrap(httpURL: httpURL)
-    }.token
+    advertisedHTTPURL = httpURL
+    host.start(service: self)
   }
 
   func stop() {
-    bootstrapTask = nil
-    peerWatchTask = nil
-    closeWindowSubscription = nil
-    suspendSubscription = nil
-    resumeSubscription = nil
-    proxyRequestSubscription = nil
-    proxyCancelSubscription = nil
     httpTunnel.stop()
     for (_, window) in openOnAVP {
       window.watchTask.cancel()
@@ -123,14 +111,41 @@ final class KosmosLink {
     openOnAVP.removeAll()
     peerRoles.removeAll()
     peerResumed.removeAll()
-    if let client {
-      Task { await client.stop() }
-    }
-    client = nil
-    link = nil
-    isAdvertising = false
+    Task { await host.stop() }
     isPeerConnected = false
     isAVPReachable = false
+  }
+
+  // MARK: - KosmosService
+
+  func makeLink() async -> (KosmosClient, any KosmosTransport.KosmosLink) {
+    let metadata: [String: String] = advertisedHTTPURL.map {
+      [GalleyKosmosMetadataKey.httpURL: $0.absoluteString]
+    } ?? [:]
+    return await makeGalleyKosmosClient(
+      role: .server,
+      deviceID: deviceID,
+      extraMetadata: metadata)
+  }
+
+  func configure(host: KosmosServiceHost, client: KosmosClient) async {
+    await registerHandlers(host: host, client: client)
+    registerSubscriptions(host: host, client: client)
+  }
+
+  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
+    handlePeersChanged(snapshot)
+  }
+
+  func linkStarted(_ error: (any Error)?) {
+    if let error {
+      log.error("""
+        Kosmos link failed to start: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+    } else {
+      log.notice("Kosmos link started.")
+    }
   }
 
   /// Called by `application(_:open:)` (and the Mac Viewer's
@@ -139,7 +154,7 @@ final class KosmosLink {
   /// unavailable and the caller should fall back.
   func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
     guard
-      let client,
+      let client = host.client,
       let visionPeer = firstReachableVisionPeer()
     else {
       log.notice("""
@@ -195,7 +210,7 @@ final class KosmosLink {
     // The data plane rides Kosmos via `ProxyHTTPRequest` — AVP
     // synthesizes its own `galley://preview/<path>` URL from
     // `documentPath` and tunnels each subresource fetch back through
-    // the `HTTPTunnelMacHandler` over Kosmos.
+    // the `KosmosHTTPTunnelResponder` over Kosmos.
     let message = OpenDocument(
       docID: windowID,
       documentPath: fileURL.target.url.path,
@@ -209,35 +224,6 @@ final class KosmosLink {
       """)
     Task { [weak client] in
       await client?.publish(message)
-    }
-  }
-
-  // MARK: - Bootstrap
-
-  private func bootstrap(httpURL: URL?) async {
-    var metadata: [String: String] = [:]
-    if let httpURL {
-      metadata[GalleyKosmosMetadataKey.httpURL] = httpURL.absoluteString
-    }
-    let (client, link) = await makeGalleyKosmosClient(
-      role: .server, deviceID: deviceID, extraMetadata: metadata)
-    self.client = client
-    self.link = link
-
-    await registerHandlers(client: client)
-    startPeerWatch(client: client)
-    startSubscriptions(client: client)
-
-    do {
-      try await link.start()
-      isAdvertising = true
-      log.notice("Kosmos link started.")
-    } catch {
-      isAdvertising = false
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public)
-        """)
     }
   }
 
@@ -262,7 +248,11 @@ final class KosmosLink {
     return false
   }
 
-  private func registerHandlers(client: KosmosClient) async {
+  // MARK: - Subscription wiring
+
+  private func registerHandlers(
+    host: KosmosServiceHost, client: KosmosClient
+  ) async {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
     // Reuses the same dispatch path Finder-opens use so the
     // AVP-vs-Mac decision stays in one place (Pillar 4).
@@ -284,52 +274,44 @@ final class KosmosLink {
     }
   }
 
-  private func startPeerWatch(client: KosmosClient) {
-    peerWatchTask = Task { [weak self] in
-      for await snapshot in client.peers {
-        await MainActor.run {
-          self?.handlePeersChanged(snapshot)
-        }
-      }
-    }.token
-  }
+  private func registerSubscriptions(
+    host: KosmosServiceHost, client: KosmosClient
+  ) {
+    host.retain(client.subscribe(CloseWindow.self) {
+      [weak self] sender, message in
+      log.notice("""
+        ← RECV CloseWindow from=\(sender.description, privacy: .public) \
+        window=\(message.windowID, privacy: .public)
+        """)
+      self?.handleCloseWindow(message)
+    })
 
-  private func startSubscriptions(client: KosmosClient) {
-    closeWindowSubscription = client
-      .subscribe(CloseWindow.self) { [weak self] sender, message in
-        log.notice("""
-          ← RECV CloseWindow from=\(sender.description, privacy: .public) \
-          window=\(message.windowID, privacy: .public)
-          """)
-        self?.handleCloseWindow(message)
-      }
+    host.retain(client.subscribe(AppWillSuspend.self) {
+      [weak self] sender, _ in
+      log.notice("""
+        ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
+        """)
+      self?.setPeerResumed(sender, resumed: false)
+    })
 
-    suspendSubscription = client
-      .subscribe(AppWillSuspend.self) { [weak self] sender, _ in
-        log.notice("""
-          ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
-          """)
-        self?.setPeerResumed(sender, resumed: false)
-      }
+    host.retain(client.subscribe(AppDidResume.self) {
+      [weak self] sender, _ in
+      log.notice("""
+        ← RECV AppDidResume from=\(sender.description, privacy: .public)
+        """)
+      self?.setPeerResumed(sender, resumed: true)
+    })
 
-    resumeSubscription = client
-      .subscribe(AppDidResume.self) { [weak self] sender, _ in
-        log.notice("""
-          ← RECV AppDidResume from=\(sender.description, privacy: .public)
-          """)
-        self?.setPeerResumed(sender, resumed: true)
-      }
+    host.retain(client.subscribe(ProxyHTTPRequest.self) {
+      [weak self, weak client] _, request in
+      guard let self, let client else { return }
+      self.httpTunnel.handleRequest(request, client: client)
+    })
 
-    proxyRequestSubscription = client
-      .subscribe(ProxyHTTPRequest.self) { [weak self, weak client] _, request in
-        guard let self, let client else { return }
-        self.httpTunnel.handleRequest(request, client: client)
-      }
-
-    proxyCancelSubscription = client
-      .subscribe(ProxyHTTPCancel.self) { [weak self] _, message in
-        self?.httpTunnel.handleCancel(message)
-      }
+    host.retain(client.subscribe(ProxyHTTPCancel.self) {
+      [weak self] _, message in
+      self?.httpTunnel.handleCancel(message)
+    })
   }
 
   private func setPeerResumed(_ peer: PeerID, resumed: Bool) {
@@ -393,7 +375,7 @@ final class KosmosLink {
     updateReachabilityFlag()
     // No bind-mode flip: the Mac HTTP listener stays loopback-only
     // for AVP and every other consumer. AVP traffic rides the
-    // Kosmos tunnel via `HTTPTunnelMacHandler`.
+    // Kosmos tunnel via `KosmosHTTPTunnelResponder`.
   }
 
   private func onVisionPeerLeft(_ peer: PeerID) {

@@ -13,34 +13,20 @@ private let log = Logger(
 /// two UI gates (Server pill, "Show on Vision Pro" enabledness) and
 /// a single outbound `RouteToAVP` request. The Mac Viewer does not
 /// own dispatch state — Server is the routing authority.
+///
+/// Conforms to `KosmosService`; the `KosmosServiceHost` owns the
+/// bootstrap / peer-watch / stop boilerplate and calls back through
+/// the protocol.
 @MainActor
 @Observable
-final class KosmosViewerService {
-  /// Snapshot of peers visible to Kosmos.
-  private(set) var peers: [PeerID: PeerInfo] = [:]
-
-  /// True once `link.start()` returned successfully. Stays true even
-  /// if every peer subsequently leaves — failures show up as
-  /// `lastStartError`, not as `isLinkRunning` flipping back.
-  private(set) var isLinkRunning: Bool = false
-
-  /// Last error encountered during `link.start()`, if any. Surfaced
-  /// in Settings so the user can tell a "no peer discovered" pill
-  /// (probably Local Network permission, or the Server isn't really
-  /// up) apart from a "link failed to advertise" pill.
-  private(set) var lastStartError: String?
-
+final class KosmosViewerService: KosmosService {
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
   @ObservationIgnored private let localHostUUID: String? =
     KosmosLocalHostID.current
 
   @ObservationIgnored private let deviceID: UUID
-  @ObservationIgnored private var client: KosmosClient?
-  @ObservationIgnored private var link: LoomKosmosLink?
-
-  @ObservationIgnored private var bootstrapTask: SubscriptionToken?
-  @ObservationIgnored private var peerWatchTask: SubscriptionToken?
+  @ObservationIgnored private let host = KosmosServiceHost()
 
   init() {
     self.deviceID = loadOrMakeGalleyDeviceID(role: .macViewer)
@@ -48,22 +34,63 @@ final class KosmosViewerService {
 
   /// Begin advertising. Idempotent.
   func start() {
-    guard bootstrapTask == nil else { return }
-    bootstrapTask = Task { [weak self] in
-      await self?.bootstrap()
-    }.token
+    host.start(service: self)
   }
 
   func stop() async {
-    bootstrapTask = nil
-    peerWatchTask = nil
-    if let client {
-      await client.stop()
-    }
-    client = nil
-    link = nil
-    peers = [:]
+    await host.stop()
   }
+
+  // MARK: - KosmosService
+
+  func makeLink() async -> (KosmosClient, any KosmosLink) {
+    await makeGalleyKosmosClient(role: .macViewer, deviceID: deviceID)
+  }
+
+  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
+    let summary = snapshot.values
+      .map { info in
+        let role = info.galleyRole?.rawValue ?? "nil"
+        let url = info.galleyHTTPURL?.absoluteString ?? "-"
+        return "\(info.id.description)[role=\(role) url=\(url)]"
+      }
+      .sorted()
+      .joined(separator: ", ")
+    log.notice("""
+      peer-snapshot count=\(snapshot.count, privacy: .public) \
+      peers=[\(summary, privacy: .public)]
+      """)
+  }
+
+  func linkStarted(_ error: (any Error)?) {
+    if let error {
+      log.error("""
+        Kosmos link failed to start: \
+        \(error.localizedDescription, privacy: .public). \
+        Check Console.app for subsystem net.leuski.galley, and \
+        verify Local Network permission for Galley in System Settings.
+        """)
+      return
+    }
+    guard let client = host.client else { return }
+    Task {
+      let identity = await client.identity.description
+      log.notice("""
+        Kosmos link started identity=\(identity, privacy: .public)
+        """)
+    }
+  }
+
+  // MARK: - Observable passthroughs
+
+  /// Snapshot of peers visible to Kosmos.
+  var peers: [PeerID: PeerInfo] { host.peers }
+
+  /// True once `link.start()` returned successfully.
+  var isLinkRunning: Bool { host.isLinkRunning }
+
+  /// Last error encountered during `link.start()`, if any.
+  var lastStartError: String? { host.lastStartError }
 
   // MARK: - Derived state
 
@@ -73,7 +100,7 @@ final class KosmosViewerService {
   /// strangers.
   var serverPeer: PeerID? {
     GalleyPeerClassifier.serverPeer(
-      in: peers, localHostUUID: localHostUUID)
+      in: host.peers, localHostUUID: localHostUUID)
   }
 
   /// First reachable AVP. Reachability is purely peer-set membership
@@ -83,7 +110,7 @@ final class KosmosViewerService {
   /// that aren't real suspension and would disable the menu while a
   /// viewer window was visibly open.
   var avpPeer: PeerID? {
-    GalleyPeerClassifier.avpPeer(in: peers)
+    GalleyPeerClassifier.avpPeer(in: host.peers)
   }
 
   /// Drives the Server-status pill.
@@ -93,7 +120,7 @@ final class KosmosViewerService {
   /// advertise time. `nil` until the Server peer appears with a URL
   /// in metadata. Drives the port number shown in `.running` pill text.
   var serverPeerHTTPURL: URL? {
-    guard let id = serverPeer, let info = peers[id] else { return nil }
+    guard let id = serverPeer, let info = host.peers[id] else { return nil }
     return info.galleyHTTPURL
   }
 
@@ -107,7 +134,7 @@ final class KosmosViewerService {
   /// to the Mac Viewer's own LSHandler).
   @discardableResult
   func routeToAVP(_ target: DocumentTarget) async throws -> RouteToAVP.Reply {
-    guard let client else {
+    guard let client = host.client else {
       throw RouteError.notReady
     }
     guard let serverPeer else {
@@ -137,7 +164,7 @@ final class KosmosViewerService {
 
   enum RouteError: LocalizedError {
     /// `KosmosClient` not yet constructed — `start()` either hasn't
-    /// been called, or its `bootstrap` Task is still pending.
+    /// been called, or its bootstrap is still pending.
     case notReady
     /// No peer with `role=.server` matching this Mac's host UUID is
     /// in `client.peers`. Usually means Galley Server isn't running,
@@ -156,63 +183,6 @@ final class KosmosViewerService {
         """
       }
     }
-  }
-
-  // MARK: - Bootstrap
-
-  private func bootstrap() async {
-    let (client, link) = await makeGalleyKosmosClient(
-      role: .macViewer, deviceID: deviceID)
-    self.client = client
-    self.link = link
-
-    startPeerWatch(client: client)
-
-    do {
-      try await link.start()
-      isLinkRunning = true
-      lastStartError = nil
-      let identity = await client.identity.description
-      log.notice("""
-        Kosmos link started identity=\(identity, privacy: .public)
-        """)
-    } catch {
-      isLinkRunning = false
-      lastStartError = error.localizedDescription
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public). \
-        Check Console.app for subsystem net.leuski.galley, and \
-        verify Local Network permission for Galley in System Settings.
-        """)
-    }
-  }
-
-  private func startPeerWatch(client: KosmosClient) {
-    peerWatchTask = Task { [weak self] in
-      for await snapshot in client.peers {
-        await MainActor.run {
-          self?.applyPeerSnapshot(snapshot)
-        }
-      }
-    }.token
-  }
-
-  private func applyPeerSnapshot(_ snapshot: [PeerID: PeerInfo]) {
-    peers = snapshot
-
-    let summary = snapshot.values
-      .map { info in
-        let role = info.galleyRole?.rawValue ?? "nil"
-        let url = info.galleyHTTPURL?.absoluteString ?? "-"
-        return "\(info.id.description)[role=\(role) url=\(url)]"
-      }
-      .sorted()
-      .joined(separator: ", ")
-    log.notice("""
-      peer-snapshot count=\(snapshot.count, privacy: .public) \
-      peers=[\(summary, privacy: .public)]
-      """)
   }
 }
 #endif
