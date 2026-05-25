@@ -83,9 +83,11 @@ private struct WelcomeScreen: View {
 
   var body: some View {
     VStack(spacing: 24) {
-      Image(systemName: "doc.richtext")
-        .font(.system(size: 64))
-        .foregroundStyle(.secondary)
+      Image("AppIconImage")
+        .resizable()
+        .scaledToFit()
+        .frame(width: 128, height: 128)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
       Text("Galley")
         .font(.largeTitle.weight(.semibold))
       Text("Open a Markdown document to preview it.")
@@ -154,13 +156,15 @@ private struct WelcomeScreen: View {
             VStack(alignment: .leading, spacing: 2) {
               Text(url.lastPathComponent)
                 .font(.body)
-              Text(url.parent.path)
+                .lineLimit(1)
+                .truncationMode(.middle)
+              Text(url.path)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
           }
           .padding(.vertical, 4)
           .contentShape(Rectangle())

@@ -20,6 +20,9 @@ func galleyModuleLoads() {
   #expect(Bool(true))
 }
 
+// No-op marker: the visionOS WelcomeScreen icon swap is an asset/view
+// change (Image asset + sizing) with no testable logic.
+
 // MARK: - HistorySnapshot
 
 @Suite("HistorySnapshot")
