@@ -4,6 +4,7 @@ import Hummingbird
 import NIOCore
 import Security
 import GalleyCoreKit
+import KosmosHTTPTunnel
 
 enum Routes {
   static let assetExtensions: Set<String> = [
@@ -408,34 +409,36 @@ enum Routes {
   /// `hostURL.scheme` is the source-of-truth for the listener's
   /// scheme, since `Host` headers don't carry it.
   ///
-  /// `X-Galley-Origin` overrides this when present. The AVP-side
-  /// `Responder` sets it so the rendered HTML's
-  /// `<base href>` points at the WebView's `galley://` origin
-  /// instead of the loopback authority — without it, sub-resource
-  /// fetches (CSS, JS, images) would resolve against
-  /// `http://127.0.0.1:<port>/` and bypass the scheme handler. Not
-  /// a security boundary: `<base href>` only steers the browser's
-  /// outbound fetches, and the host-header guard already gated the
-  /// caller. Use the header strictly for origin composition.
+  /// `X-Kosmos-Origin` overrides this when present (see
+  /// `KosmosHTTPTunnel.TunnelHeaders.origin`). The AVP-side scheme
+  /// handler sets it so the rendered HTML's `<base href>` points at
+  /// the WebView's `kosmos://` origin instead of the loopback
+  /// authority — without it, sub-resource fetches (CSS, JS, images)
+  /// would resolve against `http://127.0.0.1:<port>/` and bypass
+  /// the scheme handler. Not a security boundary: `<base href>`
+  /// only steers the browser's outbound fetches, and the host-header
+  /// guard already gated the caller. Use the header strictly for
+  /// origin composition.
   static func templateOriginURL(
     for request: Request, fallback hostURL: URL
   ) -> URL {
     templateOriginURL(
-      originHeader: request.headers[xGalleyOriginHeader],
+      originHeader: request.headers[kosmosOriginHeader],
       authority: request.head.authority,
       fallback: hostURL)
   }
 
-  private static let xGalleyOriginHeader: HTTPField.Name = {
-    guard let name = HTTPField.Name("X-Galley-Origin") else {
-      preconditionFailure("X-Galley-Origin is a valid HTTP field name")
+  private static let kosmosOriginHeader: HTTPField.Name = {
+    guard let name = HTTPField.Name(TunnelHeaders.origin) else {
+      preconditionFailure(
+        "\(TunnelHeaders.origin) is a valid HTTP field name")
     }
     return name
   }()
 
   /// Pure decision: same as the `Request`-flavored overload but with
   /// the two inputs the `Request` exposes (Host authority + the
-  /// `X-Galley-Origin` header), so tests can drive it without
+  /// `X-Kosmos-Origin` header), so tests can drive it without
   /// constructing a Hummingbird `Request`.
   static func templateOriginURL(
     originHeader: String?,

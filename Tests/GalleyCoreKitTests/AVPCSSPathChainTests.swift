@@ -11,7 +11,7 @@
 //    KosmosTunnelSchemeTests          → URL construction
 //    HTTPTunnelAVPClientTests         → URL → ProxyHTTPRequest (AVP)
 //    HTTPTunnelURLBuilderTests        → ProxyHTTPRequest → URLRequest (Mac)
-//    TemplateOriginURLTests           → X-Galley-Origin → base href
+//    TemplateOriginURLTests           → X-Kosmos-Origin → base href
 //    RoutePathDecodingTests           → /preview/<encoded> → file URL
 //
 //  This file chains the pure value-type layers (everything except
@@ -23,6 +23,7 @@
 
 import Foundation
 import KosmosCore
+import KosmosHTTPTunnel
 import Testing
 @testable import GalleyCoreKit
 
@@ -38,9 +39,9 @@ struct AVPCSSPathChainTests {
 
     // Layer 1: AVP synthesizes the navigation URL.
     let tunnelURL = try #require(
-      KosmosTunnelScheme.previewURL(forFile: documentPath))
+      TunnelScheme.originURL.galleyPreviewURL(forFile: documentPath))
     #expect(tunnelURL.absoluteString
-      == "galley://local/preview/Users/x/Documents/Read%20Me.md")
+      == "kosmos://local/preview/Users/x/Documents/Read%20Me.md")
 
     // Layer 2: simulated AVP scheme handler — wire `urlPath` is
     // `URLComponents.percentEncodedPath` verbatim.
@@ -55,14 +56,14 @@ struct AVPCSSPathChainTests {
       method: "GET",
       urlPath: wireURLPath,
       headers: [
-        "X-Galley-Origin": KosmosTunnelScheme.originURL.absoluteString
+        TunnelHeaders.origin: TunnelScheme.originURL.absoluteString
       ])
     let urlRequest = try #require(
-      HTTPTunnelURLBuilder.buildURLRequest(base: base, request: proxy))
+      URLBuilder.buildURLRequest(base: base, request: proxy))
     #expect(urlRequest.url?.absoluteString
       == "http://127.0.0.1:54775/preview/Users/x/Documents/Read%20Me.md")
-    #expect(urlRequest.value(forHTTPHeaderField: "X-Galley-Origin")
-      == "galley://local")
+    #expect(urlRequest.value(forHTTPHeaderField: "X-Kosmos-Origin")
+      == "kosmos://local")
   }
 
   /// A CSS sub-resource fetch is the same chain, just with a
@@ -73,7 +74,7 @@ struct AVPCSSPathChainTests {
   @Test("a CSS asset under /template/<id>/ round-trips correctly")
   func templateAssetWithSpace() throws {
     let tunnelURL = URL(
-      string: "galley://local/template/galley.default/style%20one.css")!
+      string: "kosmos://local/template/galley.default/style%20one.css")!
 
     let components = try #require(URLComponents(
       url: tunnelURL, resolvingAgainstBaseURL: false))
@@ -85,10 +86,10 @@ struct AVPCSSPathChainTests {
       method: "GET",
       urlPath: wireURLPath,
       headers: [
-        "X-Galley-Origin": KosmosTunnelScheme.originURL.absoluteString
+        TunnelHeaders.origin: TunnelScheme.originURL.absoluteString
       ])
     let urlRequest = try #require(
-      HTTPTunnelURLBuilder.buildURLRequest(base: base, request: proxy))
+      URLBuilder.buildURLRequest(base: base, request: proxy))
     #expect(urlRequest.url?.absoluteString
       == "http://127.0.0.1:54775/template/galley.default/style%20one.css")
   }

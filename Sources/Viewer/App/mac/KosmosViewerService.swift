@@ -22,8 +22,8 @@ private let log = Logger(
 final class KosmosViewerService: KosmosService {
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
-  @ObservationIgnored private let localHostUUID: String? =
-    LocalHostID.current
+  @ObservationIgnored private let localHostUUID = UUID.hostStable?
+    .uuidString.lowercased()
 
   @ObservationIgnored private let host = KosmosServiceHost(role: .macViewer)
 
@@ -131,7 +131,7 @@ final class KosmosViewerService: KosmosService {
       """)
     do {
       let reply: RouteToAVP.Reply =
-        try await client.send(request, to: serverPeer)
+      try await client.send(request, to: serverPeer)
       log.notice("""
         ← REPLY RouteToAVP from=\(serverPeer.description, privacy: .public) \
         accepted=\(reply.accepted, privacy: .public)

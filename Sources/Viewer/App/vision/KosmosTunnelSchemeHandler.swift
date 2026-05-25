@@ -20,18 +20,17 @@ import WebKit
 /// teardown doesn't leak.
 ///
 /// **Origin header.** The Mac's Hummingbird routes use
-/// `X-Galley-Origin: galley://local` to know which `<base href>` to
+/// `X-Kosmos-Origin: kosmos://local` to know which `<base href>` to
 /// emit in rendered HTML so unrewritten sub-resources resolve back to
-/// this scheme handler. The shared `Client` is
-/// product-neutral and doesn't stamp it; Galley stamps it here on
-/// every outbound request.
+/// this scheme handler. The shared `Client` is product-neutral and
+/// doesn't stamp it; Galley stamps it here on every outbound request.
 @MainActor
 struct KosmosTunnelSchemeHandler: URLSchemeHandler {
-  /// Force-unwrap is safe — `KosmosTunnelScheme.name` is a constant
+  /// Force-unwrap is safe — `TunnelScheme.name` is a constant
   /// string that's guaranteed to satisfy `URLScheme`'s validation
   /// (alphanumeric + dash, lowercase ASCII).
-  static let scheme = URLScheme(KosmosTunnelScheme.name)
-  !! "Failed to make URLScheme for \(KosmosTunnelScheme.name)"
+  static let scheme = URLScheme(TunnelScheme.name)
+  !! "Failed to make URLScheme for \(TunnelScheme.name)"
 
   let tunnel: Client
 
@@ -41,8 +40,8 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
   ) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
     var stamped = request
     stamped.setValue(
-      KosmosTunnelScheme.originURL.absoluteString,
-      forHTTPHeaderField: "X-Galley-Origin")
+      TunnelScheme.originURL.absoluteString,
+      forHTTPHeaderField: TunnelHeaders.origin)
     return AsyncThrowingStream { continuation in
       let task = Task { @MainActor [stamped] in
         let stream = tunnel.openTunnel(for: stamped)

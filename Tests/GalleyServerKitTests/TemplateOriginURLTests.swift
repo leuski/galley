@@ -3,7 +3,7 @@
 //
 //  Pin the origin-selection policy `Routes.templateOriginURL` uses to
 //  build `<base href>` for rendered HTML. The honored override is
-//  `X-Galley-Origin`, set exclusively by the AVP-side loopback proxy
+//  `X-Kosmos-Origin`, set exclusively by the AVP-side loopback proxy
 //  (`AVPHTTPProxy`) so sub-resource fetches stay on the proxy's
 //  loopback origin instead of escaping to the upstream LAN authority.
 //
@@ -28,7 +28,7 @@ struct TemplateOriginURLTests {
     #expect(url == fallback)
   }
 
-  @Test("uses authority when no X-Galley-Origin")
+  @Test("uses authority when no X-Kosmos-Origin")
   func authorityFromHost() {
     let url = Routes.templateOriginURL(
       originHeader: nil,
@@ -37,7 +37,7 @@ struct TemplateOriginURLTests {
     #expect(url.absoluteString == "https://mercury.local:54201")
   }
 
-  @Test("X-Galley-Origin overrides Host authority")
+  @Test("X-Kosmos-Origin overrides Host authority")
   func headerOverridesHost() {
     let url = Routes.templateOriginURL(
       originHeader: "http://127.0.0.1:54290/",
@@ -46,7 +46,7 @@ struct TemplateOriginURLTests {
     #expect(url.absoluteString == "http://127.0.0.1:54290/")
   }
 
-  @Test("X-Galley-Origin used even with empty Host")
+  @Test("X-Kosmos-Origin used even with empty Host")
   func headerWithoutHost() {
     let url = Routes.templateOriginURL(
       originHeader: "http://127.0.0.1:54290/",
@@ -55,7 +55,7 @@ struct TemplateOriginURLTests {
     #expect(url.absoluteString == "http://127.0.0.1:54290/")
   }
 
-  @Test("blank X-Galley-Origin is ignored")
+  @Test("blank X-Kosmos-Origin is ignored")
   func blankHeaderIgnored() {
     let url = Routes.templateOriginURL(
       originHeader: "   ",
@@ -64,7 +64,7 @@ struct TemplateOriginURLTests {
     #expect(url.absoluteString == "https://mercury.local:54201")
   }
 
-  @Test("malformed X-Galley-Origin falls through to authority")
+  @Test("malformed X-Kosmos-Origin falls through to authority")
   func malformedHeader() {
     let url = Routes.templateOriginURL(
       originHeader: "not a url",

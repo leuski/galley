@@ -26,6 +26,17 @@ extension URL {
     appending(path: RouteNames.preview)
   }
 
+  /// Construct a tunnel URL for a document or asset at a POSIX path.
+  /// `path` must begin with `/`. Returns nil only on malformed input.
+  ///
+  /// `URL.appending(path:)` percent-encodes its argument, so the
+  /// input is the raw filesystem path — never `percentEncodedForPath`,
+  /// or `%` itself ends up as `%25` on the wire.
+  public func galleyPreviewURL(forFile path: String) -> URL? {
+    guard path.hasPrefix("/") else { return nil }
+    return galleyPreview.appending(path: path)
+  }
+
   public func galleyTemplate(id: String) -> URL {
     appending(path: RouteNames.template).appending(path: id)
   }

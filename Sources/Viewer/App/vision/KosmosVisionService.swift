@@ -190,7 +190,7 @@ final class KosmosVisionService: KosmosService {
       scrollLineHint=\(message.scrollLineHint ?? -1, privacy: .public) \
       behavior=\(message.openBehavior.rawValue, privacy: .public)
       """)
-    guard let url = KosmosTunnelScheme.previewURL(
+    guard let url = TunnelScheme.originURL.galleyPreviewURL(
       forFile: message.documentPath)
     else {
       log.error("""
