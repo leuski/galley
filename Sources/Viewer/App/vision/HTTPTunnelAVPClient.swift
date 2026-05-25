@@ -1,4 +1,5 @@
 #if os(visionOS)
+import CryptoKit
 import Foundation
 import GalleyCoreKit
 import KosmosCore
@@ -26,15 +27,36 @@ private let log = Logger(
 final class HTTPTunnelAVPClient {
   private weak var client: KosmosClient?
 
-  /// Per-request state. Two kinds of work live here: yielding
-  /// `URLSchemeTaskResult`s into the scheme handler's stream, and
-  /// publishing a final `ProxyHTTPCancel` if the stream terminates
-  /// before the responder finishes.
+  /// Per-request state. Three jobs live here:
+  ///
+  /// 1. Yield `URLSchemeTaskResult`s into the scheme handler's
+  ///    stream. For ordinary (bounded) responses we accumulate every
+  ///    chunk in `buffer` and yield exactly one `.data(buffer)` when
+  ///    the final chunk arrives — WebKit's `URLSchemeTask` doesn't
+  ///    reliably deliver multi-event `.data(...)` payloads (PNG /
+  ///    JS decoders see the bytes truncated even when the tunnel
+  ///    delivers them bit-exact). For streaming responses
+  ///    (`Content-Type: text/event-stream`) `isStreaming` is set
+  ///    when the response head arrives and each chunk yields
+  ///    immediately so `EventSource` gets line-level latency.
+  ///
+  /// 2. Publish a final `ProxyHTTPCancel` if the WebKit stream
+  ///    terminates before the responder finishes (via
+  ///    `continuation.onTermination`).
+  ///
+  /// 3. Diagnostic accounting (`bytesYielded` / `chunksRouted` /
+  ///    `hasher`) logged at completion — lets us cross-check the
+  ///    Mac responder's "bytes / chunks / sha256-prefix" totals.
   private struct Entry {
     let continuation: AsyncThrowingStream<URLSchemeTaskResult, any Error>
       .Continuation
     let url: URL
     var sawHead: Bool
+    var isStreaming: Bool
+    var bytesYielded: Int
+    var chunksRouted: Int
+    var hasher: SHA256
+    var buffer: Data
   }
   private var inflight: [UUID: Entry] = [:]
 
@@ -74,7 +96,12 @@ final class HTTPTunnelAVPClient {
       self.inflight[requestID] = Entry(
         continuation: continuation,
         url: url,
-        sawHead: false)
+        sawHead: false,
+        isStreaming: false,
+        bytesYielded: 0,
+        chunksRouted: 0,
+        hasher: SHA256(),
+        buffer: Data())
 
       log.notice("""
         → TUNNEL \(proxyRequest.method, privacy: .public) \
@@ -97,7 +124,9 @@ final class HTTPTunnelAVPClient {
   /// Route an inbound response head into the matching entry's
   /// continuation. Drops the message if the requestID isn't in
   /// `inflight` (the request was already cancelled, or this peer
-  /// received a broadcast meant for another peer's request).
+  /// received a broadcast meant for another peer's request). The
+  /// head's `Content-Type` decides whether subsequent chunks
+  /// stream (event-stream) or buffer until `isFinal`.
   func handle(_ head: ProxyHTTPResponseHead) {
     guard var entry = inflight[head.requestID] else { return }
     guard let response = HTTPURLResponse(
@@ -112,11 +141,31 @@ final class HTTPTunnelAVPClient {
     }
     entry.continuation.yield(.response(response))
     entry.sawHead = true
+    entry.isStreaming = Self.isEventStream(head.headers)
     inflight[head.requestID] = entry
   }
 
+  /// Whether the response head signals a long-lived event stream
+  /// the receiver should consume incrementally rather than buffer.
+  /// Case-insensitive scan of the `Content-Type` header. Matches
+  /// `text/event-stream` with or without parameters
+  /// (`; charset=utf-8` etc.).
+  nonisolated static func isEventStream(
+    _ headers: [String: String]
+  ) -> Bool {
+    let value = headers.first { name, _ in
+      name.caseInsensitiveCompare("Content-Type") == .orderedSame
+    }?.value ?? ""
+    let trimmed = value
+      .split(separator: ";", maxSplits: 1)
+      .first
+      .map { $0.trimmingCharacters(in: .whitespaces) } ?? value
+    return trimmed.caseInsensitiveCompare("text/event-stream")
+      == .orderedSame
+  }
+
   func handle(_ chunk: ProxyHTTPResponseChunk) {
-    guard let entry = inflight[chunk.requestID] else { return }
+    guard var entry = inflight[chunk.requestID] else { return }
     // The Mac responder always sends a head before any chunks. If
     // we somehow received chunks before a head, drop the entry and
     // let WebKit see a cancellation — a missing head is fatal for
@@ -130,11 +179,39 @@ final class HTTPTunnelAVPClient {
       return
     }
     if !chunk.bytes.isEmpty {
-      entry.continuation.yield(.data(chunk.bytes))
+      if entry.isStreaming {
+        // Event-stream: deliver each chunk immediately so
+        // `EventSource` sees events as the producer emits them.
+        entry.continuation.yield(.data(chunk.bytes))
+      } else {
+        // Bounded response: accumulate; single `.data` yield on
+        // `isFinal` works around WebKit's `URLSchemeTask` not
+        // reliably delivering multi-event `.data(...)` payloads.
+        entry.buffer.append(chunk.bytes)
+      }
+      entry.bytesYielded += chunk.bytes.count
+      entry.hasher.update(data: chunk.bytes)
     }
+    entry.chunksRouted += 1
     if chunk.isFinal {
+      if !entry.isStreaming, !entry.buffer.isEmpty {
+        entry.continuation.yield(.data(entry.buffer))
+      }
       entry.continuation.finish()
+      let digest = entry.hasher.finalize().prefix(4)
+        .map { String(format: "%02x", $0) }
+        .joined()
+      log.notice("""
+        TUNNEL done requestID=\(chunk.requestID, privacy: .public) \
+        url=\(entry.url.absoluteString, privacy: .public) \
+        streaming=\(entry.isStreaming, privacy: .public) \
+        bytes=\(entry.bytesYielded, privacy: .public) \
+        chunks=\(entry.chunksRouted, privacy: .public) \
+        sha256-prefix=\(digest, privacy: .public)
+        """)
       inflight.removeValue(forKey: chunk.requestID)
+    } else {
+      inflight[chunk.requestID] = entry
     }
   }
 

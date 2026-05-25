@@ -119,3 +119,86 @@ struct HTTPTunnelURLBuilderExtractHeadersTests {
     #expect(headers["X-Custom"] == "value")
   }
 }
+
+@Suite("HTTPTunnelURLBuilder.chunks")
+struct HTTPTunnelURLBuilderChunksTests {
+  private static let requestID = UUID()
+
+  @Test("empty body emits a single empty final chunk")
+  func empty() {
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: Data(), requestID: Self.requestID, chunkSize: 64)
+    #expect(chunks.count == 1)
+    #expect(chunks[0].bytes.isEmpty)
+    #expect(chunks[0].sequence == 0)
+    #expect(chunks[0].isFinal)
+  }
+
+  @Test("body smaller than chunkSize emits one final chunk verbatim")
+  func smallerThanChunk() {
+    let body = Data(repeating: 0xAB, count: 100)
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: body, requestID: Self.requestID, chunkSize: 1024)
+    #expect(chunks.count == 1)
+    #expect(chunks[0].bytes == body)
+    #expect(chunks[0].sequence == 0)
+    #expect(chunks[0].isFinal)
+  }
+
+  @Test("body equal to chunkSize emits one final chunk")
+  func equalToChunk() {
+    let body = Data(repeating: 0xCD, count: 64)
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: body, requestID: Self.requestID, chunkSize: 64)
+    #expect(chunks.count == 1)
+    #expect(chunks[0].bytes.count == 64)
+    #expect(chunks[0].isFinal)
+  }
+
+  @Test("body larger than chunkSize splits with correct sequence + isFinal")
+  func largerThanChunk() {
+    let body = Data((0..<200).map { UInt8($0 % 256) })
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: body, requestID: Self.requestID, chunkSize: 64)
+    #expect(chunks.count == 4)
+    #expect(chunks.map(\.bytes.count) == [64, 64, 64, 8])
+    #expect(chunks.map(\.sequence) == [0, 1, 2, 3])
+    #expect(chunks.map(\.isFinal) == [false, false, false, true])
+    // Reassembled bytes equal the original buffer.
+    let reassembled = chunks.reduce(into: Data()) { $0.append($1.bytes) }
+    #expect(reassembled == body)
+  }
+
+  @Test("every chunk carries the same requestID")
+  func sameRequestID() {
+    let body = Data(repeating: 0x11, count: 256)
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: body, requestID: Self.requestID, chunkSize: 64)
+    #expect(chunks.allSatisfy { $0.requestID == Self.requestID })
+  }
+}
+
+@Suite("HTTPTunnelURLBuilder.requiresStreaming")
+struct HTTPTunnelURLBuilderRequiresStreamingTests {
+  @Test("event-stream paths stream")
+  func eventsStreams() {
+    #expect(HTTPTunnelURLBuilder.requiresStreaming(
+      urlPath: "/events/Users/x/foo.md"))
+    #expect(HTTPTunnelURLBuilder.requiresStreaming(urlPath: "/events"))
+  }
+
+  @Test("preview / template paths do not stream")
+  func othersBuffered() {
+    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
+      urlPath: "/preview/Users/x/foo.md"))
+    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
+      urlPath: "/template/galley.default/style.css"))
+    #expect(!HTTPTunnelURLBuilder.requiresStreaming(urlPath: "/"))
+  }
+
+  @Test("path that merely contains 'events' but isn't an event route does not stream")
+  func notAnEventRoute() {
+    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
+      urlPath: "/preview/Users/x/events-log.md"))
+  }
+}

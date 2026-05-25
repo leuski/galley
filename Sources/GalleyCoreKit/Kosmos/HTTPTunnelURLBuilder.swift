@@ -70,4 +70,53 @@ public enum HTTPTunnelURLBuilder {
     }
     return headers
   }
+
+  /// Slice an already-buffered response body into chunked
+  /// `ProxyHTTPResponseChunk` messages. `sequence` starts at 0 and
+  /// increments; the last chunk carries `isFinal: true`. An empty
+  /// body produces exactly one chunk with empty bytes and
+  /// `isFinal: true` so the receiver always sees a terminator.
+  ///
+  /// Used by the Mac responder when the upstream request isn't an
+  /// event-stream — buffering the whole body and chunking once is
+  /// orders of magnitude faster than per-byte iteration over
+  /// `URLSession.AsyncBytes`. SSE keeps the streaming path so events
+  /// reach the receiver as they're produced.
+  public static func chunks(
+    of data: Data,
+    requestID: UUID,
+    chunkSize: Int
+  ) -> [ProxyHTTPResponseChunk] {
+    precondition(chunkSize > 0, "chunkSize must be positive")
+    if data.isEmpty {
+      return [ProxyHTTPResponseChunk(
+        requestID: requestID,
+        sequence: 0,
+        bytes: Data(),
+        isFinal: true)]
+    }
+    var chunks: [ProxyHTTPResponseChunk] = []
+    var offset = 0
+    var sequence: UInt64 = 0
+    while offset < data.count {
+      let end = min(offset + chunkSize, data.count)
+      let slice = Data(data[offset..<end])
+      chunks.append(ProxyHTTPResponseChunk(
+        requestID: requestID,
+        sequence: sequence,
+        bytes: slice,
+        isFinal: end == data.count))
+      offset = end
+      sequence += 1
+    }
+    return chunks
+  }
+
+  /// Whether a tunneled URL path should be served via streaming
+  /// (per-byte) iteration rather than buffered fetch. Today only the
+  /// SSE event-stream routes need streaming; every other path is a
+  /// finite response and benefits from the fast buffered path.
+  public static func requiresStreaming(urlPath: String) -> Bool {
+    urlPath.hasPrefix("/events/") || urlPath == "/events"
+  }
 }

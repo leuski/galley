@@ -30,9 +30,12 @@ public enum KosmosTunnelScheme {
 
   /// Construct a tunnel URL for a document or asset at a POSIX path.
   /// `path` must begin with `/`. Returns nil only on malformed input.
+  ///
+  /// `URL.appending(path:)` percent-encodes its argument, so the
+  /// input is the raw filesystem path — never `percentEncodedForPath`,
+  /// or `%` itself ends up as `%25` on the wire.
   public static func previewURL(forFile path: String) -> URL? {
     guard path.hasPrefix("/") else { return nil }
-    return originURL.galleyPreview
-      .appendingPathComponent(path.percentEncodedForPath)
+    return originURL.galleyPreview.appending(path: path)
   }
 }

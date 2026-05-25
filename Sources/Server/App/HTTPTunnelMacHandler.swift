@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import GalleyCoreKit
 import KosmosCore
@@ -99,22 +100,19 @@ final class HTTPTunnelMacHandler {
       """)
 
     do {
-      let (bytes, response) = try await session.bytes(for: urlRequest)
-      try Task.checkCancellation()
-      let httpResponse = response as? HTTPURLResponse
-      let status = httpResponse?.statusCode ?? 502
-      let headers = HTTPTunnelURLBuilder.extractHeaders(from: httpResponse)
-      await client.publish(ProxyHTTPResponseHead(
-        requestID: request.requestID,
-        status: status, headers: headers))
-
-      // 64 KB chunk size matches typical URLSession internal batches
-      // and is well below any Kosmos message ceiling.
-      try await streamBody(
-        requestID: request.requestID,
-        bytes: bytes,
-        chunkSize: 64 * 1024,
-        client: client)
+      if HTTPTunnelURLBuilder.requiresStreaming(urlPath: request.urlPath) {
+        try await streamThroughBytes(
+          requestID: request.requestID,
+          urlPath: request.urlPath,
+          urlRequest: urlRequest,
+          client: client)
+      } else {
+        try await fetchAndChunk(
+          requestID: request.requestID,
+          urlPath: request.urlPath,
+          urlRequest: urlRequest,
+          client: client)
+      }
     } catch is CancellationError {
       // AVP cancelled (page navigated away, WebKit dropped the
       // sub-resource). Don't emit a final chunk — the receiver isn't
@@ -137,22 +135,85 @@ final class HTTPTunnelMacHandler {
     }
   }
 
-  /// Drain `bytes` into chunked `ProxyHTTPResponseChunk` publishes.
-  /// Each batch is at most `chunkSize`; the final batch sets
-  /// `isFinal: true` even when empty so the receiver can finalize the
-  /// `URLSchemeTask`.
-  private func streamBody(
+  /// Buffered fast path. Uses `URLSession.data(for:)` so the full
+  /// response body arrives in one allocation, then dispatches to
+  /// `HTTPTunnelURLBuilder.chunks` for sequencing. Massively faster
+  /// than per-byte `AsyncBytes` iteration for non-streaming responses
+  /// (HTML, CSS, JS, images, fonts) — Apple's `AsyncBytes` yields one
+  /// `UInt8` per `await`, which is fine for tiny SSE events but ruins
+  /// throughput for binary bodies.
+  private func fetchAndChunk(
     requestID: UUID,
-    bytes: URLSession.AsyncBytes,
-    chunkSize: Int,
+    urlPath: String,
+    urlRequest: URLRequest,
     client: KosmosClient
   ) async throws {
+    let (data, response) = try await session.data(for: urlRequest)
+    try Task.checkCancellation()
+    let httpResponse = response as? HTTPURLResponse
+    let status = httpResponse?.statusCode ?? 502
+    await client.publish(ProxyHTTPResponseHead(
+      requestID: requestID,
+      status: status,
+      headers: HTTPTunnelURLBuilder.extractHeaders(from: httpResponse)))
+    // 64 KB matches typical URLSession internal batches and is well
+    // below any Kosmos message ceiling.
+    let chunks = HTTPTunnelURLBuilder.chunks(
+      of: data, requestID: requestID, chunkSize: 64 * 1024)
+    for chunk in chunks {
+      try Task.checkCancellation()
+      await client.publish(chunk)
+    }
+    let digest = Self.shortHash(data)
+    log.notice("""
+      TUNNEL done requestID=\(requestID, privacy: .public) \
+      path=\(urlPath, privacy: .public) \
+      status=\(status, privacy: .public) \
+      bytes=\(data.count, privacy: .public) \
+      chunks=\(chunks.count, privacy: .public) \
+      sha256-prefix=\(digest, privacy: .public)
+      """)
+  }
+
+  /// Streaming path for SSE event-streams. Drains `URLSession.AsyncBytes`
+  /// and flushes a chunk whenever the buffer hits a newline (the SSE
+  /// wire format is line-delimited) so events reach the AVP receiver
+  /// with line-level latency instead of waiting until 64 KB has
+  /// accumulated. A 64 KB safety valve still flushes if no newline
+  /// arrives. The trailing flush carries the rest with `isFinal: true`.
+  ///
+  /// `timeoutInterval` is overridden to infinity so URLSession doesn't
+  /// kill an idle but otherwise-healthy event stream after 60 s — the
+  /// configuration default that applies to bounded fetches.
+  private func streamThroughBytes(
+    requestID: UUID,
+    urlPath: String,
+    urlRequest: URLRequest,
+    client: KosmosClient
+  ) async throws {
+    var request = urlRequest
+    request.timeoutInterval = .greatestFiniteMagnitude
+    let (bytes, response) = try await session.bytes(for: request)
+    try Task.checkCancellation()
+    let httpResponse = response as? HTTPURLResponse
+    let status = httpResponse?.statusCode ?? 502
+    await client.publish(ProxyHTTPResponseHead(
+      requestID: requestID,
+      status: status,
+      headers: HTTPTunnelURLBuilder.extractHeaders(from: httpResponse)))
+
+    let chunkSize = 64 * 1024
     var buffer = Data()
     buffer.reserveCapacity(chunkSize)
     var sequence: UInt64 = 0
+    var totalBytes = 0
     for try await byte in bytes {
       buffer.append(byte)
-      if buffer.count >= chunkSize {
+      // Flush eagerly on newline (SSE event boundary) or when the
+      // safety valve trips.
+      let shouldFlush = byte == 0x0A || buffer.count >= chunkSize
+      if shouldFlush {
+        totalBytes += buffer.count
         await client.publish(ProxyHTTPResponseChunk(
           requestID: requestID,
           sequence: sequence,
@@ -163,12 +224,30 @@ final class HTTPTunnelMacHandler {
         try Task.checkCancellation()
       }
     }
-    // Final flush — may carry a tail of bytes or be empty.
+    totalBytes += buffer.count
     await client.publish(ProxyHTTPResponseChunk(
       requestID: requestID,
       sequence: sequence,
       bytes: buffer,
       isFinal: true))
+    log.notice("""
+      TUNNEL stream-done requestID=\(requestID, privacy: .public) \
+      path=\(urlPath, privacy: .public) \
+      status=\(status, privacy: .public) \
+      bytes=\(totalBytes, privacy: .public) \
+      chunks=\(sequence + 1, privacy: .public)
+      """)
+  }
+
+  /// First 8 hex chars of SHA-256 of `data`. Used to cross-check
+  /// the AVP side's hash log — if Mac and AVP hashes differ on a
+  /// request with matching byte counts, the tunnel is corrupting
+  /// bytes in flight.
+  private static func shortHash(_ data: Data) -> String {
+    let digest = SHA256.hash(data: data)
+    return digest.prefix(4)
+      .map { String(format: "%02x", $0) }
+      .joined()
   }
 
   /// Publish a synthetic error response so the AVP-side scheme
