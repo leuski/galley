@@ -268,37 +268,37 @@ final class KosmosLink: KosmosService {
   private func registerSubscriptions(
     host: KosmosServiceHost, client: KosmosClient
   ) {
-    client.subscribe(CloseWindow.self) { [weak self] sender, message in
+    host.subscribe(CloseWindow.self) { [weak self] sender, message in
       log.notice("""
         ← RECV CloseWindow from=\(sender.description, privacy: .public) \
         window=\(message.windowID, privacy: .public)
         """)
       self?.handleCloseWindow(message)
-    }.register(with: host)
+    }
 
-    client.subscribe(AppWillSuspend.self) { [weak self] sender, _ in
+    host.subscribe(AppWillSuspend.self) { [weak self] sender, _ in
       log.notice("""
         ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
         """)
       self?.setPeerResumed(sender, resumed: false)
-    }.register(with: host)
+    }
 
-    client.subscribe(AppDidResume.self) { [weak self] sender, _ in
+    host.subscribe(AppDidResume.self) { [weak self] sender, _ in
       log.notice("""
         ← RECV AppDidResume from=\(sender.description, privacy: .public)
         """)
       self?.setPeerResumed(sender, resumed: true)
-    }.register(with: host)
+    }
 
-    client
+    host
       .subscribe(ProxyHTTPRequest.self) { [weak self, weak client] _, request in
         guard let self, let client else { return }
         self.httpTunnelResponder.handleRequest(request, client: client)
-      }.register(with: host)
+      }
 
-    client.subscribe(ProxyHTTPCancel.self) { [weak self] _, message in
+    host.subscribe(ProxyHTTPCancel.self) { [weak self] _, message in
       self?.httpTunnelResponder.handleCancel(message)
-    }.register(with: host)
+    }
   }
 
   private func setPeerResumed(_ peer: PeerID, resumed: Bool) {

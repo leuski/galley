@@ -74,30 +74,30 @@ final class KosmosVisionService: KosmosService {
   func configure(host: KosmosServiceHost, client: KosmosClient) async {
     httpTunnelClient.attach(client: client)
 
-    client.subscribe(OpenURL.self) { [weak self] _, message in
+    host.subscribe(OpenURL.self) { [weak self] _, message in
       self?.handleOpenURL(message)
-    }.register(with: host)
+    }
 
-    client.subscribe(OpenDocument.self) { [weak self] sender, message in
+    host.subscribe(OpenDocument.self) { [weak self] sender, message in
       self?.handleOpenDocument(message, from: sender)
-    }.register(with: host)
+    }
 
-    client.subscribe(WindowContentChanged.self) { [weak self] sender, message in
+    host.subscribe(WindowContentChanged.self) { [weak self] sender, message in
       log.notice("""
         ← RECV WindowContentChanged \
         from=\(sender.description, privacy: .public) \
         window=\(message.windowID, privacy: .public)
         """)
       self?.reloadHandlers[message.windowID]?()
-    }.register(with: host)
+    }
 
-    client.subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
+    host.subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
       self?.httpTunnelClient.handle(head)
-    }.register(with: host)
+    }
 
-    client.subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
+    host.subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
       self?.httpTunnelClient.handle(chunk)
-    }.register(with: host)
+    }
   }
 
   func linkDidStart(_ error: (any Error)?) {
