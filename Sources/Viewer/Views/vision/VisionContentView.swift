@@ -15,6 +15,20 @@ struct VisionContentView: View {
   @Binding var fileURL: URL?
   let boot: AppBoot
 
+  @Environment(VisionWindowRegistry.self) private var registry
+  @Environment(\.dismissWindow) private var dismissWindow
+  /// Per-scene phase. `.background` fires for *this* window when
+  /// the user dismisses it, including for the last window of the
+  /// app — where `.onDisappear` doesn't fire (visionOS quirk).
+  @Environment(\.scenePhase) private var scenePhase
+  /// Stable per-window identity. `@State` outlives child view
+  /// rebinds (welcome ↔ document), so registration tracks the
+  /// window, not the current screen.
+  @State private var windowID = UUID()
+  /// Idempotent guard so `.onChange(of: scenePhase, initial: true)`
+  /// only registers / unregisters once per real lifecycle edge.
+  @State private var counted: Bool = false
+
   var body: some View {
     Group {
       if let model = boot.model {
@@ -31,6 +45,27 @@ struct VisionContentView: View {
         ProgressView()
           .controlSize(.large)
       }
+    }
+    .onChange(of: scenePhase, initial: true) { _, newPhase in
+      updateRegistration(for: newPhase)
+    }
+  }
+
+  private func updateRegistration(for phase: ScenePhase) {
+    switch phase {
+    case .active, .inactive:
+      if !counted {
+        registry.register(
+          id: windowID, binding: $fileURL, dismiss: dismissWindow)
+        counted = true
+      }
+    case .background:
+      if counted {
+        registry.unregister(id: windowID)
+        counted = false
+      }
+    @unknown default:
+      break
     }
   }
 }
@@ -408,7 +443,7 @@ private struct DocumentScreen: View {
       Divider()
 
       Button {
-        openWindow(id: VisionWindowID.settings)
+        openWindow(id: VisionViewerApp.settings)
       } label: {
         Label("Settings…", systemImage: "gearshape")
       }
@@ -441,7 +476,13 @@ private struct DocumentScreen: View {
         ForEach(recents.urls, id: \.self) { url in
           Button {
             if let fresh = recents.openRecent(url) {
-              bindingFileURL = fresh
+              switch Defaults.shared.openBehavior {
+              case .replaceCurrent:
+                bindingFileURL = fresh
+              case .newTab: break
+              case .newWindow:
+                openWindow(id: VisionViewerApp.main, value: fresh)
+              }
             }
           } label: {
             Label(url.lastPathComponent, systemImage: "doc.text")
@@ -524,14 +565,6 @@ private struct VisionChangeHandlers: ViewModifier {
         reload()
       }
   }
-}
-
-/// Identifiers for the visionOS-only auxiliary scenes.
-enum VisionWindowID {
-  static let settings = "settings"
-  /// Invisible anchor scene that keeps the app process alive across
-  /// document-window close. See `VisionViewerApp` for rationale.
-  static let home = "home"
 }
 
 #endif
