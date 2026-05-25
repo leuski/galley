@@ -44,10 +44,9 @@ public enum HTTPTunnelURLBuilder {
 
     var urlRequest = URLRequest(url: url)
     urlRequest.httpMethod = request.method
-    for (name, value) in request.headers {
-      if name.caseInsensitiveCompare("Host") == .orderedSame { continue }
-      urlRequest.setValue(value, forHTTPHeaderField: name)
-    }
+    request.headers
+      .filter { $0.key.lowercased() != "Host".lowercased() }
+      .forEach { urlRequest.setValue($0.value, forHTTPHeaderField: $0.key) }
     if !request.body.isEmpty {
       urlRequest.httpBody = request.body
     }
@@ -112,11 +111,28 @@ public enum HTTPTunnelURLBuilder {
     return chunks
   }
 
-  /// Whether a tunneled URL path should be served via streaming
-  /// (per-byte) iteration rather than buffered fetch. Today only the
-  /// SSE event-stream routes need streaming; every other path is a
-  /// finite response and benefits from the fast buffered path.
-  public static func requiresStreaming(urlPath: String) -> Bool {
-    urlPath.hasPrefix("/events/") || urlPath == "/events"
+  /// Whether a response head signals a long-lived event stream the
+  /// receiver should consume incrementally instead of buffering. The
+  /// single source of truth for streaming detection on both the Mac
+  /// responder (chooses buffered vs per-batch chunk publishing) and
+  /// the AVP receiver (chooses buffered single-yield vs per-chunk
+  /// yield into WebKit).
+  ///
+  /// Case-insensitive on both header name and value. Honors
+  /// parameters like `; charset=utf-8`. Galley's server only ever
+  /// sets this Content-Type on the `/events/` SSE route, but the
+  /// predicate is route-agnostic: any future endpoint that returns
+  /// `text/event-stream` will be detected without code change.
+  public static func isEventStream(
+    _ headers: [String: String]
+  ) -> Bool {
+    let value = headers.first { name, _ in
+      name.lowercased() == "Content-Type".lowercased()
+    }?.value ?? ""
+    let mediaType = value
+      .split(separator: ";", maxSplits: 1)
+      .first
+      .map { $0.trimmingCharacters(in: .whitespaces) } ?? value
+    return mediaType.lowercased() == "text/event-stream".lowercased()
   }
 }

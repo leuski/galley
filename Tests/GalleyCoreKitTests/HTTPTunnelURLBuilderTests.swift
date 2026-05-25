@@ -178,27 +178,50 @@ struct HTTPTunnelURLBuilderChunksTests {
   }
 }
 
-@Suite("HTTPTunnelURLBuilder.requiresStreaming")
-struct HTTPTunnelURLBuilderRequiresStreamingTests {
-  @Test("event-stream paths stream")
-  func eventsStreams() {
-    #expect(HTTPTunnelURLBuilder.requiresStreaming(
-      urlPath: "/events/Users/x/foo.md"))
-    #expect(HTTPTunnelURLBuilder.requiresStreaming(urlPath: "/events"))
+@Suite("HTTPTunnelURLBuilder.isEventStream")
+struct HTTPTunnelURLBuilderIsEventStreamTests {
+  @Test("text/event-stream → streaming")
+  func bare() {
+    #expect(HTTPTunnelURLBuilder.isEventStream(
+      ["Content-Type": "text/event-stream"]))
   }
 
-  @Test("preview / template paths do not stream")
-  func othersBuffered() {
-    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
-      urlPath: "/preview/Users/x/foo.md"))
-    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
-      urlPath: "/template/galley.default/style.css"))
-    #expect(!HTTPTunnelURLBuilder.requiresStreaming(urlPath: "/"))
+  @Test("text/event-stream with charset parameter → streaming")
+  func withParameter() {
+    #expect(HTTPTunnelURLBuilder.isEventStream(
+      ["Content-Type": "text/event-stream; charset=utf-8"]))
   }
 
-  @Test("path that merely contains 'events' but isn't an event route does not stream")
-  func notAnEventRoute() {
-    #expect(!HTTPTunnelURLBuilder.requiresStreaming(
-      urlPath: "/preview/Users/x/events-log.md"))
+  @Test("Content-Type header name is case-insensitive")
+  func nameCaseInsensitive() {
+    #expect(HTTPTunnelURLBuilder.isEventStream(
+      ["content-type": "text/event-stream"]))
+    #expect(HTTPTunnelURLBuilder.isEventStream(
+      ["CONTENT-TYPE": "text/event-stream"]))
+  }
+
+  @Test("Content-Type value is case-insensitive")
+  func valueCaseInsensitive() {
+    #expect(HTTPTunnelURLBuilder.isEventStream(
+      ["Content-Type": "Text/Event-Stream"]))
+  }
+
+  @Test("text/html → not streaming")
+  func textHTML() {
+    #expect(!HTTPTunnelURLBuilder.isEventStream(
+      ["Content-Type": "text/html; charset=utf-8"]))
+  }
+
+  @Test("image/png → not streaming")
+  func imagePNG() {
+    #expect(!HTTPTunnelURLBuilder.isEventStream(
+      ["Content-Type": "image/png"]))
+  }
+
+  @Test("missing Content-Type → not streaming")
+  func missing() {
+    #expect(!HTTPTunnelURLBuilder.isEventStream([:]))
+    #expect(!HTTPTunnelURLBuilder.isEventStream(
+      ["Other-Header": "value"]))
   }
 }
