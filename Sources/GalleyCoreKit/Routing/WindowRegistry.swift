@@ -1,49 +1,13 @@
 import Foundation
+@_exported import KosmosCore
 
-/// Opaque identity for a viewer window. The router and registry only
-/// care about identity equality, never the underlying object — so we
-/// wrap an explicit `UInt64` rather than an `ObjectIdentifier`.
-///
-/// Why not `ObjectIdentifier(NSWindow)`? It is just a wrapped pointer.
-/// In tests, a `StubWindow()` temporary is freed as soon as it leaves
-/// the local scope; the next allocation may reuse the address, and
-/// two different `WindowID(StubWindow())` calls then compare equal.
-/// The production caller (`ViewerAppDelegate`) holds the `NSWindow`
-/// alive in a registry, but the value-type `WindowID` itself must not
-/// require the AnyObject to stay alive — otherwise tests turn flaky
-/// the moment they introduce a temporary.
-///
-/// Production callers mint IDs through `WindowIDAllocator` (see
-/// below) and key their own `[ObjectIdentifier: WindowID]` table off
-/// the live `NSWindow`.
-public struct WindowID: Hashable, Sendable, CustomStringConvertible {
-  public let raw: UInt64
-
-  public init(raw: UInt64) {
-    self.raw = raw
-  }
-
-  public var description: String {
-    "WindowID(\(raw))"
-  }
-}
-
-/// Monotonic allocator for `WindowID`s. Each new window gets a fresh
-/// integer that never collides with a previously-issued one within
-/// the lifetime of the allocator. The Viewer's `ViewerAppDelegate`
-/// owns a single allocator and consults it once per `registerWindow`
-/// call, then maps `NSWindow → WindowID` in its own table for
-/// subsequent lookups.
-public struct WindowIDAllocator: Sendable {
-  private var counter: UInt64 = 0
-
-  public init() {}
-
-  public mutating func next() -> WindowID {
-    counter &+= 1
-    return WindowID(raw: counter)
-  }
-}
+// `WindowID` and `WindowIDAllocator` come from `KosmosCore` and are
+// re-exported above. The same identifier flows across the Mac↔AVP
+// wire (in `OpenDocument` / `CloseWindow` / `WindowContentChanged`)
+// and is keyed locally by the Mac Viewer's `WindowDispatcher` — one
+// type for both roles. Production callers mint IDs through
+// `WindowIDAllocator` (a class with internal locking) and key their
+// own `[ObjectIdentifier: WindowID]` table off the live `NSWindow`.
 
 /// Snapshot of one registered window's state. Value-type so the
 /// registry can hand out copies for routing decisions without leaking

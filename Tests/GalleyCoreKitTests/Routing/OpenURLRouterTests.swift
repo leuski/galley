@@ -2,16 +2,11 @@ import Foundation
 import Testing
 @testable import GalleyCoreKit
 
-private final class IDFountain: @unchecked Sendable {
-  private var allocator = WindowIDAllocator()
-  func next() -> WindowID { allocator.next() }
-}
-
 private let url = URL(fileURLWithPath: "/tmp/note.md")
 
 @Suite("OpenURLRouter")
 struct OpenURLRouterTests {
-  private let ids = IDFountain()
+  private let ids = WindowIDAllocator()
   private let router = OpenURLRouter()
 
   // MARK: - Pre-launch

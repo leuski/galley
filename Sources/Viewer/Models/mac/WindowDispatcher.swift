@@ -45,7 +45,7 @@ final class WindowDispatcher {
   @ObservationIgnored private var registry = WindowRegistry()
   @ObservationIgnored private var pendingScrolls = PendingScrollLines()
   @ObservationIgnored private let router = OpenURLRouter()
-  @ObservationIgnored private var idAllocator = WindowIDAllocator()
+  @ObservationIgnored private let idAllocator = WindowIDAllocator()
 
   /// Maps the live AppKit `NSWindow` (by `ObjectIdentifier`) to the
   /// stable `WindowID` we issued at registration time. Production-only

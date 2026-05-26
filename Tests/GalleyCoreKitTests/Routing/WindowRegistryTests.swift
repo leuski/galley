@@ -2,16 +2,12 @@ import Foundation
 import Testing
 @testable import GalleyCoreKit
 
-/// Per-suite allocator so each test's `ids.next()` calls produce
-/// distinct, stable IDs without depending on object lifetimes.
-private final class IDFountain: @unchecked Sendable {
-  private var allocator = WindowIDAllocator()
-  func next() -> WindowID { allocator.next() }
-}
-
 @Suite("WindowRegistry")
 struct WindowRegistryTests {
-  private let ids = IDFountain()
+  /// Per-suite allocator so each test's `ids.next()` calls produce
+  /// distinct, stable IDs. `WindowIDAllocator` is a class with
+  /// internal locking, so `let` is fine.
+  private let ids = WindowIDAllocator()
 
   @Test("Empty registry has no records")
   func emptyByDefault() {
@@ -101,7 +97,7 @@ struct WindowRegistryTests {
   func frontmostNilWhenEmpty() {
     let registry = WindowRegistry()
     #expect(registry.frontmost() == nil)
-    #expect(registry.frontmost(mainWindow: WindowID(raw: 1)) == nil)
+    #expect(registry.frontmost(mainWindow: WindowID(1)) == nil)
   }
 
   // MARK: - Idempotence and unknown-id resilience
@@ -168,31 +164,15 @@ struct WindowRegistryTests {
 
   @Test("Allocator issues strictly monotonic, distinct IDs")
   func allocatorMonotonic() {
-    var allocator = WindowIDAllocator()
+    let allocator = WindowIDAllocator()
     var seen: Set<UInt64> = []
     var prev: UInt64 = 0
     for _ in 0..<1_000 {
       let id = allocator.next()
-      #expect(seen.insert(id.raw).inserted, "duplicate ID \(id.raw)")
-      #expect(id.raw > prev)
-      prev = id.raw
+      #expect(seen.insert(id.value).inserted, "duplicate ID \(id.value)")
+      #expect(id.value > prev)
+      prev = id.value
     }
-  }
-
-  @Test("Allocator copies fork independently (value semantics)")
-  func allocatorValueSemantics() {
-    var first = WindowIDAllocator()
-    _ = first.next()
-    _ = first.next()
-    var fork = first
-    let firstNext = first.next()
-    let forkNext = fork.next()
-    // Same counter state at fork time — both forks issue the same
-    // next id, then diverge as each is mutated.
-    #expect(firstNext.raw == forkNext.raw)
-    let firstAfter = first.next()
-    let forkAfter = fork.next()
-    #expect(firstAfter.raw == forkAfter.raw)
   }
 
   // MARK: - registration(matching:) edge cases
