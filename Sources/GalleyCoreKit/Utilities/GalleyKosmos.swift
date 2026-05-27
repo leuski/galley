@@ -1,7 +1,6 @@
 import Foundation
 import KosmosCore
 import KosmosTransport
-import Loom
 
 /// Which Galley surface a Kosmos peer represents. Published as the
 /// standard `kosmos.role` metadata on the peer's Loom advertisement so
@@ -12,7 +11,7 @@ public enum GalleyKosmosRole: String, Sendable {
   case macViewer = "mac-viewer"
   case visionViewer = "vision-viewer"
 
-  fileprivate var loomDeviceType: DeviceType {
+  fileprivate var deviceType: DeviceType {
     switch self {
     case .server, .macViewer: .mac
     case .visionViewer: .vision
@@ -51,18 +50,18 @@ extension KosmosServiceHost {
   /// Construct a Loom-backed `KosmosClient` for the given Galley
   /// surface. Pump is already running on return so registrations land
   /// before any peer connects. Caller registers handlers and then
-  /// `try await link.start()`.
+  /// `try await client.startLink()`.
   public func makeLink(
     role: GalleyKosmosRole,
     deviceName: String? = nil,
     extraMetadata: [String: String] = [:]
-  ) async -> (client: KosmosClient, link: LoomKosmosLink) {
+  ) async -> KosmosClient {
     await KosmosClient.makeLoomBacked(
       role: role.rawValue,
       product: "galley",
       deviceID: deviceID,
       deviceName: deviceName ?? role.defaultDeviceName,
-      deviceType: role.loomDeviceType,
+      deviceType: role.deviceType,
       extraMetadata: extraMetadata)
   }
 }

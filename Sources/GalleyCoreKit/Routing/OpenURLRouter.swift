@@ -1,4 +1,5 @@
 import Foundation
+import KosmosCore
 
 /// Concrete action the Viewer's AppKit adapter should take in response
 /// to an inbound URL. The router decides; the adapter executes.

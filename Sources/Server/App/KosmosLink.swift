@@ -111,7 +111,7 @@ final class KosmosLink: KosmosService {
 
   // MARK: - KosmosService
 
-  func makeLink() async -> (KosmosClient, any KosmosTransport.KosmosLink) {
+  func makeLink() async -> KosmosClient {
     await host.makeLink(
       role: .server,
       extraMetadata: advertisedHTTPURL.map {

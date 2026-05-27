@@ -67,7 +67,7 @@ final class KosmosVisionService: KosmosService {
 
   // MARK: - KosmosService
 
-  func makeLink() async -> (KosmosClient, any KosmosLink) {
+  func makeLink() async -> KosmosClient {
     await host.makeLink(role: .visionViewer)
   }
 
