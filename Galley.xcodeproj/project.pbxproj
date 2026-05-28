@@ -22,12 +22,10 @@
 		62812BED2FC4AC160059DDFF /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62812BEC2FC4AC160059DDFF /* KosmosCore */; };
 		62812BEF2FC4AC160059DDFF /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62812BEE2FC4AC160059DDFF /* KosmosTransport */; };
 		62812BF12FC4AC700059DDFF /* KosmosHTTPTunnel in Frameworks */ = {isa = PBXBuildFile; productRef = 62812BF02FC4AC700059DDFF /* KosmosHTTPTunnel */; };
-		629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050B00000000CADD7B01 /* KosmosWebView */; };
-		629150E02FBFCE2700088C1F /* HummingbirdCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62913BA12FBC3B9A00088C1F /* HummingbirdCore */; };
-		62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 62A0050100000000CADD7B01 /* KosmosBridge */; };
 		62A1000300000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 62A1000400000000CADD7B01 /* ALFoundation */; };
 		62A1000500000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000600000000CADD7B01 /* KosmosCore */; };
 		62A1000700000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000800000000CADD7B01 /* KosmosTransport */; };
+		62A127162FC6BDD6002FDFD7 /* MarkdownHTMLKit in Frameworks */ = {isa = PBXBuildFile; productRef = 62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */; };
 		62A7C37E2FC0FC9F00902074 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A7C37D2FC0FC9F00902074 /* ALFoundation */; };
 		62B0000100000000CADD7B01 /* KosmosCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62B0000200000000CADD7B01 /* KosmosCore */; };
 		62B0000300000000CADD7B01 /* KosmosTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 62B0000400000000CADD7B01 /* KosmosTransport */; };
@@ -36,8 +34,6 @@
 		62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E49C2FA5D9D900CADD72 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49B2FA5D9D900CADD72 /* Markdown */; };
-		62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E49E2FA5D9F100CADD72 /* Hummingbird */; };
-		62D5E4A12FA5D9F100CADD72 /* HummingbirdTLS in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */; };
 		62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
 		62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B22FA5DAEC00CADD72 /* ALFoundation */; };
@@ -48,6 +44,12 @@
 		62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); };
 		62FE000300000000CADD7201 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE000400000000CADD7201 /* ALFoundation */; };
+		FF02050000000000FF000100 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF000010 /* FlyingFox */; };
+		FF02050000000000FF000101 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF000011 /* FlyingSocks */; };
+		FF02050000000000FF001100 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF001010 /* HTTPTypes */; };
+		FF02050000000000FF002100 /* KosmosHTTPTunnel in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF002010 /* KosmosHTTPTunnel */; };
+		FF02050000000000FF002101 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF002011 /* HTTPTypes */; };
+		FF02050000000000FF002102 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = FF02050000000000FF002012 /* FlyingFox */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -314,7 +316,6 @@
 				62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */,
 				62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62812BF12FC4AC700059DDFF /* KosmosHTTPTunnel in Frameworks */,
-				62A0050200000000CADD7B01 /* KosmosBridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -327,6 +328,9 @@
 				62FE000300000000CADD7201 /* ALFoundation in Frameworks */,
 				62A1000500000000CADD7B01 /* KosmosCore in Frameworks */,
 				62A1000700000000CADD7B01 /* KosmosTransport in Frameworks */,
+				FF02050000000000FF002100 /* KosmosHTTPTunnel in Frameworks */,
+				FF02050000000000FF002101 /* HTTPTypes in Frameworks */,
+				FF02050000000000FF002102 /* FlyingFox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,7 +349,6 @@
 			files = (
 				62812A292FC4A9FC0059DDFF /* KosmosTransport in Frameworks */,
 				62812A282FC4A9FC0059DDFF /* KosmosCore in Frameworks */,
-				629139DF2FBC381400088C1F /* KosmosWebView in Frameworks */,
 				62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62812A252FC4A9EE0059DDFF /* KosmosHTTPTunnel in Frameworks */,
 				62D5E4B62FA5DB9200CADD72 /* ALFoundation in Frameworks */,
@@ -361,6 +364,7 @@
 				62B0000100000000CADD7B01 /* KosmosCore in Frameworks */,
 				62B0000300000000CADD7B01 /* KosmosTransport in Frameworks */,
 				62D5E49C2FA5D9D900CADD72 /* Markdown in Frameworks */,
+				62A127162FC6BDD6002FDFD7 /* MarkdownHTMLKit in Frameworks */,
 				62FA000300000000CADD7300 /* ObservableDefaults in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -371,11 +375,11 @@
 			files = (
 				62812BEF2FC4AC160059DDFF /* KosmosTransport in Frameworks */,
 				62812BEB2FC4ABFD0059DDFF /* KosmosHTTPTunnel in Frameworks */,
-				629150E02FBFCE2700088C1F /* HummingbirdCore in Frameworks */,
+				FF02050000000000FF000100 /* FlyingFox in Frameworks */,
+				FF02050000000000FF000101 /* FlyingSocks in Frameworks */,
+				FF02050000000000FF001100 /* HTTPTypes in Frameworks */,
 				62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */,
 				62812BED2FC4AC160059DDFF /* KosmosCore in Frameworks */,
-				62D5E49F2FA5D9F100CADD72 /* Hummingbird in Frameworks */,
-				62D5E4A12FA5D9F100CADD72 /* HummingbirdTLS in Frameworks */,
 				62A1000300000000CADD7B01 /* ALFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -494,7 +498,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				629139D22FBC365F00088C1F /* PBXTargetDependency */,
 				62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
@@ -502,7 +505,6 @@
 			);
 			name = Server;
 			packageProductDependencies = (
-				62A0050100000000CADD7B01 /* KosmosBridge */,
 				62A0050300000000CADD7B01 /* KosmosCore */,
 				62A0050500000000CADD7B01 /* KosmosTransport */,
 				62A1000200000000CADD7B01 /* ALFoundation */,
@@ -533,6 +535,9 @@
 				62FE000400000000CADD7201 /* ALFoundation */,
 				62A1000600000000CADD7B01 /* KosmosCore */,
 				62A1000800000000CADD7B01 /* KosmosTransport */,
+				FF02050000000000FF002010 /* KosmosHTTPTunnel */,
+				FF02050000000000FF002011 /* HTTPTypes */,
+				FF02050000000000FF002012 /* FlyingFox */,
 			);
 			productName = GalleyTests;
 			productReference = 626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */;
@@ -582,7 +587,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				629139DC2FBC367000088C1F /* PBXTargetDependency */,
 				62B8BEAF2FB96B6A004FB681 /* PBXTargetDependency */,
 				62D5E7692FA5E20100CADD72 /* PBXTargetDependency */,
 				62564F3D2FA857A400FF0F84 /* PBXTargetDependency */,
@@ -595,7 +599,6 @@
 				62D5E4B52FA5DB9200CADD72 /* ALFoundation */,
 				62A0050700000000CADD7B01 /* KosmosCore */,
 				62A0050900000000CADD7B01 /* KosmosTransport */,
-				62A0050B00000000CADD7B01 /* KosmosWebView */,
 				62812A242FC4A9EE0059DDFF /* KosmosHTTPTunnel */,
 			);
 			productName = Galley;
@@ -632,6 +635,7 @@
 				62B0000200000000CADD7B01 /* KosmosCore */,
 				62B0000400000000CADD7B01 /* KosmosTransport */,
 				6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */,
+				62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */,
 			);
 			productName = GalleyCoreKit;
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
@@ -650,17 +654,18 @@
 			);
 			dependencies = (
 				62D5E4A92FA5DA1F00CADD72 /* PBXTargetDependency */,
-				62D5E4AB2FA5DA1F00CADD72 /* PBXTargetDependency */,
-				62D5E4AD2FA5DA1F00CADD72 /* PBXTargetDependency */,
+				FF02050000000000FF000020 /* PBXTargetDependency */,
+				FF02050000000000FF000021 /* PBXTargetDependency */,
+				FF02050000000000FF001020 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				62D5E4562FA5D99A00CADD72 /* GalleyServerKit */,
 			);
 			name = GalleyServerKit;
 			packageProductDependencies = (
-				62D5E49E2FA5D9F100CADD72 /* Hummingbird */,
-				62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */,
-				62913BA12FBC3B9A00088C1F /* HummingbirdCore */,
+				FF02050000000000FF000010 /* FlyingFox */,
+				FF02050000000000FF000011 /* FlyingSocks */,
+				FF02050000000000FF001010 /* HTTPTypes */,
 				62A1000400000000CADD7B01 /* ALFoundation */,
 				62812BEA2FC4ABFD0059DDFF /* KosmosHTTPTunnel */,
 				62812BEC2FC4AC160059DDFF /* KosmosCore */,
@@ -718,9 +723,11 @@
 			packageReferences = (
 				62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */,
 				62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */,
-				62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */,
+				FF02050000000000FF000001 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				FF02050000000000FF001001 /* XCRemoteSwiftPackageReference "swift-http-types" */,
 				62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */,
 				629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */,
+				62A127142FC6BDD6002FDFD7 /* XCLocalSwiftPackageReference "../MarkdownHTMLKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 626E8D502F9DD1C700BD51F9 /* Products */;
@@ -948,14 +955,6 @@
 			isa = PBXTargetDependency;
 			productRef = 6281285A2FC410160059DDFF /* KosmosTransport */;
 		};
-		629139D22FBC365F00088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 629139D12FBC365F00088C1F /* KosmosBridge */;
-		};
-		629139DC2FBC367000088C1F /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 629139DB2FBC367000088C1F /* KosmosWebView */;
-		};
 		62913BA02FBC39AE00088C1F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			productRef = 62913B9F2FBC39AE00088C1F /* ObservableDefaults */;
@@ -992,14 +991,6 @@
 			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
 			targetProxy = 62D5E4A82FA5DA1F00CADD72 /* PBXContainerItemProxy */;
 		};
-		62D5E4AB2FA5DA1F00CADD72 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 62D5E4AA2FA5DA1F00CADD72 /* Hummingbird */;
-		};
-		62D5E4AD2FA5DA1F00CADD72 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 62D5E4AC2FA5DA1F00CADD72 /* HummingbirdTLS */;
-		};
 		62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 62D5E4432FA5D95400CADD72 /* GalleyServerKit */;
@@ -1017,6 +1008,18 @@
 			);
 			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
 			targetProxy = 62D5E7682FA5E20100CADD72 /* PBXContainerItemProxy */;
+		};
+		FF02050000000000FF000020 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = FF02050000000000FF000010 /* FlyingFox */;
+		};
+		FF02050000000000FF000021 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = FF02050000000000FF000011 /* FlyingSocks */;
+		};
+		FF02050000000000FF001020 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = FF02050000000000FF001010 /* HTTPTypes */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1597,6 +1600,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Kosmos;
 		};
+		62A127142FC6BDD6002FDFD7 /* XCLocalSwiftPackageReference "../MarkdownHTMLKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../MarkdownHTMLKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1616,20 +1623,28 @@
 				minimumVersion = 0.7.3;
 			};
 		};
-		62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/hummingbird-project/hummingbird.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.23.0;
-			};
-		};
 		62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/fatbobman/ObservableDefaults";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 1.8.6;
+			};
+		};
+		FF02050000000000FF000001 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/FlyingFox.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.26.0;
+			};
+		};
+		FF02050000000000FF001001 /* XCRemoteSwiftPackageReference "swift-http-types" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-http-types.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1680,30 +1695,10 @@
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
 			productName = KosmosHTTPTunnel;
 		};
-		629139D12FBC365F00088C1F /* KosmosBridge */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosBridge;
-		};
-		629139DB2FBC367000088C1F /* KosmosWebView */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosWebView;
-		};
 		62913B9F2FBC39AE00088C1F /* ObservableDefaults */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */;
 			productName = ObservableDefaults;
-		};
-		62913BA12FBC3B9A00088C1F /* HummingbirdCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
-			productName = HummingbirdCore;
-		};
-		62A0050100000000CADD7B01 /* KosmosBridge */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosBridge;
 		};
 		62A0050300000000CADD7B01 /* KosmosCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1725,11 +1720,6 @@
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
 			productName = KosmosTransport;
 		};
-		62A0050B00000000CADD7B01 /* KosmosWebView */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = KosmosWebView;
-		};
 		62A1000200000000CADD7B01 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
@@ -1749,6 +1739,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
 			productName = KosmosTransport;
+		};
+		62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MarkdownHTMLKit;
 		};
 		62A7C37B2FC0FC9700902074 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1775,16 +1769,6 @@
 			package = 62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
 		};
-		62D5E49E2FA5D9F100CADD72 /* Hummingbird */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
-			productName = Hummingbird;
-		};
-		62D5E4A02FA5D9F100CADD72 /* HummingbirdTLS */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
-			productName = HummingbirdTLS;
-		};
 		62D5E4A22FA5DA0600CADD72 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
@@ -1794,16 +1778,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E49A2FA5D9D900CADD72 /* XCRemoteSwiftPackageReference "swift-markdown" */;
 			productName = Markdown;
-		};
-		62D5E4AA2FA5DA1F00CADD72 /* Hummingbird */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
-			productName = Hummingbird;
-		};
-		62D5E4AC2FA5DA1F00CADD72 /* HummingbirdTLS */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E49D2FA5D9F100CADD72 /* XCRemoteSwiftPackageReference "hummingbird" */;
-			productName = HummingbirdTLS;
 		};
 		62D5E4B22FA5DAEC00CADD72 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1824,6 +1798,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
 			productName = ALFoundation;
+		};
+		FF02050000000000FF000010 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FF02050000000000FF000001 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
+		};
+		FF02050000000000FF000011 /* FlyingSocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FF02050000000000FF000001 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingSocks;
+		};
+		FF02050000000000FF001010 /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FF02050000000000FF001001 /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+		FF02050000000000FF002010 /* KosmosHTTPTunnel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
+			productName = KosmosHTTPTunnel;
+		};
+		FF02050000000000FF002011 /* HTTPTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FF02050000000000FF001001 /* XCRemoteSwiftPackageReference "swift-http-types" */;
+			productName = HTTPTypes;
+		};
+		FF02050000000000FF002012 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FF02050000000000FF000001 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

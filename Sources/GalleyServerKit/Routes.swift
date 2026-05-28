@@ -1,7 +1,5 @@
 import Foundation
 import HTTPTypes
-import Hummingbird
-import NIOCore
 import Security
 import GalleyCoreKit
 import KosmosHTTPTunnel
@@ -32,7 +30,7 @@ enum Routes {
     rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
     watcher: DocumentWatcher
   ) -> Router<BasicRequestContext> {
-    let router = Router()
+    let router = Router<BasicRequestContext>()
 
     router.get("/\(RouteNames.preview)/**") { request, _ -> Response in
       guard let hostURL = await hostURLProvider() else {

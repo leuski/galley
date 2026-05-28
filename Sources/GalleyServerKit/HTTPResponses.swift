@@ -1,7 +1,5 @@
 import Foundation
 import HTTPTypes
-import Hummingbird
-import NIOCore
 import GalleyCoreKit
 
 enum HTTPResponses {
