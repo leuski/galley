@@ -13,6 +13,7 @@
 		627395452FC806FF00205507 /* HTTPTypes in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = FF02050000000000FF002011 /* HTTPTypes */; };
 		62739DD32FC9E78900205507 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = 62739DD22FC9E78900205507 /* FlyingFox */; };
 		62739DD52FC9E78900205507 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = 62739DD42FC9E78900205507 /* FlyingSocks */; };
+		6273A0762FCA2B9100205507 /* KosmosAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6273A0752FCA2B9100205507 /* KosmosAppKit */; };
 		628053992FBFEC0600A02808 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
 		6281285D2FC4101D0059DDFF /* KosmosHTTPTunnel in Frameworks */ = {isa = PBXBuildFile; productRef = 6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */; };
 		6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
@@ -168,9 +169,17 @@
 			);
 			target = 62564F2F2FA857A400FF0F84 /* Quicklook */;
 		};
+		6273A0782FCA334E00205507 /* Exceptions for "Server" folder in "GalleyCoreKit" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/GalleyBridgeRequest.swift,
+			);
+			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
+		};
 		629150AD2FBD78A200088C1F /* Exceptions for "Server" folder in "Server" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				App/GalleyBridgeRequest.swift,
 				Resources/Info.plist,
 			);
 			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
@@ -255,6 +264,7 @@
 		62D5D5292FA1673B00CADD72 /* Server */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				6273A0782FCA334E00205507 /* Exceptions for "Server" folder in "GalleyCoreKit" target */,
 				629150AD2FBD78A200088C1F /* Exceptions for "Server" folder in "Server" target */,
 			);
 			path = Server;
@@ -351,6 +361,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6281285D2FC4101D0059DDFF /* KosmosHTTPTunnel in Frameworks */,
+				6273A0762FCA2B9100205507 /* KosmosAppKit in Frameworks */,
 				62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */,
 				62B0000100000000CADD7B01 /* KosmosCore in Frameworks */,
 				62B0000300000000CADD7B01 /* KosmosTransport in Frameworks */,
@@ -624,6 +635,7 @@
 				62B0000400000000CADD7B01 /* KosmosTransport */,
 				6281285C2FC4101D0059DDFF /* KosmosHTTPTunnel */,
 				62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */,
+				6273A0752FCA2B9100205507 /* KosmosAppKit */,
 			);
 			productName = GalleyCoreKit;
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
@@ -714,6 +726,7 @@
 				629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */,
 				62A127142FC6BDD6002FDFD7 /* XCLocalSwiftPackageReference "../MarkdownHTMLKit" */,
 				62739DD12FC9E78900205507 /* XCRemoteSwiftPackageReference "FlyingFox" */,
+				6273A0742FCA2B9100205507 /* XCLocalSwiftPackageReference "../KosmosAppKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 626E8D502F9DD1C700BD51F9 /* Products */;
@@ -1565,6 +1578,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		6273A0742FCA2B9100205507 /* XCLocalSwiftPackageReference "../KosmosAppKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../KosmosAppKit;
+		};
 		629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Kosmos;
@@ -1628,6 +1645,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 62739DD12FC9E78900205507 /* XCRemoteSwiftPackageReference "FlyingFox" */;
 			productName = FlyingSocks;
+		};
+		6273A0752FCA2B9100205507 /* KosmosAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KosmosAppKit;
 		};
 		628128562FC410160059DDFF /* KosmosCore */ = {
 			isa = XCSwiftPackageProductDependency;

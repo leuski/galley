@@ -4,6 +4,7 @@
 //
 
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 
 typealias SceneProcessorChoiceValue = SceneChoiceValueEnvelope<ProcessorChoice>

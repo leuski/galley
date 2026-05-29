@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OSLog
 import GalleyCoreKit
+import KosmosAppKit
 
 /// Persisted view-state Galley remembers about each previously-seen
 /// file. Survives window-close, app-quit, and fresh re-opens of the

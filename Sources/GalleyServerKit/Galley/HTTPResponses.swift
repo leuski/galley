@@ -1,6 +1,7 @@
 import Foundation
 import HTTPTypes
 import GalleyCoreKit
+import KosmosAppKit
 
 enum HTTPResponses {
   static func badRequest(_ message: String) -> Response {

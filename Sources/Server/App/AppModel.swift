@@ -3,7 +3,7 @@ import SwiftUI
 import GalleyCoreKit
 import GalleyServerKit
 import OSLog
-import ALFoundation
+import KosmosAppKit
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -19,7 +19,10 @@ private let defaultsLog = Logger(
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
+final class Defaults: GalleyRenderDefaults,
+                      GalleyNetworkDefaults,
+                      BroadcastedDefaults
+{
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
   @DefaultsKey var serverGalleyHash: String?
@@ -31,6 +34,8 @@ final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
   @DefaultsKey var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
+
+  let broadcaster = DefaultsBroadcast(suiteName: GalleyConstants.suiteName)
 }
 
 @MainActor @Observable
@@ -78,7 +83,7 @@ final class AppModel {
     // for the rationale: `UserDefaults.didChangeNotification` is
     // process-local; the Darwin-notification bridge is what makes
     // cross-process change observation actually work.
-    DefaultsBroadcast.startListening()
+    Defaults.shared.startListening()
 
     persistenceTokens = bindPersistent(
       templates,
@@ -118,10 +123,10 @@ final class AppModel {
     let galleyApp = serverBundle.parent.parent.parent
     Task.detached(priority: .userInitiated) {
       do {
-        let hash = try await GalleyAppHash.compute(at: galleyApp)
+        let hash = try await galleyApp.computeHash()
         await MainActor.run {
           Defaults.shared.serverGalleyHash = hash
-          DefaultsBroadcast.post()
+          Defaults.shared.post()
         }
       } catch {
         defaultsLog.error("""
@@ -183,21 +188,21 @@ final class AppModel {
         case .running(let url):
           let port = (url.port).flatMap { UInt16(exactly: $0) } ?? 0
           Defaults.shared.serverHTTPPort = port
-          DefaultsBroadcast.post()
+          Defaults.shared.post()
           if !kosmosStarted {
             kosmos.start(httpURL: url)
             kosmosStarted = true
           }
         case .failed:
           Defaults.shared.serverHTTPPort = 0
-          DefaultsBroadcast.post()
+          Defaults.shared.post()
           if !kosmosStarted {
             kosmos.start(httpURL: nil)
             kosmosStarted = true
           }
         case .stopped:
           Defaults.shared.serverHTTPPort = 0
-          DefaultsBroadcast.post()
+          Defaults.shared.post()
         }
       }
     }

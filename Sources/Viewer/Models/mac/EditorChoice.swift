@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import GalleyCoreKit
+import KosmosAppKit
 import ALFoundation
 import Observation
 import OSLog

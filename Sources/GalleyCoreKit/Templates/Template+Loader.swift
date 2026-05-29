@@ -1,5 +1,5 @@
 import Foundation
-import ALFoundation
+import KosmosAppKit
 
 extension Template {
   /// Build a `Template` from a filesystem entry inside one of

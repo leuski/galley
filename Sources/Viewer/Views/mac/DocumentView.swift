@@ -5,7 +5,7 @@ import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
-import ALFoundation
+import KosmosAppKit
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentView")

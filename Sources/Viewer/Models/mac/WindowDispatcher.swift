@@ -4,6 +4,7 @@ import GalleyCoreKit
 import Observation
 import OSLog
 import SwiftUI
+import KosmosAppKit
 
 /// Owns the routing state and AppKit-bridge for inbound document URLs.
 ///

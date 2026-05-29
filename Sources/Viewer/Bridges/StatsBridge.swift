@@ -2,6 +2,7 @@ import Foundation
 import GalleyCoreKit
 import OSLog
 import WebKit
+import KosmosAppKit
 
 /// Receives `{ words, characters, headings }` messages from a user
 /// script that walks the rendered DOM after each load. Drives the

@@ -7,6 +7,7 @@
 
 import Foundation
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 
 /// User-controllable color scheme for a rendered document. visionOS
@@ -22,8 +23,8 @@ import SwiftUI
 /// which lets the same on-disk plist round-trip cleanly through the
 /// Server (macOS) suite.
 enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
-                         Hashable, Sendable,
-                         CustomLocalizedStringResourceConvertible
+                          Hashable, Sendable,
+                          CustomLocalizedStringResourceConvertible
 {
   case light
   case dark

@@ -1,5 +1,5 @@
 import Foundation
-import ALFoundation
+import KosmosAppKit
 
 public struct PlaceholderContext: Sendable {
   public let documentContent: String

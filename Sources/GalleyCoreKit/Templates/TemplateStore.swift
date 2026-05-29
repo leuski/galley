@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import ALFoundation
+import KosmosAppKit
 import OSLog
 #if os(macOS)
 import AppKit

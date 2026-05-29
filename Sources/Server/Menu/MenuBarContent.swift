@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
-import ALFoundation
+import KosmosAppKit
 import GalleyCoreKit
 import GalleyServerKit
 
@@ -69,7 +68,7 @@ struct MenuBarContent: View {
   private func openFile() {
     let panel = NSOpenPanel()
     panel.identifier = .init(rawValue: "open.file.panel")
-    panel.allowedContentTypes = UTType.allMarkdownTypesAndPlainText
+    panel.allowedContentTypes = MarkdownFileTypes.allTypesAndPlainText
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
     panel.allowsMultipleSelection = false

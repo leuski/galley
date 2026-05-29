@@ -7,16 +7,14 @@ public enum MarkdownFileTypes {
   public static let extensions: Set<String> = [
     "md", "markdown", "mdown", "mmd"
   ]
-}
 
-public extension UTType {
-  static let allMarkdownTypes: [UTType] = (
+  private static let allTypes: [UTType] = (
     [ "md", "markdown", "mdown", "mmd" ]
-      .map { UTType.init(filenameExtension: $0) } + [.markdown]
+      .map { UTType.init(filenameExtension: $0) } + [markdown]
   ).compactMap({$0})
 
-  static let markdown = UTType("net.daringfireball.markdown")
+  private static let markdown = UTType("net.daringfireball.markdown")
 
-  static let allMarkdownTypesAndPlainText: [UTType] = allMarkdownTypes
+  public static let allTypesAndPlainText: [UTType] = allTypes
   + [.plainText]
 }

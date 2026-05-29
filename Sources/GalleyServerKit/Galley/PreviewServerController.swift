@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import OSLog
 import GalleyCoreKit
-import ALFoundation
+import KosmosAppKit
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "PreviewServer")

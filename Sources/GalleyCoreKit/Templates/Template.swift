@@ -1,5 +1,5 @@
 import Foundation
-import ALFoundation
+import KosmosAppKit
 
 /// One template — bundled or user-installed, file-shape or folder-shape,
 /// they all collapse to the same struct. The kit ships a `Default`

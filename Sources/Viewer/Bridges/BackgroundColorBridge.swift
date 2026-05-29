@@ -3,6 +3,7 @@ import GalleyCoreKit
 import OSLog
 import SwiftUI
 import WebKit
+import KosmosAppKit
 
 /// Receives the rendered page's computed background color (the
 /// `html` element's, falling back to `body`) so the SwiftUI host can

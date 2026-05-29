@@ -1,6 +1,7 @@
 import Foundation
 import GalleyCoreKit
 import WebKit
+import KosmosAppKit
 
 /// Find-text user scripts. Installs a `window.galleyFind` controller
 /// that walks text nodes, wraps every match in a `<mark>` element, and

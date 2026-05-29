@@ -1,5 +1,6 @@
 import Foundation
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 import OSLog
 import ALFoundation
@@ -70,7 +71,7 @@ final class AppModel {
     // local didChangeNotification post that the ObservableDefaults
     // macro observer is already subscribed to. `post()` after each
     // outbound write fires the cross-process signal.
-    DefaultsBroadcast.startListening()
+    Defaults.shared.startListening()
 
     persistenceTokens = bindPersistent(
       templates,
@@ -202,7 +203,7 @@ final class AppBoot {
 
     let myHash: String
     do {
-      myHash = try await GalleyAppHash.compute(at: Bundle.main.bundleURL)
+      myHash = try await Bundle.main.bundleURL.computeHash()
     } catch {
       defaultsLog.error("""
         Server staleness check failed to hash Galley.app: \

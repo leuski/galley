@@ -5,7 +5,7 @@ import Foundation
 import GalleyCoreKit
 import WebKit
 import OSLog
-import ALFoundation
+import KosmosAppKit
 
 /// Handles plain-click on `<a href>` elements inside the rendered
 /// preview: resolves relative paths against the current document, and

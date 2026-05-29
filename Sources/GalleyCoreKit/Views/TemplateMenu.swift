@@ -1,4 +1,5 @@
 import SwiftUI
+import KosmosAppKit
 
 public struct TemplateMenu<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,

@@ -4,7 +4,7 @@ import AppKit
 import GalleyCoreKit
 import Observation
 import SwiftUI
-import UniformTypeIdentifiers
+import KosmosAppKit
 
 #if !os(macOS)
 /// Persisted form of a visionOS recent entry. File URLs carry a
@@ -155,7 +155,7 @@ final class RecentDocumentsModel {
     panel.allowsMultipleSelection = true
     panel.canChooseDirectories = false
     panel.canChooseFiles = true
-    panel.allowedContentTypes = UTType.allMarkdownTypesAndPlainText
+    panel.allowedContentTypes = MarkdownFileTypes.allTypesAndPlainText
     activeOpenPanel = panel
     let response: NSApplication.ModalResponse =
     await withCheckedContinuation { continuation in

@@ -3,6 +3,7 @@ import HTTPTypes
 import Security
 import GalleyCoreKit
 import KosmosHTTPTunnel
+import KosmosAppKit
 
 enum Routes {
   static let assetExtensions: Set<String> = [

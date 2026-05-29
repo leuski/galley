@@ -1,6 +1,7 @@
 #if !os(macOS)
 
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 
 /// Single settings surface for the visionOS Viewer. Hosted by the

@@ -2,7 +2,6 @@
 
 import GalleyCoreKit
 import SwiftUI
-import UniformTypeIdentifiers
 import WebKit
 import ALFoundation
 
@@ -109,7 +108,7 @@ private struct WelcomeScreen: View {
     .padding(40)
     .fileImporter(
       isPresented: $isFilePickerPresented,
-      allowedContentTypes: UTType.allMarkdownTypesAndPlainText,
+      allowedContentTypes: MarkdownFileTypes.allTypesAndPlainText,
       allowsMultipleSelection: false
     ) { result in
       guard case .success(let urls) = result, let url = urls.first
@@ -218,7 +217,7 @@ private struct DocumentScreen: View {
     // slot instead of spawning a second window.
     .fileImporter(
       isPresented: $isFilePickerPresented,
-      allowedContentTypes: UTType.allMarkdownTypesAndPlainText,
+      allowedContentTypes: MarkdownFileTypes.allTypesAndPlainText,
       allowsMultipleSelection: false
     ) { result in
       guard case .success(let urls) = result, let url = urls.first

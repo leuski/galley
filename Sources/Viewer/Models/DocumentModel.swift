@@ -4,7 +4,7 @@ import Observation
 import OSLog
 import SwiftUI
 import WebKit
-import ALFoundation
+import KosmosAppKit
 
 /// Per-document state for the native viewer. Owns the WebPage, the
 /// file watcher, and the editor bridge. Renderer and template come

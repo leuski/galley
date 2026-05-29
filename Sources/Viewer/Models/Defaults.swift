@@ -9,6 +9,7 @@ import Foundation
 import GalleyCoreKit
 import SwiftUI
 import OSLog
+import KosmosAppKit
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
 /// (catalog discovery + persisted ID), template store, server config,
@@ -29,7 +30,9 @@ import OSLog
 /// notification) because `UserDefaults.didChangeNotification` is
 /// process-local.
 @ObservableDefaults(limitToInstance: false)
-final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
+final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults,
+                      BroadcastedDefaults
+{
   @DefaultsKey var renderer: String?
   @DefaultsKey var template: String?
   @DefaultsKey var enablePerDocumentOverrides: Bool = false
@@ -105,6 +108,8 @@ final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults {
   @DefaultsKey var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
+
+  let broadcaster = DefaultsBroadcast(suiteName: GalleyConstants.suiteName)
 
   /// Synchronize the `@ObservableDefaults` macro's per-property cache
   /// with the actual on-disk values. Must be called once at app boot,

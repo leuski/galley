@@ -1,6 +1,6 @@
 import Foundation
 @_exported import ObservableDefaults
-import ALFoundation
+import KosmosAppKit
 
 /// Shared defaults contract between the Viewer and Server apps.
 /// Both AppModels conform to this protocol. The Viewer backs it with
@@ -11,8 +11,12 @@ import ALFoundation
 /// `DefaultsBroadcast` (Darwin notification), not by `cfprefsd`
 /// notifications — `UserDefaults.didChangeNotification` is
 /// process-local.
-public protocol GalleyDefaults: AnyObject {
-  @MainActor static var shared: Self { get }
+public protocol GalleyDefaults: DefaultsProtocol
+{
+}
+
+extension GalleyDefaults {
+  var suiteName: String { GalleyConstants.suiteName }
 }
 
 public protocol GalleyRenderDefaults: GalleyDefaults {

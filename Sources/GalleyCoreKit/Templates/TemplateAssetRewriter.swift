@@ -1,4 +1,5 @@
 import Foundation
+import KosmosAppKit
 
 /// Rewrites asset references inside a template's HTML so they resolve
 /// through the kit's well-known routes (`/template/<id>/<file>` and

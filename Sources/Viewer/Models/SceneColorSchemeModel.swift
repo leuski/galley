@@ -7,6 +7,7 @@
 
 import GalleyCoreKit
 import SwiftUI
+import KosmosAppKit
 
 typealias SceneColorSchemeChoiceValue
   = SceneChoiceValueEnvelope<ColorSchemeChoice>
