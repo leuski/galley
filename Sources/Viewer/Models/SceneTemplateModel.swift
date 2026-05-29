@@ -9,5 +9,7 @@ import GalleyCoreKit
 import KosmosAppKit
 import SwiftUI
 
-typealias SceneTemplateChoiceValue = SceneChoiceValueEnvelope<TemplateChoice>
-typealias SceneTemplateChoice = SceneChoice<TemplateChoice>
+typealias SceneTemplateChoiceValue = SceneChoiceValueEnvelope<
+  TemplateChoice, SceneChoiceLocalizer<TemplateChoice.Element>>
+typealias SceneTemplateChoice = SceneChoice<
+  TemplateChoice, SceneChoiceLocalizer<TemplateChoice.Element>>
