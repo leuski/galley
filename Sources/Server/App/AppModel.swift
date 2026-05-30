@@ -4,6 +4,7 @@ import GalleyCoreKit
 import GalleyServerKit
 import OSLog
 import KosmosAppKit
+import UserNotifications
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -20,7 +21,7 @@ private let defaultsLog = Logger(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
 final class Defaults: GalleyRenderDefaults,
-                      GalleyNetworkDefaults,
+                      HTTPServerDefaults,
                       BroadcastedDefaults
 {
   @DefaultsKey var renderer: String?
@@ -138,9 +139,9 @@ final class AppModel {
   }
 
   private static func notify(
-    _ kind: DisplacementNotifier.Kind, _ name: String)
+    _ kind: UNUserNotificationCenter.Kind, _ name: String)
   {
-    DisplacementNotifier.post(kind: kind, displaced: name)
+    UNUserNotificationCenter.post(kind: kind, displaced: name)
   }
 
   private static func logInit(
@@ -217,10 +218,11 @@ final class AppBoot {
   private(set) var model: AppModel?
 
   init() {
+    SingleProcessInstance.enforceSingleInstance()
     // Notification permission is presented as a system sheet on
     // first run; awaiting it would block boot until the user
     // responds. Fire it in parallel and let it resolve whenever.
-    Task { await DisplacementNotifier.requestAuthorization() }
+    Task { await UNUserNotificationCenter.requestAuthorization() }
     Task { @MainActor in
       await ProcessorStore.shared.discover()
       self.model = AppModel()

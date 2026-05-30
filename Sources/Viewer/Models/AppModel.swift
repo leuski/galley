@@ -3,7 +3,7 @@ import GalleyCoreKit
 import KosmosAppKit
 import SwiftUI
 import OSLog
-import ALFoundation
+import UserNotifications
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -104,9 +104,9 @@ final class AppModel {
   }
 
   private static func notify(
-    _ kind: DisplacementNotifier.Kind, _ name: String)
+    _ kind: UNUserNotificationCenter.Kind, _ name: String)
   {
-    DisplacementNotifier.post(kind: kind, displaced: name)
+    UNUserNotificationCenter.post(kind: kind, displaced: name)
   }
 
   private static func logInit(
@@ -146,7 +146,7 @@ final class AppBoot {
     // Notification permission is presented as a system sheet on
     // first run; awaiting it would block boot until the user
     // responds. Fire it in parallel and let it resolve whenever.
-    Task { await DisplacementNotifier.requestAuthorization() }
+    Task { await UNUserNotificationCenter.requestAuthorization() }
     Task { @MainActor in
 #if os(macOS)
       await Self.restartServerIfStale()

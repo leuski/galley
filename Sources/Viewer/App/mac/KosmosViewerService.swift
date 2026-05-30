@@ -19,13 +19,13 @@ private let log = Logger(
 /// the protocol.
 @MainActor
 @Observable
-final class KosmosViewerService: KosmosService {
+final class KosmosViewerService: KosmosService<GalleyKosmosRole> {
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
   @ObservationIgnored private let localHostUUID = UUID.hostStable?
     .uuidString.lowercased()
 
-  @ObservationIgnored private let host = KosmosServiceHost(role: .macViewer)
+  @ObservationIgnored private let host = ServiceHost(role: .macViewer)
 
   /// Begin advertising. Idempotent.
   func start() {
@@ -39,7 +39,7 @@ final class KosmosViewerService: KosmosService {
   // MARK: - KosmosService
 
   func makeLink() async -> KosmosClient {
-    await host.makeLink(role: .macViewer)
+    await host.makeLink()
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {

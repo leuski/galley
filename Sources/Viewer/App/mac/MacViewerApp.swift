@@ -1,13 +1,9 @@
 #if os(macOS)
 import AppKit
 import GalleyCoreKit
-import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
-import ALFoundation
-
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "MacViewerApp")
+import KosmosAppKit
 
 @main
 struct MacViewerApp: App {
@@ -17,35 +13,8 @@ struct MacViewerApp: App {
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos: KosmosViewerService
 
-  private static func createApplicationSupportDirectory() {
-    let localized = GalleyConstants
-      .applicationSupportDirectory / ".localized" / "en.strings"
-    guard !localized.itemExists else { return }
-    do {
-      try localized.parent.createDirectory()
-    } catch {
-      log.warning("""
-        Couldn't create .localized dir: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
-    let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
-    ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
-    ?? ProcessInfo.processInfo.processName
-    do {
-      try """
-      "\(GalleyConstants.suiteName)" = "\(appName)";
-      """.write(to: localized, atomically: true, encoding: .utf8)
-    } catch {
-      log.warning("""
-        Couldn't seed en.strings: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
-  }
-
   init() {
-    Self.createApplicationSupportDirectory()
+    URL.createLocalizedApplicationSupportDirectory()
     // Sync the @ObservableDefaults cache with the on-disk values
     // before any SwiftUI scene starts laying out. See
     // `Defaults.warmCache()` for the full rationale — short version:

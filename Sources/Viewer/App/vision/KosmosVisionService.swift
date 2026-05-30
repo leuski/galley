@@ -28,13 +28,13 @@ private let log = Logger(
 /// the protocol.
 @MainActor
 @Observable
-final class KosmosVisionService: KosmosService {
+final class KosmosVisionService: KosmosService<GalleyKosmosRole> {
   /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
   let httpTunnelClient: Client
 
-  @ObservationIgnored private let host = KosmosServiceHost(role: .visionViewer)
+  @ObservationIgnored private let host = ServiceHost(role: .visionViewer)
 
   /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
   /// by the app to call `openWindow(value: url)`. The service holds
@@ -68,10 +68,10 @@ final class KosmosVisionService: KosmosService {
   // MARK: - KosmosService
 
   func makeLink() async -> KosmosClient {
-    await host.makeLink(role: .visionViewer)
+    await host.makeLink()
   }
 
-  func configure(host: KosmosServiceHost, client: KosmosClient) async {
+  func configure(host: ServiceHost, client: KosmosClient) async {
     httpTunnelClient.attach(client: client)
 
     host.subscribe(OpenURL.self) { [weak self] _, message in

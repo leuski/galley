@@ -24,6 +24,7 @@
       }
     },
     {
+      "enabled" : false,
       "target" : {
         "containerPath" : "container:Galley.xcodeproj",
         "identifier" : "62CC3C5E2FA7B8F90018F091",

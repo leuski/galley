@@ -1,5 +1,6 @@
 import Foundation
 import GalleyCoreKit
+import KosmosAppKit
 
 /// Quick Look's view onto the shared `net.leuski.galley` defaults
 /// suite. We don't have our own bundle id matching that suite, so
@@ -19,7 +20,7 @@ import GalleyCoreKit
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyNetworkDefaults {
+final class Defaults: GalleyDefaults, HTTPServerDefaults {
   @DefaultsKey var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()

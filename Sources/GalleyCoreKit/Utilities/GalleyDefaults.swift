@@ -24,30 +24,6 @@ public protocol GalleyRenderDefaults: GalleyDefaults {
   var template: String? { get set }
 }
 
-/// Live HTTP listener coordinates for the Galley Server, published
-/// through the shared `net.leuski.galley` plist so cross-process
-/// readers (Server, Viewer, Quicklook) all see the same value.
-/// The Server is the sole writer; it sets `serverHTTPPort` to the
-/// OS-assigned port on bind, and back to 0 on stop or failure.
-public protocol GalleyNetworkDefaults: GalleyDefaults {
-  var serverHTTPPort: UInt16 { get set }
-}
-
-public extension GalleyNetworkDefaults {
-  /// `http://127.0.0.1:<port>/` for the running Server, or nil when
-  /// no port is published (port == 0). Loopback-only — AVP doesn't
-  /// dial this; it tunnels through Kosmos. All same-machine consumers
-  /// reach the listener here.
-  var serverEndpointURL: URL? {
-    guard serverHTTPPort != 0 else { return nil }
-    var components = URLComponents()
-    components.scheme = "http"
-    components.host = GalleyConstants.defaultHost
-    components.port = Int(serverHTTPPort)
-    return components.url
-  }
-}
-
 public let bundleIdentifier = Bundle.main.bundleIdentifier
 ?? GalleyConstants.suiteName
 
@@ -65,6 +41,6 @@ public enum GalleyConstants {
   /// on-disk state live in one place regardless of which process is
   /// running.
   public static var applicationSupportDirectory: URL {
-    URL.applicationSupportDirectory / "\(suiteName).localized"
+    URL.localizedApplicationSupportDirectory(suiteName)
   }
 }

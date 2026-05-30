@@ -4,33 +4,14 @@
 //
 
 import Foundation
-import OSLog
+import KosmosAppKit
 import UserNotifications
-
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "DisplacementNotifier")
 
 /// Posts user-facing notifications when a previously-selected
 /// processor or template is no longer available and we've snapped
 /// back to the default. Stateless — call `post(...)` whenever a
 /// `healIfDisplaced()` returns non-nil.
-public enum DisplacementNotifier {
-  /// Ask for notification authorization. Safe to call repeatedly —
-  /// the system records the user's first answer. Errors are
-  /// swallowed; the notification post will simply do nothing if not
-  /// authorized.
-  public static func requestAuthorization() async {
-    let center = UNUserNotificationCenter.current()
-    do {
-      _ = try await center.requestAuthorization(options: [.alert, .sound])
-    } catch {
-      log.warning("""
-        Notification authorization request failed: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
-  }
-
+extension UNUserNotificationCenter {
   public enum Kind: Sendable {
     case processor
     case template
@@ -52,10 +33,6 @@ public enum DisplacementNotifier {
     }
   }
 
-  public static func post(kind: Kind, displaced: String) {
-    Task { await _post(kind: kind, displaced: displaced) }
-  }
-
   /// Post a "<thing> unavailable" notification. The display name is
   /// what the user previously picked; we already healed the
   /// selection by the time this is called.
@@ -67,25 +44,12 @@ public enum DisplacementNotifier {
   /// translators receive
   /// `"%@ is no longer available — switched to the default."` as one
   /// key with the displaced name as the runtime substitution.
-  private static func _post(kind: Kind, displaced: String) async {
-    let content = UNMutableNotificationContent()
-    content.title = String(localized: kind.title)
-    content.body = String(
-      localized:
-        "\(displaced) is no longer available — switched to the default.",
-      bundle: .galleyCoreKit)
-    let request = UNNotificationRequest(
-      identifier: UUID().uuidString,
-      content: content,
-      trigger: nil)
-    do {
-      try await UNUserNotificationCenter.current().add(request)
-    } catch {
-      log.error("""
-        Failed to post displacement notification for \
-        \(displaced, privacy: .public): \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    }
+  public static func post(kind: Kind, displaced: String) {
+    post(
+      title: String(localized: kind.title),
+      body: String(
+        localized:
+          "\(displaced) is no longer available — switched to the default.",
+        bundle: .galleyCoreKit))
   }
 }

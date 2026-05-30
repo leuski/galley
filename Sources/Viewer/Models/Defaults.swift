@@ -30,7 +30,8 @@ import KosmosAppKit
 /// notification) because `UserDefaults.didChangeNotification` is
 /// process-local.
 @ObservableDefaults(limitToInstance: false)
-final class Defaults: GalleyRenderDefaults, GalleyNetworkDefaults,
+final class Defaults: GalleyRenderDefaults,
+                      HTTPServerDefaults,
                       BroadcastedDefaults
 {
   @DefaultsKey var renderer: String?

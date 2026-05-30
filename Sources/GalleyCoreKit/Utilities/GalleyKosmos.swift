@@ -6,19 +6,27 @@ import KosmosTransport
 /// standard `kosmos.role` metadata on the peer's Loom advertisement so
 /// other peers can classify each other without an extra Kosmos
 /// message.
-public enum GalleyKosmosRole: String, Sendable {
+public enum GalleyKosmosRole: String, Role {
   case server
   case macViewer = "mac-viewer"
   case visionViewer = "vision-viewer"
 
-  fileprivate var deviceType: DeviceType {
+  public var product: String {
+    "galley"
+  }
+
+  public var identifier: String {
+    rawValue
+  }
+
+  public var deviceType: DeviceType {
     switch self {
     case .server, .macViewer: .mac
     case .visionViewer: .vision
     }
   }
 
-  fileprivate var defaultDeviceName: String {
+  public var defaultDeviceName: String {
     switch self {
 #if os(macOS)
     case .server: Host.current().localizedName ?? "Galley Server"
@@ -29,40 +37,6 @@ public enum GalleyKosmosRole: String, Sendable {
 #endif
     case .visionViewer: "Apple Vision Pro"
     }
-  }
-
-  /// UserDefaults key used to persist this surface's Kosmos deviceID.
-  /// Each surface gets its own UUID — colliding would have two surfaces
-  /// share an identity on the wire, which the link doesn't expect.
-  fileprivate var deviceIDKey: String {
-    "net.leuski.galley.\(rawValue).kosmos.deviceID"
-  }
-}
-
-extension KosmosServiceHost {
-  /// Per-app persisted device identifier — thin wrapper around the
-  /// generic `KosmosClient.persistentDeviceID(forKey:)` to keep the
-  /// `role`-typed call site here.
-  public convenience init(role: GalleyKosmosRole) {
-    self.init(deviceIDKey: role.deviceIDKey)
-  }
-
-  /// Construct a Loom-backed `KosmosClient` for the given Galley
-  /// surface. Pump is already running on return so registrations land
-  /// before any peer connects. Caller registers handlers and then
-  /// `try await client.startLink()`.
-  public func makeLink(
-    role: GalleyKosmosRole,
-    deviceName: String? = nil,
-    extraMetadata: [String: String] = [:]
-  ) async -> KosmosClient {
-    await KosmosClient.makeLoomBacked(
-      role: role.rawValue,
-      product: "galley",
-      deviceID: deviceID,
-      deviceName: deviceName ?? role.defaultDeviceName,
-      deviceType: role.deviceType,
-      extraMetadata: extraMetadata)
   }
 }
 

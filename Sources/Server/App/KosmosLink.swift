@@ -33,7 +33,7 @@ private let log = Logger(
 /// stop) lives in `KosmosServiceHost`.
 @MainActor
 @Observable
-final class KosmosLink: KosmosService {
+final class KosmosLink: KosmosService<GalleyKosmosRole> {
   /// Any peer is currently connected. Surfaced for legacy callers
   /// (UI binding etc.); newer code should branch on `isAVPReachable`.
   private(set) var isPeerConnected: Bool = false
@@ -42,7 +42,7 @@ final class KosmosLink: KosmosService {
   /// connected AND its last lifecycle message was a resume.
   private(set) var isAVPReachable: Bool = false
 
-  @ObservationIgnored private let host = KosmosServiceHost(role: .server)
+  @ObservationIgnored private let host = ServiceHost(role: .server)
   @ObservationIgnored private let server: PreviewServerController
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
@@ -114,13 +114,12 @@ final class KosmosLink: KosmosService {
 
   func makeLink() async -> KosmosClient {
     await host.makeLink(
-      role: .server,
       extraMetadata: advertisedHTTPURL.map {
         [GalleyKosmosMetadataKey.httpURL: $0.absoluteString]
       } ?? [:])
   }
 
-  func configure(host: KosmosServiceHost, client: KosmosClient) async {
+  func configure(host: ServiceHost, client: KosmosClient) async {
     await registerHandlers(host: host, client: client)
     registerSubscriptions(host: host, client: client)
   }
@@ -243,7 +242,7 @@ final class KosmosLink: KosmosService {
   // MARK: - Subscription wiring
 
   private func registerHandlers(
-    host: KosmosServiceHost, client: KosmosClient
+    host: ServiceHost, client: KosmosClient
   ) async {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
     // Reuses the same dispatch path Finder-opens use so the
@@ -267,7 +266,7 @@ final class KosmosLink: KosmosService {
   }
 
   private func registerSubscriptions(
-    host: KosmosServiceHost, client: KosmosClient
+    host: ServiceHost, client: KosmosClient
   ) {
     host.subscribe(CloseWindow.self) { [weak self] sender, message in
       log.notice("""

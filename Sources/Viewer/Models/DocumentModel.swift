@@ -5,6 +5,7 @@ import OSLog
 import SwiftUI
 import WebKit
 import KosmosAppKit
+import UserNotifications
 
 /// Per-document state for the native viewer. Owns the WebPage, the
 /// file watcher, and the editor bridge. Renderer and template come
@@ -288,13 +289,13 @@ final class DocumentModel {
       source: appModel.templates,
       persistent: templatePersistent
     ) { name in
-      DisplacementNotifier.post(kind: .template, displaced: name)
+      UNUserNotificationCenter.post(kind: .template, displaced: name)
     }
     self.processors = SceneProcessorChoice(
       source: appModel.processors,
       persistent: processorPersistent
     ) { name in
-      DisplacementNotifier.post(kind: .processor, displaced: name)
+      UNUserNotificationCenter.post(kind: .processor, displaced: name)
     }
     // Color-scheme catalog is static — same no-op notifier reasoning
     // as `AppModel.colorSchemes`.
