@@ -15,14 +15,6 @@ struct MacViewerApp: App {
 
   init() {
     URL.createLocalizedApplicationSupportDirectory()
-    // Sync the @ObservableDefaults cache with the on-disk values
-    // before any SwiftUI scene starts laying out. See
-    // `Defaults.warmCache()` for the full rationale — short version:
-    // WebKit's first WKWebView.init posts a synchronous
-    // UserDefaults.didChangeNotification mid-layout, and an uninitialized
-    // cache turns that into a `withMutation` that re-enters the
-    // AttributeGraph and crashes.
-    Defaults.warmCache()
     // If the active server-agent backend persists an absolute path
     // to the helper, the user moving `Galley.app` would leave that
     // record pointing at a stale location. Detect and repair before

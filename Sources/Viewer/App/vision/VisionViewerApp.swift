@@ -14,11 +14,6 @@ import SwiftUI
 /// `VisionWindowRegistry` re-spawns one whenever the last document
 /// window closes. The user can explicitly close the empty to opt
 /// out — when that happens the app suspends, which matches intent.
-///
-/// `Defaults.warmCache()` must run before the first SwiftUI layout
-/// pass so the first WebKit-driven `UserDefaults.didChangeNotification`
-/// can't trip `ObservableDefaults`'s mutation handler mid-flush — see
-/// the macOS `Defaults.warmCache()` doc comment for the failure mode.
 @main
 struct VisionViewerApp: App {
   /// The document `WindowGroup`. An instance bound to a nil URL is
@@ -40,7 +35,6 @@ struct VisionViewerApp: App {
   @Environment(\.scenePhase) private var scenePhase
 
   init() {
-    Defaults.warmCache()
     kosmos.start()
   }
 
