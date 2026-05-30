@@ -3,6 +3,7 @@ import Observation
 import OSLog
 import GalleyCoreKit
 import KosmosAppKit
+import KosmosHTTPTunnel
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "PreviewServer")
@@ -74,6 +75,7 @@ public final class PreviewServerController {
         extraAllowedHostsProvider: { [] },
         selectedTemplateProvider: templateProvider,
         rendererProvider: renderProvider,
+        origin: TunnelHeaders.origin,
         watcher: watcher)
     }
   }

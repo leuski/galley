@@ -3,6 +3,7 @@
 // PreviewServer.swift; everything else (Routes, SSE, MIMETypes,
 // HTTPResponses) is internal to this module.
 import Foundation
+@_exported import KosmosHTTPServer
 
 private final class Helper: NSObject {}
 

@@ -58,7 +58,6 @@ struct ClipboardRoundTripTests {
     """
 
   nonisolated private static func bundledTemplates() -> [Template] {
-    let dir = URL.bundleTemplatesDirectoryURL
     let contents = (try? URL.bundleTemplatesDirectoryURL.contentsOfDirectory(
       includingPropertiesForKeys: nil,
       options: [.skipsHiddenFiles])) ?? []
