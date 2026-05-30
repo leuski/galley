@@ -38,29 +38,12 @@ private let log = Logger(
 @MainActor
 @Observable
 final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
-  /// Any peer is currently connected. Forwarded from the tracker for
-  /// legacy callers; newer code should branch on `isAVPReachable`.
-  var isPeerConnected: Bool { reachability.isPeerConnected }
-
-  /// AVP currently reachable: a `visionViewer` peer is connected AND
-  /// its last lifecycle message was a resume.
-  var isAVPReachable: Bool { reachability.isAVPReachable }
+  /// AVP currently reachable: a same-product `vision` peer is connected
+  /// AND its last lifecycle message was a resume. Resolved by the host.
+  var isAVPReachable: Bool { host.reachablePeer(deviceType: .vision) != nil }
 
   @ObservationIgnored private let host = ServiceHost(role: .server)
   @ObservationIgnored private let server: PreviewServerController
-
-  /// Shared peer-role mirror + AVP reachability state machine. Vision
-  /// join/leave is routed back here to start/stop file delegation.
-  /// `@ObservationIgnored` keeps the `@Observable` macro from rewriting
-  /// this `lazy` stored property into a computed one (the closures
-  /// capture `self`, so it must stay lazy); reads of the tracker's own
-  /// observable state still invalidate observers because it is
-  /// `@Observable`.
-  @ObservationIgnored
-  private lazy var reachability = PeerReachabilityTracker<GalleyKosmosRole>(
-    roleOf: { $0.galleyRole },
-    onVisionPeerJoined: { [weak self] peer in self?.onVisionPeerJoined(peer) },
-    onVisionPeerLeft: { [weak self] peer in self?.onVisionPeerLeft(peer) })
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
   /// peers and streams responses chunkwise from the local HTTP
@@ -120,46 +103,20 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   func configure(host: ServiceHost, client: KosmosClient) async {
-    await registerHandlers(host: host, client: client)
+    await registerHandlers(host: host)
     httpTunnelResponder.install(on: host, client: client)
-    reachability.installLifecycleObservers(on: host)
-    host.subscribe(CloseWindow.self) { [weak self] sender, message in
-      log.notice("""
-        ← RECV CloseWindow from=\(sender.description, privacy: .public) \
-        window=\(message.windowID, privacy: .public)
-        """)
+    // Lifecycle (AppWillSuspend/Resume) reachability gating, and the
+    // `← RECV` logging below, are wired by the host itself.
+    host.subscribe(CloseWindow.self) { [weak self] _, message in
       self?.handleCloseWindow(message)
     }
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
-    // Dump the raw snapshot — including peers with nil role — so a
-    // "Mac Viewer sees AVP, Server doesn't" mismatch is diagnosable by
-    // eye. A peer discovered without role metadata (TXT-record race) is
-    // filtered out of the tracker and would otherwise be invisible.
-    let summary = snapshot.values
-      .map { info in
-        let role = info.galleyRole?.rawValue ?? "nil"
-        return "\(info.id.description)[role=\(role)]"
-      }
-      .sorted()
-      .joined(separator: ", ")
-    log.notice("""
-      peer-snapshot count=\(snapshot.count, privacy: .public) \
-      peers=[\(summary, privacy: .public)]
-      """)
-    reachability.update(snapshot)
-  }
-
-  func linkDidStart(_ error: (any Error)?) {
-    if let error {
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    } else {
-      log.notice("Kosmos link started.")
-    }
+    // The host logs the snapshot and mirrors reachability; the Server's
+    // only reaction is to migrate any windows back to the Mac when the
+    // AVP they were delegated to drops out of the peer set.
+    migrateWindowsForDepartedPeers(present: Set(snapshot.keys))
   }
 
   /// Called by `application(_:open:)` (and the Mac Viewer's
@@ -167,10 +124,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   /// possible. Returns true if dispatched; false if AVP is unavailable
   /// and the caller should fall back.
   func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
-    guard
-      let client = host.client,
-      let visionPeer = reachability.firstReachableVisionPeer
-    else {
+    guard let visionPeer = host.reachablePeer(deviceType: .vision) else {
       log.notice("""
         Cannot dispatch — no reachable vision peer for \
         \(fileURL, privacy: .public)
@@ -178,35 +132,24 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
       return false
     }
     let windowID = trackOpenWindow(
-      fileURL: fileURL.target.url,
-      peerID: visionPeer,
-      client: client)
-    publishOpenDocument(
-      fileURL: fileURL,
-      windowID: windowID,
-      client: client)
+      fileURL: fileURL.target.url, peerID: visionPeer)
+    publishOpenDocument(fileURL: fileURL, windowID: windowID)
     return true
   }
 
   /// Allocates the per-window state and subscribes the watcher to the
   /// file. Each file-change event publishes a `WindowContentChanged`
-  /// so AVP can reload the preview.
+  /// (logged by the host) so AVP can reload the preview.
   private func trackOpenWindow(
     fileURL: URL,
-    peerID: PeerID,
-    client: KosmosClient
+    peerID: PeerID
   ) -> KosmosCore.WindowID {
     let windowID = windowIDAllocator.next()
     let watcher = server.watcher
-    let watchTask = Task { [weak client] in
+    let watchTask = Task { @MainActor [weak self] in
       let changes = await watcher.subscribe(to: fileURL)
       for await _ in changes {
-        log.notice("""
-          → PUBLISH WindowContentChanged \
-          window=\(windowID, privacy: .public) \
-          file=\(fileURL.path, privacy: .public)
-          """)
-        await client?.publish(WindowContentChanged(windowID: windowID))
+        self?.host.publish(WindowContentChanged(windowID: windowID))
       }
     }
     openOnAVP[windowID] = OpenWindow(
@@ -214,31 +157,20 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     return windowID
   }
 
-  /// Builds and publishes the `OpenDocument` Kosmos message and emits
-  /// the corresponding diagnostic log line.
+  /// Publishes the `OpenDocument` for a freshly-delegated window. The
+  /// data plane rides Kosmos via `ProxyHTTPRequest` — AVP synthesizes
+  /// its own `galley://preview/<path>` URL from `documentPath` and
+  /// tunnels each subresource fetch back through the `Responder`.
   private func publishOpenDocument(
     fileURL: GalleyBridgeRequest,
-    windowID: KosmosCore.WindowID,
-    client: KosmosClient
+    windowID: KosmosCore.WindowID
   ) {
-    // The data plane rides Kosmos via `ProxyHTTPRequest` — AVP
-    // synthesizes its own `galley://preview/<path>` URL from
-    // `documentPath` and tunnels each subresource fetch back through
-    // the `Responder` over Kosmos.
-    let message = OpenDocument(
+    host.publish(OpenDocument(
       docID: windowID,
       documentPath: fileURL.target.url.path,
       displayName: fileURL.target.url.lastPathComponent,
       scrollLineHint: fileURL.target.scrollLine,
-      openBehavior: .newWindow)
-    log.notice("""
-      → PUBLISH OpenDocument doc=\(windowID, privacy: .public) \
-      path=\(message.documentPath, privacy: .public) \
-      name=\(message.displayName, privacy: .public)
-      """)
-    Task { [weak client] in
-      await client?.publish(message)
-    }
+      openBehavior: .newWindow))
   }
 
   public static func openInLocalGalleyApp(_ fileURL: GalleyBridgeRequest) {
@@ -264,43 +196,30 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
 
   // MARK: - Subscription wiring
 
-  private func registerHandlers(
-    host: ServiceHost, client: KosmosClient
-  ) async {
+  private func registerHandlers(host: ServiceHost) async {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
     // Reuses the same dispatch path Finder-opens use so the AVP-vs-Mac
-    // decision stays in one place.
-    await client.handle(
-      RouteToAVP.self
-    ) { [weak self] sender, request -> RouteToAVP.Reply in
-      log.notice("""
-        ← HANDLE RouteToAVP from=\(sender.description, privacy: .public) \
-        filepath=\(request.target, privacy: .public)
-        """)
+    // decision stays in one place. The host logs the request and reply.
+    await host.handle(RouteToAVP.self) {
+      [weak self] _, request -> RouteToAVP.Reply in
       let dispatched = await Self.dispatchOpenURL(
         GalleyBridgeRequest(target: request.target), with: self
       )
-      log.notice("""
-        → REPLY RouteToAVP to=\(sender.description, privacy: .public) \
-        accepted=\(dispatched, privacy: .public)
-        """)
       return RouteToAVP.Reply(accepted: dispatched)
     }
   }
 
-  // MARK: - Vision peer lifecycle (driven by the reachability tracker)
+  // MARK: - Window migration
 
-  private func onVisionPeerJoined(_ peer: PeerID) {
-    log.notice("Vision peer joined: \(peer.description, privacy: .public)")
-    // No bind-mode flip: the Mac HTTP listener stays loopback-only for
-    // AVP and every other consumer. AVP traffic rides the Kosmos tunnel
-    // via `Responder`. The resumed flag is seeded by the tracker.
-  }
-
-  private func onVisionPeerLeft(_ peer: PeerID) {
-    log.notice("Vision peer left: \(peer.description, privacy: .public)")
-    // Migrate windows that were on this peer back to Mac.
-    let toMigrate = openOnAVP.filter { $0.value.peerID == peer }
+  /// When an AVP peer we've delegated windows to drops out of the peer
+  /// set, re-open those documents on the local Mac. Driven by
+  /// `peersChanged` — the Server tracks which peer each window lives on,
+  /// so a simple set-difference against the live peers replaces the old
+  /// join/leave callback bookkeeping. (No bind-mode flip on join: the
+  /// Mac HTTP listener stays loopback-only; AVP traffic rides the Kosmos
+  /// tunnel via `Responder`.)
+  private func migrateWindowsForDepartedPeers(present: Set<PeerID>) {
+    let toMigrate = openOnAVP.filter { !present.contains($0.value.peerID) }
     for (windowID, window) in toMigrate {
       openOnAVP.removeValue(forKey: windowID)
       window.watchTask.cancel()

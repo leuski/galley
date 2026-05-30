@@ -82,12 +82,7 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
       self?.handleOpenDocument(message, from: sender)
     }
 
-    host.subscribe(WindowContentChanged.self) { [weak self] sender, message in
-      log.notice("""
-        ← RECV WindowContentChanged \
-        from=\(sender.description, privacy: .public) \
-        window=\(message.windowID, privacy: .public)
-        """)
+    host.subscribe(WindowContentChanged.self) { [weak self] _, message in
       self?.reloadHandlers[message.windowID]?()
     }
 
@@ -97,59 +92,29 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
     httpTunnelClient.install(on: host)
   }
 
-  func linkDidStart(_ error: (any Error)?) {
-    if let error {
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-    } else {
-      log.notice("Kosmos link started.")
-    }
-  }
+  // Link start/fail logging is handled uniformly by
+  // `KosmosServiceHost`; this surface doesn't override `linkDidStart`.
 
-  /// Notify the Mac that AVP is about to suspend (`scenePhase`
-  /// transitioned to `.background` — typically the user closed the
-  /// last AVP Galley window including the anchor). Mac side flips the
-  /// per-peer resumed flag and falls back to local Galley.app for
-  /// subsequent opens until `publishResume` fires.
+  /// Notify peers that AVP is about to suspend (`scenePhase`
+  /// transitioned to `.background` — every scene gone, i.e. real
+  /// suspension). The Server folds this into its per-peer resumed flag
+  /// and falls back to the local Mac for subsequent opens until
+  /// `publishResume` fires. Emission is a generic host capability — any
+  /// surface can announce its lifecycle; AVP is just the one that does.
   func publishSuspend() {
-    let message = AppWillSuspend(
-      appID: Self.galleyAppID,
-      deviceID: host.deviceID)
-    log.notice("→ PUBLISH AppWillSuspend")
-    if let client = host.client {
-      Task { [client] in await client.publish(message) }
-    }
+    host.publishSuspend()
   }
 
-  /// Notify the Mac that AVP is serviceable again.
+  /// Notify peers that AVP is serviceable again.
   func publishResume() {
-    let message = AppDidResume(
-      appID: Self.galleyAppID,
-      deviceID: host.deviceID)
-    log.notice("→ PUBLISH AppDidResume")
-    if let client = host.client {
-      Task { [client] in await client.publish(message) }
-    }
+    host.publishResume()
   }
-
-  /// Galley's wire AppID. Reverse-DNS, matches the Server's bundle
-  /// identifier (the Server is the bridge — `appID` identifies the
-  /// product, not the publishing endpoint).
-  private static let galleyAppID = AppID(GalleyConstants.suiteName)
 
   /// Notify the Mac that the user closed a window on AVP.
   func notifyWindowClosed(_ windowID: KosmosCore.WindowID) {
     openWindows.removeValue(forKey: windowID)
     reloadHandlers.removeValue(forKey: windowID)
-    let message = CloseWindow(windowID: windowID)
-    log.notice("""
-      → PUBLISH CloseWindow window=\(windowID, privacy: .public)
-      """)
-    if let client = host.client {
-      Task { [client] in await client.publish(message) }
-    }
+    host.publish(CloseWindow(windowID: windowID))
   }
 
   /// Register a reload callback for a window. The document view calls
@@ -168,10 +133,6 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   // MARK: - Inbound handling
 
   private func handleOpenURL(_ message: OpenURL) {
-    log.notice("""
-      ← RECV OpenURL window=\(message.windowID, privacy: .public) \
-      url=\(message.url.absoluteString, privacy: .public)
-      """)
     openWindows[message.windowID] = message.url
     onOpenURL?(message.url)
   }
@@ -179,14 +140,6 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   private func handleOpenDocument(
     _ message: OpenDocument, from sender: PeerID
   ) {
-    log.notice("""
-      ← RECV OpenDocument from=\(sender.description, privacy: .public) \
-      doc=\(message.docID, privacy: .public) \
-      path=\(message.documentPath, privacy: .public) \
-      name=\(message.displayName, privacy: .public) \
-      scrollLineHint=\(message.scrollLineHint ?? -1, privacy: .public) \
-      behavior=\(message.openBehavior.rawValue, privacy: .public)
-      """)
     guard let url = TunnelScheme.originURL.galleyPreviewURL(
       forFile: message.documentPath)
     else {

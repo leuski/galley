@@ -1,6 +1,7 @@
 #if !os(macOS)
 
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 import WebKit
 import ALFoundation

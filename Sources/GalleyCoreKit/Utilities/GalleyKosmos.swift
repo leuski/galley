@@ -52,49 +52,22 @@ public enum GalleyKosmosMetadataKey {
 }
 
 extension PeerInfo {
-  /// `kosmos.role` metadata mapped back to the typed enum.
-  public var galleyRole: GalleyKosmosRole? {
-    role.flatMap(GalleyKosmosRole.init)
-  }
-
   /// HTTP base URL the Server published in its advertisement
   /// metadata. `nil` for non-server peers, for servers that haven't
-  /// finished binding yet, or when the metadata is malformed.
+  /// finished binding yet, or when the metadata is malformed. The
+  /// metadata key is product-namespaced, so this is safe against
+  /// sibling products on the shared mesh.
   public var galleyHTTPURL: URL? {
     metadata[GalleyKosmosMetadataKey.httpURL].flatMap(URL.init(string:))
   }
 }
 
-/// Pure peer-classification helpers, kept out of the live Kosmos
-/// services so they're unit-testable without spinning up a real
-/// Kosmos client. The instance accessors on each surface delegate
-/// here.
-public enum GalleyPeerClassifier {
-  /// First reachable Server whose `kosmos.host` matches `localHostUUID`.
-  /// Peers with the same role on other Macs are visible in the peer
-  /// set but ignored — the Mac Viewer should only pair with *its own*
-  /// local Server. When `localHostUUID` is nil (the visionOS slice
-  /// has no `gethostuuid`) any Server peer is acceptable.
-  public static func serverPeer(
-    in peers: [PeerID: PeerInfo],
-    localHostUUID: String?
-  ) -> PeerID? {
-    peers.values.first { info in
-      guard info.galleyRole == .server else { return false }
-      guard let local = localHostUUID, let theirs = info.hostUUID
-      else { return true }
-      return local == theirs
-    }?.id
-  }
-
-  /// First visionViewer peer in the snapshot. Multi-AVP picker UX is
-  /// out of scope for v1; "first reachable wins" matches the plan's
-  /// default. Reachability is peer-set membership alone — Kosmos
-  /// session liveness is the truth signal.
-  public static func avpPeer(in peers: [PeerID: PeerInfo]) -> PeerID? {
-    peers.values.first { $0.galleyRole == .visionViewer }?.id
-  }
-}
+// Peer classification (server-by-host, AVP-by-device-type) and AVP
+// reachability now live on `KosmosServiceHost` as product-scoped
+// queries (`presentPeer(role:onHost:)`, `reachablePeer(deviceType:)`).
+// The old `GalleyPeerClassifier` + `PeerInfo.galleyRole` were product-
+// blind — they matched any product's `kosmos.role == "server"` — and
+// were removed when reachability moved into the host.
 
 /// Mac Viewer → Server. "User chose Show on Vision Pro — please
 /// dispatch this file." Server's `RouteToAVP` handler resolves the

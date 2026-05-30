@@ -4,10 +4,9 @@ import GalleyCoreKit
 import KosmosCore
 import KosmosTransport
 import Observation
-import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "ViewerKosmosService")
+// All message I/O and peer/link diagnostics for this surface are logged
+// uniformly by `KosmosServiceHost`; this file has no logger of its own.
 
 /// Mac Viewer's Kosmos surface. Narrow by design: peer presence for
 /// two UI gates (Server pill, "Show on Vision Pro" enabledness) and
@@ -18,16 +17,15 @@ private let log = Logger(
 /// bootstrap / peer-watch / stop boilerplate and calls back through
 /// the protocol.
 ///
-/// Unlike the Server, this surface does **not** use
-/// `PeerReachabilityTracker`: it gates on peer-set **membership**, not
-/// the suspend/resume flag (visionOS scene phase fires `.background`
-/// for transient focus blips that aren't real suspension, and gating
-/// the menu on those would disable "Show on Vision Pro" while an AVP
-/// window is visibly open), and its `serverPeer` lookup needs the
-/// `kosmos.host`-matched classification that lives in
-/// `GalleyPeerClassifier`. So it reads `host.peers` through the
-/// classifier directly — one peer source, no tracker. The Server gates
-/// dispatch on resume; the Viewer gates the menu on presence.
+/// Peer presence is resolved by the host's product-scoped queries:
+/// `presentPeer(role:onHost:)` for *this* Mac's Server, and
+/// `reachablePeer(deviceType:.vision)` for the AVP. The AVP query is
+/// resume-gated — identical to the policy the Server uses for dispatch
+/// — so "Show on Vision Pro" is enabled exactly when a route would
+/// actually land on AVP. (The AVP only emits `AppWillSuspend` on real
+/// suspension, reading aggregate App-level `scenePhase`, so gating here
+/// no longer risks the focus-blip flicker that an earlier membership-
+/// only workaround was guarding against.)
 @MainActor
 @Observable
 final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
@@ -53,59 +51,18 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
     await host.makeLink()
   }
 
-  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
-    let summary = snapshot.values
-      .map { info in
-        let role = info.galleyRole?.rawValue ?? "nil"
-        let url = info.galleyHTTPURL?.absoluteString ?? "-"
-        return "\(info.id.description)[role=\(role) url=\(url)]"
-      }
-      .sorted()
-      .joined(separator: ", ")
-    log.notice("""
-      peer-snapshot count=\(snapshot.count, privacy: .public) \
-      peers=[\(summary, privacy: .public)]
-      """)
-  }
-
-  func linkDidStart(_ error: (any Error)?) {
-    if let error {
-      log.error("""
-        Kosmos link failed to start: \
-        \(error.localizedDescription, privacy: .public). \
-        Check Console.app for subsystem net.leuski.galley, and \
-        verify Local Network permission for Galley in System Settings.
-        """)
-      return
-    }
-    guard let client = host.client else { return }
-    Task {
-      let identity = await client.identity.description
-      log.notice("""
-        Kosmos link started identity=\(identity, privacy: .public)
-        """)
-    }
-  }
+  // Peer-snapshot and link-start/fail logging are handled uniformly by
+  // `KosmosServiceHost`; this surface overrides neither `peersChanged`
+  // nor `linkDidStart`.
 
   // MARK: - Derived state
 
-  /// First reachable Server whose `kosmos.host` matches this Mac's.
-  /// Peers with the same role on other Macs are visible in
-  /// `client.peers` but ignored here so the pill / menu don't track
-  /// strangers.
+  /// This Mac's local Server, if present. `onHost:` restricts the
+  /// match to a Server on *this* Mac (others on the LAN are visible but
+  /// ignored), and `presentPeer(role:)` is product-scoped, so a Dot
+  /// Server on the same machine never matches.
   var serverPeer: PeerID? {
-    GalleyPeerClassifier.serverPeer(
-      in: host.peers, localHostUUID: localHostUUID)
-  }
-
-  /// First reachable AVP. Reachability is purely peer-set membership
-  /// — if AVP's Kosmos session is up, AVP can receive. Earlier code
-  /// gated on `AppWillSuspend` / `AppDidResume` lifecycle messages,
-  /// but visionOS scene phase fires `.background` for focus blips
-  /// that aren't real suspension and would disable the menu while a
-  /// viewer window was visibly open.
-  var avpPeer: PeerID? {
-    GalleyPeerClassifier.avpPeer(in: host.peers)
+    host.presentPeer(role: .server, onHost: localHostUUID)
   }
 
   /// Drives the Server-status pill.
@@ -119,42 +76,26 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
     return info.galleyHTTPURL
   }
 
-  /// Drives the "Show on Vision Pro" menu enabledness.
-  var isAVPReachable: Bool { avpPeer != nil }
+  /// Drives the "Show on Vision Pro" menu enabledness. Same resume-
+  /// gated reachability the Server uses for dispatch, so the menu is
+  /// enabled exactly when a route would actually land on AVP (rather
+  /// than silently falling back to the Mac).
+  var isAVPReachable: Bool {
+    host.reachablePeer(deviceType: .vision) != nil
+  }
 
   // MARK: - Outbound
 
   /// Send `RouteToAVP` to the local Server. Server decides where the
   /// file lands (AVP if reachable, else `NSWorkspace.open(galley://)`
   /// to the Mac Viewer's own LSHandler).
+  /// Send `RouteToAVP` to this Mac's Server. The host logs the request,
+  /// reply, and any transport error uniformly.
   @discardableResult
   func routeToAVP(_ target: DocumentTarget) async throws -> RouteToAVP.Reply {
-    guard let client = host.client else {
-      throw RouteError.notReady
-    }
-    guard let serverPeer else {
-      throw RouteError.noServer
-    }
-    let request = RouteToAVP(target: target)
-    log.notice("""
-      → SEND RouteToAVP to=\(serverPeer.description, privacy: .public) \
-      filepath=\(target, privacy: .public)
-      """)
-    do {
-      let reply: RouteToAVP.Reply =
-      try await client.send(request, to: serverPeer)
-      log.notice("""
-        ← REPLY RouteToAVP from=\(serverPeer.description, privacy: .public) \
-        accepted=\(reply.accepted, privacy: .public)
-        """)
-      return reply
-    } catch {
-      log.error("""
-        ✗ SEND RouteToAVP to=\(serverPeer.description, privacy: .public) \
-        error=\(String(reflecting: error), privacy: .public)
-        """)
-      throw error
-    }
+    guard host.client != nil else { throw RouteError.notReady }
+    guard let serverPeer else { throw RouteError.noServer }
+    return try await host.send(RouteToAVP(target: target), to: serverPeer)
   }
 
   enum RouteError: LocalizedError {
