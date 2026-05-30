@@ -7,10 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Two apps and a Quick Look extension sharing one rendering engine, with the Viewer app shipping on two platforms from a single target:
 
 - **Galley** (bundle id `net.leuski.galley`, target `Viewer`, product `Galley`) — native document viewer. Same target builds for **macOS** (`macosx`) and **visionOS** (`xros` / `xrsimulator`); the project's `SUPPORTED_PLATFORMS` is `"macosx xros xrsimulator"`. Platform-specific code lives under per-platform subfolders (`Sources/Viewer/App/mac/` vs. `Sources/Viewer/App/vision/`, and the same `mac/` / `vision/` split inside `Models/`, `Views/`, `Utilities/`, `Resources/`); cross-platform code sits at the parent level and is compiled into both. macOS surface: `WindowGroup(for: URL.self)` over a `WebPage`-backed `WebView`, Cmd-click → editor, full menu bar, embedded Server, custom URL schemes (`x-galley://local` for template/asset resolution; `galley://<path>?line=N` for the BBEdit `Preview Markdown… → in Galley` script). visionOS surface: a single `WindowGroup(for: URL.self)` with `.fileImporter` for the empty case; no menus, no `WindowDispatcher`, no embedded Server; receives Mac-hosted documents via Kosmos (see Architecture decisions).
-- **Galley Server** (bundle id `net.leuski.galley.server`, target `Server`, macOS) — `MenuBarExtra`-only app that runs a loopback HTTP server in-process so any local browser (or BBEdit's preview pane) can view the same documents Galley would render. Owns server lifecycle, port publication (via the shared `net.leuski.galley` defaults plist and via Kosmos peer metadata), launch-at-login, the BBEdit helper-script installer, the Kosmos AVP bridge (`KosmosLink`), and the AVP HTTP tunnel responder (`KosmosHTTPTunnel.Responder`). Galley.app embeds `Galley Server.app` inside its bundle and registers it as a user `LaunchAgent` (see `LaunchctlServerAgent` under `Sources/Viewer/Utilities/mac/`).
+- **Galley Server** (bundle id `net.leuski.galley.server`, target `Server`, macOS) — `MenuBarExtra`-only app that runs a loopback HTTP server in-process so any local browser (or BBEdit's preview pane) can view the same documents Galley would render. Owns server lifecycle, port publication (via the shared `net.leuski.galley` defaults plist and via Kosmos peer metadata), launch-at-login, the BBEdit helper-script installer, the Kosmos AVP bridge, and the AVP HTTP tunnel responder (`KosmosHTTPTunnel.Responder`) — the bridge and responder both live in `ServerKosmosService` (`Sources/Server/App/`). Galley.app embeds `Galley Server.app` inside its bundle and registers it as a user `LaunchAgent` (the generic `ActiveServerAgent` / `LaunchctlServerAgent` / `SingleProcessInstance` live in the sibling `KosmosAppKit` package; the Galley-specific `.shared` wiring + `Bundle.serverBundle` helper are under `Sources/Viewer/Utilities/mac/`).
 - **Quicklook** (target `Quicklook`, product `Quicklook.appex`, macOS) — `QLPreviewingController` extension. Tries the running Galley Server first so the user's chosen processor and template are honored; falls back to an in-process render with the built-in Swift renderer and bundled template when the server is unreachable.
 
-The shared engine ships as two Xcode framework targets — `GalleyCoreKit` (rendering, templates, models, watch, scripts, scheme handler, routing value types, shared Kosmos surface, shared defaults protocols) and `GalleyServerKit` (FlyingFox-backed loopback HTTP server, fronted by a thin Hummingbird-API-shaped adapter so the kit's route call sites stay verbatim — see Architecture decisions). Both apps link `GalleyCoreKit`; `Server` also links `GalleyServerKit`; the Quicklook extension links `GalleyCoreKit` directly for the in-process render fallback path. Viewer (both platform slices) only links `GalleyCoreKit`. Kosmos (the Mac↔AVP bridge) is a sibling Swift package — `KosmosCore` + `KosmosTransport` are linked by `GalleyCoreKit`; `KosmosHTTPTunnel` is linked directly by `Server` and by the Viewer's visionOS slice (it carries the `Responder` / `Client` / `URLBuilder` types that turn `ProxyHTTPRequest` / `ProxyHTTPResponse*` messages into `URLSession` calls and back, plus `TunnelScheme` — the `galley://local` URL surface). The Galley-specific Kosmos surface in this repo lives in `Sources/GalleyCoreKit/Utilities/GalleyKosmos.swift`, which holds the typed enums and shared messages (`GalleyKosmosRole`, `KosmosServiceHost.init(role:)` + `.makeLink(role:deviceName:extraMetadata:)`, `PeerInfo.galleyRole`, `PeerInfo.galleyHTTPURL`, `GalleyKosmosMetadataKey.httpURL`, `GalleyPeerClassifier`, `RouteToAVP`). No HTTPS, no cert pinning, no `KosmosBridge` / `KosmosWebView` dependency — AVP renders Mac-hosted documents by tunneling each WebKit fetch back through Kosmos via the `galley://local` scheme handler.
+The shared engine ships as two Xcode framework targets — `GalleyCoreKit` (Galley-specific rendering, templates, choice models, scheme handler, routing value types, shared Kosmos surface, shared defaults protocols) and `GalleyServerKit` (a thin Galley facade — routes, the preview-server controller, localized error pages — over the generic HTTP server). The generic, product-agnostic pieces have been extracted into **sibling Swift packages** alongside `Galley.xcodeproj`:
+
+- **`Kosmos`** (`../Kosmos`) — `KosmosCore` + `KosmosTransport` (peer mesh, roles, `KosmosService`/`KosmosServiceHost`, `WindowID`) and `KosmosHTTPTunnel` (`Responder` / `Client` / `URLBuilder` / `TunnelScheme` — the `galley://local` surface that turns `ProxyHTTPRequest` / `ProxyHTTPResponse*` into `URLSession` calls and back).
+- **`KosmosAppKit`** (`../KosmosAppKit`) — shared app-level primitives that used to live in `GalleyCoreKit`: the `ChoiceModel` / `SelectableCollection` base, `DocumentWatcher`, `DefaultsBroadcast`, the `DefaultsProtocol` / `HTTPServerDefaults` / `BroadcastedDefaults` contracts, the launch-agent stack (`ActiveServerAgent` / `LaunchctlServerAgent` / `SingleProcessInstance`), and shared SwiftUI/Foundation helpers (`DividedSections`, `PullDownIconMenu`, `URL+`, `String+URL/+HTML`, `Bundle+Resources`, `AsyncSequence+Debounce`, `Observation`, `UNUserNotificationCenter+`, `URL.computeHash`).
+- **`KosmosHTTPServer`** (`../KosmosHTTPServer`) — the FlyingFox-backed loopback HTTP server, fronted by a thin Hummingbird-API-shaped adapter (`Application` / `Router` / `Request` / `Response` / `ByteBuffer`), plus `HTTPServerController`, SSE, and `guardedRequest`. **FlyingFox and swift-http-types are this package's dependencies, not Galley's** (see Architecture decisions). `GalleyServerKit` re-exports it.
+- **`MarkdownHTMLKit`** (`../MarkdownHTMLKit`) — wraps `swift-markdown`; backs `GalleyCoreKit`'s `SwiftMarkdownRenderer`.
+
+Link map: `GalleyCoreKit` links `KosmosAppKit`, `MarkdownHTMLKit`, the three Kosmos products, `ALFoundation`, `ObservableDefaults`. `GalleyServerKit` links `GalleyCoreKit` + `KosmosHTTPServer` + `KosmosHTTPTunnel`. The **Viewer** (both slices) and **Quicklook** link `GalleyCoreKit` (+ Kosmos core/transport/tunnel); only **Server** also links `GalleyServerKit`.
+
+The Galley-specific Kosmos surface in this repo is `Sources/GalleyCoreKit/Utilities/GalleyKosmos.swift`: `GalleyKosmosRole` (conforms to Kosmos's `Role`), the `MetadataKey<URL>.httpURL` accessor (wire key `galley.http-url`), and the `RouteToAVP` request/reply messages. Peer classification + AVP-reachability are no longer Galley's — they moved onto `KosmosServiceHost` as product-scoped queries (`presentPeer(role:onHost:)`, `reachablePeer(deviceType:)`); the old product-blind `GalleyPeerClassifier` / `PeerInfo.galleyRole` were removed. No HTTPS, no cert pinning — AVP renders Mac-hosted documents by tunneling each WebKit fetch back through Kosmos via the `galley://local` scheme handler.
 
 Localized strings live in `Localizable.xcstrings` per target. `Sources/Viewer/Resources/Localizable.xcstrings` is shared across the Viewer's macOS and visionOS slices. Server, GalleyCoreKit, GalleyServerKit, and Quicklook each have their own. English and Russian are shipped.
 
@@ -23,81 +32,68 @@ Galley.xcodeproj              # 7 targets: GalleyCoreKit, GalleyServerKit, Serve
                               #            Quicklook, Viewer (macOS + visionOS),
                               #            Tests, UITests
 Sources/
-  GalleyCoreKit/              # framework — rendering, templates, watch, networking,
-                              # scripts, shared models, routing
+  GalleyCoreKit/              # framework — Galley-specific rendering, templates,
+                              # choice values, routing, scheme handler. Generic
+                              # primitives live in KosmosAppKit (sibling package).
     Accessibility/              # ViewerAccessibilityIdentifiers (ViewerA11yID),
                                 # ServerAccessibilityIdentifiers (ServerA11yID)
-    Localizable.xcstrings       # localized strings owned by the kit
-    Models/                     # ChoiceModel + SelectableCollection,
+    Models/                     # ChoiceModel+Localization (the ChoiceModel /
+                                # SelectableCollection BASE is in KosmosAppKit;
+                                # this adds Galley's localized labels),
                                 # ProcessorModel, TemplateModel, TOCEntry,
                                 # MarkdownFileTypes, PreviewRoute + RouteNames
                                 # (shared HTTP/scheme parser), ServerStatus
-                                # (the .running case carries the Server's
-                                # peer-published loopback URL — there is no
-                                # HTTP probe; truth comes from Kosmos peer
-                                # presence). The Kosmos tunnel scheme
-                                # (KosmosTunnelScheme / galley://local) and
-                                # the HTTP-tunnel Responder/Client/URLBuilder
-                                # all live in the sibling Kosmos package's
-                                # KosmosHTTPTunnel product, not here. The
-                                # non-tunnel Galley-specific Kosmos surface
-                                # (GalleyKosmosRole, host convenience init +
-                                # makeLink, PeerInfo.galleyRole,
-                                # PeerInfo.galleyHTTPURL,
-                                # GalleyKosmosMetadataKey, GalleyPeerClassifier,
-                                # RouteToAVP) lives in
-                                # Utilities/GalleyKosmos.swift below.
-    Render/                     # MarkdownRenderer, SwiftMarkdownRenderer,
-                                # ExternalProcessRenderer, ProcessorStore,
-                                # HTMLHeadings
-    Routing/                    # OpenBehavior, WindowID + WindowIDAllocator,
-                                # WindowRegistry, WindowRecord, LaunchURLBuffer,
-                                # PendingScrollLines, OpenURLRouter +
-                                # DispatchAction, LaunchArguments.
-                                # (URL→GalleyRequest normalization now lives
-                                # on URL.galleyRequest in
-                                # Utilities/URL+Galley.swift; the old
-                                # URLNormalizer wrapper is gone.)
-    Templates/                  # Template, Template+Loader, BuiltInTemplate,
-                                # UserTemplate, TemplateStore,
-                                # TemplateAssetRewriter, Placeholders
-    Watch/                      # DocumentWatcher
-    Views/                      # DividedSections, ColorSchemeMenu,
-                                # ProcessorMenu, TemplateMenu, PullDownIconMenu
-                                # (shared SwiftUI helpers)
+                                # (.disabled / .starting / .running(URL) /
+                                # .notResponding; the .running URL is what the
+                                # Server peer-published — no HTTP probe, truth
+                                # comes from Kosmos peer presence).
+    Render/                     # MarkdownRenderer, SwiftMarkdownRenderer (over
+                                # MarkdownHTMLKit), ExternalProcessRenderer,
+                                # ProcessorStore, HTMLHeadings
+    Routing/                    # OpenURLRouter + DispatchAction, WindowRegistry +
+                                # WindowRecord, LaunchURLBuffer, PendingScrollLines,
+                                # LaunchArguments, OpenBehavior+DisplayName.
+                                # (OpenBehavior, WindowID + WindowIDAllocator come
+                                # from KosmosCore. URL→GalleyRequest normalization
+                                # is URL.galleyRequest in Utilities/URL+Galley.swift.)
+    Templates/                  # Template (+ built-in / user shapes), Template+Loader,
+                                # TemplateStore, TemplateAssetRewriter, Placeholders
+    Views/                      # ColorSchemeMenu, ProcessorMenu, TemplateMenu
+                                # (Galley-specific SwiftUI menus; DividedSections /
+                                # PullDownIconMenu are in KosmosAppKit)
     Utilities/                  # GalleyDefaults (GalleyDefaults / GalleyRenderDefaults
-                                # / GalleyNetworkDefaults protocols, GalleyConstants),
-                                # GalleyKosmos (typed role + Loom factory +
-                                # peer-metadata accessors + RouteToAVP),
-                                # GalleyAppHash, DefaultsBroadcast,
-                                # DisplacementNotifier, URL+Galley (DocumentTarget,
-                                # GalleyRequest, SettingsTab, URL.galleyRequest,
-                                # bundleTemplatesDirectoryURL), URL+,
-                                # AsyncSequence+Debounce, Observation,
-                                # MIMETypes, Bundle+Resources, String+URL/+HTML
+                                # protocols over KosmosAppKit's DefaultsProtocol;
+                                # GalleyConstants — suiteName, defaultHost,
+                                # applicationSupportDirectory; bundleIdentifier),
+                                # GalleyKosmos (GalleyKosmosRole, MetadataKey.httpURL,
+                                # RouteToAVP), DisplacementNotifier,
+                                # URL+Galley (DocumentTarget, GalleyRequest,
+                                # SettingsTab, URL.galleyRequest,
+                                # bundleTemplatesDirectoryURL).
+                                # (DocumentWatcher, DefaultsBroadcast, GalleyAppHash,
+                                # MIMETypes, and the generic URL/String/Bundle/
+                                # AsyncSequence/Observation helpers moved to KosmosAppKit.)
     WebKit/                     # PreviewScheme (x-galley://local — shared in-process
                                 # resolver for Quicklook + offscreen print web view)
                                 # + ClassicPreviewSchemeHandler (WKURLSchemeHandler).
-    Resources/                  # bundled DefaultTemplate.html, BBEdit helper scripts,
-                                # Templates.bundle (Default, GitHub, HighContrast,
-                                # LaTeX, Manuscript, Sepia, Solarized, Terminal, Tufte)
-  GalleyServerKit/            # framework — FlyingFox loopback HTTP server, SSE
-    PreviewServer.swift         # PreviewServerController (lifecycle + state)
-    Routes.swift, SSE.swift, HTTPResponses.swift
-    Adapter/                    # Hummingbird-API-shaped shim over FlyingFox so
-                                # the route call sites (Router(), Application,
-                                # Request, Response, ResponseBody { writer in ... },
-                                # ByteBuffer) stay unchanged. Buffer.swift,
-                                # Request.swift, Response.swift, Router.swift
-                                # (incl. PathPattern — our own /** matcher since
-                                # FlyingFox's * is single-segment), Application.swift
-                                # (HTTPServer lifecycle, onServerRunning bridge,
-                                # streaming-body dispatch), Mapping.swift (HTTPFields
-                                # ↔ HTTPHeaders, HTTPResponse.Status → HTTPStatusCode),
-                                # PushBufferedSequence.swift (AsyncStream<Data> →
-                                # AsyncBufferedSequence<UInt8> for SSE chunked transfer)
-    Resources/                  # bundled ErrorPage.html
-    Localizable.xcstrings
+    Resources/                  # Localizable.xcstrings, Templates.bundle (Default,
+                                # GitHub, HighContrast, LaTeX, Manuscript, Sepia,
+                                # Solarized, Terminal, Tufte)
+  GalleyServerKit/            # framework — thin Galley facade over KosmosHTTPServer
+                              # (the generic FlyingFox server lives in that package)
+    GalleyServerKit.swift       # @_exported import KosmosHTTPServer; Bundle accessor
+    Galley/
+      PreviewServerController.swift  # Galley facade — owns the template/renderer
+                                # provider closures + the shared DocumentWatcher,
+                                # delegates lifecycle (state, bound-URL, start/stop)
+                                # to KosmosHTTPServer's HTTPServerController.
+                                # State = HTTPServerState (re-exported).
+      Routes.swift              # /preview, /template/<id>/<file>, /events (SSE), /
+                                # handlers, built on KosmosHTTPServer's Router /
+                                # Request / Response and host-guarding (guardedRequest)
+      Response+Localization.swift  # localized .errorPage / .ok / .badRequest / etc.
+                                # over the generic Response, using .galleyServerKit bundle
+    Resources/                  # ErrorPage.html, Localizable.xcstrings
   Viewer/                     # the Galley document app — single target,
                               # macOS + visionOS. Cross-platform code sits at the
                               # parent level; `mac/` and `vision/` subfolders hold
@@ -128,7 +124,7 @@ Sources/
                                 # App/vision/ above, not here.
     Models/                     # cross-platform: AppModel, AppBoot, Defaults
                                 # (@ObservableDefaults; conforms to
-                                # GalleyRenderDefaults + GalleyNetworkDefaults),
+                                # GalleyRenderDefaults + HTTPServerDefaults),
                                 # BindPlan, ColorSchemeModel,
                                 # DocumentModel + +History/+Notice/+Scroll/+Zoom/
                                 # +Configuration/+Resolution/+Source, DocumentStats,
@@ -172,23 +168,25 @@ Sources/
     Viewer.entitlements
   Server/                     # the Galley Server menu-bar app (macOS)
     ServerApp.swift             # @main — single MenuBarExtra scene
-    App/                        # AppModel (server-owning; holds TemplateStore /
-                                # ProcessorStore choices, PreviewServerController,
-                                # the KosmosLink, and the Server's @ObservableDefaults
-                                # Defaults class — conforms to
-                                # GalleyRenderDefaults + GalleyNetworkDefaults,
-                                # publishes serverHTTPPort to the shared
-                                # net.leuski.galley plist on every state change),
-                                # KosmosLink (Kosmos host + AVP bridge,
-                                # hosts a KosmosHTTPTunnel.Responder that
-                                # turns inbound ProxyHTTPRequest messages
-                                # into URLSession calls against the loopback
-                                # HTTP listener and streams ProxyHTTPResponseHead
-                                # + chunked ProxyHTTPResponseChunk back;
-                                # advertises the loopback HTTP URL in peer
-                                # metadata via GalleyKosmosMetadataKey.httpURL),
-                                # ServerAppDelegate (LSHandler — receives Finder
-                                # opens + galley-bridge:// URLs)
+    App/                        # AppModel + AppBoot (server-owning; holds
+                                # TemplateStore / ProcessorStore choices,
+                                # PreviewServerController, the ServerKosmosService,
+                                # and the Server's @ObservableDefaults Defaults class
+                                # — conforms to GalleyRenderDefaults + HTTPServerDefaults
+                                # + BroadcastedDefaults, publishes serverHTTPPort to
+                                # the shared net.leuski.galley plist on every state
+                                # change),
+                                # ServerKosmosService (subclass of
+                                # KosmosService<GalleyKosmosRole>; Kosmos host + AVP
+                                # bridge; hosts a KosmosHTTPTunnel.Responder that
+                                # turns inbound ProxyHTTPRequest messages into
+                                # URLSession calls against the loopback HTTP listener
+                                # and streams ProxyHTTPResponseHead + chunked
+                                # ProxyHTTPResponseChunk back; advertises the loopback
+                                # HTTP URL in peer metadata via MetadataKey.httpURL),
+                                # GalleyBridgeRequest (the galley-bridge:// scheme
+                                # value type), ServerAppDelegate (LSHandler —
+                                # receives Finder opens + galley-bridge:// URLs)
     Menu/                       # MenuBarContent
     Resources/                  # AppIcon.icon, Assets.xcassets, Info.plist,
                                 # Localizable.xcstrings, Server.entitlements
@@ -196,7 +194,7 @@ Sources/
     PreviewViewController.swift # QLPreviewingController — server-first, falls back
                                 # to built-in render via ClassicPreviewSchemeHandler
     Defaults.swift              # @ObservableDefaults Defaults class — minimal
-                                # GalleyNetworkDefaults conformer that reads
+                                # HTTPServerDefaults conformer that reads
                                 # serverHTTPPort from the shared
                                 # net.leuski.galley suite via QL's
                                 # shared-preference.read-only entitlement
@@ -204,21 +202,21 @@ Sources/
     en.lproj, ru.lproj
 Tests/                        # Swift Testing — kit + app-logic unit tests
   GalleyCoreKitTests/           # PlaceholderContext, TemplateAssetRewriter,
-                                # URLPathHelpers, SwiftMarkdownRenderer (incl. spec
-                                # conformance), ChoiceObservation,
-                                # GalleyNetworkDefaults (serverEndpointURL
-                                # composition), GalleyAppHash, ClipboardRoundTrip,
-                                # AVPCSSPathChain (URL→tunnel→base-href round-trip),
+                                # TemplateStoreObservation, URLPathHelpers,
+                                # SwiftMarkdownRenderer + SwiftMarkdownSpecConformance,
+                                # ClipboardRoundTrip, AVPCSSPathChain
+                                # (URL→tunnel→base-href round-trip),
                                 # HTTPTunnelURLBuilder, KosmosTunnelScheme
     Routing/                    # WindowRegistry, OpenURLRouter, GalleyAction
                                 # (URL→GalleyRequest normalization), LaunchURLBuffer,
                                 # PendingScrollLines, LaunchArguments
-  GalleyServerKitTests/         # PreviewServerController, RoutePathDecoding,
-                                # HostHeaderGuard, ReloadScriptInjection, SSEEncoder,
-                                # TemplateOriginURL
-    Integration/                # ServerPreviewEndToEnd
-  ViewerTests/                  # ViewerTests (app-logic, currently sparse),
-                                # KosmosTests, HTTPTunnelAVPClientTests,
+  GalleyServerKitTests/         # PreviewServerController, HTTPServerController
+                                # (generic lifecycle pins)
+    Integration/                # ServerPreviewEndToEnd (binds a real socket)
+                                # (the route-decoding / host-guard / SSE / template-
+                                # origin tests moved to the KosmosHTTPServer package)
+  ViewerTests/                  # ViewerTests (app-logic, sparse), KosmosTests,
+                                # ColorSchemeChoiceTests, HTTPTunnelAVPClientTests,
                                 # WebKitZoneIDRejectionTests
   TestPlan.xctestplan           # enrols Tests + UITests
 UITests/                      # XCUITest bundle — testTargetName: Viewer
@@ -230,7 +228,7 @@ docs/                         # test-framework
 
 ## Build & test
 
-Pure Xcode project — **no top-level `Package.swift`**. Frameworks build inside the project; Kosmos is consumed as a sibling Swift package referenced from the project. New source files dropped into the per-target source directories (`Sources/Viewer/...`, `Sources/Server/...`, etc.) are picked up automatically — the project uses Xcode 16 filesystem-synchronized groups, so `Galley.xcodeproj/project.pbxproj` has no individual file references and **no manual registration is required** when adding a file. Files under `Sources/Viewer/.../mac/` and `.../vision/` are conditionally compiled — each file in those subfolders is wrapped in `#if os(macOS)` / `#if os(visionOS)` so the project's filesystem-synchronized membership compiles cleanly on both platforms.
+Pure Xcode project — **no top-level `Package.swift`**. The two framework targets (`GalleyCoreKit`, `GalleyServerKit`) build inside the project; the four local sibling Swift packages (`../Kosmos`, `../KosmosAppKit`, `../KosmosHTTPServer`, `../MarkdownHTMLKit`) are referenced from the project. New source files dropped into the per-target source directories (`Sources/Viewer/...`, `Sources/Server/...`, etc.) are picked up automatically — the project uses Xcode 16 filesystem-synchronized groups, so `Galley.xcodeproj/project.pbxproj` has no individual file references and **no manual registration is required** when adding a file. Files under `Sources/Viewer/.../mac/` and `.../vision/` are conditionally compiled — each file in those subfolders is wrapped in `#if os(macOS)` / `#if os(visionOS)` so the project's filesystem-synchronized membership compiles cleanly on both platforms.
 
 Shared schemes:
 
@@ -238,7 +236,7 @@ Shared schemes:
 - **Server** — the menu-bar previewer
 - **Quicklook** — the Quick Look preview extension
 - **GalleyCoreKit** / **GalleyServerKit** — framework schemes (mostly for direct iteration / testing)
-- Other sibling-package schemes from the Kosmos package may also surface in Galley's scheme list; only `KosmosCore` and `KosmosTransport` are linked by Galley.
+- Sibling-package schemes (`KosmosCore`, `KosmosTransport`, `KosmosHTTPTunnel`, `KosmosAppKit`, `KosmosHTTPServer`, `MarkdownHTMLKit`, and their transitive deps) may also surface in Galley's scheme list. The link map: `GalleyCoreKit` pulls `KosmosAppKit` + `MarkdownHTMLKit` + the three Kosmos products; `GalleyServerKit` adds `KosmosHTTPServer`.
 
 There is no separate `Viewer.vision` scheme — the visionOS slice is the same scheme with a different destination.
 
@@ -257,7 +255,7 @@ xcodebuild -project Galley.xcodeproj -scheme Viewer test
 # (Or run from Xcode's Test navigator.)
 ```
 
-Logic tests use **Swift Testing** (`@Test`, `#expect`); UI tests use **XCTest** (XCUITest is XCTest-based). The shared `TestPlan.xctestplan` enrols both targets. Logic coverage includes placeholder substitution, template rewriting, URL path helpers, the swift-markdown renderer (with a CommonMark-spec-conformance suite), the shared `GalleyNetworkDefaults.serverEndpointURL` composition, the AVP CSS path chain (galley://local URL → tunnel `urlPath` → Mac `<base href>` → sub-resource URL), the SSE encoder, host-header guarding, reload-script injection, template-origin policy, the HTTP-tunnel URL builder, the Kosmos tunnel scheme, the HTTP tunnel AVP client (per-request buffering vs SSE streaming), the WebKit Zone.Identifier-suffix rejection, and every routing-layer decision (`WindowRegistry`, `OpenURLRouter`, `GalleyAction` (URL → `GalleyRequest`), `LaunchURLBuffer`, `PendingScrollLines`, `LaunchArguments`). UI coverage exercises real product invariants — welcome stays hidden, FTUE Open panel surfaces on cold launch, seeded launches produce visible document windows, File/View menus reachable on a populated doc. See `docs/test-framework.md` for the test pyramid.
+Logic tests use **Swift Testing** (`@Test`, `#expect`); UI tests use **XCTest** (XCUITest is XCTest-based). The shared `TestPlan.xctestplan` enrols both targets. Logic coverage in this repo includes placeholder substitution, template rewriting, `TemplateStore` observation, URL path helpers, the swift-markdown renderer (with a CommonMark-spec-conformance suite), the AVP CSS path chain (galley://local URL → tunnel `urlPath` → Mac `<base href>` → sub-resource URL), the HTTP-tunnel URL builder, the Kosmos tunnel scheme, the HTTP tunnel AVP client (per-request buffering vs SSE streaming), the WebKit Zone.Identifier-suffix rejection, the `PreviewServerController` / `HTTPServerController` lifecycle + an end-to-end socket round-trip, color-scheme choice, and every routing-layer decision (`WindowRegistry`, `OpenURLRouter`, `GalleyAction` (URL → `GalleyRequest`), `LaunchURLBuffer`, `PendingScrollLines`, `LaunchArguments`). (The generic server internals — SSE encoding, host-header guarding, reload-script injection, template-origin policy, `serverEndpointURL` composition — are now tested in the `KosmosHTTPServer` / `KosmosAppKit` packages, not here.) UI coverage exercises real product invariants — welcome stays hidden, FTUE Open panel surfaces on cold launch, seeded launches produce visible document windows, File/View menus reachable on a populated doc. See `docs/test-framework.md` for the test pyramid.
 
 The UITests target launches Galley with a `--seed-file <path>` flag handled by `LaunchArguments` (parsed in `ViewerApp.init`, pre-buffered into `WindowDispatcher`). Test mode also passes `-ApplePersistenceIgnoreState YES` to skip the post-crash "Reopen?" alert that would otherwise hang launches. **Don't pass `--ui-test-mode` as a launch argument** — AppKit's command-line `NSUserDefaults` parser eats `--`-prefixed tokens and pollutes the defaults domain in ways that suppress the welcome scene from spawning. Use `launchEnvironment` for the test-mode marker instead.
 
@@ -277,14 +275,14 @@ SwiftLint runs as a `Lint` shell-script build phase (no separate scheme/target).
 
 ## Dependencies
 
-Resolved by Xcode against package references in `Galley.xcodeproj`:
+Resolved by Xcode against package references in `Galley.xcodeproj`. The project references **four local sibling packages** (`../Kosmos`, `../KosmosAppKit`, `../KosmosHTTPServer`, `../MarkdownHTMLKit`) and **two remote packages** (`swift-core-kit`, `ObservableDefaults`). FlyingFox, swift-http-types, and swift-markdown are **transitive** — pulled in by the sibling packages, not referenced by Galley directly.
 
-- **FlyingFox** (`github.com/swhitty/FlyingFox`) — loopback HTTP server. `GalleyServerKit` only, behind a Hummingbird-shaped adapter (see Architecture decisions). FlyingFox is dependency-free (FlyingFox + FlyingSocks, no NIO), which is the whole point — Kosmos shed NIO when SSH bootstrap moved out of Loom's core target, and Hummingbird was the last NIO consumer in the graph.
-- **swift-http-types** (`github.com/apple/swift-http-types`) — `HTTPFields`, `HTTPField.Name`, `HTTPResponse.Status`. Tiny, zero-dep. Kept so the route call sites in `GalleyServerKit` use `headers[.contentType]` etc. unchanged across the FlyingFox migration.
-- **swift-markdown** (`github.com/swiftlang/swift-markdown`) — bundled "Default" renderer.
-- **swift-core-kit** (`github.com/leuski/swift-core-kit`, module `ALFoundation`) — **private** repo. CI authenticates via `GH_PACKAGES_PAT`; locally, ensure your git credentials can read it.
+- **Kosmos** (`../Kosmos`, local) — Mac↔AVP bridge. `KosmosCore` + `KosmosTransport` (peer mesh, `Role`, `KosmosService` / `KosmosServiceHost`, `WindowID`) are linked via `GalleyCoreKit`, so Server and Viewer share one definition of `GalleyKosmosRole` / `RouteToAVP` and the `ProxyHTTPRequest` / `ProxyHTTPResponse*` tunnel messages. `KosmosHTTPTunnel` carries the `Responder` (used by `Server`), the `Client` (used by the Viewer's visionOS slice), `TunnelScheme`, and the pure `URLBuilder` helpers (path splicing, header extraction, body chunking, SSE streaming detection). No TLS in the data path; Kosmos handles peer identity / trust on its own channel (dev builds use `AlwaysTrustProvider`; SAS-code pairing is the planned production replacement). `Kosmos` depends on a local `../Loom` fork (BonjourAdvertiser self-recovery patch).
+- **KosmosAppKit** (`../KosmosAppKit`, local) — product-agnostic app primitives extracted from `GalleyCoreKit`: `ChoiceModel` / `SelectableCollection`, `DocumentWatcher`, `DefaultsBroadcast`, the `DefaultsProtocol` / `HTTPServerDefaults` / `BroadcastedDefaults` contracts (incl. `serverEndpointURL` / `serverHTTPPort`), the launch-agent stack (`ActiveServerAgent` / `LaunchctlServerAgent` / `SingleProcessInstance`), and shared helpers/views. Depends on `ALFoundation`. Linked by `GalleyCoreKit`.
+- **KosmosHTTPServer** (`../KosmosHTTPServer`, local) — generic FlyingFox-backed loopback HTTP server + Hummingbird-shaped adapter + `HTTPServerController` + SSE + `guardedRequest`. **This package owns the FlyingFox and swift-http-types dependencies.** Linked by `GalleyServerKit` (which `@_exported`s it). FlyingFox is dependency-free (FlyingFox + FlyingSocks, no NIO), which is the point — the whole NIO/Hummingbird cluster is gone from the graph (see Architecture decisions).
+- **MarkdownHTMLKit** (`../MarkdownHTMLKit`, local) — wraps `swift-markdown` (pinned 0.8.0) for the bundled "Default" renderer. Linked by `GalleyCoreKit`, used by `SwiftMarkdownRenderer`.
+- **swift-core-kit** (`github.com/leuski/swift-core-kit`, module `ALFoundation`) — **private** repo. CI authenticates via `GH_PACKAGES_PAT`; locally, ensure your git credentials can read it. Pulled directly by Galley and transitively by `KosmosAppKit`.
 - **ObservableDefaults** (`github.com/fatbobman/ObservableDefaults`) — `@ObservableDefaults` macro backing the cross-platform `Sources/Viewer/Models/Defaults.swift`. `MacViewerApp.init` and `VisionViewerApp.init` both call `Defaults.warmCache()` before SwiftUI lays out a single view — see the long comment on `warmCache()` for the WebKit-triggered AttributeGraph reentrancy this defends against.
-- **Kosmos** (sibling local package at `../Kosmos`, referenced from the project) — Mac↔AVP bridge. `KosmosCore` + `KosmosTransport` are linked via `GalleyCoreKit`, so Server and Viewer share one definition of the Galley-specific role enum / device-ID / `RouteToAVP` message and the `ProxyHTTPRequest` / `ProxyHTTPResponse*` tunnel messages. `KosmosHTTPTunnel` is linked directly by `Server` (for the `Responder`) and by the Viewer's visionOS slice (for the `Client`); it also carries the pure `URLBuilder` helpers (path splicing, header extraction, body chunking, SSE streaming detection) both ends use. `KosmosBridge` and `KosmosWebView` are intentionally unused — there's no TLS in the data path and Kosmos handles peer identity / trust on its own channel. The trust provider in dev builds is `AlwaysTrustProvider`; `KosmosPairingProvider` (SAS-code pairing) is the planned production replacement.
 
 External Markdown processors (MultiMarkdown, Pandoc, Discount, cmark-gfm, Markdown.pl) are invoked as subprocesses via `ExternalProcessRenderer` (macOS-only — the kit guards `Process` use behind `#if os(macOS)`).
 
@@ -301,7 +299,7 @@ What we actually use today:
 | Executable discovery | `try await URL(command: "pandoc")` | `ExternalProcessRenderer.discover` |
 | Subprocess execution | `Process.runAndCapture(_:with:at:streams:)`, `Process.runAndReturn(...)`, `Process.run(...)`, `ProcessStreams.inMemory`, `ProcessArgument` | `ExternalProcessRenderer.swift`, `EditorChoice.swift`, `LaunchctlServerAgent.swift` |
 | Force-unwrap with message | `expr !! "message"` | `URL+Galley.swift` (`bundleTemplatesDirectoryURL`) |
-| File-system watching | `FileSystemObjectWatcher`, `FileSystemEventStream` | (available; `DocumentWatcher` is the kit's wrapper around FSEvents) |
+| File-system watching | `FileSystemObjectWatcher`, `FileSystemEventStream` | (available; `DocumentWatcher` — now in KosmosAppKit — is the wrapper around FSEvents) |
 
 **Rules:**
 
@@ -326,10 +324,10 @@ Where the pattern lives:
 
 | File | Suite | Role |
 |---|---|---|
-| `Sources/Viewer/Models/Defaults.swift` | `UserDefaults.standard` (Viewer's bundle id `net.leuski.galley` *is* the suite) | Every Viewer-facing pref (renderer, template, `enablePerDocumentOverrides`, `openBehavior`, `perFileStateStore`, `templateBackgroundColors`, `lastTemplateBackgroundColor`, `tintWindowWithPageBackground`, `showsStatusBar`, `readingWordsPerMinute`, `editor` on macOS, `recentEntries` on visionOS, `colorScheme`, `serverGalleyHash`, `serverHTTPPort`). Conforms to `GalleyRenderDefaults` + `GalleyNetworkDefaults`. Cross-platform. |
-| `Sources/Server/App/AppModel.swift` (the `Defaults` class) | `UserDefaults(suiteName: "net.leuski.galley")` | The Server-side mirror — same plist as the Viewer; `renderer`, `template`, `serverGalleyHash`, `serverHTTPPort`. Conforms to `GalleyRenderDefaults` + `GalleyNetworkDefaults`; the Server is the sole writer of `serverHTTPPort`. |
-| `Sources/Quicklook/Defaults.swift` | `UserDefaults(suiteName: "net.leuski.galley")` (QL has its own bundle id and reads via `temporary-exception.shared-preference.read-only`) | Minimal QL-facing reader — only `serverHTTPPort`. Conforms to `GalleyNetworkDefaults`. Used to compose `serverEndpointURL` for the server-first preview path. |
-| `Sources/GalleyCoreKit/Utilities/GalleyDefaults.swift` | — | `@_exported import ObservableDefaults`, `GalleyDefaults` + `GalleyRenderDefaults` + `GalleyNetworkDefaults` protocols (`@MainActor static var shared: Self`), `GalleyConstants.suiteName`, `GalleyConstants.applicationSupportDirectory`. |
+| `Sources/Viewer/Models/Defaults.swift` | `UserDefaults.standard` (Viewer's bundle id `net.leuski.galley` *is* the suite) | Every Viewer-facing pref (renderer, template, `enablePerDocumentOverrides`, `openBehavior`, `perFileStateStore`, `templateBackgroundColors`, `lastTemplateBackgroundColor`, `tintWindowWithPageBackground`, `showsStatusBar`, `readingWordsPerMinute`, `editor` on macOS, `recentEntries` on visionOS, `colorScheme`, `serverGalleyHash`, `serverHTTPPort`). Conforms to `GalleyRenderDefaults` + `HTTPServerDefaults`. Cross-platform. |
+| `Sources/Server/App/AppModel.swift` (the `Defaults` class) | `UserDefaults(suiteName: "net.leuski.galley")` | The Server-side mirror — same plist as the Viewer; `renderer`, `template`, `serverGalleyHash`, `serverHTTPPort`. Conforms to `GalleyRenderDefaults` + `HTTPServerDefaults`; the Server is the sole writer of `serverHTTPPort`. |
+| `Sources/Quicklook/Defaults.swift` | `UserDefaults(suiteName: "net.leuski.galley")` (QL has its own bundle id and reads via `temporary-exception.shared-preference.read-only`) | Minimal QL-facing reader — only `serverHTTPPort`. Conforms to `HTTPServerDefaults`. Used to compose `serverEndpointURL` for the server-first preview path. |
+| `Sources/GalleyCoreKit/Utilities/GalleyDefaults.swift` | — | `@_exported import ObservableDefaults`, `GalleyDefaults` + `GalleyRenderDefaults` + `HTTPServerDefaults` protocols (`@MainActor static var shared: Self`), `GalleyConstants.suiteName`, `GalleyConstants.applicationSupportDirectory`. |
 | `Sources/GalleyCoreKit/Utilities/DefaultsBroadcast.swift` | — | Darwin-notification bridge → synthesizes a local `UserDefaults.didChangeNotification` so the other process's `@ObservableDefaults` observer fires. Call `DefaultsBroadcast.startListening()` once per process. |
 
 **Rules:**
@@ -347,28 +345,24 @@ Where the pattern lives:
 
 **`GalleyCoreKit`** — pure rendering and platform-agnostic primitives. No HTTP-server code:
 - `Render/` — `MarkdownRenderer` protocol; `SwiftMarkdownRenderer` (with optional `annotatesSourceLines` that emits `data-source-line="N"` on every block, used by the Viewer for cmd-click→editor); `ExternalProcessRenderer` (shells out via `Process.runAndCapture` from ALFoundation, macOS-only); `ProcessorStore` exposes the ordered list of `Processor` rows (each with `installHint` and either a live `MarkdownRenderer` or `nil` if unavailable); `HTMLHeadings` parses headings out of rendered HTML for the TOC sidebar. The Viewer's cmd-click bridge also accepts pandoc's `data-pos` and cmark-gfm's `data-sourcepos` so source-line jumps work across renderers.
-- `Templates/` — `Template` protocol + `Template+Loader`; `BuiltInTemplate` and `UserTemplate`; `TemplateStore` watches `~/Library/Application Support/net.leuski.galley.localized/Templates/` and accepts **two shapes** — a folder containing `Template.html`/`template.html` (Galley convention), or a top-level `*.html`/`*.htm` file with sibling assets (BBEdit preview-template convention). Built-in templates (Default, GitHub, HighContrast, LaTeX, Manuscript, Sepia, Solarized, Terminal, Tufte) ship in `Resources/Templates.bundle`. `Placeholders.swift` does `#TOKEN#` substitution (`#TITLE#`, `#DOCUMENT_CONTENT#`, `#BASE#`, `#FILE#`, `#BASENAME#`, `#FILE_EXTENSION#`, `#DATE#`, `#TIME#` — token names match BBEdit's). `TemplateAssetRewriter` rewrites template-relative paths through `/template/<id>/...` and absolute filesystem paths through `/preview/<absolute-path>` so the resulting URLs resolve in either the HTTP server, the in-process `x-galley://local` resolver (Quicklook + print web view), or the AVP `galley://local` tunnel.
-- `Models/ServerStatus.swift` — `ServerStatus` only (`.disabled` / `.starting` / `.running(URL)` / `.notResponding`). The Mac Viewer's status pill is driven by Kosmos peer presence (truth-of-running) + `ActiveServerAgent.isEnabled` (truth-of-intent); the `.running` case's URL is what the Server published in its Kosmos peer metadata (`GalleyKosmosMetadataKey.httpURL`). There is **no** HTTP probe — the previous `ServerProbe` poll loop is gone.
+- `Templates/` — `Template` (a single `Sendable` value `struct`, conforms to `ChoiceValueProtocol`; `Template.bundledDefault` / `.default` for the built-in) + `Template+Loader`; `TemplateStore` watches `~/Library/Application Support/net.leuski.galley.localized/Templates/` and accepts **two shapes** — a folder containing `Template.html`/`template.html` (Galley convention), or a top-level `*.html`/`*.htm` file with sibling assets (BBEdit preview-template convention). Built-in templates (Default, GitHub, HighContrast, LaTeX, Manuscript, Sepia, Solarized, Terminal, Tufte) ship in `Resources/Templates.bundle`. `Placeholders.swift` does `#TOKEN#` substitution (`#TITLE#`, `#DOCUMENT_CONTENT#`, `#BASE#`, `#FILE#`, `#BASENAME#`, `#FILE_EXTENSION#`, `#DATE#`, `#TIME#` — token names match BBEdit's). `TemplateAssetRewriter` rewrites template-relative paths through `/template/<id>/...` and absolute filesystem paths through `/preview/<absolute-path>` so the resulting URLs resolve in either the HTTP server, the in-process `x-galley://local` resolver (Quicklook + print web view), or the AVP `galley://local` tunnel.
+- `Models/ServerStatus.swift` — `ServerStatus` only (`.disabled` / `.starting` / `.running(URL)` / `.notResponding`). The Mac Viewer's status pill is driven by Kosmos peer presence (truth-of-running) + `ActiveServerAgent.isEnabled` (truth-of-intent); the `.running` case's URL is what the Server published in its Kosmos peer metadata (`MetadataKey.httpURL`). There is **no** HTTP probe — the previous `ServerProbe` poll loop is gone.
 - `WebKit/PreviewSchemeHandler.swift` — `PreviewScheme` enum with the `x-galley` scheme name + `x-galley://local` origin URL + the shared `resolve(...)` function. `ClassicPreviewSchemeHandler` (the `WKURLSchemeHandler` adapter, no SwiftUI dep) is here; the Viewer-visible SwiftUI-flavored `URLSchemeHandler` is in `Sources/Viewer/WebKit/PreviewSchemeHandler.swift` and delegates to the same resolver. Used by the Viewer's visible `WebPage`, the Viewer's offscreen print/export `WKWebView`, and the QuickLook extension's fallback render. AVP does **not** use this scheme — it has its own `galley://local` tunnel-backed scheme (`KosmosHTTPTunnel.TunnelScheme`, from the Kosmos package).
-- `Models/` — `ChoiceValueProtocol` / `ChoiceValueEnvelopeProtocol` + `SelectableCollection`, `ProcessorChoiceValue`, `TemplateChoiceValue`, `TOCEntry`, `MarkdownFileTypes` (recognized extensions, also used by open-panel UTI lists). Also holds `PreviewRoute` + `RouteNames` (the shared `/template/<id>/<file>` + `/preview/<absolute-path>` + `/events/<absolute-path>` parser used by both the Server's HTTP routes and the Viewer/Quicklook scheme handlers) and `ServerStatus` (see above). A small generic layer for "pick one of N" UIs that also persist their selection by stable `persistentID`.
+- `Models/` — the Galley choice values `ProcessorModel` / `TemplateModel` plus `ChoiceModel+Localization` (the generic `ChoiceModel` / `SelectableCollection` "pick one of N + persist by `persistentID`" base now lives in KosmosAppKit), `TOCEntry`, `MarkdownFileTypes` (recognized extensions, also used by open-panel UTI lists), `PreviewRoute` + `RouteNames` (the shared `/template/<id>/<file>` + `/preview/<absolute-path>` + `/events/<absolute-path>` parser used by both the Server's HTTP routes and the Viewer/Quicklook scheme handlers), and `ServerStatus` (see above).
 - `Routing/` — pure value types for the Viewer's URL routing. `OpenBehavior` (`.newWindow` / `.newTab` / `.replaceCurrent`); `WindowRegistry` + `WindowRecord`; `LaunchURLBuffer` (FIFO buffer for URLs that arrive before `openWindow` is captured); `PendingScrollLines` (`galley://...?line=N` scroll-line cache); `OpenURLRouter` + `DispatchAction` (pure decision function returning `.queue` / `.openNew` / `.rebind(WindowID)` / `.tabOnto(WindowID)` / `.focusExisting(WindowID)`); `LaunchArguments` parser. `WindowID` + `WindowIDAllocator` (counter-based opaque identity, intentionally *not* `ObjectIdentifier(NSWindow)`) come from `KosmosCore` and are `@_exported`-re-exported by `WindowRegistry.swift` so the routing layer and the Kosmos wire (`OpenDocument` / `CloseWindow` / `WindowContentChanged`) share one identifier type. URL → `GalleyRequest` normalization (was `URLNormalizer`) now lives as `URL.galleyRequest` in `Utilities/URL+Galley.swift` and returns the typed `GalleyRequest` (`.openSettings(SettingsTab?)` / `.document(DocumentTarget)`). The Viewer's `WindowDispatcher` (in `Sources/Viewer/Models/mac/`) is the AppKit interpreter that holds the live `NSWindow` references and applies the router's actions. The visionOS slice of the same Viewer target does not use `WindowDispatcher` and currently only borrows the value-type pieces (`OpenBehavior`, `WindowRegistry`) for its smaller in-window dispatch.
 - `Accessibility/` — `ViewerAccessibilityIdentifiers` (`ViewerA11yID`) and `ServerAccessibilityIdentifiers` (`ServerA11yID`) enum-of-string-constants catalogs.
 - Tunnel scheme + HTTP-tunnel implementation — **not here**. `KosmosHTTPTunnel.TunnelScheme` (declares the AVP-facing `galley://local` scheme + `originURL` sent as `X-Galley-Origin` on every tunneled request so the Mac's `<base href>` stays on this scheme, plus a `previewURL(forFile:)` builder) and the matching pure URL/header helpers (`buildURLRequest`, `extractHeaders`, `chunks(of:requestID:chunkSize:)`, `requiresStreaming(urlPath:)`) both live in the sibling Kosmos package's `KosmosHTTPTunnel` product so the `Responder` and `Client` can share them without a Galley-side dependency.
-- `Utilities/GalleyKosmos.swift` — single source of truth for the non-tunnel Kosmos surface that Server, Viewer, and tests all share: `GalleyKosmosRole` (server / mac-viewer / vision-viewer; published as `kosmos.role` Loom metadata), a `KosmosServiceHost` convenience init `init(role:)` (persists the per-role device ID) and a `makeLink(role:deviceName:extraMetadata:)` method (Loom-backed `KosmosClient` + `LoomKosmosLink` factory), `PeerInfo.galleyRole` + `PeerInfo.galleyHTTPURL` extensions, `GalleyKosmosMetadataKey.httpURL` (the metadata key the Server uses to advertise its loopback HTTP URL inline), `GalleyPeerClassifier` (pure `serverPeer` / `avpPeer` helpers, unit-tested), and the `RouteToAVP` request/reply message.
-- `Utilities/GalleyDefaults.swift` — shared defaults contract. `GalleyDefaults` (`@MainActor static var shared`); `GalleyRenderDefaults` adds `renderer` + `template`; `GalleyNetworkDefaults` adds `serverHTTPPort: UInt16` and exposes `serverEndpointURL: URL?` (composes `http://127.0.0.1:<port>/`, returns nil when port is 0). `GalleyConstants.suiteName` is `"net.leuski.galley"`; `GalleyConstants.applicationSupportDirectory` resolves to `~/Library/Application Support/net.leuski.galley.localized/`. The Server, Viewer, and Quicklook each have their own `Defaults` class conforming to a subset of these protocols — they all back the same on-disk plist.
+- `Utilities/GalleyKosmos.swift` — the Galley-specific Kosmos surface that Server, Viewer, and tests share: `GalleyKosmosRole` (server / mac-viewer / vision-viewer; conforms to Kosmos's `Role`, published as `kosmos.role` metadata), the `MetadataKey<URL>.httpURL` accessor (wire key `galley.http-url`, the metadata key the Server uses to advertise its loopback HTTP URL inline), and the `RouteToAVP` request/reply message. Peer classification + AVP-reachability are **not** here — they moved onto `KosmosServiceHost` (sibling package) as product-scoped queries (`presentPeer(role:onHost:)`, `reachablePeer(deviceType:)`); the old product-blind `GalleyPeerClassifier` / `PeerInfo.galleyRole` were removed. Host bootstrap (`KosmosService` / `KosmosServiceHost`) also lives in the Kosmos package, not here.
+- `Utilities/GalleyDefaults.swift` — Galley's defaults contract over KosmosAppKit's `DefaultsProtocol`: `GalleyDefaults` (adds the `net.leuski.galley` `suiteName`) and `GalleyRenderDefaults` (adds `renderer` + `template`). The `HTTPServerDefaults` protocol (`serverHTTPPort: UInt16`, `serverEndpointURL: URL?` — composes `http://127.0.0.1:<port>/`, nil when port is 0) and `BroadcastedDefaults` live in **KosmosAppKit**. Also defines `GalleyConstants` (`suiteName` = `"net.leuski.galley"`, `defaultHost` = `"127.0.0.1"`, `applicationSupportDirectory`) and the `bundleIdentifier` global. The Server, Viewer, and Quicklook each have their own `Defaults` class conforming to a subset of these protocols — they all back the same on-disk plist.
 - `Utilities/URL+Galley.swift` — `DocumentTarget(url:scrollLine:)` value type, `GalleyRequest` enum (`.openSettings(SettingsTab?)` / `.document(DocumentTarget)`), `SettingsTab` enum, `URL.galleyRequest`, `URL.bundleTemplatesDirectoryURL`.
-- `Utilities/GalleyAppHash.swift` — SHA-256 of the Galley.app bundle. Server publishes its containing Galley.app's hash to `serverGalleyHash`; Viewer compares against its own hash at launch to detect a stale embedded Server after an in-place update.
-- `Utilities/DefaultsBroadcast.swift` — Darwin-notification bridge → synthesizes a local `UserDefaults.didChangeNotification` so the other process's `@ObservableDefaults` observer fires. Call `DefaultsBroadcast.startListening()` once per process.
-- `Watch/DocumentWatcher` — file-system watch over a document and its sibling directory; multiplexes events to all subscribers.
 - `Utilities/DisplacementNotifier` — surfaces a user-facing notice when a previously-persisted processor or template selection no longer exists in the live catalog.
-- `Views/` — shared SwiftUI helpers: `DividedSections`, `ColorSchemeMenu`, `ProcessorMenu`, `TemplateMenu`, `PullDownIconMenu`.
-- `Utilities/` (other) — `MIMETypes`, `Bundle+Resources`, `String+URL`, `String+HTML`, `URL+`, `AsyncSequence+Debounce`, `Observation`.
+- `Views/` — Galley-specific SwiftUI menus: `ColorSchemeMenu`, `ProcessorMenu`, `TemplateMenu`. (The generic `DividedSections` / `PullDownIconMenu` moved to KosmosAppKit.)
+- **Moved to KosmosAppKit** (sibling package), formerly here: `DocumentWatcher`, `DefaultsBroadcast`, the `GalleyAppHash` SHA-256 logic (now `URL.computeHash`), `MIMETypes`, `Bundle+Resources`, `String+URL` / `String+HTML`, `URL+`, `AsyncSequence+Debounce`, `Observation`, and the `ChoiceModel` / `SelectableCollection` base (GalleyCoreKit keeps only `ChoiceModel+Localization` and the Galley choice values `ProcessorModel` / `TemplateModel`).
 
-**`GalleyServerKit`** — wraps a `FlyingFox` HTTP server in a `Task`, behind a thin Hummingbird-API-shaped adapter so the route call sites read like Hummingbird code:
-- `PreviewServer.swift` / `PreviewServerController` — lifecycle and state. Binds the HTTP listener to `127.0.0.1` on an **OS-assigned port** (no fixed port). The bound URL flows out via `state = .running(url:)`; the Server target's AppModel observes that and (a) writes `Defaults.shared.serverHTTPPort` so other processes can find the port through the shared `net.leuski.galley` defaults plist, and (b) starts Kosmos with the URL as `extraMetadata[GalleyKosmosMetadataKey.httpURL]` so peers see the same value inline on the peer's advertisement. Loopback-only — AVP traffic doesn't reach this listener directly; the `KosmosHTTPTunnel.Responder` (hosted by `KosmosLink` in `Sources/Server/App/`) proxies AVP requests through it on the AVP's behalf. Same-machine consumers (Quicklook, browsers, BBEdit scripts) hit the listener via `Defaults.shared.serverEndpointURL` (from `GalleyNetworkDefaults`).
-- `Routes.swift` — `/preview/<path>` (Markdown→HTML, with placeholders + live-reload script injection; non-Markdown extensions fall through to static asset serving from the document's directory), `/template/<id>/<file>`, `/events/<path>` (SSE stream from `SSE.swift`). Host-header guarded (loopback-only). Reads requests through the shim's `Request` (`uri.path`, `head.authority`, `headers: HTTPFields`) and emits responses through the shim's `Response` / `ResponseBody`. `swift-http-types` is kept (small, zero-dep) so `headers[.contentType]` / `[.secFetchSite]` etc. work unchanged.
-- `Adapter/` — Hummingbird-shaped shim over FlyingFox. `Router<BasicRequestContext>` registers `/preview/**`, `/template/**`, `/events/**`, `/` patterns; `PathPattern` is our own `/**` matcher (FlyingFox's `*` is single-segment, so we register one catch-all `HTTPRoute("GET /*")` against the FlyingFox server and dispatch internally). `Application` mirrors `Application(router:configuration:onServerRunning:)` — the `onServerRunning` closure receives a `ServerChannel` whose `localAddress?.port` mirrors NIO's channel-bound-address shape (so the `PreviewServer.swift` call site is unchanged). `ResponseBody { writer in ... }` streaming bridges to `HTTPBodySequence(from:)` via a `PushBufferedSequence` that adapts `AsyncStream<Data>` to `AsyncBufferedSequence<UInt8>`; each `writer.write(_:)` becomes one HTTP chunk so SSE preserves line-level flush latency.
-- `rendererProvider` and `templateStore` are passed in as `@Sendable` closures so each request reads the current selection without server-side state.
+**`GalleyServerKit`** — a thin Galley facade over the generic `KosmosHTTPServer` package (which it `@_exported`s). The FlyingFox server, the Hummingbird-shaped adapter, `HTTPServerController`, SSE, and `guardedRequest` all live in `KosmosHTTPServer` now; what's left here is Galley's route table and localized error pages:
+- `Galley/PreviewServerController.swift` — Galley facade. Owns the `selectedTemplateProvider` / `rendererProvider` `@Sendable` closures and the shared `DocumentWatcher` the SSE route subscribes against; delegates lifecycle to `KosmosHTTPServer`'s `HTTPServerController` (binds `127.0.0.1` on an **OS-assigned port**; `State` is `HTTPServerState`, re-exported). The bound URL flows out via `state = .running(url:)`; the Server's AppModel observes that and (a) writes `Defaults.shared.serverHTTPPort` to the shared `net.leuski.galley` plist, and (b) starts Kosmos with the URL as advertise-time `MetadataKey.httpURL`. Loopback-only — AVP traffic doesn't reach this listener directly; the `KosmosHTTPTunnel.Responder` (hosted by `ServerKosmosService`) proxies AVP requests through it. Same-machine consumers reach the listener via `Defaults.shared.serverEndpointURL`.
+- `Galley/Routes.swift` — builds the `Router<BasicRequestContext>`: `/preview/<path>` (Markdown→HTML with placeholders + live-reload injection; non-Markdown extensions fall through to static asset serving), `/template/<id>/<file>`, `/events/<path>` (SSE via the shared `DocumentWatcher`), `/`. Every route is host-guarded (`Response.guarded(...)` → `guardedRequest` in KosmosHTTPServer; loopback-only, DNS-rebinding-safe). The `/preview` handler computes the template `origin` from the request's own `Host` header (not the listener's `127.0.0.1` URL) so the rendered `<base href>` works for AVP-tunneled callers too. `rendererProvider` / `selectedTemplateProvider` are read at request time, so menu picks take effect on the next request with no restart.
+- `Galley/Response+Localization.swift` — localized `Response.errorPage` / `.ok` / `.badRequest` / `.notFound` / `.forbidden` / `.unavailable` over KosmosHTTPServer's generic `Response`, pulling strings from `Bundle.galleyServerKit` (`ErrorPage.html`, `Localizable.xcstrings`), plus the `guarded(...)` host-check wrapper that maps thrown guard errors to responses.
 
 ### `Sources/Viewer/` — cross-platform viewer code (one target, two platforms)
 
@@ -438,14 +432,14 @@ Far smaller surface than the macOS slice. No AppDelegate, no welcome bootstrap s
 ### `Sources/Server/` — Galley Server menu-bar app (macOS)
 
 - **`ServerApp`** — `@main`, single Scene: `MenuBarExtra` hosting `MenuBarContent`. Label is `Image("MenuBarIcon")`. Uses `@NSApplicationDelegateAdaptor(ServerAppDelegate.self)`. Hydration is gated on `AppBoot` (the menu shows "Starting…" until the model resolves). The Server does not host a SwiftUI `Settings` scene of its own — preferences are surfaced inside `MenuBarContent`.
-- **`App/AppModel`** — `@Observable @MainActor`. Owns the `templates: TemplateChoice` and `processors: ProcessorChoice` envelopes, the `PreviewServerController`, the `KosmosLink`, and the Server's own `@ObservableDefaults Defaults` class (conforms to `GalleyRenderDefaults` + `GalleyNetworkDefaults`). On each `PreviewServerController` state change, writes `Defaults.shared.serverHTTPPort` (the OS-assigned port from `state = .running(url:)`, or `0` on stop/failure) and posts `DefaultsBroadcast.post()` so Viewer/Quicklook see the update. The first `.running` / `.failed` also starts the `KosmosLink` with the URL as `extraMetadata[GalleyKosmosMetadataKey.httpURL]`. Renderer + template selection is read at request time via `@Sendable` closures, so switching processor/template in the menu takes effect on the next request without server restart.
-- **`App/ServerAppDelegate`** — `NSApplicationDelegate`. Receives Finder file opens and `galley-bridge://` URL opens, dispatches each through `KosmosLink.dispatchOpenURL(_:with:)` — if a reachable AVP peer is available, publishes `OpenDocument` via Kosmos; otherwise falls back to `NSWorkspace.open(galley://path)` to launch Galley.app.
-- **`App/KosmosLink`** — `@Observable @MainActor`. Long-lived `KosmosClient` from `KosmosTransport`. Owns the Kosmos AVP session, the per-window open-on-AVP registry (`KosmosCore.WindowID → fileURL + peerID + watchTask`), the AVP-reachability flag (peer-connected ∧ app-resumed), and the AVP-doff migration path (peer disconnect → `NSWorkspace.open(galley://path)` per open window). Hosts a `KosmosHTTPTunnel.Responder` (from the Kosmos package) that turns inbound `ProxyHTTPRequest` messages into `URLSession` data tasks against the loopback HTTP listener (looked up via `Defaults.shared.serverEndpointURL`) and streams `ProxyHTTPResponseHead` + chunked `ProxyHTTPResponseChunk`s back. The `Responder` owns the in-flight `requestID → Task` map and picks between two paths per request: a **buffered fast path** for bounded responses (HTML, CSS, JS, images, fonts) — `URLSession.data(for:)` pulls the whole body in one allocation, then `KosmosHTTPTunnel.URLBuilder.chunks(of:requestID:chunkSize:)` slices it into 64 KB `ProxyHTTPResponseChunk`s with the final carrying `isFinal: true` — and a **streaming path** for SSE event-streams (`KosmosHTTPTunnel.URLBuilder.requiresStreaming(urlPath:)` matches `/events/*`) that drains `URLSession.AsyncBytes` and flushes on each newline or 64 KB safety valve, so events reach AVP with line-level latency. SSE only sees `isFinal: true` once the upstream URLSession completes (or the requester cancels via `ProxyHTTPCancel`, which tears down the matching task). `KosmosLink` also handles the `RouteToAVP` request from the Mac Viewer through the same dispatch path Finder-opens take, and defines `GalleyBridgeRequest` (the `galley-bridge://` scheme value type used to round-trip a `DocumentTarget` between Galley.app and the Server). The preview server stays loopback-only at all times.
+- **`App/AppModel`** — `@Observable @MainActor`. Owns the `templates: TemplateChoice` and `processors: ProcessorChoice` envelopes, the `PreviewServerController`, the `ServerKosmosService`, and the Server's own `@ObservableDefaults Defaults` class (conforms to `GalleyRenderDefaults` + `HTTPServerDefaults` + `BroadcastedDefaults`). On each `PreviewServerController` state change, writes `Defaults.shared.serverHTTPPort` (the OS-assigned port from `state = .running(url:)`, or `0` on stop/failure) and posts `Defaults.shared.post()` so Viewer/Quicklook see the update. The first `.running` / `.failed` also starts the `ServerKosmosService` with the URL as advertise-time `MetadataKey.httpURL` metadata. Renderer + template selection is read at request time via `@Sendable` closures, so switching processor/template in the menu takes effect on the next request without server restart. (`App/AppBoot` runs `ProcessorStore.discover()` + single-instance enforcement before constructing the model.)
+- **`App/ServerAppDelegate`** — `NSApplicationDelegate`. Receives Finder file opens and `galley-bridge://` URL opens, dispatches each through `ServerKosmosService` — if a reachable AVP peer is available, publishes `OpenDocument` via Kosmos; otherwise falls back to `NSWorkspace.open(galley://path)` to launch Galley.app.
+- **`App/ServerKosmosService`** — `@Observable @MainActor`, a subclass of `KosmosService<GalleyKosmosRole>` (from `KosmosTransport`). The generic boilerplate — host bootstrap, peer-watch, subscription bookkeeping, stop, the peer-role mirror, and suspend/resume reachability gating — lives in the shared `KosmosServiceHost` + `PeerReachabilityTracker`; `isAVPReachable` is just `host.reachablePeer(deviceType: .vision) != nil`. What's left here is purely Galley's: the per-window open-on-AVP registry (`KosmosCore.WindowID → fileURL + peerID + watchTask`), the AVP-doff migration path (last vision peer leaves → `NSWorkspace.open(galley://path)` per open window), and the `RouteToAVP` handler (routed through the same dispatch path Finder-opens take). It also hosts a `KosmosHTTPTunnel.Responder` (constructed with `upstreamBaseProvider: { Defaults.shared.serverEndpointURL }`) that turns inbound `ProxyHTTPRequest` messages into `URLSession` data tasks against the loopback HTTP listener and streams `ProxyHTTPResponseHead` + chunked `ProxyHTTPResponseChunk`s back. The `Responder` (in the Kosmos package) owns the in-flight `requestID → Task` map and picks per request between a **buffered fast path** for bounded responses (`URLSession.data(for:)` → `URLBuilder.chunks(of:requestID:chunkSize:)` slicing into 64 KB chunks, final carrying `isFinal: true`) and a **streaming path** for SSE event-streams (`URLBuilder.requiresStreaming(urlPath:)` matches `/events/*`; drains `URLSession.AsyncBytes`, flushing on each newline or 64 KB safety valve). `ProxyHTTPCancel` tears down the matching task. The `galley-bridge://` scheme value type is `App/GalleyBridgeRequest.swift` (its own file). The preview server stays loopback-only at all times.
 - **`Menu/MenuBarContent`** — the entirety of the Server's UI: server state, processor + template quick-switchers, BBEdit script installer entry, a Settings entry, and Quit.
 
 ## Concurrency conventions
 
-- UI-facing state (`AppModel` in both Viewer and Server, `DocumentModel`, `WindowDispatcher`, `KosmosLink`, `KosmosClient`, `RecentDocumentsModel`, scene/per-file stores, `ServerStatusModel`) is `@MainActor`.
+- UI-facing state (`AppModel` in both Viewer and Server, `DocumentModel`, `WindowDispatcher`, `ServerKosmosService`, `KosmosClient`, `RecentDocumentsModel`, scene/per-file stores, `ServerStatusModel`) is `@MainActor`.
 - The HTTP server runs in a background `Task`; route handlers are `async` and capture only `Sendable` collaborators (closures, actors, value types).
 - Renderer + template selection is read at request time via `@Sendable` provider closures rather than via shared mutable state — there is no dedicated `CurrentRenderer` actor.
 - The routing layer in `GalleyCoreKit/Routing/` is pure value types (`Sendable`); the `WindowDispatcher` adapter is the only place that holds live `NSWindow` references.
@@ -489,13 +483,13 @@ The HTTP server was originally FlyingFox. It was swapped for Hummingbird (briefl
 
 With HTTPS gone, Hummingbird's reason to exist disappeared. The graph cleanup was: Loom split its SSH bootstrap into its own target so `Loom` core no longer pulls `swift-nio` / `swift-nio-ssh`; Kosmos (which links only `Loom` core) then carries zero NIO. That left Hummingbird as the only NIO consumer in the project. Swapping it for FlyingFox (zero-dep on Apple platforms — just FlyingFox + FlyingSocks) collapses the entire NIO/server-infra cluster: `swift-nio`, `-ssh`, `-ssl`, `-http2`, `-extras`, `-transport-services`, `async-http-client`, `swift-distributed-tracing`, `swift-service-context`, `swift-metrics`, `swift-service-lifecycle`, `swift-http-structured-headers`, `swift-configuration`, `swift-atomics` — all gone.
 
-To avoid a sweep through `Routes.swift` / `PreviewServer.swift` / `HTTPResponses.swift`, FlyingFox sits behind a Hummingbird-API-shaped shim in `Sources/GalleyServerKit/Adapter/` (`Application`, `Router<BasicRequestContext>`, `Request`, `Response`, `ResponseBody`, `ByteBuffer`, plus a `PushBufferedSequence` that bridges Hummingbird's push-based `ResponseBody { writer in ... }` to FlyingFox's pull-based `AsyncBufferedSequence<UInt8>` for SSE). The route bodies read like Hummingbird code; only the imports changed. `swift-http-types` is kept (small, no NIO) so `HTTPField.Name.contentType` etc. work verbatim — this matters because `Routes.swift` uses ~10 well-known header names plus a handful of custom ones (`Sec-Fetch-Site`, `X-Frame-Options`, etc.) that would otherwise need a sweep too.
+To keep the route bodies reading like Hummingbird code, FlyingFox sits behind a Hummingbird-API-shaped shim (`Application`, `Router<BasicRequestContext>`, `Request`, `Response`, `ResponseBody`, `ByteBuffer`, plus a `PushBufferedSequence` that bridges Hummingbird's push-based `ResponseBody { writer in ... }` to FlyingFox's pull-based `AsyncBufferedSequence<UInt8>` for SSE). The route bodies read like Hummingbird code; only the imports changed. `swift-http-types` is kept (small, no NIO) so `HTTPField.Name.contentType` etc. work verbatim — `Routes.swift` uses ~10 well-known header names plus a handful of custom ones (`Sec-Fetch-Site`, `X-Frame-Options`, etc.) that would otherwise need a sweep too.
 
-The adapter is internal to `GalleyServerKit`. If you ever need to swap FlyingFox out for something else, the adapter is the only file set that touches the underlying server library.
+This adapter — together with `HTTPServerController`, SSE, `HTTPResponses`, and `guardedRequest` — has since been **extracted into the standalone `KosmosHTTPServer` sibling package** (`../KosmosHTTPServer`), which owns the FlyingFox and swift-http-types dependencies. `GalleyServerKit` `@_exported`s it and now contains only Galley's route table (`Routes.swift`), the `PreviewServerController` facade, and localized error pages. If you ever need to swap FlyingFox out for something else, `KosmosHTTPServer`'s `Adapter/` is the only file set that touches the underlying server library — and it's product-agnostic, so the change lands once for every consumer.
 
 ### OS-assigned port, not fixed
 
-The loopback HTTP listener binds to `127.0.0.1` on an OS-assigned port; the port is published to the shared `net.leuski.galley` defaults plist under `serverHTTPPort`. Same-machine readers (Quicklook, future Viewer surface) compose the URL via `Defaults.shared.serverEndpointURL` from `GalleyNetworkDefaults`. The user-configurable port setting is gone — fewer footguns when two processes try to listen on the same number.
+The loopback HTTP listener binds to `127.0.0.1` on an OS-assigned port; the port is published to the shared `net.leuski.galley` defaults plist under `serverHTTPPort`. Same-machine readers (Quicklook, future Viewer surface) compose the URL via `Defaults.shared.serverEndpointURL` from `HTTPServerDefaults`. The user-configurable port setting is gone — fewer footguns when two processes try to listen on the same number.
 
 ### `WindowGroup<URL>` not `DocumentGroup`
 
@@ -529,8 +523,8 @@ All three runtimes — Server, Galley.app (Mac Viewer), and the AVP viewer — a
 
 The data plane split, in two cases:
 
-- **Same-machine consumers** (Quicklook, browsers, BBEdit scripts) hit the Server's loopback HTTP listener via `Defaults.shared.serverEndpointURL` (`GalleyNetworkDefaults`). The port lives in the shared `net.leuski.galley` defaults plist (`serverHTTPPort`); Quicklook reads it through its own `Defaults` class plus the suite's `temporary-exception.shared-preference.read-only` entitlement; BBEdit scripts read it via `defaults read net.leuski.galley serverHTTPPort`. No TLS, no pinning — `127.0.0.1` is its own trust boundary. The Mac Viewer doesn't currently dial the loopback listener itself — its `Defaults` class still conforms to `GalleyNetworkDefaults` to keep the shared-suite contract honest, but it isn't a reader.
-- **AVP** tunnels through Kosmos. The WebView is configured with a `galley://local` URL scheme handler (`KosmosTunnelSchemeHandler`); every request — the document, every CSS / JS / image / font, the SSE `/events/<path>` stream — becomes a `ProxyHTTPRequest` Kosmos broadcast, executed against the Mac's loopback listener by `KosmosHTTPTunnel.Responder` (hosted by `KosmosLink`), and streamed back as `ProxyHTTPResponseHead` + chunked `ProxyHTTPResponseChunk` messages. The literal scheme host is the sentinel `local` (so `URLComponents` parsing is unambiguous), and every tunneled request carries `X-Galley-Origin: galley://local` so the Mac's `templateOriginURL` composes a `<base href="galley://local/preview/<docparent>/">` and every sub-resource fetch stays on the scheme handler. No HTTPS over the LAN, no cert pinning, no AWDL ingress concerns.
+- **Same-machine consumers** (Quicklook, browsers, BBEdit scripts) hit the Server's loopback HTTP listener via `Defaults.shared.serverEndpointURL` (`HTTPServerDefaults`). The port lives in the shared `net.leuski.galley` defaults plist (`serverHTTPPort`); Quicklook reads it through its own `Defaults` class plus the suite's `temporary-exception.shared-preference.read-only` entitlement; BBEdit scripts read it via `defaults read net.leuski.galley serverHTTPPort`. No TLS, no pinning — `127.0.0.1` is its own trust boundary. The Mac Viewer doesn't currently dial the loopback listener itself — its `Defaults` class still conforms to `HTTPServerDefaults` to keep the shared-suite contract honest, but it isn't a reader.
+- **AVP** tunnels through Kosmos. The WebView is configured with a `galley://local` URL scheme handler (`KosmosTunnelSchemeHandler`); every request — the document, every CSS / JS / image / font, the SSE `/events/<path>` stream — becomes a `ProxyHTTPRequest` Kosmos broadcast, executed against the Mac's loopback listener by `KosmosHTTPTunnel.Responder` (hosted by `ServerKosmosService`), and streamed back as `ProxyHTTPResponseHead` + chunked `ProxyHTTPResponseChunk` messages. The literal scheme host is the sentinel `local` (so `URLComponents` parsing is unambiguous), and every tunneled request carries `X-Galley-Origin: galley://local` so the Mac's `templateOriginURL` composes a `<base href="galley://local/preview/<docparent>/">` and every sub-resource fetch stays on the scheme handler. No HTTPS over the LAN, no cert pinning, no AWDL ingress concerns.
 
 Same `/preview/<path>` + `/template/<id>/<file>` + `/events/<path>` route surface either way; only the data-plane transport differs.
 
@@ -563,7 +557,7 @@ External integrations (BBEdit's `Preview Markdown… → in Galley` script, Xcod
 | AVP take-off handoff | Server observes AVP peer drop → `NSWorkspace.open(galley://path)` per active doc |
 | Server status pill in Mac Viewer | Reads Server peer presence via Kosmos (was: HTTP probe) |
 | "Show on Vision Pro" menu enabledness | Reads AVP peer presence via Kosmos (was: `AVPReachabilityFile`) |
-| Mac-doc HTML / assets / live reload to AVP | Kosmos tunnel. WebKit's `galley://local/preview/<path>` request → `KosmosTunnelSchemeHandler` → `KosmosHTTPTunnel.Client` → `ProxyHTTPRequest` → `KosmosHTTPTunnel.Responder` (hosted by `KosmosLink`) → loopback HTTP → response chunks back via `ProxyHTTPResponseHead` + `ProxyHTTPResponseChunk` messages. Same `/preview/<path>` + `/template/<id>/<file>` + `/events/<path>` route surface as same-machine HTTP loopback; SSE flushes line-by-line, bounded responses are buffered on AVP and yielded as a single `.data` to WebKit. |
+| Mac-doc HTML / assets / live reload to AVP | Kosmos tunnel. WebKit's `galley://local/preview/<path>` request → `KosmosTunnelSchemeHandler` → `KosmosHTTPTunnel.Client` → `ProxyHTTPRequest` → `KosmosHTTPTunnel.Responder` (hosted by `ServerKosmosService`) → loopback HTTP → response chunks back via `ProxyHTTPResponseHead` + `ProxyHTTPResponseChunk` messages. Same `/preview/<path>` + `/template/<id>/<file>` + `/events/<path>` route surface as same-machine HTTP loopback; SSE flushes line-by-line, bounded responses are buffered on AVP and yielded as a single `.data` to WebKit. |
 | Mac-doc HTML / assets / live reload to Quicklook | HTTP loopback (`http://127.0.0.1:<port>/`) via `Defaults.shared.serverEndpointURL`. No pinning. Falls back to in-process render when the port is 0. |
 
 #### Kosmos message inventory

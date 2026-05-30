@@ -40,7 +40,7 @@ public enum GalleyKosmosRole: String, Role {
   }
 }
 
-extension MetadataKey where Value == URL {
+extension PeerInfo.Metadata.Key where Value == URL {
   /// Server's loopback HTTP base URL (`http://127.0.0.1:<port>`),
   /// published in peer metadata once the listener has bound, and read
   /// back as `peer.metadata[.httpURL]`. Lets Kosmos peers learn the
@@ -48,7 +48,7 @@ extension MetadataKey where Value == URL {
   /// — same value, different transport. The wire key is
   /// product-namespaced (`galley.http-url`), so it's safe against
   /// sibling products on the shared mesh.
-  public static var httpURL: Self { .init("galley.http-url") }
+  public static let httpURL: Self = "galley.http-url"
 }
 
 // Peer classification (server-by-host, AVP-by-device-type) and AVP
