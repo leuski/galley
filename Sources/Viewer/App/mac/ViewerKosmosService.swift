@@ -7,7 +7,7 @@ import Observation
 import OSLog
 
 private let log = Logger(
-  subsystem: bundleIdentifier, category: "KosmosViewerService")
+  subsystem: bundleIdentifier, category: "ViewerKosmosService")
 
 /// Mac Viewer's Kosmos surface. Narrow by design: peer presence for
 /// two UI gates (Server pill, "Show on Vision Pro" enabledness) and
@@ -17,9 +17,20 @@ private let log = Logger(
 /// Conforms to `KosmosService`; the `KosmosServiceHost` owns the
 /// bootstrap / peer-watch / stop boilerplate and calls back through
 /// the protocol.
+///
+/// Unlike the Server, this surface does **not** use
+/// `PeerReachabilityTracker`: it gates on peer-set **membership**, not
+/// the suspend/resume flag (visionOS scene phase fires `.background`
+/// for transient focus blips that aren't real suspension, and gating
+/// the menu on those would disable "Show on Vision Pro" while an AVP
+/// window is visibly open), and its `serverPeer` lookup needs the
+/// `kosmos.host`-matched classification that lives in
+/// `GalleyPeerClassifier`. So it reads `host.peers` through the
+/// classifier directly — one peer source, no tracker. The Server gates
+/// dispatch on resume; the Viewer gates the menu on presence.
 @MainActor
 @Observable
-final class KosmosViewerService: KosmosService<GalleyKosmosRole> {
+final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
   @ObservationIgnored private let localHostUUID = UUID.hostStable?

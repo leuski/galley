@@ -10,44 +10,61 @@ import OSLog
 import KosmosAppKit
 
 private let log = Logger(
-  subsystem: bundleIdentifier, category: "KosmosLink")
+  subsystem: bundleIdentifier, category: "ServerKosmosService")
 
-/// One per Server process. Owns the `KosmosServiceHost`, the peer-role
-/// mirror, and the per-window state for files currently displayed on
-/// AVP. Built but not started by `AppModel.init`;
+/// One per Server process. Owns the `KosmosServiceHost`, the
+/// `PeerReachabilityTracker` that mirrors peer roles + AVP
+/// reachability, and the per-window state for files currently
+/// displayed on AVP. Built but not started by `AppModel.init`;
 /// `AppModel.startServer()` calls `start()` after the preview server
 /// is up so we have a port to publish on each `OpenDocument`.
 ///
 /// When a `visionViewer` peer joins: AVP traffic rides the Kosmos
-/// tunnel (`Responder`) — the Mac HTTP listener stays
-/// loopback-only.
+/// tunnel (`Responder`) — the Mac HTTP listener stays loopback-only.
 ///
-/// When the last `visionViewer` peer leaves: walk the open-window
-/// set and re-open each on the local Galley.app via `URL.galleyRequest`.
+/// When the last `visionViewer` peer leaves: walk the open-window set
+/// and re-open each on the local Galley.app.
 ///
 /// The `RouteToAVP` request from a Mac Viewer peer is dispatched
 /// through the same path Finder-opens take (`dispatchOpenURLToAVP`),
 /// so the AVP-vs-Mac decision stays in one place.
 ///
-/// Boilerplate (bootstrap, peer-watch, subscription bookkeeping,
-/// stop) lives in `KosmosServiceHost`.
+/// Boilerplate (bootstrap, peer-watch, subscription bookkeeping, stop)
+/// lives in `KosmosServiceHost`; the peer-role mirror + suspend/resume
+/// reachability gating + vision join/leave diffing live in the shared
+/// `PeerReachabilityTracker`. What's left here is purely Galley's: what
+/// gets dispatched to AVP (`OpenDocument` + `DocumentWatcher`) and how
+/// a file falls back to the local app.
 @MainActor
 @Observable
-final class KosmosLink: KosmosService<GalleyKosmosRole> {
-  /// Any peer is currently connected. Surfaced for legacy callers
-  /// (UI binding etc.); newer code should branch on `isAVPReachable`.
-  private(set) var isPeerConnected: Bool = false
+final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
+  /// Any peer is currently connected. Forwarded from the tracker for
+  /// legacy callers; newer code should branch on `isAVPReachable`.
+  var isPeerConnected: Bool { reachability.isPeerConnected }
 
-  /// AVP currently reachable: at least one `visionViewer` peer is
-  /// connected AND its last lifecycle message was a resume.
-  private(set) var isAVPReachable: Bool = false
+  /// AVP currently reachable: a `visionViewer` peer is connected AND
+  /// its last lifecycle message was a resume.
+  var isAVPReachable: Bool { reachability.isAVPReachable }
 
   @ObservationIgnored private let host = ServiceHost(role: .server)
   @ObservationIgnored private let server: PreviewServerController
 
+  /// Shared peer-role mirror + AVP reachability state machine. Vision
+  /// join/leave is routed back here to start/stop file delegation.
+  /// `@ObservationIgnored` keeps the `@Observable` macro from rewriting
+  /// this `lazy` stored property into a computed one (the closures
+  /// capture `self`, so it must stay lazy); reads of the tracker's own
+  /// observable state still invalidate observers because it is
+  /// `@Observable`.
+  @ObservationIgnored
+  private lazy var reachability = PeerReachabilityTracker<GalleyKosmosRole>(
+    roleOf: { $0.galleyRole },
+    onVisionPeerJoined: { [weak self] peer in self?.onVisionPeerJoined(peer) },
+    onVisionPeerLeft: { [weak self] peer in self?.onVisionPeerLeft(peer) })
+
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
-  /// peers and streams responses chunkwise from the local Hummingbird
-  /// HTTP listener over Kosmos.
+  /// peers and streams responses chunkwise from the local HTTP
+  /// listener over Kosmos.
   @ObservationIgnored private let httpTunnelResponder: Responder
 
   /// Server's loopback HTTP base URL, captured at `start(httpURL:)`
@@ -66,19 +83,6 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
   = [:]
   @ObservationIgnored private let windowIDAllocator = KosmosCore
     .WindowIDAllocator()
-
-  /// Current peer role mirror, driven by `host.peers`.
-  @ObservationIgnored private var peerRoles: [PeerID: GalleyKosmosRole] = [:]
-
-  /// Per-peer "is this peer's app currently resumed?" flag. Set to
-  /// `true` on join (peers are assumed reachable until they say
-  /// otherwise), `false` on `AppWillSuspend`, `true` on `AppDidResume`.
-  /// Read by `firstReachableVisionPeer` to gate routing — a suspended
-  /// AVP looks like a connected peer at the Kosmos level (the TCP
-  /// socket lingers when visionOS suspends the app with no scenes),
-  /// so we need an in-band signal to know it's not actually draining
-  /// its message queue.
-  @ObservationIgnored private var peerResumed: [PeerID: Bool] = [:]
 
   init(server: PreviewServerController) {
     self.server = server
@@ -103,11 +107,7 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
       window.watchTask.cancel()
     }
     openOnAVP.removeAll()
-    peerRoles.removeAll()
-    peerResumed.removeAll()
     Task { await host.stop() }
-    isPeerConnected = false
-    isAVPReachable = false
   }
 
   // MARK: - KosmosService
@@ -121,11 +121,34 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
 
   func configure(host: ServiceHost, client: KosmosClient) async {
     await registerHandlers(host: host, client: client)
-    registerSubscriptions(host: host, client: client)
+    httpTunnelResponder.install(on: host, client: client)
+    reachability.installLifecycleObservers(on: host)
+    host.subscribe(CloseWindow.self) { [weak self] sender, message in
+      log.notice("""
+        ← RECV CloseWindow from=\(sender.description, privacy: .public) \
+        window=\(message.windowID, privacy: .public)
+        """)
+      self?.handleCloseWindow(message)
+    }
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
-    handlePeersChanged(snapshot)
+    // Dump the raw snapshot — including peers with nil role — so a
+    // "Mac Viewer sees AVP, Server doesn't" mismatch is diagnosable by
+    // eye. A peer discovered without role metadata (TXT-record race) is
+    // filtered out of the tracker and would otherwise be invisible.
+    let summary = snapshot.values
+      .map { info in
+        let role = info.galleyRole?.rawValue ?? "nil"
+        return "\(info.id.description)[role=\(role)]"
+      }
+      .sorted()
+      .joined(separator: ", ")
+    log.notice("""
+      peer-snapshot count=\(snapshot.count, privacy: .public) \
+      peers=[\(summary, privacy: .public)]
+      """)
+    reachability.update(snapshot)
   }
 
   func linkDidStart(_ error: (any Error)?) {
@@ -140,13 +163,13 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
   }
 
   /// Called by `application(_:open:)` (and the Mac Viewer's
-  /// `RouteToAVP` handler) when a file should be dispatched to AVP
-  /// if possible. Returns true if dispatched; false if AVP is
-  /// unavailable and the caller should fall back.
+  /// `RouteToAVP` handler) when a file should be dispatched to AVP if
+  /// possible. Returns true if dispatched; false if AVP is unavailable
+  /// and the caller should fall back.
   func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
     guard
       let client = host.client,
-      let visionPeer = firstReachableVisionPeer()
+      let visionPeer = reachability.firstReachableVisionPeer
     else {
       log.notice("""
         Cannot dispatch — no reachable vision peer for \
@@ -225,13 +248,13 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
   @MainActor
   @discardableResult
   public static func dispatchOpenURL(
-    _ url: GalleyBridgeRequest, with kosmos: KosmosLink?) async -> Bool
+    _ url: GalleyBridgeRequest, with kosmos: ServerKosmosService?) async -> Bool
   {
-    // AVP reachable over Kosmos → dispatch and we're done.
-    // Otherwise (no peer, or peer suspended per `peerResumed`) the
-    // doc opens in local Galley.app. AVP shows up automatically the
-    // next time the user activates Galley on AVP — the peer reconnects
-    // and subsequent opens land there again.
+    // AVP reachable over Kosmos → dispatch and we're done. Otherwise
+    // (no peer, or peer suspended) the doc opens in local Galley.app.
+    // AVP shows up automatically the next time the user activates
+    // Galley on AVP — the peer reconnects and subsequent opens land
+    // there again.
     if await kosmos?.dispatchOpenURLToAVP(url) == true {
       return true
     }
@@ -245,8 +268,8 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
     host: ServiceHost, client: KosmosClient
   ) async {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
-    // Reuses the same dispatch path Finder-opens use so the
-    // AVP-vs-Mac decision stays in one place (Pillar 4).
+    // Reuses the same dispatch path Finder-opens use so the AVP-vs-Mac
+    // decision stays in one place.
     await client.handle(
       RouteToAVP.self
     ) { [weak self] sender, request -> RouteToAVP.Reply in
@@ -265,111 +288,17 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
     }
   }
 
-  private func registerSubscriptions(
-    host: ServiceHost, client: KosmosClient
-  ) {
-    host.subscribe(CloseWindow.self) { [weak self] sender, message in
-      log.notice("""
-        ← RECV CloseWindow from=\(sender.description, privacy: .public) \
-        window=\(message.windowID, privacy: .public)
-        """)
-      self?.handleCloseWindow(message)
-    }
+  // MARK: - Vision peer lifecycle (driven by the reachability tracker)
 
-    host.subscribe(AppWillSuspend.self) { [weak self] sender, _ in
-      log.notice("""
-        ← RECV AppWillSuspend from=\(sender.description, privacy: .public)
-        """)
-      self?.setPeerResumed(sender, resumed: false)
-    }
-
-    host.subscribe(AppDidResume.self) { [weak self] sender, _ in
-      log.notice("""
-        ← RECV AppDidResume from=\(sender.description, privacy: .public)
-        """)
-      self?.setPeerResumed(sender, resumed: true)
-    }
-
-    host
-      .subscribe(ProxyHTTPRequest.self) { [weak self, weak client] _, request in
-        guard let self, let client else { return }
-        self.httpTunnelResponder.handleRequest(request, client: client)
-      }
-
-    host.subscribe(ProxyHTTPCancel.self) { [weak self] _, message in
-      self?.httpTunnelResponder.handleCancel(message)
-    }
-  }
-
-  private func setPeerResumed(_ peer: PeerID, resumed: Bool) {
-    peerResumed[peer] = resumed
-    updateReachabilityFlag()
-  }
-
-  // MARK: - Peer state
-
-  private func handlePeersChanged(_ snapshot: [PeerID: PeerInfo]) {
-    let previousRoles = peerRoles
-    var newRoles: [PeerID: GalleyKosmosRole] = [:]
-    for (id, info) in snapshot {
-      if let role = info.galleyRole {
-        newRoles[id] = role
-      }
-    }
-    peerRoles = newRoles
-    isPeerConnected = !newRoles.isEmpty
-
-    // Dump the raw snapshot — including peers with nil role — so a
-    // "Mac Viewer sees AVP, Server doesn't" mismatch is diagnosable
-    // by eye. A peer that's discovered without role metadata
-    // (TXT-record race) is filtered out of `peerRoles` and would
-    // otherwise be invisible to logs.
-    let summary = snapshot.values
-      .map { info in
-        let role = info.galleyRole?.rawValue ?? "nil"
-        return "\(info.id.description)[role=\(role)]"
-      }
-      .sorted()
-      .joined(separator: ", ")
-    log.notice("""
-      peer-snapshot count=\(snapshot.count, privacy: .public) \
-      peers=[\(summary, privacy: .public)]
-      """)
-
-    let newVisionPeers = Set(newRoles.filter { $0.value == .visionViewer }
-      .map(\.key))
-    let oldVisionPeers = Set(previousRoles.filter { $0.value == .visionViewer }
-      .map(\.key))
-
-    for peer in newVisionPeers.subtracting(oldVisionPeers) {
-      Task { await self.onVisionPeerJoined(peer) }
-    }
-    for peer in oldVisionPeers.subtracting(newVisionPeers) {
-      onVisionPeerLeft(peer)
-    }
-
-    updateReachabilityFlag()
-  }
-
-  private func onVisionPeerJoined(_ peer: PeerID) async {
+  private func onVisionPeerJoined(_ peer: PeerID) {
     log.notice("Vision peer joined: \(peer.description, privacy: .public)")
-    // Assume the AVP is resumed when it first connects. Subsequent
-    // `AppWillSuspend` / `AppDidResume` lifecycle messages correct
-    // this; in their absence "connected = resumed" is the right
-    // default (the peer wouldn't have completed the Kosmos handshake
-    // if its app weren't running).
-    peerResumed[peer] = true
-    updateReachabilityFlag()
-    // No bind-mode flip: the Mac HTTP listener stays loopback-only
-    // for AVP and every other consumer. AVP traffic rides the
-    // Kosmos tunnel via `Responder`.
+    // No bind-mode flip: the Mac HTTP listener stays loopback-only for
+    // AVP and every other consumer. AVP traffic rides the Kosmos tunnel
+    // via `Responder`. The resumed flag is seeded by the tracker.
   }
 
   private func onVisionPeerLeft(_ peer: PeerID) {
     log.notice("Vision peer left: \(peer.description, privacy: .public)")
-    peerResumed.removeValue(forKey: peer)
-    updateReachabilityFlag()
-
     // Migrate windows that were on this peer back to Mac.
     let toMigrate = openOnAVP.filter { $0.value.peerID == peer }
     for (windowID, window) in toMigrate {
@@ -389,22 +318,4 @@ final class KosmosLink: KosmosService<GalleyKosmosRole> {
     }
     log.debug("CloseWindow \(message.windowID, privacy: .public)")
   }
-
-  // MARK: - Helpers
-
-  /// First `visionViewer` peer that's connected AND currently
-  /// resumed. Suspended peers (AVP whose scenes are all gone — the
-  /// OS suspended the process even though the Kosmos TCP socket
-  /// lingers) are excluded so dispatches don't land in a process
-  /// that can't drain its message queue.
-  private func firstReachableVisionPeer() -> PeerID? {
-    peerRoles.first { id, role in
-      role == .visionViewer && peerResumed[id] == true
-    }?.key
-  }
-
-  private func updateReachabilityFlag() {
-    isAVPReachable = firstReachableVisionPeer() != nil
-  }
-
 }

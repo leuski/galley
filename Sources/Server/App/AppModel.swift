@@ -47,7 +47,7 @@ final class AppModel {
   let templates: TemplateChoice
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
-  @ObservationIgnored let kosmos: KosmosLink
+  @ObservationIgnored let kosmos: ServerKosmosService
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
   init() {
@@ -74,7 +74,7 @@ final class AppModel {
       rendererProvider: { [weak processors] in
         await processors?.selected.value.renderer
       })
-    self.kosmos = KosmosLink(server: self.server)
+    self.kosmos = ServerKosmosService(server: self.server)
 
     // Bidirectional sync with the shared `net.leuski.galley.shared`
     // suite. Outbound: menu-bar picks here surface in the Viewer

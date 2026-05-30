@@ -11,7 +11,7 @@ struct MacViewerApp: App {
   @State private var boot = AppBoot()
   @State private var dispatcher: WindowDispatcher
   @State private var recents = RecentDocumentsModel()
-  @State private var kosmos: KosmosViewerService
+  @State private var kosmos: ViewerKosmosService
 
   init() {
     URL.createLocalizedApplicationSupportDirectory()
@@ -32,7 +32,7 @@ struct MacViewerApp: App {
     _dispatcher = State(wrappedValue: dispatcher)
     // Start the Kosmos surface so the peer set populates by the
     // time the menu / pill consult it. Independent of `AppBoot`.
-    let kosmos = KosmosViewerService()
+    let kosmos = ViewerKosmosService()
     kosmos.start()
     _kosmos = State(wrappedValue: kosmos)
   }

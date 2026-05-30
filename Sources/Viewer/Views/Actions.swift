@@ -312,7 +312,7 @@ extension Action {
 extension Action {
   static func showOnVisionPro(
     _ model: DocumentModel?,
-    kosmos: KosmosViewerService) -> Action
+    kosmos: ViewerKosmosService) -> Action
   {
     Action(
       title: { "Show on Vision Pro" },

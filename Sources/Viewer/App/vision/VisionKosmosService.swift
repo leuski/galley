@@ -9,7 +9,7 @@ import OSLog
 import SwiftUI
 
 private let log = Logger(
-  subsystem: bundleIdentifier, category: "KosmosVisionService")
+  subsystem: bundleIdentifier, category: "VisionKosmosService")
 
 /// AVP-side Kosmos surface. Advertises as a `visionViewer`, mirrors
 /// the discovered peer set, subscribes to bridge messages (open-document,
@@ -28,7 +28,7 @@ private let log = Logger(
 /// the protocol.
 @MainActor
 @Observable
-final class KosmosVisionService: KosmosService<GalleyKosmosRole> {
+final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
@@ -91,13 +91,10 @@ final class KosmosVisionService: KosmosService<GalleyKosmosRole> {
       self?.reloadHandlers[message.windowID]?()
     }
 
-    host.subscribe(ProxyHTTPResponseHead.self) { [weak self] _, head in
-      self?.httpTunnelClient.handle(head)
-    }
-
-    host.subscribe(ProxyHTTPResponseChunk.self) { [weak self] _, chunk in
-      self?.httpTunnelClient.handle(chunk)
-    }
+    // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
+    // `ProxyHTTPResponseChunk` → the in-flight request) is shared in
+    // `KosmosHTTPTunnel`.
+    httpTunnelClient.install(on: host)
   }
 
   func linkDidStart(_ error: (any Error)?) {

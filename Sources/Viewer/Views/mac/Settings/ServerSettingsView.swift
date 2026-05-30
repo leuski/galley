@@ -4,7 +4,7 @@ import SwiftUI
 import GalleyCoreKit
 
 struct ServerSettingsView: View {
-  @Environment(KosmosViewerService.self) private var kosmos
+  @Environment(ViewerKosmosService.self) private var kosmos
 
   private let agent = ActiveServerAgent.shared
 

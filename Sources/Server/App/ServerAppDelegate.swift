@@ -20,7 +20,7 @@ private let log = Logger(
 ///
 /// `AppBoot` is the boot wrapper that owns the `AppModel`; we hold a
 /// weak reference to it so the delegate can ask for the current
-/// `KosmosLink` whenever a file shows up.
+/// `ServerKosmosService` whenever a file shows up.
 @MainActor
 final class ServerAppDelegate: NSObject, NSApplicationDelegate {
   weak var boot: AppBoot?
@@ -49,12 +49,14 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
         Boot not ready. Falling back to local Galley.app for \
         \(fileURLs.count, privacy: .public) file(s).
         """)
-      for fileURL in fileURLs { KosmosLink.openInLocalGalleyApp(fileURL) }
+      for fileURL in fileURLs {
+        ServerKosmosService.openInLocalGalleyApp(fileURL)
+      }
       return
     }
     Task {
       for fileURL in fileURLs {
-        await KosmosLink.dispatchOpenURL(fileURL, with: model.kosmos)
+        await ServerKosmosService.dispatchOpenURL(fileURL, with: model.kosmos)
       }
     }
   }

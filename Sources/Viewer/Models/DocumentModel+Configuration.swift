@@ -109,7 +109,7 @@ extension DocumentModel {
     // AVP renders Mac-hosted documents by tunneling each WebKit fetch
     // through Kosmos via the `galley://` scheme. The handler holds a
     // reference to the shared `Client` owned by
-    // `KosmosVisionService`.
+    // `VisionKosmosService`.
     if let kosmosTunnel = kosmosTunnel?.client {
       let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
       configuration.urlSchemeHandlers[KosmosTunnelSchemeHandler.scheme]

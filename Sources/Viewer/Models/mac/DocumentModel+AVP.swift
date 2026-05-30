@@ -14,7 +14,7 @@ private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentModel+AVP")
 
 extension DocumentModel {
-  func showOnVisionPro(kosmos: KosmosViewerService) {
+  func showOnVisionPro(kosmos: ViewerKosmosService) {
     let docURL = documentURL
     let kosmos = kosmos
     Task {

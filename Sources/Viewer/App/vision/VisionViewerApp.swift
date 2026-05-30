@@ -24,7 +24,7 @@ struct VisionViewerApp: App {
 
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
-  @State private var kosmos = KosmosVisionService()
+  @State private var kosmos = VisionKosmosService()
   @State private var registry = VisionWindowRegistry()
 
   /// Read at the **App** level so SwiftUI hands us the aggregate
@@ -104,7 +104,7 @@ struct VisionViewerApp: App {
 /// is functionally equivalent, so re-binding on every appear is
 /// idempotent.
 private struct KosmosOpenURLBinder: ViewModifier {
-  let kosmos: KosmosVisionService
+  let kosmos: VisionKosmosService
   let registry: VisionWindowRegistry
   @Environment(\.openWindow) private var openWindow
 

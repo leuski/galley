@@ -197,7 +197,7 @@ private struct DocumentScreen: View {
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(RecentDocumentsModel.self) private var recents
-  @Environment(KosmosVisionService.self) private var kosmos
+  @Environment(VisionKosmosService.self) private var kosmos
 
   var body: some View {
     Group {
