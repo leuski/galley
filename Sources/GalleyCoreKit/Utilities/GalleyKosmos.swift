@@ -40,26 +40,15 @@ public enum GalleyKosmosRole: String, Role {
   }
 }
 
-/// Galley-specific Kosmos peer-metadata keys. Keep in sync with the
-/// accessors on `PeerInfo` below — the keys are the wire shape.
-public enum GalleyKosmosMetadataKey {
+extension MetadataKey where Value == URL {
   /// Server's loopback HTTP base URL (`http://127.0.0.1:<port>`),
-  /// published once the listener has bound. Consumers read it via
-  /// `PeerInfo.galleyHTTPURL` so Kosmos peers don't need to dip
-  /// into the shared `net.leuski.galley` defaults just to learn the
-  /// port — same value, different transport.
-  public static let httpURL = "galley.http-url"
-}
-
-extension PeerInfo {
-  /// HTTP base URL the Server published in its advertisement
-  /// metadata. `nil` for non-server peers, for servers that haven't
-  /// finished binding yet, or when the metadata is malformed. The
-  /// metadata key is product-namespaced, so this is safe against
+  /// published in peer metadata once the listener has bound, and read
+  /// back as `peer.metadata[.httpURL]`. Lets Kosmos peers learn the
+  /// port without dipping into the shared `net.leuski.galley` defaults
+  /// — same value, different transport. The wire key is
+  /// product-namespaced (`galley.http-url`), so it's safe against
   /// sibling products on the shared mesh.
-  public var galleyHTTPURL: URL? {
-    metadata[GalleyKosmosMetadataKey.httpURL].flatMap(URL.init(string:))
-  }
+  public static var httpURL: Self { .init("galley.http-url") }
 }
 
 // Peer classification (server-by-host, AVP-by-device-type) and AVP

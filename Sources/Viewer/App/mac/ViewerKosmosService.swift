@@ -73,7 +73,7 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
   /// in metadata. Drives the port number shown in `.running` pill text.
   var serverPeerHTTPURL: URL? {
     guard let id = serverPeer, let info = host.peers[id] else { return nil }
-    return info.galleyHTTPURL
+    return info.metadata[.httpURL]
   }
 
   /// Drives the "Show on Vision Pro" menu enabledness. Same resume-

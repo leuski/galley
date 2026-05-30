@@ -96,10 +96,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   // MARK: - KosmosService
 
   func makeLink() async -> KosmosClient {
-    await host.makeLink(
-      extraMetadata: advertisedHTTPURL.map {
-        [GalleyKosmosMetadataKey.httpURL: $0.absoluteString]
-      } ?? [:])
+    await host.makeLink(extraMetadata: [.httpURL => advertisedHTTPURL])
   }
 
   func configure(host: ServiceHost, client: KosmosClient) async {
@@ -200,8 +197,8 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
     // Reuses the same dispatch path Finder-opens use so the AVP-vs-Mac
     // decision stays in one place. The host logs the request and reply.
-    await host.handle(RouteToAVP.self) {
-      [weak self] _, request -> RouteToAVP.Reply in
+    await host.handle(RouteToAVP.self)
+    { [weak self] _, request -> RouteToAVP.Reply in
       let dispatched = await Self.dispatchOpenURL(
         GalleyBridgeRequest(target: request.target), with: self
       )
