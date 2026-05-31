@@ -1,5 +1,9 @@
 import Foundation
-import KosmosCore
+import KosmosAppKit
+// Re-exported so `import GalleyCoreKit` keeps surfacing `WindowID` /
+// `WindowIDAllocator` / `OpenBehavior` app-wide, as it did when the
+// (now-shared) `WindowRegistry` lived here and carried this re-export.
+@_exported import KosmosCore
 
 /// Concrete action the Viewer's AppKit adapter should take in response
 /// to an inbound URL. The router decides; the adapter executes.
@@ -39,7 +43,7 @@ public struct OpenURLRouter: Sendable {
   public func decide(
     for url: URL,
     behavior: OpenBehavior,
-    registry: WindowRegistry,
+    registry: WindowRegistry<WindowID>,
     handlerInstalled: Bool,
     mainWindow: WindowID? = nil,
     keyWindow: WindowID? = nil

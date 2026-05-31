@@ -1,37 +1,37 @@
 #if os(macOS)
 import AppKit
 import GalleyCoreKit
+import KosmosAppKit
+import KosmosCore
 import Observation
 import OSLog
 import SwiftUI
-import KosmosAppKit
 
-/// Owns the routing state and AppKit-bridge for inbound document URLs.
+/// Owns Galley's inbound-document-URL routing policy and its
+/// AppKit-side state, layered on the shared `OpenURLCoordinator`.
 ///
-/// Pre-extraction this lived inside `ViewerAppDelegate` directly. The
-/// extraction is mechanical: state types (registry, buffer, scrolls,
-/// router, the `NSWindow ↔ WindowID` maps) move here, AppKit-only
-/// `apply(_:for:)` interpreting `DispatchAction` against `NSApp`/
-/// `NSWindow` moves with them. The `@Observable @MainActor` class is
-/// injected via `.environment()` so SwiftUI views (welcome,
-/// content view, file commands) talk to it directly without going
-/// through `NSApplication.delegate` casts.
+/// The generic mechanism — the launch buffer, the `WindowRegistry`, the
+/// `NSWindow ↔ WindowID` maps, the `willCloseNotification` observers, the
+/// `dispatch → decide → apply` pipeline — lives in `KosmosAppKit`'s
+/// `OpenURLCoordinator` and is shared with Dot. This class supplies the
+/// Galley-specific *policy*: the `OpenURLRouter` decision (`decide`), the
+/// `DispatchAction` execution (`apply`, the only AppKit-window-mutating
+/// code), and the bits the generic layer knows nothing about — help-window
+/// routing, `galley://` parsing, per-window rebind closures, the
+/// `newTab` host queue, and scroll-line stashing.
 ///
-/// The pure routing decisions live in `GalleyCoreKit/Routing/`
-/// (`OpenURLRouter`, `WindowRegistry`, `LaunchURLBuffer`, …); this
-/// class is the AppKit adapter that holds the live `NSWindow`
-/// references and converts router actions into AppKit calls.
+/// `@Observable @MainActor`, injected via `.environment()` so SwiftUI
+/// views (welcome, content view, file commands) reach it without
+/// `NSApplication.delegate` casts.
 @MainActor
 @Observable
 final class WindowDispatcher {
-  @ObservationIgnored private(set) var openHandler: ((URL) -> Void)?
-
   /// Closure that brings the singleton Help window to front. Set by
   /// the bootstrap modifier; captures `\.openWindow`. Help URLs bypass
   /// the regular routing pipeline entirely — they are not registered
-  /// in `WindowRegistry`, never tab-merge, never focus-existing onto
-  /// a doc window. The URL to display is stored in `currentHelpURL`
-  /// and observed by `HelpWindowView`.
+  /// in the coordinator, never tab-merge, never focus-existing onto a
+  /// doc window. The URL to display is stored in `currentHelpURL` and
+  /// observed by `HelpWindowView`.
   @ObservationIgnored private(set) var helpHandler: (() -> Void)?
 
   /// URL the singleton Help window should display. The Help scene is
@@ -42,51 +42,34 @@ final class WindowDispatcher {
   /// underlying `DocumentView`.
   var currentHelpURL: URL?
 
-  @ObservationIgnored private var launchBuffer = LaunchURLBuffer()
-  @ObservationIgnored private var registry = WindowRegistry()
-  @ObservationIgnored private var pendingScrolls = PendingScrollLines()
+  /// Shared, app-agnostic routing mechanism. Galley keys windows by the
+  /// Kosmos `WindowID` so the local registry id matches the id it sends
+  /// over the Kosmos wire — the coordinator itself never sees Kosmos.
+  @ObservationIgnored
+  private let coordinator: OpenURLCoordinator<WindowID, DispatchAction>
+
   @ObservationIgnored private let router = OpenURLRouter()
   @ObservationIgnored private let idAllocator = WindowIDAllocator()
+  @ObservationIgnored private var pendingScrolls = PendingScrollLines()
 
-  /// Maps the live AppKit `NSWindow` (by `ObjectIdentifier`) to the
-  /// stable `WindowID` we issued at registration time. Production-only
-  /// table — the routing layer itself never sees `NSWindow`.
-  @ObservationIgnored
-  private var idsByObject: [ObjectIdentifier: WindowID] = [:]
-
-  /// Reverse lookup so `apply(_:for:)` can dereference an opaque
-  /// `WindowID` back to the live `NSWindow` it represents.
-  @ObservationIgnored private var windowsByID: [WindowID: NSWindow] = [:]
-
-  /// Closures the registry can't carry (they aren't `Sendable`).
-  /// Each closure rebinds the owning window's WindowGroup binding +
+  /// Per-window rebind closures the registry can't carry (they aren't
+  /// `Sendable`). Each rebinds the owning window's WindowGroup binding +
   /// `DocumentModel` to a new URL — installed by `ContentView` at
-  /// registration time.
+  /// registration time, dropped via the coordinator's `onUnregister`
+  /// hook when the window closes.
   @ObservationIgnored
   private var rebindClosures: [WindowID: @MainActor (URL) -> Void] = [:]
 
-  /// `NSWindow.willCloseNotification` observers, keyed by window id,
-  /// so the dispatcher reliably unregisters a closed window even when
-  /// SwiftUI's `WindowGroup` keeps the underlying `NSWindow` alive
-  /// across close (`isReleasedWhenClosed = false` is the SwiftUI
-  /// default for managed windows). Without this hook, closing a tab
-  /// leaves a stale registration in the registry — the next reopen
-  /// of the same URL routes to `.focusExisting` on the hidden,
-  /// already-detached-from-its-tab-group window, which then surfaces
-  /// as a floating standalone window instead of merging as a tab.
-  @ObservationIgnored
-  private var closeObservers: [WindowID: NSObjectProtocol] = [:]
-
   /// Pending `newTab` merges keyed by the URL that triggered them.
-  /// Populated immediately before calling `openHandler`; each new
-  /// window's `WindowAccessor` consumes the entry whose URL matches
+  /// Populated immediately before asking the coordinator to spawn; each
+  /// new window's `WindowAccessor` consumes the entry whose URL matches
   /// its bound `fileURL`. URL-match (rather than FIFO) is what makes
   /// merging robust against duplicate dispatches: when `.onOpenURL`
-  /// fan-out or rapid back-to-back opens push the host more times
-  /// than SwiftUI ends up creating windows (because `openWindow(
-  /// value:)` dedupes on the in-flight URL), the leftover entries
-  /// sit in the queue without poisoning the next legitimate open
-  /// onto a different URL.
+  /// fan-out or rapid back-to-back opens push the host more times than
+  /// SwiftUI ends up creating windows (because `openWindow(value:)`
+  /// dedupes on the in-flight URL), the leftover entries sit in the
+  /// queue without poisoning the next legitimate open onto a different
+  /// URL.
   @ObservationIgnored
   private var pendingTabHosts: [(url: URL, host: NSWindow)] = []
 
@@ -95,12 +78,35 @@ final class WindowDispatcher {
     subsystem: bundleIdentifier,
     category: "WindowDispatcher")
 
-  init() {}
+  init() {
+    let router = router
+    let allocator = idAllocator
+    let coordinator = OpenURLCoordinator<WindowID, DispatchAction>(
+      makeID: { allocator.next() },
+      decide: { url, registry, handlerInstalled, mainWindow, keyWindow in
+        router.decide(
+          for: url,
+          behavior: Defaults.shared.openBehavior,
+          registry: registry,
+          handlerInstalled: handlerInstalled,
+          mainWindow: mainWindow,
+          keyWindow: keyWindow)
+      })
+    self.coordinator = coordinator
+    // `self` is fully initialized here (every stored property has a
+    // value), so the execution + cleanup closures may capture it.
+    coordinator.apply = { [weak self] action, url in
+      self?.apply(action, for: url)
+    }
+    coordinator.onUnregister = { [weak self] id in
+      self?.rebindClosures[id] = nil
+    }
+  }
 
   /// Single entry point for handling a batch of inbound URLs (from
   /// Finder, LaunchServices, Open Recent, etc.). Each URL is
   /// normalized (galley://path?line=N → file URL with stashed line),
-  /// then routed through the dispatcher's decide/apply pipeline.
+  /// then routed through the coordinator's decide/apply pipeline.
   ///
   /// `galley://settings` URLs pass through to the caller via
   /// `onSettingsRequested` — the caller (ViewerApp's WindowGroup
@@ -130,10 +136,10 @@ final class WindowDispatcher {
         if let line = info.scrollLine {
           pendingScrolls.stash(line, for: info.url)
         }
-        dispatch(info.url)
+        coordinator.dispatch(info.url)
       case .none:
         logUnparseableURL(url)
-        dispatch(url)
+        coordinator.dispatch(url)
       }
     }
   }
@@ -152,44 +158,29 @@ final class WindowDispatcher {
     pendingScrolls.consume(for: url)
   }
 
-  /// Single entry point all "open this URL" requests funnel through.
-  /// Honors `Defaults.shared.openBehavior` when at least one window
-  /// is already on screen; with no windows, every mode collapses to
-  /// "spawn a new window."
-  func dispatch(_ url: URL) {
-    let action = router.decide(
-      for: url,
-      behavior: Defaults.shared.openBehavior,
-      registry: registry,
-      handlerInstalled: openHandler != nil,
-      mainWindow: NSApp.mainWindow.flatMap { windowID(for: $0) },
-      keyWindow: NSApp.keyWindow.flatMap { windowID(for: $0) })
-    apply(action, for: url)
-  }
-
-  /// Interpret a `DispatchAction` from the router against the live
-  /// `NSApplication`. The split keeps the routing decisions pure
-  /// (testable in `Tests/GalleyCoreKitTests/Routing/`) and limits
-  /// `NSWindow`/`NSApp` coupling to this one method.
+  /// Interpret a `DispatchAction` against the live `NSApplication`.
+  /// Wired into the coordinator as its `apply` closure — the one place
+  /// `NSWindow`/`NSApp` mutation happens; the decision itself is pure
+  /// (`OpenURLRouter`, tested in `Tests/GalleyCoreKitTests/Routing/`).
   private func apply(_ action: DispatchAction, for url: URL) {
     switch action {
     case .queue:
-      launchBuffer.append(url)
+      coordinator.enqueue(url)
 
     case .openNew:
-      openHandler?(url)
+      coordinator.spawn(url)
 
     case .rebind(let id):
       rebindClosures[id]?(url)
 
     case .tabOnto(let id):
-      if let host = windowsByID[id] {
+      if let host = coordinator.window(for: id) {
         pendingTabHosts.append((url: url, host: host))
       }
-      openHandler?(url)
+      coordinator.spawn(url)
 
     case .focusExisting(let id):
-      windowsByID[id]?.makeKeyAndOrderFront(nil)
+      coordinator.window(for: id)?.makeKeyAndOrderFront(nil)
       NSApp.activate(ignoringOtherApps: true)
       rebindClosures[id]?(url)
     }
@@ -210,8 +201,8 @@ final class WindowDispatcher {
   ///      away.
   ///   2. Tab merge — if this open came in under the `newTab`
   ///      open-behavior, the dispatcher queued the host window when
-  ///      it asked SwiftUI to spawn this one. Match by URL so a
-  ///      stale queue entry from a deduped `openWindow(value:)` or
+  ///      it asked the coordinator to spawn this one. Match by URL so
+  ///      a stale queue entry from a deduped `openWindow(value:)` or
   ///      fan-out `.onOpenURL` doesn't poison an unrelated open —
   ///      see `consumePendingTabHost(for:)`.
   ///   3. Tab "+" hook — `NewTabAction.install(on:)` patches the
@@ -220,12 +211,12 @@ final class WindowDispatcher {
   ///      picks as tabs. Idempotent at the class level.
   ///   4. Register — wire up the rebind closure that the routing
   ///      adapter will call for `replaceCurrent` and `focusExisting`
-  ///      paths, and install the `willCloseNotification` cleanup.
+  ///      paths; the coordinator installs the `willCloseNotification`
+  ///      cleanup.
   ///
   /// Detach is the asymmetric one-liner `unregisterWindow(_:)`. The
-  /// `willCloseNotification` observer installed during `register`
-  /// auto-fires `unregisterWindow` on tab close — `unregisterWindow`
-  /// is safe to call twice (registry treats unknown ids as no-ops).
+  /// coordinator's close observer auto-fires `unregisterWindow` on tab
+  /// close — safe to call twice (unknown ids are no-ops).
   func adopt(
     _ window: NSWindow,
     fileURL: URL,
@@ -251,46 +242,19 @@ final class WindowDispatcher {
     initialURL: URL?,
     rebind: @escaping @MainActor (URL) -> Void
   ) {
-    let id = idAllocator.next()
-    idsByObject[ObjectIdentifier(window)] = id
-    windowsByID[id] = window
+    let id = coordinator.registerWindow(window, initialURL: initialURL)
     rebindClosures[id] = rebind
-    registry.register(WindowRecord(id: id, currentURL: initialURL))
-    // SwiftUI's `WindowGroup` leaves `isReleasedWhenClosed = false`
-    // on managed windows, so closing a tab does NOT trigger
-    // `viewWillMove(toWindow: nil)` on the contained subview — the
-    // `WindowAccessor.onDetach` path can't be relied on. Observe the
-    // notification directly so the registry stays in sync with the
-    // user's perception of "this window is gone."
-    let observer = NotificationCenter.default.addObserver(
-      forName: NSWindow.willCloseNotification,
-      object: window,
-      queue: .main
-    ) { [weak self] _ in
-      MainActor.assumeIsolated {
-        self?.unregisterWindow(window)
-      }
-    }
-    closeObservers[id] = observer
   }
 
   func unregisterWindow(_ window: NSWindow) {
-    guard let id = idsByObject
-      .removeValue(forKey: ObjectIdentifier(window)) else { return }
-    registry.unregister(id)
-    windowsByID.removeValue(forKey: id)
-    rebindClosures.removeValue(forKey: id)
-    if let observer = closeObservers.removeValue(forKey: id) {
-      NotificationCenter.default.removeObserver(observer)
-    }
+    coordinator.unregisterWindow(window)
   }
 
   /// Track the URL each window is currently bound to. ContentView
-  /// calls this whenever `model.documentURL` changes so `dispatch`
-  /// can short-circuit re-opens of an already-visible document.
+  /// calls this whenever `model.documentURL` changes so the router can
+  /// short-circuit re-opens of an already-visible document.
   func updateCurrentURL(_ window: NSWindow, _ url: URL?) {
-    guard let id = idsByObject[ObjectIdentifier(window)] else { return }
-    registry.updateCurrentURL(id, url)
+    coordinator.updateCurrentURL(window, url)
   }
 
   /// Consume the pending tab-merge host queued for `url`, if any.
@@ -313,7 +277,7 @@ final class WindowDispatcher {
   /// ("new tab here"), so we bypass `Defaults.shared.openBehavior`
   /// and the router's deduplication / focus-existing logic.
   func openAsTabs(_ urls: [URL], onto host: NSWindow) {
-    guard let openHandler else { return }
+    guard coordinator.openHandler != nil else { return }
     for url in urls {
       switch url.galleyRequest {
       case .openSettings:
@@ -323,37 +287,30 @@ final class WindowDispatcher {
           pendingScrolls.stash(line, for: info.url)
         }
         pendingTabHosts.append((url: info.url, host: host))
-        openHandler(info.url)
+        coordinator.spawn(info.url)
       case .none:
         pendingTabHosts.append((url: url, host: host))
-        openHandler(url)
+        coordinator.spawn(url)
       }
     }
   }
 
   /// True when at least one document window is registered.
   func hasAnyDocumentWindow() -> Bool {
-    !registry.isEmpty
-  }
-
-  /// Reverse-lookup helper for `dispatch`: given a live `NSWindow`,
-  /// return the `WindowID` we registered it under (if still tracked).
-  private func windowID(for window: NSWindow) -> WindowID? {
-    idsByObject[ObjectIdentifier(window)]
+    coordinator.hasRegisteredWindow
   }
 
   /// Called by the welcome scene's `.task` once the first SwiftUI
   /// view is alive. Installs the `openWindow` action and flushes
-  /// any URLs queued during launch.
+  /// any URLs queued during launch (Galley drains at install: each
+  /// buffered URL spawns a window via `openWindow(value:)`).
   ///
   /// Returns `true` when pending URLs were flushed — informational;
   /// no caller currently branches on it.
   @discardableResult
   func install(_ handler: @escaping (URL) -> Void) -> Bool {
-    let hadPending = !launchBuffer.isEmpty
-    openHandler = handler
-    for url in launchBuffer.drain() { handler(url) }
-    return hadPending
+    coordinator.install(handler)
+    return coordinator.flushLaunchBuffer()
   }
 
   /// Install the closure that brings the singleton Help window to
@@ -367,7 +324,7 @@ final class WindowDispatcher {
   /// `--seed-file` injection point — equivalent to the URL having
   /// arrived via `application(_:open:)` immediately after launch.
   func enqueueAtLaunch(_ url: URL) {
-    launchBuffer.append(url)
+    coordinator.enqueue(url)
   }
 }
 

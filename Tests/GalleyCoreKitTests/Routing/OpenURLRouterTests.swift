@@ -1,4 +1,5 @@
 import Foundation
+import KosmosAppKit
 import Testing
 @testable import GalleyCoreKit
 
@@ -17,7 +18,7 @@ struct OpenURLRouterTests {
     let action = router.decide(
       for: url,
       behavior: behavior,
-      registry: WindowRegistry(),
+      registry: WindowRegistry<WindowID>(),
       handlerInstalled: false)
     #expect(action == .queue)
   }
@@ -27,7 +28,7 @@ struct OpenURLRouterTests {
   @Test("focusExisting wins over every other behavior when URL is already open",
         arguments: OpenBehavior.allCases)
   func focusExistingPriority(behavior: OpenBehavior) {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let openWindow = ids.next()
     let otherDoc = ids.next()
     registry.register(WindowRecord(id: openWindow, currentURL: url))
@@ -51,7 +52,7 @@ struct OpenURLRouterTests {
     let action = router.decide(
       for: url,
       behavior: behavior,
-      registry: WindowRegistry(),
+      registry: WindowRegistry<WindowID>(),
       handlerInstalled: true)
     #expect(action == .openNew)
   }
@@ -60,7 +61,7 @@ struct OpenURLRouterTests {
 
   @Test("newWindow always spawns regardless of existing windows")
   func newWindowAlwaysSpawns() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     registry.register(WindowRecord(id: ids.next(), currentURL: url))
     registry.register(WindowRecord(id: ids.next()))
     let action = router.decide(
@@ -75,7 +76,7 @@ struct OpenURLRouterTests {
 
   @Test("newTab onto frontmost window")
   func newTabOntoFront() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let doc = ids.next()
     registry.register(WindowRecord(id: doc))
     let action = router.decide(
@@ -92,7 +93,7 @@ struct OpenURLRouterTests {
     let action = router.decide(
       for: url,
       behavior: .newTab,
-      registry: WindowRegistry(),
+      registry: WindowRegistry<WindowID>(),
       handlerInstalled: true)
     #expect(action == .openNew)
   }
@@ -101,7 +102,7 @@ struct OpenURLRouterTests {
 
   @Test("replaceCurrent rebinds the frontmost window")
   func replaceFront() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let doc = ids.next()
     registry.register(WindowRecord(id: doc))
     let action = router.decide(
@@ -118,7 +119,7 @@ struct OpenURLRouterTests {
     let action = router.decide(
       for: url,
       behavior: .replaceCurrent,
-      registry: WindowRegistry(),
+      registry: WindowRegistry<WindowID>(),
       handlerInstalled: true)
     #expect(action == .openNew)
   }
@@ -127,7 +128,7 @@ struct OpenURLRouterTests {
 
   @Test("Without main/key hints, newTab still picks any registered window")
   func newTabWithoutHints() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let doc = ids.next()
     registry.register(WindowRecord(id: doc))
     let action = router.decide(
@@ -148,7 +149,7 @@ struct OpenURLRouterTests {
   @Test("handler-not-installed queues even when URL is already open",
         arguments: OpenBehavior.allCases)
   func handlerNotInstalledOverridesFocusExisting(behavior: OpenBehavior) {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     registry.register(WindowRecord(id: ids.next(), currentURL: url))
     let action = router.decide(
       for: url,
@@ -162,7 +163,7 @@ struct OpenURLRouterTests {
     "handler-not-installed queues even with frontmost+key+main hints set",
     arguments: OpenBehavior.allCases)
   func handlerNotInstalledOverridesHints(behavior: OpenBehavior) {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let main = ids.next()
     let key = ids.next()
     registry.register(WindowRecord(id: main))
@@ -181,7 +182,7 @@ struct OpenURLRouterTests {
 
   @Test("newTab uses mainWindow over keyWindow")
   func newTabPrefersMainOverKey() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let main = ids.next()
     let key = ids.next()
     registry.register(WindowRecord(id: main))
@@ -198,7 +199,7 @@ struct OpenURLRouterTests {
 
   @Test("replaceCurrent uses mainWindow over keyWindow")
   func replacePrefersMainOverKey() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let main = ids.next()
     let key = ids.next()
     registry.register(WindowRecord(id: main))
@@ -215,7 +216,7 @@ struct OpenURLRouterTests {
 
   @Test("newTab falls back to key when main is unknown")
   func newTabFallsBackToKey() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let key = ids.next()
     registry.register(WindowRecord(id: key))
     let unknownMain = ids.next()
@@ -239,7 +240,7 @@ struct OpenURLRouterTests {
   /// regression in either side lights up here.
   @Test("focusExisting matches across percent-encoding differences")
   func focusExistingPercentEncoding() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let opened = URL(fileURLWithPath: "/tmp/foo bar.md")
     let inbound = URL(string: "file:///tmp/foo%20bar.md")!
     let id = ids.next()
@@ -256,7 +257,7 @@ struct OpenURLRouterTests {
   /// an absolute-form inbound (path-based equality, not URL-equality).
   @Test("focusExisting matches when stored URL has trailing slash")
   func focusExistingTrailingSlash() {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     // file URLs without trailing slash on a regular file: same path
     // after standardisation, so registration should match.
     let stored = URL(fileURLWithPath: "/tmp/note.md", isDirectory: false)
@@ -276,7 +277,7 @@ struct OpenURLRouterTests {
   @Test("Duplicate-URL registrations never spawn a new window",
         arguments: OpenBehavior.allCases)
   func duplicateURLNeverSpawns(behavior: OpenBehavior) {
-    var registry = WindowRegistry()
+    var registry = WindowRegistry<WindowID>()
     let first = ids.next()
     let second = ids.next()
     registry.register(WindowRecord(id: first, currentURL: url))
