@@ -1,5 +1,6 @@
 #if os(visionOS)
 import GalleyCoreKit
+import KosmosAppKit
 import SwiftUI
 
 /// visionOS entry point for Galley. Simpler than the macOS counterpart
@@ -25,7 +26,7 @@ struct VisionViewerApp: App {
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos = VisionKosmosService()
-  @State private var registry = VisionWindowRegistry()
+  @State private var registry = VisionWindowRegistry(windowGroupID: Self.main)
 
   /// Read at the **App** level so SwiftUI hands us the aggregate
   /// phase across all live scenes (`.active` if any scene is active,
