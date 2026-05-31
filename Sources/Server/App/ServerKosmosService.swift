@@ -171,7 +171,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   public static func openInLocalGalleyApp(_ fileURL: GalleyBridgeRequest) {
-    NSWorkspace.shared.open(GalleyRequest.document(fileURL.target).url)
+    NSWorkspace.shared.open(fileURL.target.url)
   }
 
   @MainActor

@@ -33,7 +33,7 @@ struct ViewCommands: Commands {
 }
 
 struct WindowCommands: Commands {
-  var kosmos: ViewerKosmosService
+  @Environment(ViewerKosmosService.self) var kosmos: ViewerKosmosService
   @FocusedValue(\.documentModel) private var model
 
   var body: some Commands {

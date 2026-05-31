@@ -22,7 +22,7 @@ struct HelpCommands: Commands {
         withExtension: "md")
       Button("How to Make a Template") {
         guard let url else { return }
-        NSWorkspace.shared.open(URL.galleyHelp(forBundleFile: url))
+        NSWorkspace.shared.open(OpenHelpActivity(documentURL: url).url)
       }
       .disabled(url == nil)
       .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)

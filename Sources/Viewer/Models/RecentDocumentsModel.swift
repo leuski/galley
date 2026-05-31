@@ -127,6 +127,10 @@ final class RecentDocumentsModel {
   }
 
 #if os(macOS)
+  func resolveRecentURL(_ url: URL) -> URL? {
+    url
+  }
+
   /// Open one previously-opened URL through the same path as
   /// Finder/NSOpenPanel (fire-at-self) — used by the Open Recent menu.
   func openRecent(_ url: URL) {
@@ -177,7 +181,7 @@ final class RecentDocumentsModel {
   ///
   /// Refreshes the on-disk bookmark when resolution reports stale
   /// data, and re-prepends the entry so reopening promotes it.
-  func openRecent(_ url: URL) -> URL? {
+  func resolveRecentURL(_ url: URL) -> URL? {
     let key = Self.dedupeKey(for: url)
     guard let idx = entries.firstIndex(where: {
       Self.dedupeKey(for: $0.url) == key

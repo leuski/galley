@@ -54,8 +54,8 @@ final class ViewerOpenModel {
   /// through unchanged.
   func openViaSelf(_ url: URL) {
     let target = url.isFileURL
-      ? GalleyRequest.document(DocumentTarget(url: url)).url
-      : url
+    ? OpenDocumentActivity(url: url).url
+    : url
     NSWorkspace.shared.open(target)
   }
 

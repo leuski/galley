@@ -28,12 +28,30 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>galley</string>
-				<string>galley-settings</string>
-				<string>galley-help</string>
 			</array>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 		</dict>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>net.leuski.galley-settings</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>galley-settings</string>
+      </array>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+    </dict>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>net.leuski.galley-help</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>galley-help</string>
+      </array>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+    </dict>
 	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>

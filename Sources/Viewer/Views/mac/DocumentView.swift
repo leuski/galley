@@ -553,13 +553,13 @@ struct DocumentView: View {
 /// so help never advertises `allowing: ["*"]` and steal a document open.
 private struct DocumentInboundURLs: ViewModifier {
   let enabled: Bool
-  let tokens: [String]
+  let tokens: Set<String>
   let onDocument: (DocumentTarget) -> Void
 
   func body(content: Content) -> some View {
     if enabled {
       content.handlesInboundURLs(
-        preferring: Set(tokens), onDocument: onDocument)
+        preferring: tokens, onDocument: onDocument)
     } else {
       content
     }

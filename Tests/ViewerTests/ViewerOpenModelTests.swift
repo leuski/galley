@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import GalleyCoreKit
 import Testing
 @testable import Galley
 
@@ -31,6 +32,31 @@ struct ViewerOpenModelTests {
     let model = ViewerOpenModel()
     #expect(model.consumePendingScrollLine(
       for: URL(fileURLWithPath: "/tmp/missing.md")) == nil)
+  }
+
+}
+
+/// Pins the scene routing tokens to the canonical scheme constants —
+/// no scattered hardcoded strings, and the document tokens must not
+/// capture the settings / help schemes.
+@Suite("MacScene tokens")
+struct MacSceneTests {
+  @Test("Scheme tokens derive from the canonical scheme constants")
+  func tokensDeriveFromSchemes() {
+    #expect(MacScene.settingsSchemeTokens
+      == ["\(GalleyRequest.settingsScheme):"])
+    #expect(MacScene.helpSchemeTokens == ["\(URL.galleyHelpScheme):"])
+    #expect(MacScene.documentSchemeTokens.contains("\(GalleyRequest.scheme):"))
+  }
+
+  @Test("Document tokens do not prefix-capture settings / help schemes")
+  func documentTokensExcludeOtherSchemes() {
+    let settings = "\(GalleyRequest.settingsScheme):"   // "galley-settings:"
+    let help = "\(URL.galleyHelpScheme):"               // "galley-help:"
+    for token in MacScene.documentSchemeTokens {
+      #expect(!settings.hasPrefix(token))
+      #expect(!help.hasPrefix(token))
+    }
   }
 }
 #endif

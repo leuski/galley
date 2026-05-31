@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import KosmosAppKit
 
 /// Pure normalization of inbound URLs from `application(_:open:)` and
 /// the custom `galley://` scheme into the canonical file URL the
@@ -29,7 +30,8 @@ import Foundation
 /// altogether: LaunchServices hands the URL to Server's
 /// `application(_:open:)` directly.
 public struct GalleyBridgeRequest: Sendable, Equatable,
-                                   CustomStringConvertible
+                                   CustomStringConvertible,
+                                   URLSerializable
 {
   public static let scheme = "galley-bridge"
 
@@ -44,17 +46,17 @@ public struct GalleyBridgeRequest: Sendable, Equatable,
   }
 
   public init?(from url: URL) {
-    guard url.scheme?.lowercased() == Self.scheme
-    else { return nil }
-    let components = URLComponents(
-      url: url,
-      resolvingAgainstBaseURL: false)
-    guard let target = DocumentTarget.init(components: components)
-    else { return nil }
-    self.target = target
+    if let target = DocumentTarget(from: url, scheme: Self.scheme) {
+      self.target = target
+      return
+    }
+    return nil
   }
 
   public var url: URL {
-    target.url(scheme: Self.scheme)
+    guard let url = target.url(scheme: Self.scheme) else {
+      preconditionFailure("GalleyBridgeRequest produced nil url")
+    }
+    return url
   }
 }

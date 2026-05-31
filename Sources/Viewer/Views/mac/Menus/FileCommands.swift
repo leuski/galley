@@ -7,13 +7,17 @@ import SwiftUI
 /// install a system Open Recent menu (that's `NSDocument`-driven),
 /// so we build it ourselves from `RecentDocumentsModel.urls`.
 struct FileCommands: Commands {
-  @Bindable var recents: RecentDocumentsModel
   @FocusedValue(\.documentModel) private var model
+  @Environment(RecentDocumentsModel.self) private var recents
 
   var visibleWindows: [NSWindow] {
     NSApp.windows.filter { window in
       window.isVisible
     }
+  }
+
+  var frontWindow: NSWindow? {
+    NSApp.mainWindow ?? NSApp.keyWindow ?? visibleWindows.first
   }
 
   var body: some Commands {
@@ -52,9 +56,9 @@ struct FileCommands: Commands {
     // of which scene is key.
     CommandGroup(replacing: .saveItem) {
       Button("Close", systemImage: "xmark") {
-        NSApp.keyWindow?.performClose(nil)
+        frontWindow?.performClose(nil)
       }
-      .disabled(NSApp.keyWindow == nil)
+      .disabled(frontWindow == nil)
       .keyboardShortcut("w", modifiers: .command)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.close)
 

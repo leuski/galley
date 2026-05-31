@@ -51,71 +51,20 @@ struct MacViewerApp: App {
     // swiftlint:disable:next redundant_discardable_let
     let _ = configureRouting()
 
-    // The document scene. SwiftUI materializes one `url == nil` member
-    // at cold launch (WindowProbe FINDINGS §3) which `MacContentView`
-    // uses as the invisible bootstrap anchor — capturing `openWindow`,
-    // hosting `.onOpenURL`, and running the FTUE Open panel. No
-    // separate welcome scene is needed.
-    WindowGroup(for: URL.self) { $url in
-      MacContentView(fileURL: $url)
-        .environment(boot)
-        .environment(openModel)
-        .environment(recents)
-    }
-    .defaultSize(width: 700, height: 900)
-    .windowToolbarStyle(.unified)
-    .commands {
-      FileCommands(recents: recents)
-      EditCommands()
-      ToolbarCommands()
-      ViewCommands()
-      if let model = boot.model {
-        FormatCommands(appModel: model)
-      }
-      WindowCommands(kosmos: kosmos)
-      HelpCommands()
-    }
+    DocumentScene()
+      .environment(boot)
+      .environment(openModel)
+      .environment(recents)
+      .environment(kosmos)
 
-    // Singleton Help window. It claims the `galley-help://` scheme via
-    // `handlesExternalEvents`, so firing `galley-help://<bundle-path>`
-    // at the app opens/raises it and delivers the URL to
-    // `HelpWindowView.onOpenURL`. `openModel` + `recents` are injected
-    // because the child `DocumentView` reads them.
-    // `.restorationBehavior(.disabled)` keeps help out of state
-    // restoration — closing the app while help is open doesn't bring it
-    // back on relaunch.
-    Window("Help", id: "help") {
-      HelpWindowView()
-        .environment(boot)
-        .environment(openModel)
-        .environment(recents)
-    }
-    .handlesExternalEvents(matching: ["galley-help:"])
-    .restorationBehavior(.disabled)
-    // Drop SwiftUI's static "Help" entry from the Window menu —
-    // AppKit auto-lists the window dynamically once it's visible
-    // (and removes the entry when it closes), so the static entry
-    // would only show "Help" as an always-present opener even when
-    // no help window exists.
-    .commandsRemoved()
-    .defaultSize(width: 600, height: 900)
+    HelpScene()
+      .environment(boot)
+      .environment(openModel)
+      .environment(recents)
 
-    Settings {
-      if let model = boot.model {
-        SettingsView(appModel: model)
-          .environment(kosmos)
-      } else {
-        ProgressView("Starting…")
-          .padding()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
-    }
-    // The Settings scene claims its own `galley-settings://` scheme, so a
-    // deep link (e.g. the Server's "Galley Settings…") opens it and the
-    // `?tab=` lands via `SettingsView.onOpenURL`.
-    .handlesExternalEvents(matching: ["galley-settings:"])
-    .defaultSize(width: 580, height: 360)
-    .windowResizability(.contentSize)
+    SettingsScene()
+      .environment(boot)
+      .environment(kosmos)
   }
 
   private func configureRouting() {

@@ -6,10 +6,8 @@ struct GeneralSettingsView: View {
   @Bindable var defaults = Defaults.shared
 
   var body: some View {
-    Section {
-      openDocumentPicker
-      statusBarSettings
-    }
+    openDocumentPicker
+    statusBarSettings
   }
 
   @ViewBuilder

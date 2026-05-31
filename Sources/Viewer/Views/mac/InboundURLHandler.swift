@@ -28,25 +28,17 @@ struct InboundURLHandler: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .handlesExternalEvents(preferring: preferring, allowing: ["*"])
+      .handlesExternalEvents(
+        preferring: preferring, allowing: DocumentScene.events)
       .onOpenURL { route($0) }
   }
 
   private func route(_ url: URL) {
-    switch url.galleyRequest {
-    case .document(let info):
-      recents.record(info.url)
-      onDocument(info)
-    case .none:
-      // Unparseable — pass the raw URL through as a document target.
-      recents.record(url)
-      onDocument(DocumentTarget(url: url))
-    case .openSettings:
-      // The Settings scene claims `galley-settings://` directly; reaching
-      // a document window means a misroute — ignore rather than spawn a
-      // bogus document window.
-      break
+    guard let document = OpenDocumentActivity(from: url) else {
+      return
     }
+    recents.record(document.documentURL)
+    onDocument(document)
   }
 }
 

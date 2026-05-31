@@ -29,7 +29,10 @@ struct HelpWindowView: View {
       }
     }
     .onOpenURL { url in
-      if let file = url.galleyHelpFileURL { helpURL = file }
+      guard let help = OpenHelpActivity(from: url) else {
+        return
+      }
+      helpURL = help.documentURL
     }
   }
 }
