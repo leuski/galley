@@ -18,8 +18,9 @@ private let log = Logger(
 struct DocumentView: View {
   @Binding var fileURL: URL
   let appModel: AppModel
-  @Environment(WindowDispatcher.self) private var dispatcher
+  @Environment(ViewerOpenModel.self) private var openModel
   @Environment(RecentDocumentsModel.self) private var recents
+  @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var model: DocumentModel
   @State private var didRestore = false
@@ -69,9 +70,9 @@ struct DocumentView: View {
   /// each get their own history that survives app relaunch. The
   /// stack is genuinely per-window (a sequence of files visited in
   /// order), so it can't move to `PerFileStateStore` — every other
-  /// piece of per-window state has, since `WindowRegistry`'s focus-
-  /// existing rule guarantees one window per URL and the per-file
-  /// store already carries the same fields.
+  /// piece of per-window state has, since the `preferring:` dedup
+  /// keeps one window per URL and the per-file store already carries
+  /// the same fields.
   @SceneStorage("history") private var historyJSON: String = ""
 
   var body: some View {
@@ -87,40 +88,31 @@ struct DocumentView: View {
         }
       }
       .animation(reduceMotion ? nil : .default, value: model.notice)
-      .background(WindowAccessor(
-        onAttach: { window in
-          // Re-run registration whenever the resolved NSWindow
-          // *changes identity* — but skip a no-op re-attach to the
-          // same host. SwiftUI caches scene `@State` for a freshly-
-          // closed `WindowGroup<URL>` window and reuses it when the
-          // same URL is reopened (the close-a-tab-and-reopen path),
-          // which leaves `hostWindow` pointing at the dead AppKit
-          // window. A simple `nil` guard here would skip the re-
-          // register + tab-merge for the new window — turning the
-          // reopened tab into a floating, toolbar-less window.
-          guard let window, window !== hostWindow else { return }
-          hostWindow = window
-          if model.kind == .help {
-            // Help windows reveal themselves directly — no dispatcher
-            // adoption, no registry entry, no tab "+" hook.
-            window.alphaValue = model.didFirstBind ? 1 : 0
-            return
-          }
-          // The window-adoption ceremony (alpha unhide, tab merge,
-          // tab "+" hook, registry insert) lives on the dispatcher
-          // so it stays unit-testable. See `WindowDispatcher.adopt`.
-          dispatcher.adopt(
-            window,
-            fileURL: fileURL,
-            didFirstBind: model.didFirstBind
-          ) { newURL in
-            replaceDocument(with: newURL)
-          }
-        },
-        onDetach: { window in
-          guard model.kind == .document, let window else { return }
-          dispatcher.unregisterWindow(window)
-        }))
+      .background(WindowAccessor(onAttach: { window in
+        // Reveal whenever the resolved NSWindow changes identity —
+        // skip a no-op re-attach to the same host. SwiftUI caches
+        // scene `@State` for a freshly-closed `WindowGroup<URL>`
+        // window and reuses it when the same URL is reopened; a plain
+        // `nil` guard would leave the reopened tab toolbar-less.
+        guard let window, window !== hostWindow else { return }
+        hostWindow = window
+        window.alphaValue = model.didFirstBind ? 1 : 0
+        // Tabs are born into the key group at creation (born-as-tab,
+        // no post-hoc `addTabbedWindow` flash — WindowProbe FINDINGS
+        // §8). We only still patch the AppKit tab-bar "+" so a user
+        // "+" click runs the Open panel + opens a tab. Help skips it.
+        if model.kind == .document {
+          NewTabAction.install(on: window)
+        }
+      }))
+      // A document window prefers its own URL so a repeat-open routes
+      // back here (dedup) instead of duplicating; the token list
+      // tracks `model.documentURL` reactively, covering in-window
+      // navigation. Help windows opt out — they never receive URLs.
+      .modifier(DocumentInboundURLs(
+        enabled: model.kind == .document,
+        tokens: model.documentURL.galleyPreferringTokens,
+        onDocument: handleInbound))
       .focusedSceneValue(\.documentModel, model)
       .alert(
         "Rename Document",
@@ -293,11 +285,39 @@ struct DocumentView: View {
   /// safe to call from multiple `.onChange` observers.
   private func handleDocumentBound() {
     saveHistory()
-    if model.kind == .document, let window = hostWindow {
-      dispatcher.updateCurrentURL(window, model.documentURL)
-    }
+    // The window's `preferring:` dedup tokens track `model.documentURL`
+    // reactively (see `DocumentInboundURLs` in `body`), so in-window
+    // navigation needs no explicit registry update here.
     if model.didFirstBind {
       hostWindow?.alphaValue = 1
+    }
+  }
+
+  /// Apply an inbound document URL that SwiftUI routed to this window.
+  /// Re-open of the doc this window already shows → just scroll +
+  /// focus (dedup). Otherwise honor the user's open-behavior:
+  /// `replaceCurrent` rebinds this window in place; `newWindow` /
+  /// `newTab` spawn a fresh window (born standalone or born-as-tab via
+  /// `allowsAutomaticWindowTabbing` — WindowProbe FINDINGS §9).
+  private func handleInbound(_ info: DocumentTarget) {
+    if model.documentURL.standardizedFileURL == info.url.standardizedFileURL {
+      if let line = info.scrollLine {
+        Task { await model.scrollToSourceLine(line) }
+      }
+      NSApp.activate(ignoringOtherApps: true)
+      hostWindow?.makeKeyAndOrderFront(nil)
+      return
+    }
+    switch Defaults.shared.openBehavior {
+    case .replaceCurrent:
+      replaceDocument(with: info.url, scrollLine: info.scrollLine)
+    case .newTab, .newWindow:
+      if let line = info.scrollLine {
+        openModel.stash(scrollLine: line, for: info.url)
+      }
+      NSWindow.allowsAutomaticWindowTabbing =
+        Defaults.shared.openBehavior == .newTab
+      openWindow(value: info.url)
     }
   }
 
@@ -376,10 +396,10 @@ struct DocumentView: View {
   /// the `replaceCurrent` open behavior. Updates the WindowGroup
   /// binding so state restoration follows, and rebinds the model so
   /// history/watcher restart on the new URL.
-  private func replaceDocument(with newURL: URL) {
+  private func replaceDocument(with newURL: URL, scrollLine: Int? = nil) {
     recents.record(newURL)
     if fileURL != newURL { fileURL = newURL }
-    let line = dispatcher.consumePendingScrollLine(for: newURL)
+    let line = scrollLine
     // Replace-current is a fresh-doc switch, not a parent→child
     // navigation, so re-seed the TOC sidebar from the destination's
     // own per-file pref rather than inheriting the previous doc's
@@ -442,7 +462,7 @@ struct DocumentView: View {
 
     case .initialBind(let url, let scrollY, let showsTOC):
       recents.record(url)
-      let line = dispatcher.consumePendingScrollLine(for: url)
+      let line = openModel.consumePendingScrollLine(for: url)
       await model.bind(
         to: url,
         scrollToLine: line,
@@ -525,6 +545,24 @@ struct DocumentView: View {
   private var zoomLabel: String {
     let percent = Int((model.pageZoom * 100).rounded())
     return "\(percent)%"
+  }
+}
+
+/// Applies inbound-URL receipt + `preferring:` dedup tokens to a
+/// document window, and no-ops for the Help window (`enabled == false`)
+/// so help never advertises `allowing: ["*"]` and steal a document open.
+private struct DocumentInboundURLs: ViewModifier {
+  let enabled: Bool
+  let tokens: [String]
+  let onDocument: (DocumentTarget) -> Void
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.handlesInboundURLs(
+        preferring: Set(tokens), onDocument: onDocument)
+    } else {
+      content
+    }
   }
 }
 

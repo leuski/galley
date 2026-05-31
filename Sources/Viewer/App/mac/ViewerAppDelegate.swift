@@ -11,7 +11,8 @@ import AppKit
 ///
 /// SwiftUI provides no scene-level way to declare this, so we
 /// reintroduce an `NSApplicationDelegateAdaptor` for this single
-/// hook. Routing state lives in `WindowDispatcher`, recents in
+/// hook. URL receipt + routing live in `InboundURLHandler` (per
+/// window) and the small shared `ViewerOpenModel`; recents in
 /// `RecentDocumentsModel`; those stay out of here.
 ///
 /// If you find yourself reaching for another method on this class,

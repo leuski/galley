@@ -11,29 +11,29 @@ struct GalleyActionTests {
     #expect(outcome == .document(.init(url: url)))
   }
 
-  @Test("galley://settings becomes openSettings with no tab")
+  @Test("galley-settings:// becomes openSettings with no tab")
   func settingsURL() {
-    let url = URL(string: "galley://settings")!
+    let url = URL(string: "galley-settings://")!
     #expect(url.galleyRequest == .openSettings(nil))
   }
 
-  @Test("galley://settings?tab=<id> carries the tab")
+  @Test("galley-settings://?tab=<id> carries the tab")
   func settingsTabExtracted() {
     for tab in SettingsTab.allCases {
-      let url = URL(string: "galley://settings?tab=\(tab.rawValue)")!
+      let url = URL(string: "galley-settings://?tab=\(tab.rawValue)")!
       #expect(url.galleyRequest == .openSettings(tab))
     }
   }
 
   @Test("Settings tab value is case-insensitive")
   func settingsTabCaseInsensitive() {
-    let url = URL(string: "galley://settings?tab=SERVER")!
+    let url = URL(string: "galley-settings://?tab=SERVER")!
     #expect(url.galleyRequest == .openSettings(.server))
   }
 
   @Test("Unknown settings tab is dropped")
   func settingsTabUnknownDropped() {
-    let url = URL(string: "galley://settings?tab=bogus")!
+    let url = URL(string: "galley-settings://?tab=bogus")!
     #expect(url.galleyRequest == .openSettings(nil))
   }
 
@@ -49,10 +49,18 @@ struct GalleyActionTests {
     }
   }
 
-  @Test("settings host is case-insensitive")
-  func settingsHostCaseInsensitive() {
-    let upper = URL(string: "galley://Settings")!
-    #expect(upper.galleyRequest == .openSettings(nil))
+  @Test("galley-settings scheme is case-insensitive")
+  func settingsSchemeCaseInsensitive() {
+    let upper = URL(string: "GALLEY-SETTINGS://?tab=server")!
+    #expect(upper.galleyRequest == .openSettings(.server))
+  }
+
+  @Test("Old galley://settings form is no longer settings (now a doc/none)")
+  func oldSettingsFormRetired() {
+    // The settings deep-link moved to its own scheme; `galley://settings`
+    // has an empty path under the document scheme → unparseable.
+    let url = URL(string: "galley://settings")!
+    #expect(url.galleyRequest != .openSettings(nil))
   }
 
   @Test("galley://path?line=N stashes scroll line")
@@ -177,19 +185,19 @@ struct GalleyActionTests {
   /// if the lookup ever flips to case-insensitive on the param NAME.
   @Test("tab= parameter NAME is case-sensitive (only lowercase 'tab' wins)")
   func settingsTabParamNameCaseSensitive() {
-    let url = URL(string: "galley://settings?TAB=server")!
+    let url = URL(string: "galley-settings://?TAB=server")!
     #expect(url.galleyRequest == .openSettings(nil))
   }
 
   @Test("Settings with no query items returns no tab")
   func settingsEmptyQuery() {
-    let url = URL(string: "galley://settings?")!
+    let url = URL(string: "galley-settings://?")!
     #expect(url.galleyRequest == .openSettings(nil))
   }
 
   @Test("Settings with extra unrelated params still returns the tab")
   func settingsTabWithExtras() {
-    let url = URL(string: "galley://settings?foo=bar&tab=server&x=y")!
+    let url = URL(string: "galley-settings://?foo=bar&tab=server&x=y")!
     #expect(url.galleyRequest == .openSettings(.server))
   }
 
@@ -220,5 +228,31 @@ struct GalleyActionTests {
   func settingsTabRawValueRoundTrip(tab: SettingsTab) {
     let parsed = SettingsTab(rawValue: tab.rawValue)
     #expect(parsed == tab)
+  }
+
+  // MARK: - Scheme round-trips (build → parse)
+
+  @Test("GalleyRequest.openSettings builds a galley-settings URL that "
+        + "parses back", arguments: SettingsTab.allCases)
+  func settingsURLRoundTrip(tab: SettingsTab) {
+    let url = GalleyRequest.openSettings(tab).url
+    #expect(url.scheme == "galley-settings")
+    #expect(url.galleyRequest == .openSettings(tab))
+  }
+
+  // MARK: - Help URL helpers
+
+  @Test("galley-help URL round-trips to the bundle file path")
+  func helpURLRoundTrip() {
+    let file = URL(fileURLWithPath: "/App.app/Contents/Resources/help.md")
+    let helpURL = URL.galleyHelp(forBundleFile: file)
+    #expect(helpURL.scheme == "galley-help")
+    #expect(helpURL.galleyHelpFileURL == file)
+  }
+
+  @Test("Non-help URLs have no galleyHelpFileURL")
+  func nonHelpHasNoFileURL() {
+    #expect(URL(string: "galley:///tmp/a.md")!.galleyHelpFileURL == nil)
+    #expect(URL(fileURLWithPath: "/tmp/a.md").galleyHelpFileURL == nil)
   }
 }

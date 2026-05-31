@@ -14,7 +14,7 @@ import Foundation
 /// The interpreter (in `DocumentView`) handles the side effects the
 /// pure plan deliberately leaves out:
 ///   - recording in `RecentDocumentsModel`
-///   - consuming the pending scroll-line from `WindowDispatcher`
+///   - consuming the pending scroll-line from `ViewerOpenModel`
 ///   - awaiting `model.restore` / `model.bind`
 struct BindPlan: Equatable {
   /// Zoom factor to apply on every launchTask fire — a JS rule

@@ -9,27 +9,19 @@ import KosmosAppKit
 struct MacViewerApp: App {
   @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
-  @State private var dispatcher: WindowDispatcher
+  @State private var openModel = ViewerOpenModel()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos: ViewerKosmosService
 
   init() {
     URL.createLocalizedApplicationSupportDirectory()
+    Self.pinWindowTabbingPreference()
     // If the active server-agent backend persists an absolute path
     // to the helper, the user moving `Galley.app` would leave that
     // record pointing at a stale location. Detect and repair before
     // any UI reflects stale state. No-op when nothing is installed.
     // Fire-and-forget: scenes don't need to wait on it.
     Task { await ActiveServerAgent.shared.validateAndRepair() }
-    let args = LaunchArguments.fromProcess()
-    let dispatcher = WindowDispatcher()
-    if let seed = args.seedFile {
-      // Test-mode injection: pre-populate the launch buffer so the
-      // welcome scene drains it on first install. Equivalent to the
-      // URL having arrived via `.onOpenURL` immediately at launch.
-      dispatcher.enqueueAtLaunch(seed)
-    }
-    _dispatcher = State(wrappedValue: dispatcher)
     // Start the Kosmos surface so the peer set populates by the
     // time the menu / pill consult it. Independent of `AppBoot`.
     let kosmos = ViewerKosmosService()
@@ -37,49 +29,37 @@ struct MacViewerApp: App {
     _kosmos = State(wrappedValue: kosmos)
   }
 
+  /// Force `NSWindow.userTabbingPreference == .always` for this process
+  /// via the volatile argument domain (outranks the user's global
+  /// "Prefer tabs" setting, but only for us — WindowProbe FINDINGS §8).
+  /// That's the substrate the per-open `allowsAutomaticWindowTabbing`
+  /// toggle needs so `newTab` opens are born-as-tab without a flash;
+  /// `newWindow`/`replaceCurrent` still open standalone because the
+  /// toggle is flipped off for them.
+  private static func pinWindowTabbingPreference() {
+    var domain = UserDefaults.standard
+      .volatileDomain(forName: UserDefaults.argumentDomain)
+    domain["AppleWindowTabbingMode"] = "always"
+    UserDefaults.standard
+      .setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+  }
+
   var body: some Scene {
-    // Wire the cross-references the recents model needs to dispatch
-    // through the same path as Finder dispatches, plus the
-    // tab-bar "+" handler that runs the Open panel and merges picks
-    // as tabs onto the source window. Both assignments are
-    // idempotent — body may re-run.
+    // Wire the tab-bar "+" handler (runs the Open panel and opens the
+    // picks as tabs onto the source window). Idempotent — body may
+    // re-run.
     // swiftlint:disable:next redundant_discardable_let
     let _ = configureRouting()
 
-    // Always-alive hidden anchor scene. SwiftUI auto-spawns this
-    // because it's a `Window` (singular) — guarantees a view exists
-    // at launch to capture `openWindow` and host `.onOpenURL` for
-    // the URL-typed `WindowGroup` below. See WelcomeView for the
-    // full justification.
-    Window("Welcome", id: "welcome") {
-      WelcomeView()
-        .environment(boot)
-        .environment(dispatcher)
-        .environment(recents)
-    }
-    // Always present at launch. Without this, SwiftUI may remember
-    // a previous "closed" state and skip auto-spawning, leaving us
-    // with no view to capture `openWindow`.
-    .defaultLaunchBehavior(.presented)
-    // Don't persist welcome's "is open" state across launches.
-    // We never want it remembered as closed; we always want it
-    // ready as the bootstrap anchor.
-    .restorationBehavior(.disabled)
-    // Strip SwiftUI's auto-generated commands for this scene —
-    // notably the Window-menu entry SwiftUI inserts for every
-    // `Window` scene. Without this, `Welcome` shows up alongside
-    // real document windows in the Window menu and the user can
-    // bring it forward (stealing focus from doc windows). The
-    // per-NSWindow flags `isExcludedFromWindowsMenu` and
-    // `NSApp.removeWindowsItem` operate on the AppKit window
-    // list; this scene-level entry is a separate construct that
-    // only `.commandsRemoved()` reaches.
-    .commandsRemoved()
-
+    // The document scene. SwiftUI materializes one `url == nil` member
+    // at cold launch (WindowProbe FINDINGS §3) which `MacContentView`
+    // uses as the invisible bootstrap anchor — capturing `openWindow`,
+    // hosting `.onOpenURL`, and running the FTUE Open panel. No
+    // separate welcome scene is needed.
     WindowGroup(for: URL.self) { $url in
       MacContentView(fileURL: $url)
         .environment(boot)
-        .environment(dispatcher)
+        .environment(openModel)
         .environment(recents)
     }
     .defaultSize(width: 700, height: 900)
@@ -93,23 +73,24 @@ struct MacViewerApp: App {
         FormatCommands(appModel: model)
       }
       WindowCommands(kosmos: kosmos)
-      HelpCommands(dispatcher: dispatcher)
+      HelpCommands()
     }
 
-    // Singleton Help window. SwiftUI enforces "exactly one" — calling
-    // `openWindow(id: "help")` while a Help window is open just brings
-    // it forward. The URL to display is held on the dispatcher in
-    // `currentHelpURL`; the dispatcher writes it before triggering the
-    // open via the installed help handler.
-    // `.restorationBehavior(.disabled)` keeps
-    // the help window out of state-restoration entirely — closing the
-    // app while help is open does not bring it back on relaunch.
+    // Singleton Help window. It claims the `galley-help://` scheme via
+    // `handlesExternalEvents`, so firing `galley-help://<bundle-path>`
+    // at the app opens/raises it and delivers the URL to
+    // `HelpWindowView.onOpenURL`. `openModel` + `recents` are injected
+    // because the child `DocumentView` reads them.
+    // `.restorationBehavior(.disabled)` keeps help out of state
+    // restoration — closing the app while help is open doesn't bring it
+    // back on relaunch.
     Window("Help", id: "help") {
       HelpWindowView()
         .environment(boot)
-        .environment(dispatcher)
+        .environment(openModel)
         .environment(recents)
     }
+    .handlesExternalEvents(matching: ["galley-help:"])
     .restorationBehavior(.disabled)
     // Drop SwiftUI's static "Help" entry from the Window menu —
     // AppKit auto-lists the window dynamically once it's visible
@@ -129,19 +110,27 @@ struct MacViewerApp: App {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
+    // The Settings scene claims its own `galley-settings://` scheme, so a
+    // deep link (e.g. the Server's "Galley Settings…") opens it and the
+    // `?tab=` lands via `SettingsView.onOpenURL`.
+    .handlesExternalEvents(matching: ["galley-settings:"])
     .defaultSize(width: 580, height: 360)
     .windowResizability(.contentSize)
   }
 
   private func configureRouting() {
-    recents.dispatcher = dispatcher
+    recents.openModel = openModel
     let recents = recents
-    let dispatcher = dispatcher
-    NewTabAction.handler = { source in
+    let openModel = openModel
+    NewTabAction.handler = { _ in
       Task { @MainActor in
         let picks = await recents.runOpenPanel()
-        for url in picks { recents.record(url) }
-        dispatcher.openAsTabs(picks, onto: source)
+        for url in picks {
+          recents.record(url)
+          // Born-as-tab into the key window's group (the "+" source is
+          // key). No host argument needed — see `ViewerOpenModel`.
+          openModel.openAsTab(url)
+        }
       }
     }
   }

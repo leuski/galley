@@ -46,12 +46,11 @@ enum AppLauncher {
     //
     // We deliberately do NOT pass `--ui-test-mode` as a launch arg.
     // AppKit's command-line `NSUserDefaults` parser eats `--`-prefixed
-    // tokens and interprets the next token as the value, which polutes
-    // the defaults domain in ways that suppress the `Window("welcome")`
-    // scene from spawning at launch (the symptom: WelcomeView body
-    // never fires). Inject the test-mode marker via the environment
-    // instead — `ProcessInfo.environment` isn't touched by AppKit's
-    // arg parser.
+    // tokens and interprets the next token as the value, which pollutes
+    // the defaults domain in ways that can suppress the document
+    // `WindowGroup` from spawning its initial window at launch. Inject
+    // the test-mode marker via the environment instead —
+    // `ProcessInfo.environment` isn't touched by AppKit's arg parser.
     var args: [String] = []
     if ignorePersistedState {
       args.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
@@ -108,11 +107,29 @@ enum AppLauncher {
     let fileURL = dir / fileName
     try markdownContent.write(to: fileURL, atomically: true, encoding: .utf8)
     let app = launchClean(
-      extraArgs: ["--seed-file", fileURL.path],
       ignorePersistedState: ignorePersistedState,
       file: file,
       line: line)
+    openViaURLScheme(fileURL)
     return (app, fileURL)
+  }
+
+  /// Open `fileURL` in the running app via its `galley://` scheme — the
+  /// same form BBEdit's preview script and the Server use. Routes
+  /// through `onOpenURL`, which SwiftUI delivers to a `WindowGroup`
+  /// window (materializing one if needed). Replaces the old
+  /// `--seed-file` launch-buffer injection.
+  @MainActor
+  static func openViaURLScheme(_ fileURL: URL) {
+    var components = URLComponents()
+    components.scheme = "galley"
+    components.path = fileURL.path
+    guard let url = components.url else { return }
+    let task = Process()
+    task.launchPath = "/usr/bin/open"
+    task.arguments = [url.absoluteString]
+    try? task.run()
+    task.waitUntilExit()
   }
 
   /// Launch *without* `-ApplePersistenceIgnoreState YES`, so AppKit

@@ -1,5 +1,9 @@
 import Foundation
-import KosmosCore
+// Re-exported so `import GalleyCoreKit` keeps surfacing KosmosCore
+// symbols module-wide (`WindowID` / `WindowIDAllocator` / `OpenBehavior`
+// for the Viewer, and `MIMETypes` for `WebKit/PreviewSchemeHandler`).
+// This re-export previously lived on the now-deleted `OpenURLRouter`.
+@_exported import KosmosCore
 
 public extension OpenBehavior {
   /// Localized label for the case, exposed as

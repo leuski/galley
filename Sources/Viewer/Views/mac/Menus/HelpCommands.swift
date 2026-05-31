@@ -1,12 +1,13 @@
 #if os(macOS)
+import AppKit
 import Foundation
 import GalleyCoreKit
 import SwiftUI
 
-/// Help menu — opens bundled help docs as ordinary documents through
-/// the same dispatcher that handles Finder-opens. The doc is read-only
-/// inside the app bundle, but it renders with the user's currently
-/// selected template like any other markdown file, so it Just Works.
+/// Help menu — opens bundled help docs in the singleton Help window by
+/// firing a `galley-help://<bundle-path>` URL at the app; the Help scene
+/// claims that scheme via `handlesExternalEvents` and renders the doc
+/// with the user's current template like any other markdown file.
 ///
 /// Doc sources may contain `{{GALLEY_APP_FINDER_URL}}` for the running
 /// app's bundle location, expressed as a `finder://` URL so clicked
@@ -14,8 +15,6 @@ import SwiftUI
 /// the scheme. Home-rooted paths (`~/…`) are handled by `LinkBridge`
 /// itself and need no substitution.
 struct HelpCommands: Commands {
-  let dispatcher: WindowDispatcher
-
   var body: some Commands {
     CommandGroup(replacing: .help) {
       let url = Bundle.main.url(
@@ -23,7 +22,7 @@ struct HelpCommands: Commands {
         withExtension: "md")
       Button("How to Make a Template") {
         guard let url else { return }
-        dispatcher.handleOpenURLs([url])
+        NSWorkspace.shared.open(URL.galleyHelp(forBundleFile: url))
       }
       .disabled(url == nil)
       .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)

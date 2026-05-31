@@ -2,29 +2,34 @@
 import GalleyCoreKit
 import SwiftUI
 
-/// Content for the singleton Help window scene. Reads the URL to
-/// display from `WindowDispatcher.currentHelpURL` and mounts
-/// `DocumentView` in `.help` mode so the window bypasses the routing
-/// registry, tab-merging, and recents recording.
+/// Content for the singleton Help window scene. The scene claims the
+/// `galley-help://` scheme via `handlesExternalEvents` (see
+/// `MacViewerApp`), so a `galley-help://<bundle-path>` URL fired at the
+/// app opens this window and delivers the URL here through `.onOpenURL`.
+/// We parse it back to the bundled file and mount `DocumentView` in
+/// `.help` mode (which bypasses dedup, recents, and the tab "+").
 struct HelpWindowView: View {
-  @Environment(WindowDispatcher.self) private var dispatcher
   @Environment(AppBoot.self) private var boot
+  @State private var helpURL: URL?
 
   var body: some View {
-    @Bindable var dispatcher = dispatcher
-    if let urlBinding = Binding($dispatcher.currentHelpURL),
-       let appModel = boot.model
-    {
-      DocumentView(
-        fileURL: urlBinding,
-        appModel: appModel,
-        kind: .help)
-    } else {
-      // Boot still resolving, or window was brought forward before
-      // any help URL was set. Render nothing; the help window only
-      // opens via `openWindow(id: "help")` calls that pre-set the
-      // URL, so this branch is transient.
-      Color.clear
+    Group {
+      if let urlBinding = Binding($helpURL),
+         let appModel = boot.model
+      {
+        DocumentView(
+          fileURL: urlBinding,
+          appModel: appModel,
+          kind: .help)
+      } else {
+        // Window brought forward before any help URL arrived, or boot
+        // still resolving. Transient — the scene only opens via a
+        // `galley-help://` URL that sets `helpURL` on arrival.
+        Color.clear
+      }
+    }
+    .onOpenURL { url in
+      if let file = url.galleyHelpFileURL { helpURL = file }
     }
   }
 }

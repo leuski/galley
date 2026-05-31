@@ -50,8 +50,9 @@ final class RecentDocumentsModel {
   @ObservationIgnored private weak var activeOpenPanel: NSOpenPanel?
 
   /// Routes opened URLs through the same pipeline as Finder
-  /// dispatches. Wired by `MacViewerApp.body` after construction.
-  @ObservationIgnored weak var dispatcher: WindowDispatcher?
+  /// dispatches (fire-at-self). Wired by `MacViewerApp.body` after
+  /// construction.
+  @ObservationIgnored weak var openModel: ViewerOpenModel?
 #else
   /// Cap matching the macOS system default. visionOS has no
   /// equivalent of System Settings → Desktop & Dock → Recent items.
@@ -126,20 +127,22 @@ final class RecentDocumentsModel {
   }
 
 #if os(macOS)
-  /// Open one previously-opened URL through the same dispatch path
-  /// as Finder/NSOpenPanel — used by the Open Recent menu.
+  /// Open one previously-opened URL through the same path as
+  /// Finder/NSOpenPanel (fire-at-self) — used by the Open Recent menu.
   func openRecent(_ url: URL) {
-    dispatcher?.handleOpenURLs([url])
+    openModel?.openViaSelf(url)
     record(url)
   }
 
-  /// Run NSOpenPanel and route picks through the dispatcher. The
-  /// File menu wires its Open command directly to this.
+  /// Run NSOpenPanel and route picks through the app's own URL handler
+  /// (fire-at-self). The File menu wires its Open command to this.
   func presentOpenPanel() {
     Task {
       let picks = await runOpenPanel()
-      for url in picks { record(url) }
-      dispatcher?.handleOpenURLs(picks)
+      for url in picks {
+        record(url)
+        openModel?.openViaSelf(url)
+      }
     }
   }
 

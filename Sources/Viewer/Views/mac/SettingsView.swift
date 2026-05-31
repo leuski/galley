@@ -29,6 +29,14 @@ struct SettingsView: View {
         .tag(SettingsTab.server)
     }
     .frame(minWidth: 520, minHeight: 320)
+    // The Settings scene claims `galley-settings://` via
+    // `handlesExternalEvents` (see `MacViewerApp`); a deep-linked
+    // `?tab=<id>` arrives here and selects the pane.
+    .onOpenURL { url in
+      if case .openSettings(let tab) = url.galleyRequest, let tab {
+        appModel.selectedSettingsTab = tab
+      }
+    }
   }
 }
 
