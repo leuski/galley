@@ -44,19 +44,10 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
       application(_:open:) received=\(urls.count, privacy: .public) \
       resolved=\(fileURLs.count, privacy: .public)
       """)
-    guard let boot, let model = boot.model else {
-      log.notice("""
-        Boot not ready. Falling back to local Galley.app for \
-        \(fileURLs.count, privacy: .public) file(s).
-        """)
-      for fileURL in fileURLs {
-        ServerKosmosService.openInLocalGalleyApp(fileURL)
-      }
-      return
-    }
+    let kosmos = boot?.model?.kosmos
     Task {
       for fileURL in fileURLs {
-        await ServerKosmosService.dispatchOpenURL(fileURL, with: model.kosmos)
+        await ServerKosmosService.dispatchOpenURL(fileURL, with: kosmos)
       }
     }
   }

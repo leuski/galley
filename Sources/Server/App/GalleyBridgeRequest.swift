@@ -33,12 +33,12 @@ public struct GalleyBridgeRequest: Sendable, Equatable,
                                    CustomStringConvertible,
                                    URLSerializable
 {
-  public static let scheme = "galley-bridge"
+  public static let scheme = "galley-helper"
 
   public let target: DocumentTarget
 
   public var description: String {
-    url.absoluteString
+    url?.absoluteString ?? "nil"
   }
 
   public init(target: DocumentTarget) {
@@ -46,17 +46,13 @@ public struct GalleyBridgeRequest: Sendable, Equatable,
   }
 
   public init?(from url: URL) {
-    if let target = DocumentTarget(from: url, scheme: Self.scheme) {
-      self.target = target
-      return
+    guard let target = DocumentTarget(from: url, scheme: Self.scheme) else {
+      return nil
     }
-    return nil
+    self.target = target
   }
 
-  public var url: URL {
-    guard let url = target.url(scheme: Self.scheme) else {
-      preconditionFailure("GalleyBridgeRequest produced nil url")
-    }
-    return url
+  public var url: URL? {
+    target.url(scheme: Self.scheme)
   }
 }

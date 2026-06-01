@@ -4,13 +4,14 @@ import GalleyCoreKit
 import SwiftUI
 
 /// Thin parent for a document window's root scene. Splits the
-/// optional `Binding<URL?>` SwiftUI hands us from `WindowGroup<URL>`
-/// from the actual rendering surface: when both the URL and `AppBoot`
-/// are ready, mount `DocumentView` with non-optional inputs;
-/// otherwise show an invisible placeholder while the boot resolves
-/// (or as a soft-fail if SwiftUI ever delivers a nil URL — the
-/// `WindowGroup<URL>` API is typed `URL?` even though every spawn
-/// path in this app supplies a real URL).
+/// optional `Binding<DocumentTarget?>` SwiftUI hands us from
+/// `WindowGroup(for: DocumentTarget.self)` from the actual rendering
+/// surface: when both the target and `AppBoot` are ready, mount
+/// `DocumentView` with non-optional inputs; otherwise this is the
+/// invisible bootstrap member while the boot resolves (or a soft-fail
+/// if SwiftUI ever delivers a nil target — the `WindowGroup` API is
+/// typed `DocumentTarget?` even though every spawn path in this app
+/// supplies a real target).
 struct MacContentView: View {
   @Binding var target: DocumentTarget?
   @Environment(AppBoot.self) private var boot
@@ -59,7 +60,7 @@ struct MacContentView: View {
   }
 
   /// First-run / empty-launch Open panel. State restoration brings
-  /// back `WindowGroup<URL>` windows during launch, so wait briefly
+  /// back `WindowGroup` document windows during launch, so wait briefly
   /// and bow out if a document window already exists (or one bound
   /// while we waited). Adopts the first pick in place; opens the rest
   /// as separate windows.

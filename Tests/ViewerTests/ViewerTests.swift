@@ -461,8 +461,8 @@ struct BindPlanTests {
 
   // MARK: Restoration to a different URL — the override path
 
-  /// Window's `WindowGroup<URL>` binding resolved to one URL but
-  /// state restoration brought back a different URL in the snapshot.
+  /// Window's `WindowGroup<DocumentTarget>` binding resolved to one URL
+  /// but state restoration brought back a different URL in the snapshot.
   /// The interpreter must override the per-window choice envelopes
   /// — this is the bug class the BindPlan extraction makes testable.
   @Test("Restore to different URL: applyChoiceOverrides = true")

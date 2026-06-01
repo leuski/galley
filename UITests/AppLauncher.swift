@@ -134,7 +134,7 @@ enum AppLauncher {
 
   /// Launch *without* `-ApplePersistenceIgnoreState YES`, so AppKit
   /// reads the saved-state directory and SwiftUI restores any
-  /// `WindowGroup<URL>` windows that were open at last quit.
+  /// `WindowGroup<DocumentTarget>` windows that were open at last quit.
   ///
   /// Used only by the state-restoration test, which seeds a window
   /// in a first launch, quits, and then expects this launcher to

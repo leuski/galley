@@ -27,9 +27,10 @@ public struct LaunchArguments: Sendable, Equatable {
   public var scratchDirectory: URL?
 
   /// Pre-seed a file path the Viewer should treat as if it had been
-  /// opened via Finder. Used by integration tests to avoid driving the
-  /// real `application(_:open:)` callback. The path is enqueued in the
-  /// AppDelegate's launch buffer before `openHandler` installs.
+  /// opened via Finder. Historical flag — the UITests now seed a
+  /// document by firing the app's `galley://` scheme instead (see
+  /// `AppLauncher.openViaURLScheme`), so this is no longer consulted
+  /// at launch; it remains here only for the parser unit tests.
   public var seedFile: URL?
 
   /// Override the editor invocation so cmd-click-to-editor is observable
@@ -57,9 +58,10 @@ public struct LaunchArguments: Sendable, Equatable {
     self.fixedPort = fixedPort
   }
 
-  /// Parse from the live process. Production callers invoke this from
-  /// `applicationWillFinishLaunching` (or earlier) so the returned
-  /// struct is consulted before any persistent state is read.
+  /// Parse from the live process. No production caller consults this
+  /// today (the Viewer has no AppDelegate and reads its test-mode
+  /// marker from `launchEnvironment`); kept for parser coverage and
+  /// as the entry point if process-arg parsing is rewired.
   public static func fromProcess() -> LaunchArguments {
     parse(arguments: CommandLine.arguments)
   }

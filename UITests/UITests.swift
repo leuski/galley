@@ -3,11 +3,11 @@ import GalleyCoreKit
 internal import ALFoundation
 import XCTest
 
-/// UI tests against the real Galley app — no behavior gating on
-/// `--ui-test-mode`. The flag exists only as a marker and as a vehicle
-/// for orthogonal injection points (`--seed-file`, future
-/// `--scratch-dir`, etc.) that don't change what the app does, only
-/// what initial data it sees.
+/// UI tests against the real Galley app — no behavior gating on a
+/// test-mode flag. Test mode is carried via `launchEnvironment`
+/// (`GALLEY_UI_TEST_MODE`); documents are seeded by firing the app's
+/// `galley://` scheme (`AppLauncher.openViaURLScheme`), which changes
+/// only what initial data the app sees, not what it does.
 ///
 /// The real product behaviors these tests pin:
 ///
@@ -28,8 +28,9 @@ final class UITests: XCTestCase {
   /// The AppKit tab bar's "+" button (and Window > New Tab) must
   /// run the Open panel and merge picks as new tabs onto the source
   /// window — the Safari/Preview pattern. Without our intercept,
-  /// SwiftUI's `WindowGroup<URL>` with no `defaultValue:` mishandles
-  /// `newWindowForTab:` and tears down the current window instead.
+  /// SwiftUI's `WindowGroup<DocumentTarget>` with no `defaultValue:`
+  /// mishandles `newWindowForTab:` and tears down the current window
+  /// instead.
   ///
   /// To exercise the swizzle we trigger "New Tab" via the Window
   /// menu — that action sends the same `newWindowForTab:` selector
@@ -74,8 +75,8 @@ final class UITests: XCTestCase {
     XCTAssertTrue(
       openPanel.waitForExistence(timeout: 5),
       "Open panel must appear after New Tab — without the " +
-      "NewTabAction handler, SwiftUI's WindowGroup<URL> default " +
-      "tears down the source window instead.")
+      "NewTabAction handler, SwiftUI's WindowGroup<DocumentTarget> " +
+      "default tears down the source window instead.")
 
     // Cancel cleanly so the test doesn't leave the panel up.
     let cancel = openPanel.buttons["Cancel"]
@@ -197,9 +198,9 @@ final class UITests: XCTestCase {
 
   // MARK: - Seeded launch (visible-document path)
 
-  /// A launch with `--seed-file <path>` must produce a visible window
-  /// bound to that document. Equivalent to the user double-clicking
-  /// the file in Finder.
+  /// Seeding a document via the `galley://` scheme must produce a
+  /// visible window bound to that document. Equivalent to the user
+  /// double-clicking the file in Finder.
   @MainActor
   func testSeedFileOpensVisibleDocument() throws {
     let (app, fileURL) = try AppLauncher.launchWithSeed(
@@ -228,20 +229,20 @@ final class UITests: XCTestCase {
   /// State restoration: a document window open at quit time must
   /// come back on the next launch.
   ///
-  /// Phase 1 seeds a markdown file via `--seed-file`, waits for its
-  /// window to become visible (proves the seed flowed through the
-  /// dispatcher → openWindow → ContentView path), then issues a
-  /// graceful terminate. macOS's `talagentd` daemon (managing
-  /// saved state since macOS 15) captures the open `WindowGroup<URL>`
-  /// values into its container at
+  /// Phase 1 seeds a markdown file via the `galley://` scheme, waits
+  /// for its window to become visible (proves the seed flowed through
+  /// the `handlesExternalEvents` → `onOpenURL` → `MacContentView`
+  /// path), then issues a graceful terminate. macOS's `talagentd`
+  /// daemon (managing saved state since macOS 15) captures the open
+  /// `WindowGroup<DocumentTarget>` values into its container at
   /// `~/Library/Daemon Containers/<talagentd-UUID>/Data/Library/Saved
   /// Application State/<app-UUID>/`. The container is sandboxed away
   /// from terminal access, so we don't try to introspect it — we
   /// rely on the end-to-end assertion in phase 2 instead.
   ///
-  /// Phase 2 launches *without* `--seed-file` and *without*
+  /// Phase 2 launches *without* seeding a document and *without*
   /// `-ApplePersistenceIgnoreState YES` (via `launchForRestoration`),
-  /// so SwiftUI's `WindowGroup<URL>` reads the saved URL from
+  /// so SwiftUI's `WindowGroup<DocumentTarget>` reads the saved URL from
   /// talagentd and restores the window. We verify a window with
   /// the same file's title comes back, hittable.
   ///
@@ -261,7 +262,7 @@ final class UITests: XCTestCase {
     throw XCTSkip("""
       Deferred: pre-existing state-restoration failure (independent of \
       the window-routing refactor). SwiftUI/talagentd save+restore of \
-      WindowGroup<URL> values is not deterministic under the shared \
+      WindowGroup<DocumentTarget> values is not deterministic under the shared \
       test container. Re-enable when the restoration path is revisited.
       """)
     // Phase 1 — seed a doc and wait for its window. Don't pass
@@ -296,7 +297,7 @@ final class UITests: XCTestCase {
     closeOtherDocumentWindows(in: app1, keepTitleContaining: "Persistent")
 
     // Give SwiftUI/AppKit time to register the seeded window's URL
-    // with talagentd before we terminate. `WindowGroup<URL>` writes
+    // with talagentd before we terminate. `WindowGroup<DocumentTarget>` writes
     // restorable state asynchronously after the scene presents its
     // content; terminating ~100ms after the window first becomes
     // hittable races that write and leaves the seeded URL out of
@@ -325,7 +326,7 @@ final class UITests: XCTestCase {
     Thread.sleep(forTimeInterval: 3.0)
 
     // Phase 2 — launch fresh with state restoration enabled.
-    // No --seed-file. No -ApplePersistenceIgnoreState.
+    // No document seeding. No -ApplePersistenceIgnoreState.
     let app2 = AppLauncher.launchForRestoration()
     XCTAssertTrue(
       app2.wait(for: .runningForeground, timeout: 5),

@@ -53,10 +53,9 @@ struct BindPlan: Equatable {
       scrollY: Double?,
       showsTOC: Bool)
 
-    /// First bind for a freshly-opened URL. The interpreter pulls
-    /// any pending scroll-line from the dispatcher (one-shot side
-    /// effect kept out of the pure plan) and forwards everything
-    /// else as-is.
+    /// First bind for a freshly-opened target. The target carries any
+    /// `?line=N` scroll hint (`DocumentTarget.scrollLine`); the
+    /// interpreter forwards it and everything else as-is.
     case initialBind(
       target: DocumentTarget,
       scrollY: Double?,

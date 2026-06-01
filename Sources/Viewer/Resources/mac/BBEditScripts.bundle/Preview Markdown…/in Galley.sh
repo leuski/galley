@@ -13,4 +13,4 @@ ENCODED=$(/usr/bin/python3 -c \
 
 LINE="${BB_DOC_SELSTART_LINE:-1}"
 
-open "galley://${ENCODED}?line=${LINE}"
+open "galley-helper://${ENCODED}?line=${LINE}"

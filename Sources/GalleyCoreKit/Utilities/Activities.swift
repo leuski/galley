@@ -32,11 +32,8 @@ public struct OpenDocumentActivity: URLSerializable, Hashable {
     self.target = target
   }
 
-  public var url: URL {
-    if let url = target.url(scheme: Self.scheme) {
-      return url
-    }
-    preconditionFailure("GalleyDocumentTarget produced no url")
+  public var url: URL? {
+    target.url(scheme: Self.scheme)
   }
 }
 
@@ -69,17 +66,14 @@ public struct OpenSettingsActivity: URLSerializable, Hashable {
       .flatMap { $0.value }
       .flatMap { SettingsTab(rawValue: $0.lowercased()) }
   }
-  public var url: URL {
+  public var url: URL? {
     var components = URLComponents()
     components.scheme = Self.scheme
     components.host = ""
     if let tab {
       components.queryItems = [URLQueryItem(name: "tab", value: tab.rawValue)]
     }
-    guard let url = components.url else {
-      preconditionFailure("settingsURL components produced no URL")
-    }
-    return url
+    return components.url
   }
 }
 
@@ -103,13 +97,10 @@ public struct OpenHelpActivity: URLSerializable, Hashable {
     self.documentURL = URL(fileURLWithPath: components.path)
   }
 
-  public var url: URL {
+  public var url: URL? {
     var components = URLComponents()
     components.scheme = Self.scheme
     components.path = documentURL.path
-    guard let url = components.url else {
-      preconditionFailure("OpenHelpActivity components produced no URL")
-    }
-    return url
+    return components.url
   }
 }

@@ -90,8 +90,8 @@ struct DocumentView: View {
       .windowAccessor { window in
         // Reveal whenever the resolved NSWindow changes identity —
         // skip a no-op re-attach to the same host. SwiftUI caches
-        // scene `@State` for a freshly-closed `WindowGroup<URL>`
-        // window and reuses it when the same URL is reopened; a plain
+        // scene `@State` for a freshly-closed `WindowGroup`
+        // window and reuses it when the same target is reopened; a plain
         // `nil` guard would leave the reopened tab toolbar-less.
         guard let window, window !== hostWindow else { return }
         hostWindow = window
@@ -278,14 +278,14 @@ struct DocumentView: View {
 
   /// Called whenever the model's bind state changes — first render,
   /// in-window link navigation, restore, rename. Persists the
-  /// back/forward stack, updates the dispatcher's registry, and
-  /// reveals the window once the first bind completes. Idempotent;
-  /// safe to call from multiple `.onChange` observers.
+  /// back/forward stack and reveals the window once the first bind
+  /// completes. Idempotent; safe to call from multiple `.onChange`
+  /// observers.
   private func handleDocumentBound() {
     saveHistory()
     // The window's `preferring:` dedup tokens track `model.documentURL`
-    // reactively (see `DocumentInboundURLs` in `body`), so in-window
-    // navigation needs no explicit registry update here.
+    // reactively (see `handlesInboundURLs` in `body`), so in-window
+    // navigation re-advertises this window's claim with no extra work.
     if model.didFirstBind {
       hostWindow?.alphaValue = 1
     }

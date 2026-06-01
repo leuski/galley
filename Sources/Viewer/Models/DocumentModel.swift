@@ -19,13 +19,13 @@ import UserNotifications
 @MainActor
 final class DocumentModel {
   /// Distinguishes a normal document window from the singleton Help
-  /// window. Help mode skips the routing-registry handshake (adopt /
-  /// unregister / updateCurrentURL) so help windows are invisible to
-  /// the URL dispatcher — they're never tab-merge targets, never
-  /// focus-existing targets, never rebind targets. `record(_:)` on
-  /// `RecentDocumentsModel` independently refuses bundle URLs, so
-  /// the inline `recents.record(...)` calls below are no-ops in help
-  /// mode without needing a conditional.
+  /// window. Help mode opts out of inbound-URL receipt + dedup
+  /// (`handlesInboundURLs(enabled: false)`), so a help window never
+  /// receives `galley://`/`file://` URLs and is never a dedup /
+  /// replace-current target. `record(_:)` on `RecentDocumentsModel`
+  /// independently refuses bundle URLs, so the inline
+  /// `recents.record(...)` calls below are no-ops in help mode
+  /// without needing a conditional.
   enum Kind {
     case document
     case help

@@ -164,7 +164,7 @@ struct GalleyActionTests {
     #expect(OpenDocumentActivity(from: galleyDocURL(file)) == .init(url: file))
   }
 
-  /// Fragments (`#anchor`) are dropped — the dispatcher has no use
+  /// Fragments (`#anchor`) are dropped — `DocumentTarget` has no use
   /// for them, and `Int.init` parsing of `line` doesn't read the
   /// fragment in any case. Pin that fragments don't poison parsing.
   @Test("Fragment after path is ignored, line is still parsed")
