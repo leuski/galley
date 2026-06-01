@@ -12,20 +12,20 @@ import SwiftUI
 /// `WindowGroup<URL>` API is typed `URL?` even though every spawn
 /// path in this app supplies a real URL).
 struct MacContentView: View {
-  @Binding var fileURL: URL?
+  @Binding var target: DocumentTarget?
   @Environment(AppBoot.self) private var boot
-  @Environment(ViewerOpenModel.self) private var openModel
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
+  @Environment(\.dismissWindow) private var dismissWindow
 
   var body: some View {
     Group {
-      if let urlBinding = Binding($fileURL),
+      if let target = Binding($target),
          let appModel = boot.model
       {
         // A live document window owns its own URL receipt + dedup —
         // see `DocumentView`.
-        DocumentView(fileURL: urlBinding, appModel: appModel)
+        DocumentView(target: target, appModel: appModel)
       } else {
         // The empty bootstrap window: SwiftUI materializes one
         // `url == nil` `WindowGroup` member at cold launch (WindowProbe
@@ -34,7 +34,7 @@ struct MacContentView: View {
         // adopts a document. Replaces the old `Window("welcome")`.
         Color.clear
           .background(BootWindowHider())
-          .handlesInboundURLs { adoptInPlace($0) }
+          .handlesInboundURLs { self.target = $0 }
           .task(id: boot.model != nil) {
             guard boot.model != nil else { return }
             await runFTUEIfNeeded()
@@ -43,17 +43,19 @@ struct MacContentView: View {
     }
     // Capture `openWindow` for the non-view callers (tab-bar "+",
     // menu / recents opens). Idempotent across windows.
-    .task { openModel.install(openWindow: { openWindow(value: $0) }) }
-  }
-
-  /// Adopt a document into the empty bootstrap window *in place* —
-  /// reuse the blank window for the first document instead of opening
-  /// a new one and leaving an invisible blank behind.
-  private func adoptInPlace(_ info: DocumentTarget) {
-    if let line = info.scrollLine {
-      openModel.stash(scrollLine: line, for: info.url)
+    .task {
+      NewTabAction.handler = { _ in
+        Task { @MainActor in
+          let picks = await recents.runOpenPanel()
+          for url in picks {
+            // Born-as-tab into the key window's group (the "+" source is
+            // key). No host argument needed — see `ViewerOpenModel`.
+            NSWindow.allowsAutomaticWindowTabbing = true
+            openWindow(id: DocumentScene.id, value: DocumentTarget(url: url))
+          }
+        }
+      }
     }
-    fileURL = info.url
   }
 
   /// First-run / empty-launch Open panel. State restoration brings
@@ -63,17 +65,24 @@ struct MacContentView: View {
   /// as separate windows.
   private func runFTUEIfNeeded() async {
     try? await Task.sleep(for: .milliseconds(250))
-    if Task.isCancelled || fileURL != nil { return }
-    if hasOtherVisibleWindow() { return }
+    if Task.isCancelled || target != nil { return }
+
+    if hasOtherVisibleWindow() {
+      dismissWindow()
+      return
+    }
+
     let picks = await recents.runOpenPanel()
-    if Task.isCancelled || fileURL != nil { return }
-    guard let first = picks.first else { return }
-    recents.record(first)
-    fileURL = first
+    if Task.isCancelled || target != nil { return }
+
+    guard let first = picks.first else {
+      dismissWindow()
+      return
+    }
+    target = DocumentTarget(url: first)
+
     for url in picks.dropFirst() {
-      recents.record(url)
-      NSWindow.allowsAutomaticWindowTabbing = false
-      openWindow(value: url)
+      openWindow(id: DocumentScene.id, value: DocumentTarget(url: url))
     }
   }
 

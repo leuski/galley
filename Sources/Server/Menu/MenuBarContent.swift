@@ -28,7 +28,7 @@ struct MenuBarContent: View {
       Divider()
 
       Button("Settings…") {
-        NSWorkspace.shared.open(OpenSettingsActivity(.server).url)
+        OpenSettingsActivity(.server).open()
       }
       .accessibilityIdentifier(ServerA11yID.MenuBar.settings)
     }

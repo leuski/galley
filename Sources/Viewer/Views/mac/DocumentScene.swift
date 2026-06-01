@@ -20,8 +20,8 @@ struct DocumentScene: Scene {
     // uses as the invisible bootstrap anchor — capturing `openWindow`,
     // hosting `.onOpenURL`, and running the FTUE Open panel. No
     // separate welcome scene is needed.
-    WindowGroup(for: URL.self) { $url in
-      MacContentView(fileURL: $url)
+    WindowGroup(id: Self.id, for: DocumentTarget.self) { $target in
+      MacContentView(target: $target)
     }
     .handlesExternalEvents(matching: Self.events)
     .defaultSize(width: 700, height: 900)

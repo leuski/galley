@@ -48,11 +48,6 @@ final class RecentDocumentsModel {
   /// Active FTUE open panel, kept weak so we don't extend its
   /// lifetime past presentation.
   @ObservationIgnored private weak var activeOpenPanel: NSOpenPanel?
-
-  /// Routes opened URLs through the same pipeline as Finder
-  /// dispatches (fire-at-self). Wired by `MacViewerApp.body` after
-  /// construction.
-  @ObservationIgnored weak var openModel: ViewerOpenModel?
 #else
   /// Cap matching the macOS system default. visionOS has no
   /// equivalent of System Settings → Desktop & Dock → Recent items.
@@ -134,8 +129,7 @@ final class RecentDocumentsModel {
   /// Open one previously-opened URL through the same path as
   /// Finder/NSOpenPanel (fire-at-self) — used by the Open Recent menu.
   func openRecent(_ url: URL) {
-    openModel?.openViaSelf(url)
-    record(url)
+    OpenDocumentActivity(url: url).open()
   }
 
   /// Run NSOpenPanel and route picks through the app's own URL handler
@@ -144,8 +138,7 @@ final class RecentDocumentsModel {
     Task {
       let picks = await runOpenPanel()
       for url in picks {
-        record(url)
-        openModel?.openViaSelf(url)
+        OpenDocumentActivity(url: url).open()
       }
     }
   }

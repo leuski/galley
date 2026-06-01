@@ -10,15 +10,15 @@ import SwiftUI
 /// `.help` mode (which bypasses dedup, recents, and the tab "+").
 struct HelpWindowView: View {
   @Environment(AppBoot.self) private var boot
-  @State private var helpURL: URL?
+  @State private var target: DocumentTarget?
 
   var body: some View {
     Group {
-      if let urlBinding = Binding($helpURL),
+      if let targetBinding = Binding($target),
          let appModel = boot.model
       {
         DocumentView(
-          fileURL: urlBinding,
+          target: targetBinding,
           appModel: appModel,
           kind: .help)
       } else {
@@ -32,7 +32,7 @@ struct HelpWindowView: View {
       guard let help = OpenHelpActivity(from: url) else {
         return
       }
-      helpURL = help.documentURL
+      target = DocumentTarget(url: help.documentURL)
     }
   }
 }

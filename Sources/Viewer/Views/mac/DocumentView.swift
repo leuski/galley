@@ -16,9 +16,8 @@ private let log = Logger(
 /// catalog discovery — so this view always has a concrete URL and a
 /// hydrated `AppModel` to work with.
 struct DocumentView: View {
-  @Binding var fileURL: URL
+  @Binding var target: DocumentTarget
   let appModel: AppModel
-  @Environment(ViewerOpenModel.self) private var openModel
   @Environment(RecentDocumentsModel.self) private var recents
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -49,13 +48,13 @@ struct DocumentView: View {
   /// the WindowGroup's binding will have their persistent IDs updated
   /// in `launchTask` once the snapshot is decoded.
   init(
-    fileURL: Binding<URL>,
+    target: Binding<DocumentTarget>,
     appModel: AppModel,
     kind: DocumentModel.Kind = .document
   ) {
-    self._fileURL = fileURL
+    self._target = target
     self.appModel = appModel
-    let url = fileURL.wrappedValue
+    let url = target.wrappedValue.documentURL
     let stored = Defaults.shared.perFileStateStore[url]
     self._model = State(wrappedValue: DocumentModel(
       initialURL: url,
@@ -109,10 +108,10 @@ struct DocumentView: View {
       // back here (dedup) instead of duplicating; the token list
       // tracks `model.documentURL` reactively, covering in-window
       // navigation. Help windows opt out — they never receive URLs.
-      .modifier(DocumentInboundURLs(
+      .handlesInboundURLs(
         enabled: model.kind == .document,
-        tokens: model.documentURL.galleyPreferringTokens,
-        onDocument: handleInbound))
+        preferring: model.documentURL.galleyPreferringTokens,
+        onDocument: handleInbound)
       .focusedSceneValue(\.documentModel, model)
       .alert(
         "Rename Document",
@@ -184,7 +183,6 @@ struct DocumentView: View {
       columnVisibility: model.tocColumnVisibility(reduceMotion: reduceMotion))
     {
       TOCSidebar(model: model)
-//        .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
       // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's
@@ -300,7 +298,9 @@ struct DocumentView: View {
   /// `newTab` spawn a fresh window (born standalone or born-as-tab via
   /// `allowsAutomaticWindowTabbing` — WindowProbe FINDINGS §9).
   private func handleInbound(_ info: DocumentTarget) {
-    if model.documentURL.standardizedFileURL == info.url.standardizedFileURL {
+    if model.documentURL.standardizedFileURL == info
+      .documentURL.standardizedFileURL
+    {
       if let line = info.scrollLine {
         Task { await model.scrollToSourceLine(line) }
       }
@@ -308,16 +308,14 @@ struct DocumentView: View {
       hostWindow?.makeKeyAndOrderFront(nil)
       return
     }
+    recents.record(info.documentURL)
     switch Defaults.shared.openBehavior {
     case .replaceCurrent:
-      replaceDocument(with: info.url, scrollLine: info.scrollLine)
+      replaceDocument(info)
     case .newTab, .newWindow:
-      if let line = info.scrollLine {
-        openModel.stash(scrollLine: line, for: info.url)
-      }
       NSWindow.allowsAutomaticWindowTabbing =
         Defaults.shared.openBehavior == .newTab
-      openWindow(value: info.url)
+      openWindow(id: DocumentScene.id, value: info)
     }
   }
 
@@ -378,7 +376,7 @@ struct DocumentView: View {
       do {
         let newURL = try await model.renameCurrentDocument(toName: trimmed)
         recents.record(newURL)
-        if fileURL != newURL { fileURL = newURL }
+        if target.documentURL != newURL { target = .init(url: newURL) }
       } catch {
         // `renameCurrentDocument` already posted a notice banner via
         // `report(failure:)`. Beep matches the prior NSAlert UX; log
@@ -396,25 +394,25 @@ struct DocumentView: View {
   /// the `replaceCurrent` open behavior. Updates the WindowGroup
   /// binding so state restoration follows, and rebinds the model so
   /// history/watcher restart on the new URL.
-  private func replaceDocument(with newURL: URL, scrollLine: Int? = nil) {
-    recents.record(newURL)
-    if fileURL != newURL { fileURL = newURL }
-    let line = scrollLine
+  private func replaceDocument(_ target: DocumentTarget) {
+    recents.record(target.documentURL)
+    if self.target != target { self.target = target }
+    let line = target.scrollLine
     // Replace-current is a fresh-doc switch, not a parent→child
     // navigation, so re-seed the TOC sidebar from the destination's
     // own per-file pref rather than inheriting the previous doc's
     // live setting.
-    let initialShowsTOC = Defaults.shared.perFileStateStore[newURL]
+    let initialShowsTOC = Defaults.shared.perFileStateStore[target.documentURL]
       .showsTOC ?? false
     Task {
       // Same URL re-dispatch (e.g. BBEdit's preview script firing
       // again on a file already showing): just scroll, don't tear
       // down history. A fresh URL takes the full bind path.
-      if model.documentURL == newURL, let line {
+      if model.documentURL == target.documentURL, let line {
         await model.scrollToSourceLine(line)
       } else {
         await model.bind(
-          to: newURL,
+          to: target.documentURL,
           scrollToLine: line,
           initialShowsTOC: initialShowsTOC)
       }
@@ -432,7 +430,7 @@ struct DocumentView: View {
   /// the model is already bound).
   private func launchTask() async {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: target,
       didFirstBind: model.didFirstBind,
       didRestore: didRestore,
       historyJSON: historyJSON,
@@ -458,14 +456,12 @@ struct DocumentView: View {
         snapshot: snapshot,
         initialScrollY: scrollY,
         initialShowsTOC: showsTOC)
-      recents.record(model.documentURL)
 
-    case .initialBind(let url, let scrollY, let showsTOC):
-      recents.record(url)
-      let line = openModel.consumePendingScrollLine(for: url)
+    case .initialBind(let target, let scrollY, let showsTOC):
+      recents.record(target.documentURL)
       await model.bind(
-        to: url,
-        scrollToLine: line,
+        to: target.documentURL,
+        scrollToLine: target.scrollLine,
         initialScrollY: scrollY,
         initialShowsTOC: showsTOC)
     }
@@ -545,24 +541,6 @@ struct DocumentView: View {
   private var zoomLabel: String {
     let percent = Int((model.pageZoom * 100).rounded())
     return "\(percent)%"
-  }
-}
-
-/// Applies inbound-URL receipt + `preferring:` dedup tokens to a
-/// document window, and no-ops for the Help window (`enabled == false`)
-/// so help never advertises `allowing: ["*"]` and steal a document open.
-private struct DocumentInboundURLs: ViewModifier {
-  let enabled: Bool
-  let tokens: Set<String>
-  let onDocument: (DocumentTarget) -> Void
-
-  func body(content: Content) -> some View {
-    if enabled {
-      content.handlesInboundURLs(
-        preferring: tokens, onDocument: onDocument)
-    } else {
-      content
-    }
   }
 }
 

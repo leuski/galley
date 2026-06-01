@@ -20,6 +20,7 @@ import SwiftUI
 struct InboundURLHandler: ViewModifier {
   @Environment(RecentDocumentsModel.self) private var recents
 
+  let enabled: Bool
   /// Tokens this window prefers for dedup (empty for the bootstrap
   /// window).
   let preferring: Set<String>
@@ -27,28 +28,33 @@ struct InboundURLHandler: ViewModifier {
   let onDocument: (DocumentTarget) -> Void
 
   func body(content: Content) -> some View {
-    content
-      .handlesExternalEvents(
-        preferring: preferring, allowing: DocumentScene.events)
-      .onOpenURL { route($0) }
+    if enabled {
+      content
+        .handlesExternalEvents(
+          preferring: preferring, allowing: DocumentScene.events)
+        .onOpenURL { route($0) }
+    } else {
+      content
+    }
   }
 
   private func route(_ url: URL) {
     guard let document = OpenDocumentActivity(from: url) else {
       return
     }
-    recents.record(document.documentURL)
-    onDocument(document)
+    onDocument(document.target)
   }
 }
 
 extension View {
   /// Attach document-URL receipt to a window's content.
   func handlesInboundURLs(
+    enabled: Bool = true,
     preferring: Set<String> = [],
     onDocument: @escaping (DocumentTarget) -> Void
   ) -> some View {
-    modifier(InboundURLHandler(preferring: preferring, onDocument: onDocument))
+    modifier(InboundURLHandler(
+      enabled: enabled, preferring: preferring, onDocument: onDocument))
   }
 }
 #endif

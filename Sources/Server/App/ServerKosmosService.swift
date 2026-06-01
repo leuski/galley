@@ -129,7 +129,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
       return false
     }
     let windowID = trackOpenWindow(
-      fileURL: fileURL.target.url, peerID: visionPeer)
+      fileURL: fileURL.target.documentURL, peerID: visionPeer)
     publishOpenDocument(fileURL: fileURL, windowID: windowID)
     return true
   }
@@ -164,14 +164,14 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   ) {
     host.publish(OpenDocument(
       docID: windowID,
-      documentPath: fileURL.target.url.path,
-      displayName: fileURL.target.url.lastPathComponent,
+      documentPath: fileURL.target.documentURL.path,
+      displayName: fileURL.target.documentURL.lastPathComponent,
       scrollLineHint: fileURL.target.scrollLine,
       openBehavior: .newWindow))
   }
 
-  public static func openInLocalGalleyApp(_ fileURL: GalleyBridgeRequest) {
-    NSWorkspace.shared.open(fileURL.target.url)
+  public static func openInLocalGalleyApp(_ request: GalleyBridgeRequest) {
+    OpenDocumentActivity(target: request.target).open()
   }
 
   @MainActor

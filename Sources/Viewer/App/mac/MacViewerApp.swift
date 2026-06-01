@@ -9,7 +9,6 @@ import KosmosAppKit
 struct MacViewerApp: App {
   @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
-  @State private var openModel = ViewerOpenModel()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos: ViewerKosmosService
 
@@ -45,43 +44,18 @@ struct MacViewerApp: App {
   }
 
   var body: some Scene {
-    // Wire the tab-bar "+" handler (runs the Open panel and opens the
-    // picks as tabs onto the source window). Idempotent — body may
-    // re-run.
-    // swiftlint:disable:next redundant_discardable_let
-    let _ = configureRouting()
-
     DocumentScene()
       .environment(boot)
-      .environment(openModel)
       .environment(recents)
       .environment(kosmos)
 
     HelpScene()
       .environment(boot)
-      .environment(openModel)
       .environment(recents)
 
     SettingsScene()
       .environment(boot)
       .environment(kosmos)
-  }
-
-  private func configureRouting() {
-    recents.openModel = openModel
-    let recents = recents
-    let openModel = openModel
-    NewTabAction.handler = { _ in
-      Task { @MainActor in
-        let picks = await recents.runOpenPanel()
-        for url in picks {
-          recents.record(url)
-          // Born-as-tab into the key window's group (the "+" source is
-          // key). No host argument needed — see `ViewerOpenModel`.
-          openModel.openAsTab(url)
-        }
-      }
-    }
   }
 }
 #endif

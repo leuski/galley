@@ -1,4 +1,5 @@
 import Foundation
+import GalleyCoreKit
 
 /// Pure-decision view of "what should `DocumentView.launchTask` do?"
 /// given the current state of the SwiftUI scene (binding URL,
@@ -57,7 +58,7 @@ struct BindPlan: Equatable {
     /// effect kept out of the pure plan) and forwards everything
     /// else as-is.
     case initialBind(
-      url: URL,
+      target: DocumentTarget,
       scrollY: Double?,
       showsTOC: Bool)
   }
@@ -72,7 +73,7 @@ extension BindPlan {
   /// singleton. Production callers pass
   /// `{ Defaults.shared.perFileStateStore[$0] }`.
   static func decide(
-    fileURL: URL,
+    target: DocumentTarget,
     didFirstBind: Bool,
     didRestore: Bool,
     historyJSON: String,
@@ -85,13 +86,13 @@ extension BindPlan {
       ? HistorySnapshot.decode(json: historyJSON)
       : nil
     let restoreURL = snapshot?.currentURL
-    let stored = perFileState(restoreURL ?? fileURL)
+    let stored = perFileState(restoreURL ?? target.documentURL)
 
     // Restoration brought back a different URL than the binding —
     // the model was constructed with the binding's URL, so the
     // interpreter must override the per-window choice envelopes.
     let applyOverrides =
-      restoreURL != nil && restoreURL != fileURL
+      restoreURL != nil && restoreURL != target.documentURL
 
     let action: Action
     if didFirstBind {
@@ -103,7 +104,7 @@ extension BindPlan {
         showsTOC: stored.showsTOC ?? false)
     } else {
       action = .initialBind(
-        url: fileURL,
+        target: target,
         scrollY: stored.scrollY,
         showsTOC: stored.showsTOC ?? false)
     }

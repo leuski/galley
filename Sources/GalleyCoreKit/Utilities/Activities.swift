@@ -8,18 +8,32 @@
 import Foundation
 @_exported import KosmosAppKit
 
-public typealias OpenDocumentActivity = DocumentTarget
-
-extension OpenDocumentActivity: @retroactive URLSerializable {
+public struct OpenDocumentActivity: URLSerializable, Hashable {
   /// Document scheme — `galley://<path>`, routed to the document
   /// `WindowGroup` (plain `file://` documents route there too).
   public static let scheme = "galley"
 
-  public init?(from url: URL) {
-    self.init(from: url, scheme: Self.scheme)
+  public let target: DocumentTarget
+  public var documentURL: URL { target.documentURL }
+  public var scrollLine: Int? { target.scrollLine }
+
+  public init(target: DocumentTarget) {
+    self.target = target
   }
+
+  public init(url: URL, scrollLine: Int? = nil) {
+    self.target = .init(url: url, scrollLine: scrollLine)
+  }
+
+  public init?(from url: URL) {
+    guard let target = DocumentTarget(from: url, scheme: Self.scheme) else {
+      return nil
+    }
+    self.target = target
+  }
+
   public var url: URL {
-    if let url = self.url(scheme: Self.scheme) {
+    if let url = target.url(scheme: Self.scheme) {
       return url
     }
     preconditionFailure("GalleyDocumentTarget produced no url")

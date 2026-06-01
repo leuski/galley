@@ -4,7 +4,7 @@
 //
 //  Created by Anton Leuski on 5/31/26.
 //
-
+#if os(visionOS)
 import SwiftUI
 import GalleyCoreKit
 
@@ -120,3 +120,4 @@ struct WelcomeScreen: View {
     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
   }
 }
+#endif
