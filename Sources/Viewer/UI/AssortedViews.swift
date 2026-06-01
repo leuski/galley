@@ -8,21 +8,6 @@
 import GalleyCoreKit
 import SwiftUI
 
-struct SubtitleModifier: ViewModifier {
-  func body(content: Content) -> some View {
-    content
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-  }
-}
-
-extension View {
-  func subtitle() -> some View {
-    self.modifier(SubtitleModifier())
-  }
-}
-
 @ViewBuilder @MainActor
 func templateMenu(
   title: LocalizedStringResource? = "Template",

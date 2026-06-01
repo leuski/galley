@@ -1,5 +1,5 @@
 //
-//  SettingsScene.swift
+//  MacSettingsScene.swift
 //  Galley
 //
 //  Created by Anton Leuski on 5/31/26.
@@ -9,7 +9,7 @@
 import SwiftUI
 import GalleyCoreKit
 
-struct SettingsScene: Scene {
+struct MacSettingsScene: Scene {
   static let id = "settings"
   static let events = Set(["\(OpenSettingsActivity.scheme):"])
   @Environment(AppBoot.self) var boot: AppBoot
@@ -17,7 +17,7 @@ struct SettingsScene: Scene {
   var body: some Scene {
     Window("Settings", id: Self.id) {
       if let model = boot.model {
-        SettingsView(appModel: model)
+        MacSettingsView(appModel: model)
       } else {
         ProgressView("Starting…")
           .padding()

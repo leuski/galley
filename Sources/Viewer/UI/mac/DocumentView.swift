@@ -315,7 +315,7 @@ struct DocumentView: View {
     case .newTab, .newWindow:
       NSWindow.allowsAutomaticWindowTabbing =
         Defaults.shared.openBehavior == .newTab
-      openWindow(id: DocumentScene.id, value: info)
+      openWindow(id: MacDocumentScene.id, value: info)
     }
   }
 

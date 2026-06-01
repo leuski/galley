@@ -31,7 +31,7 @@ struct InboundURLHandler: ViewModifier {
     if enabled {
       content
         .handlesExternalEvents(
-          preferring: preferring, allowing: DocumentScene.events)
+          preferring: preferring, allowing: MacDocumentScene.events)
         .onOpenURL { route($0) }
     } else {
       content

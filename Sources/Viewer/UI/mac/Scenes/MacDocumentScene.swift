@@ -9,7 +9,7 @@
 import SwiftUI
 import GalleyCoreKit
 
-struct DocumentScene: Scene {
+struct MacDocumentScene: Scene {
   static let id = "document"
   static let events = Set(["file:", "\(OpenDocumentActivity.scheme):"])
   @Environment(AppBoot.self) var boot: AppBoot

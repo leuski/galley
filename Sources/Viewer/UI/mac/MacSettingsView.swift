@@ -2,7 +2,7 @@
 import GalleyCoreKit
 import SwiftUI
 
-struct SettingsView: View {
+struct MacSettingsView: View {
   @Bindable var appModel: AppModel
 
   var body: some View {
@@ -59,6 +59,6 @@ extension View {
 }
 
 #Preview {
-  SettingsView(appModel: AppModel())
+  MacSettingsView(appModel: AppModel())
 }
 #endif

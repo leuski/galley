@@ -1,5 +1,5 @@
 //
-//  WelcomeScreen.swift
+//  VisionWelcomeScreen.swift
 //  Galley
 //
 //  Created by Anton Leuski on 5/31/26.
@@ -14,7 +14,7 @@ import GalleyCoreKit
 /// from Files.app. Picking a file rebinds the WindowGroup's URL
 /// binding so the *current* window flips from welcome to document,
 /// rather than spawning a second window.
-struct WelcomeScreen: View {
+struct VisionWelcomeScreen: View {
   @Binding var target: DocumentTarget?
   @Environment(RecentDocumentsModel.self) private var recents
   @State private var isFilePickerPresented = false
@@ -45,7 +45,7 @@ struct WelcomeScreen: View {
     }
     .handlesExternalEvents(
       preferring: ["*"],
-      allowing: DocumentScene.events
+      allowing: VisionDocumentScene.events
     )
     .onOpenURL { url in
       guard let activity = OpenDocumentActivity(from: url) else { return }
@@ -67,7 +67,7 @@ struct WelcomeScreen: View {
       _ = url.startAccessingSecurityScopedResource()
       recents.record(url)
       // Rebind this window's URL slot. The parent view's `if let`
-      // flips to `DocumentScreen` on the next layout pass — no
+      // flips to `VisionDocumentScreen` on the next layout pass — no
       // second window spawned.
       target = DocumentTarget(url: url)
     }

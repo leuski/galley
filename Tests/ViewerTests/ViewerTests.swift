@@ -20,7 +20,7 @@ func galleyModuleLoads() {
   #expect(Bool(true))
 }
 
-// No-op marker: the visionOS WelcomeScreen icon swap is an asset/view
+// No-op marker: the visionOS VisionWelcomeScreen icon swap is an asset/view
 // change (Image asset + sizing) with no testable logic.
 
 // MARK: - HistorySnapshot
@@ -397,13 +397,14 @@ struct BindPlanTests {
   @Test("Cold launch: no snapshot → initialBind for fileURL")
   func coldLaunchInitialBind() {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: "",
       perFileState: uniformStore(PerFileState()))
     #expect(plan.action == .initialBind(
-      url: fileURL, scrollY: nil, showsTOC: false))
+      target: DocumentTarget(url: fileURL), scrollY: nil,
+      showsTOC: false))
     #expect(plan.zoom == 1.0)
     #expect(!plan.applyChoiceOverrides)
   }
@@ -413,7 +414,7 @@ struct BindPlanTests {
     var stored = PerFileState()
     stored.pageZoom = 1.5
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: "",
@@ -427,13 +428,14 @@ struct BindPlanTests {
     stored.scrollY = 240.0
     stored.showsTOC = true
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: "",
       perFileState: uniformStore(stored))
     #expect(plan.action == .initialBind(
-      url: fileURL, scrollY: 240.0, showsTOC: true))
+      target: DocumentTarget(url: fileURL), scrollY: 240.0,
+      showsTOC: true))
   }
 
   // MARK: Restoration to the same URL
@@ -444,7 +446,7 @@ struct BindPlanTests {
   @Test("Restore to same URL: action=restore, no overrides")
   func restoreSameURL() {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: snapshotJSON(currentURL: fileURL),
@@ -472,7 +474,7 @@ struct BindPlanTests {
       url == self.restoredURL ? restoredState : PerFileState()
     }
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: snapshotJSON(currentURL: restoredURL),
@@ -494,7 +496,7 @@ struct BindPlanTests {
       url == self.restoredURL ? restoredState : PerFileState()
     }
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: snapshotJSON(currentURL: restoredURL),
@@ -515,7 +517,7 @@ struct BindPlanTests {
   @Test("didFirstBind=true: action is alreadyBound")
   func didFirstBindShortCircuits() {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: true,
       didRestore: false,
       historyJSON: snapshotJSON(currentURL: restoredURL),
@@ -535,7 +537,7 @@ struct BindPlanTests {
       url == self.restoredURL ? restoredState : PerFileState()
     }
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: true,
       didRestore: false,
       historyJSON: snapshotJSON(currentURL: restoredURL),
@@ -554,7 +556,7 @@ struct BindPlanTests {
   @Test("didRestore=true: snapshot is ignored")
   func didRestoreGatesSnapshotDecode() {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: true,
       historyJSON: snapshotJSON(currentURL: restoredURL),
@@ -562,7 +564,8 @@ struct BindPlanTests {
     // No restore action even though JSON exists; falls through to
     // initialBind on fileURL with no override.
     #expect(plan.action == .initialBind(
-      url: fileURL, scrollY: nil, showsTOC: false))
+      target: DocumentTarget(url: fileURL), scrollY: nil,
+      showsTOC: false))
     #expect(!plan.applyChoiceOverrides)
   }
 
@@ -575,13 +578,14 @@ struct BindPlanTests {
   @Test("Corrupt historyJSON falls through to initialBind")
   func corruptSnapshotFallsThrough() {
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: "{this is not valid json",
       perFileState: uniformStore(PerFileState()))
     #expect(plan.action == .initialBind(
-      url: fileURL, scrollY: nil, showsTOC: false))
+      target: DocumentTarget(url: fileURL), scrollY: nil,
+      showsTOC: false))
   }
 
   /// A snapshot whose `currentIndex` is out of range has nil
@@ -591,7 +595,7 @@ struct BindPlanTests {
     let snapshot = HistorySnapshot(urls: [fileURL], currentIndex: 99)
     let json = try #require(snapshot.encodedAsJSON())
     let plan = BindPlan.decide(
-      fileURL: fileURL,
+      target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
       historyJSON: json,

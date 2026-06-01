@@ -1,5 +1,5 @@
 //
-//  HelpScene.swift
+//  MacHelpScene.swift
 //  Galley
 //
 //  Created by Anton Leuski on 5/31/26.
@@ -9,7 +9,7 @@
 import SwiftUI
 import GalleyCoreKit
 
-struct HelpScene: Scene {
+struct MacHelpScene: Scene {
   static let id = "help"
   static let events = Set(["\(OpenHelpActivity.scheme):"])
 

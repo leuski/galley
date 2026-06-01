@@ -43,16 +43,16 @@ struct MacViewerApp: App {
   }
 
   var body: some Scene {
-    DocumentScene()
+    MacDocumentScene()
       .environment(boot)
       .environment(recents)
       .environment(kosmos)
 
-    HelpScene()
+    MacHelpScene()
       .environment(boot)
       .environment(recents)
 
-    SettingsScene()
+    MacSettingsScene()
       .environment(boot)
       .environment(kosmos)
   }
