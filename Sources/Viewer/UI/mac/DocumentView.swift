@@ -87,7 +87,7 @@ struct DocumentView: View {
         }
       }
       .animation(reduceMotion ? nil : .default, value: model.notice)
-      .background(WindowAccessor(onAttach: { window in
+      .windowAccessor { window in
         // Reveal whenever the resolved NSWindow changes identity —
         // skip a no-op re-attach to the same host. SwiftUI caches
         // scene `@State` for a freshly-closed `WindowGroup<URL>`
@@ -103,7 +103,7 @@ struct DocumentView: View {
         if model.kind == .document {
           NewTabAction.install(on: window)
         }
-      }))
+      }
       // A document window prefers its own URL so a repeat-open routes
       // back here (dedup) instead of duplicating; the token list
       // tracks `model.documentURL` reactively, covering in-window
@@ -205,12 +205,12 @@ struct DocumentView: View {
         // — same runloop turn as the first paint, so the visible
         // state never includes the open-sidebar frame. One-shot via
         // the `savedShowsTOC` flag flip.
-        .background(BeforeFirstDrawAccessor {
+        .willPresent {
           if !model.savedShowsTOC {
             model.savedShowsTOC = true
             model.showsTOC = false
           }
-        })
+        }
         // The WebView's pre-paint canvas paints system-white during
         // the gap between mount and the first HTML layout — visible
         // as a white flash on tab open / reload regardless of CSS.
