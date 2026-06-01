@@ -468,14 +468,13 @@ final class DocumentModel {
   /// reloads preserve current scroll normally. `scrollToLine` wins
   /// over `initialScrollY` if both happen to be set.
   func bind(
-    to url: URL,
-    scrollToLine: Int? = nil,
+    to target: DocumentTarget,
     initialScrollY: Double? = nil,
     initialShowsTOC: Bool? = nil
   ) async {
-    pendingScrollLine = scrollToLine
+    pendingScrollLine = target.scrollLine
     await finishBind(
-      urls: [url],
+      urls: [target.documentURL],
       currentIndex: 0,
       initialScrollY: initialScrollY,
       initialShowsTOC: initialShowsTOC)

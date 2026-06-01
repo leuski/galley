@@ -64,20 +64,22 @@ struct VisionViewerApp: App {
 
 struct DocumentScene: Scene {
   static let id = "document"
+  static let events = Set(["file:", "\(OpenDocumentActivity.scheme):"])
   @Environment(AppBoot.self) private var boot
   @Environment(VisionKosmosService.self) private var kosmos
 
   var body: some Scene {
-    WindowGroup(id: Self.id, for: URL.self) { $fileURL in
-      VisionContentView(fileURL: $fileURL, boot: boot)
-        .modifier(KosmosOpenURLBinder(kosmos: kosmos))
+    WindowGroup(id: Self.id, for: DocumentTarget.self) { $target in
+      VisionContentView(target: $target, boot: boot)
     }
+    .handlesExternalEvents(matching: Self.events)
     .windowResizability(.contentSize)
   }
 }
 
 struct SettingsScene: Scene {
   static let id = "settings"
+  static let events = Set(["\(OpenSettingsActivity.scheme):"])
   @Environment(AppBoot.self) private var boot
 
   var body: some Scene {
@@ -99,37 +101,7 @@ struct SettingsScene: Scene {
     .windowResizability(.contentSize)
     .restorationBehavior(.disabled)
     .defaultSize(width: 640, height: 720)
-  }
-}
-
-/// Captures `openWindow` from inside the document `WindowGroup` and
-/// wires it into:
-///
-/// - `kosmos.onOpenURL` — Mac → AVP `OpenDocument` arrives → open the
-///   doc window, then ask welcome surfaces to step aside. Order
-///   matters: opening the doc first ensures `docCount > 0` before
-///   the empty disappears, otherwise the empty's `noteDisappeared`
-///   would briefly hit zero and re-spawn yet another empty via
-///   `onNeedEmpty`.
-///
-/// - `registry.onNeedEmpty` — last document window closed and no
-///   empty is open → spawn a fresh empty welcome surface so the app
-///   stays alive.
-///
-/// Both closures use the same `openWindow` instance. WindowGroup
-/// content remounts on every window, but the closure each captures
-/// is functionally equivalent, so re-binding on every appear is
-/// idempotent.
-private struct KosmosOpenURLBinder: ViewModifier {
-  let kosmos: VisionKosmosService
-  @Environment(\.openWindow) private var openWindow
-
-  func body(content: Content) -> some View {
-    content.onAppear {
-      kosmos.onOpenURL = { url in
-        openWindow(id: DocumentScene.id, value: url)
-      }
-    }
+    .handlesExternalEvents(matching: Self.events)
   }
 }
 #endif

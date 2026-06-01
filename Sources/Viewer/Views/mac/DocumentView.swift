@@ -412,8 +412,7 @@ struct DocumentView: View {
         await model.scrollToSourceLine(line)
       } else {
         await model.bind(
-          to: target.documentURL,
-          scrollToLine: line,
+          to: target,
           initialShowsTOC: initialShowsTOC)
       }
     }
@@ -466,8 +465,7 @@ struct DocumentView: View {
     case .initialBind(let target, let scrollY, let showsTOC):
       recents.record(target.documentURL)
       await model.bind(
-        to: target.documentURL,
-        scrollToLine: target.scrollLine,
+        to: target,
         initialScrollY: scrollY,
         initialShowsTOC: showsTOC)
     }

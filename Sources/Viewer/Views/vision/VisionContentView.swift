@@ -12,7 +12,7 @@ import ALFoundation
 /// has no URL yet, and `DocumentScreen` once both `AppModel` and a
 /// `fileURL` are available.
 struct VisionContentView: View {
-  @Binding var fileURL: URL?
+  @Binding var target: DocumentTarget?
   let boot: AppBoot
 
   @Environment(\.dismissWindow) private var dismissWindow
@@ -28,14 +28,13 @@ struct VisionContentView: View {
   var body: some View {
     Group {
       if let model = boot.model {
-        if let url = fileURL {
+        if let target = Binding($target) {
           DocumentScreen(
-            fileURL: url,
-            appModel: model,
-            bindingFileURL: $fileURL)
+            target: target,
+            appModel: model)
           .navigationSplitViewStyle(.balanced)
         } else {
-          WelcomeScreen(fileURL: $fileURL)
+          WelcomeScreen(target: $target)
         }
       } else {
         ProgressView()
@@ -44,7 +43,7 @@ struct VisionContentView: View {
     }
     .onChange(of: scenePhase, initial: true) { _, newPhase in
       if newPhase == .background {
-        boot.model?.didDismissWindow(url: fileURL)
+        boot.model?.didDismissWindow(url: target?.documentURL)
         // Force-dismiss the last window, otherwise it leaks memory and
         // jams the Kosmos tunnel (if any).
         dismissWindow()
@@ -58,10 +57,9 @@ struct VisionContentView: View {
 /// then drives `bind(to:)` from `.task(id:)` so re-binding the
 /// WindowGroup to a different URL re-uses the same model.
 private struct DocumentScreen: View {
-  let fileURL: URL
+  @Binding var target: DocumentTarget
   let appModel: AppModel
 
-  @Binding var bindingFileURL: URL?
   @State private var model: DocumentModel?
   @State private var isFilePickerPresented = false
   @Environment(\.openURL) private var openURL
@@ -78,10 +76,19 @@ private struct DocumentScreen: View {
         ProgressView()
       }
     }
-    .task(id: fileURL) {
+    .task(id: target.documentURL) {
       let resolved = ensureModel()
-      recents.record(fileURL)
-      await resolved.bind(to: fileURL)
+      recents.record(target.documentURL)
+      await resolved.bind(to: target)
+    }
+    .handlesExternalEvents(
+      preferring: target.documentURL.galleyPreferringTokens,
+      allowing: Defaults.shared.openBehavior == .replaceCurrent
+      ? DocumentScene.events : []
+    )
+    .onOpenURL { url in
+      guard let activity = OpenDocumentActivity(from: url) else { return }
+      target = activity.target
     }
     // The "Open Document…" entry in the More menu drives this — the
     // visionOS-native file picker rebinds the current window's URL
@@ -95,7 +102,7 @@ private struct DocumentScreen: View {
       else { return }
       _ = url.startAccessingSecurityScopedResource()
       recents.record(url)
-      bindingFileURL = url
+      target = DocumentTarget(url: url)
     }
   }
 
@@ -327,7 +334,7 @@ private struct DocumentScreen: View {
         forResource: "template-authoring",
         withExtension: "md") {
         Button {
-          bindingFileURL = helpURL
+          target = DocumentTarget(url: helpURL)
         } label: {
           Label(
             "How to Make a Template",
@@ -350,9 +357,10 @@ private struct DocumentScreen: View {
         ForEach(recents.urls, id: \.self) { url in
           Button {
             if let fresh = recents.resolveRecentURL(url) {
+              let fresh = DocumentTarget(url: fresh)
               switch Defaults.shared.openBehavior {
               case .replaceCurrent:
-                bindingFileURL = fresh
+                target = fresh
               case .newTab: break
               case .newWindow:
                 openWindow(id: DocumentScene.id, value: fresh)
@@ -399,9 +407,9 @@ private struct DocumentScreen: View {
   @MainActor
   private func ensureModel() -> DocumentModel {
     if let model { return model }
-    let perFile = Defaults.shared.perFileStateStore[fileURL]
+    let perFile = Defaults.shared.perFileStateStore[target.documentURL]
     let created = DocumentModel(
-      initialURL: fileURL,
+      initialURL: target.documentURL,
       appModel: appModel,
       templatePersistent: perFile.templatePersistent,
       processorPersistent: perFile.rendererPersistent,

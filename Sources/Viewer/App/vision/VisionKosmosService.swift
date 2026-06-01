@@ -36,18 +36,13 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
 
   @ObservationIgnored private let host = ServiceHost(role: .visionViewer)
 
-  /// Handler for incoming `OpenURL` / `OpenDocument` messages — wired
-  /// by the app to call `openWindow(value: url)`. The service holds
-  /// the closure rather than owning a SwiftUI environment value
-  /// because `openWindow` is only available inside view bodies.
-  @ObservationIgnored var onOpenURL: (@MainActor (URL) -> Void)?
+  struct WindowInfo {
+    var reloadHandler: (@MainActor () -> Void)?
+    var url: URL?
+  }
 
-  /// Per-window reload handlers. The document view registers on
-  /// appearance, unregisters on disappearance.
   @ObservationIgnored
-  private var reloadHandlers: [KosmosCore.WindowID: @MainActor () -> Void] = [:]
-  @ObservationIgnored
-  private var openWindows: [KosmosCore.WindowID: URL] = [:]
+  private var windows: [KosmosCore.WindowID: WindowInfo] = [:]
 
   init() {
     self.httpTunnelClient = Client(client: nil)
@@ -60,8 +55,7 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
 
   func stop() async {
     httpTunnelClient.stopAll()
-    reloadHandlers.removeAll()
-    openWindows.removeAll()
+    windows.removeAll()
     await host.stop()
   }
 
@@ -83,7 +77,7 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
     }
 
     host.subscribe(WindowContentChanged.self) { [weak self] _, message in
-      self?.reloadHandlers[message.windowID]?()
+      self?.windows[message.windowID]?.reloadHandler?()
     }
 
     // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
@@ -112,8 +106,7 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
 
   /// Notify the Mac that the user closed a window on AVP.
   func notifyWindowClosed(_ windowID: KosmosCore.WindowID) {
-    openWindows.removeValue(forKey: windowID)
-    reloadHandlers.removeValue(forKey: windowID)
+    windows.removeValue(forKey: windowID)
     host.publish(CloseWindow(windowID: windowID))
   }
 
@@ -123,18 +116,18 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
     forWindow windowID: KosmosCore.WindowID,
     handler: @escaping @MainActor () -> Void
   ) {
-    reloadHandlers[windowID] = handler
+    windows[windowID, default: .init()].reloadHandler = handler
   }
 
   func unregisterReload(forWindow windowID: KosmosCore.WindowID) {
-    reloadHandlers.removeValue(forKey: windowID)
+    windows[windowID, default: .init()].reloadHandler = nil
   }
 
   // MARK: - Inbound handling
 
   private func handleOpenURL(_ message: OpenURL) {
-    openWindows[message.windowID] = message.url
-    onOpenURL?(message.url)
+    windows[message.windowID, default: .init()].url = message.url
+    OpenDocumentActivity(url: message.url).open()
   }
 
   private func handleOpenDocument(
@@ -149,8 +142,8 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
         """)
       return
     }
-    openWindows[message.docID] = url
-    onOpenURL?(url)
+    windows[message.docID, default: .init()].url = url
+    OpenDocumentActivity(url: url, scrollLine: message.scrollLineHint).open()
   }
 }
 #endif

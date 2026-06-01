@@ -15,7 +15,7 @@ import GalleyCoreKit
 /// binding so the *current* window flips from welcome to document,
 /// rather than spawning a second window.
 struct WelcomeScreen: View {
-  @Binding var fileURL: URL?
+  @Binding var target: DocumentTarget?
   @Environment(RecentDocumentsModel.self) private var recents
   @State private var isFilePickerPresented = false
 
@@ -43,6 +43,14 @@ struct WelcomeScreen: View {
         recentsList
       }
     }
+    .handlesExternalEvents(
+      preferring: ["*"],
+      allowing: DocumentScene.events
+    )
+    .onOpenURL { url in
+      guard let activity = OpenDocumentActivity(from: url) else { return }
+      target = activity.target
+    }
     .frame(minWidth: 600, minHeight: 800)
     .padding(40)
     .fileImporter(
@@ -61,7 +69,7 @@ struct WelcomeScreen: View {
       // Rebind this window's URL slot. The parent view's `if let`
       // flips to `DocumentScreen` on the next layout pass — no
       // second window spawned.
-      fileURL = url
+      target = DocumentTarget(url: url)
     }
   }
 
@@ -85,7 +93,7 @@ struct WelcomeScreen: View {
       ForEach(recents.urls.prefix(5), id: \.self) { url in
         Button {
           if let fresh = recents.resolveRecentURL(url) {
-            fileURL = fresh
+            target = DocumentTarget(url: fresh)
           }
         } label: {
           HStack {

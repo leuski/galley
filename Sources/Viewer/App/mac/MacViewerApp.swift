@@ -7,7 +7,6 @@ import KosmosAppKit
 
 @main
 struct MacViewerApp: App {
-  @NSApplicationDelegateAdaptor(ViewerAppDelegate.self) var appDelegate
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos: ViewerKosmosService
