@@ -15,7 +15,6 @@ struct VisionContentView: View {
   @Binding var fileURL: URL?
   let boot: AppBoot
 
-  @Environment(VisionWindowRegistry.self) private var registry
   @Environment(\.dismissWindow) private var dismissWindow
   /// Per-scene phase. `.background` fires for *this* window when
   /// the user dismisses it, including for the last window of the
@@ -25,9 +24,6 @@ struct VisionContentView: View {
   /// rebinds (welcome ↔ document), so registration tracks the
   /// window, not the current screen.
   @State private var windowID = UUID()
-  /// Idempotent guard so `.onChange(of: scenePhase, initial: true)`
-  /// only registers / unregisters once per real lifecycle edge.
-  @State private var counted: Bool = false
 
   var body: some View {
     Group {
@@ -47,25 +43,12 @@ struct VisionContentView: View {
       }
     }
     .onChange(of: scenePhase, initial: true) { _, newPhase in
-      updateRegistration(for: newPhase)
-    }
-  }
-
-  private func updateRegistration(for phase: ScenePhase) {
-    switch phase {
-    case .active, .inactive:
-      if !counted {
-        registry.register(
-          id: windowID, binding: $fileURL, dismiss: dismissWindow)
-        counted = true
+      if newPhase == .background {
+        boot.model?.didDismissWindow(url: fileURL)
+        // Force-dismiss the last window, otherwise it leaks memory and
+        // jams the Kosmos tunnel (if any).
+        dismissWindow()
       }
-    case .background:
-      if counted {
-        registry.unregister(id: windowID)
-        counted = false
-      }
-    @unknown default:
-      break
     }
   }
 }
@@ -334,7 +317,7 @@ private struct DocumentScreen: View {
       Divider()
 
       Button {
-        openWindow(id: VisionViewerApp.settings)
+        openWindow(id: SettingsScene.id)
       } label: {
         Label("Settings…", systemImage: "gearshape")
       }
@@ -366,13 +349,13 @@ private struct DocumentScreen: View {
       Menu {
         ForEach(recents.urls, id: \.self) { url in
           Button {
-            if let fresh = recents.openRecent(url) {
+            if let fresh = recents.resolveRecentURL(url) {
               switch Defaults.shared.openBehavior {
               case .replaceCurrent:
                 bindingFileURL = fresh
               case .newTab: break
               case .newWindow:
-                openWindow(id: VisionViewerApp.main, value: fresh)
+                openWindow(id: DocumentScene.id, value: fresh)
               }
             }
           } label: {

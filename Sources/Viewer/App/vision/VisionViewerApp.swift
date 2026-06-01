@@ -11,22 +11,16 @@ import SwiftUI
 /// Kosmos and breaks Mac → AVP routing. We achieve that without a
 /// dedicated anchor scene by having the document `WindowGroup` host
 /// an "empty" instance (nil-URL) whenever no real documents are
-/// open: that empty is the welcome surface. The
-/// `VisionWindowRegistry` re-spawns one whenever the last document
-/// window closes. The user can explicitly close the empty to opt
-/// out — when that happens the app suspends, which matches intent.
+/// open: that empty is the welcome surface.
 @main
 struct VisionViewerApp: App {
   /// The document `WindowGroup`. An instance bound to a nil URL is
   /// the welcome / empty surface; an instance bound to a real URL is
   /// a document window.
-  static let main = "main"
-  static let settings = "settings"
-
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
   @State private var kosmos = VisionKosmosService()
-  @State private var registry = VisionWindowRegistry(windowGroupID: Self.main)
+  @Environment(\.openWindow) private var openWindow
 
   /// Read at the **App** level so SwiftUI hands us the aggregate
   /// phase across all live scenes (`.active` if any scene is active,
@@ -40,37 +34,60 @@ struct VisionViewerApp: App {
   }
 
   var body: some Scene {
-    WindowGroup(id: Self.main, for: URL.self) { $fileURL in
+    DocumentScene()
+      .environment(boot)
+      .environment(recents)
+      .environment(kosmos)
+      .onChange(of: scenePhase, initial: false) { _, newPhase in
+        // App-level (aggregate) phase. Drives Kosmos suspend/resume,
+        // and tells the registry to suppress `onNeedEmpty` while the
+        // whole app is on its way out — otherwise per-scene
+        // `.background` transitions during app backgrounding would
+        // each look like a fresh dismissal and try to spawn empties.
+        boot.model?.didChangePhase(scenePhase: newPhase) {
+          openWindow(id: DocumentScene.id)
+        }
+        switch newPhase {
+        case .active, .inactive:
+          kosmos.publishResume()
+        case .background:
+          kosmos.publishSuspend()
+        @unknown default:
+          break
+        }
+      }
+
+    SettingsScene()
+      .environment(boot)
+  }
+}
+
+struct DocumentScene: Scene {
+  static let id = "document"
+  @Environment(AppBoot.self) private var boot
+  @Environment(VisionKosmosService.self) private var kosmos
+
+  var body: some Scene {
+    WindowGroup(id: Self.id, for: URL.self) { $fileURL in
       VisionContentView(fileURL: $fileURL, boot: boot)
-        .environment(recents)
-        .environment(kosmos)
-        .environment(registry)
-        .modifier(KosmosOpenURLBinder(kosmos: kosmos, registry: registry))
+        .modifier(KosmosOpenURLBinder(kosmos: kosmos))
     }
     .windowResizability(.contentSize)
-    .onChange(of: scenePhase, initial: false) { _, newPhase in
-      // App-level (aggregate) phase. Drives Kosmos suspend/resume,
-      // and tells the registry to suppress `onNeedEmpty` while the
-      // whole app is on its way out — otherwise per-scene
-      // `.background` transitions during app backgrounding would
-      // each look like a fresh dismissal and try to spawn empties.
-      switch newPhase {
-      case .active, .inactive:
-        kosmos.publishResume()
-      case .background:
-        kosmos.publishSuspend()
-      @unknown default:
-        break
-      }
-    }
+  }
+}
 
+struct SettingsScene: Scene {
+  static let id = "settings"
+  @Environment(AppBoot.self) private var boot
+
+  var body: some Scene {
     // Single settings window. visionOS has no `Settings { ... }`
     // scene type — instead we expose a regular `Window` reached via
     // `openWindow(id:)` from the document toolbar's gear button.
     // `restorationBehavior(.disabled)` keeps the window out of the
     // launch set: closing the app while Settings is open does not
     // bring it back on relaunch.
-    Window("Settings", id: Self.settings) {
+    Window("Settings", id: Self.id) {
       if let model = boot.model {
         VisionSettingsView(appModel: model)
       } else {
@@ -83,7 +100,6 @@ struct VisionViewerApp: App {
     .restorationBehavior(.disabled)
     .defaultSize(width: 640, height: 720)
   }
-
 }
 
 /// Captures `openWindow` from inside the document `WindowGroup` and
@@ -106,15 +122,13 @@ struct VisionViewerApp: App {
 /// idempotent.
 private struct KosmosOpenURLBinder: ViewModifier {
   let kosmos: VisionKosmosService
-  let registry: VisionWindowRegistry
   @Environment(\.openWindow) private var openWindow
 
   func body(content: Content) -> some View {
     content.onAppear {
       kosmos.onOpenURL = { url in
-        registry.openURL(url)
+        openWindow(id: DocumentScene.id, value: url)
       }
-      registry.openWindow = openWindow
     }
   }
 }

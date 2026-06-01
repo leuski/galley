@@ -27,6 +27,9 @@ final class AppModel {
   /// `TabView` selection to this property so external deep links can
   /// land on the right pane.
   var selectedSettingsTab: SettingsTab = .general
+#else
+  @ObservationIgnored private var appPhase: ScenePhase?
+  @ObservationIgnored private var open: (@MainActor () -> Void)?
 #endif
 
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
@@ -131,6 +134,30 @@ final class AppModel {
       template=\(template ?? "nil", privacy: .public)
       """)
   }
+
+#if os(visionOS)
+  func didDismissWindow(url: URL?) {
+    defaultsLog.notice("""
+      didDismissWindow \
+      \(url?.absoluteString ?? "nil", privacy: .public)
+      """)
+    if url != nil, appPhase == .background {
+      open?()
+    }
+  }
+
+  func didChangePhase(
+    scenePhase: ScenePhase, open: @escaping @MainActor () -> Void)
+  {
+    defaultsLog.notice("""
+      didChangePhase \
+      \(String(describing: scenePhase), privacy: .public)
+      """)
+    self.appPhase = scenePhase
+    self.open = open
+  }
+#endif
+
 }
 
 /// Boot wrapper that runs async processor discovery before

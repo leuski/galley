@@ -429,6 +429,12 @@ struct DocumentView: View {
   /// dispatches to `model.restore` or `model.bind` (or returns when
   /// the model is already bound).
   private func launchTask() async {
+    DispatchQueue.main.async {
+      NSApp.activate(ignoringOtherApps: true)
+      hostWindow?.makeKeyAndOrderFront(nil)
+      hostWindow?.tabGroup?.selectedWindow = hostWindow
+    }
+
     let plan = BindPlan.decide(
       target: target,
       didFirstBind: model.didFirstBind,
