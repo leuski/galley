@@ -8,14 +8,18 @@
 import Foundation
 @_exported import KosmosAppKit
 
-public struct OpenDocumentActivity: URLSerializable, Hashable {
-  /// Document scheme — `galley://<path>`, routed to the document
-  /// `WindowGroup` (plain `file://` documents route there too).
-  public static let scheme = "galley"
-
+public struct GenerilizedDocumentActivity<Scheme>: URLSerializable,
+                                                   Hashable,
+                                                   CustomStringConvertible
+where Scheme: SchemeProtocol
+{
   public let target: DocumentTarget
   public var documentURL: URL { target.documentURL }
   public var scrollLine: Int? { target.scrollLine }
+
+  public var description: String {
+    target.description
+  }
 
   public init(target: DocumentTarget) {
     self.target = target
@@ -26,16 +30,23 @@ public struct OpenDocumentActivity: URLSerializable, Hashable {
   }
 
   public init?(from url: URL) {
-    guard let target = DocumentTarget(from: url, scheme: Self.scheme) else {
+    guard let target = DocumentTarget(from: url, scheme: Scheme.scheme) else {
       return nil
     }
     self.target = target
   }
 
   public var url: URL? {
-    target.url(scheme: Self.scheme)
+    target.url(scheme: Scheme.scheme)
   }
 }
+
+public struct GalleyScheme: SchemeProtocol {
+  public static let scheme = "galley"
+}
+
+public typealias OpenDocumentActivity = GenerilizedDocumentActivity<
+  GalleyScheme>
 
 /// Tabs of the Viewer's Settings scene. Carried on inbound
 /// `galley://settings?tab=<id>` URLs so external callers (e.g. the

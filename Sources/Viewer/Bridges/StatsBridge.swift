@@ -14,7 +14,7 @@ import KosmosAppKit
 /// would understate (or, for verbatim include syntax that survives
 /// the render, overstate) what the reader actually sees.
 @MainActor
-final class StatsBridge: NSObject, WKScriptMessageHandler {
+final class StatsBridge: NSObject, JavaScriptBridge {
   static let messageName = "stats"
 
   /// Reader script. Source lives in

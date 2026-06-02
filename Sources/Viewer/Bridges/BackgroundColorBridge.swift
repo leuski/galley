@@ -20,7 +20,7 @@ import KosmosAppKit
 /// two diverge while the user switches templates faster than the
 /// WebView can reload.
 @MainActor
-final class BackgroundColorBridge: NSObject, WKScriptMessageHandler {
+final class BackgroundColorBridge: NSObject, JavaScriptBridge {
   /// JS handler name. Script calls
   /// `window.webkit.messageHandlers.backgroundColor.postMessage(...)`.
   static let messageName = "backgroundColor"

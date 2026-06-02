@@ -82,10 +82,4 @@ extension URL {
   public func appendingPreview(_ documentURL: URL) -> URL {
     galleyPreview.appending(path: documentURL.safe.path)
   }
-
-  /// `<self>/template/<id>` — the route prefix for template assets.
-  /// Pass `file` to point at a specific asset.
-  public func appendingTemplate(id: String, file documentURL: URL) -> URL {
-    galleyTemplate(id: id).appending(path: documentURL.safe.path)
-  }
 }

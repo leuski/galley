@@ -19,7 +19,7 @@ import KosmosAppKit
 ///   reader's section without a cursor. `nil` means the user is
 ///   scrolled above the first heading.
 @MainActor
-final class TOCBridge: NSObject, WKScriptMessageHandler {
+final class TOCBridge: NSObject, JavaScriptBridge {
   static let messageName = "toc"
 
   /// Heading extraction + active-section tracker. Source lives in

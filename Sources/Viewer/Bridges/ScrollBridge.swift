@@ -13,7 +13,7 @@ import KosmosAppKit
 /// on every frame; @SceneStorage only needs the eventual resting
 /// position, and per-frame updates would churn observation.
 @MainActor
-final class ScrollBridge: NSObject, WKScriptMessageHandler {
+final class ScrollBridge: NSObject, JavaScriptBridge {
   /// JS handler name. Script calls
   /// `window.webkit.messageHandlers.scroll.postMessage({ y: ... })`.
   static let messageName = "scroll"

@@ -29,30 +29,9 @@ import KosmosAppKit
 /// URL scheme avoids the cross-process AppleEvent delivery
 /// altogether: LaunchServices hands the URL to Server's
 /// `application(_:open:)` directly.
-public struct GalleyBridgeRequest: Sendable, Equatable,
-                                   CustomStringConvertible,
-                                   URLSerializable
-{
+public struct GalleyHelperScheme: SchemeProtocol {
   public static let scheme = "galley-helper"
-
-  public let target: DocumentTarget
-
-  public var description: String {
-    url?.absoluteString ?? "nil"
-  }
-
-  public init(target: DocumentTarget) {
-    self.target = target
-  }
-
-  public init?(from url: URL) {
-    guard let target = DocumentTarget(from: url, scheme: Self.scheme) else {
-      return nil
-    }
-    self.target = target
-  }
-
-  public var url: URL? {
-    target.url(scheme: Self.scheme)
-  }
 }
+
+public typealias GalleyBridgeRequest = GenerilizedDocumentActivity<
+  GalleyHelperScheme>

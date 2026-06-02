@@ -9,7 +9,7 @@ import KosmosAppKit
 /// own knowledge of the file path — it reads it from `documentURL`,
 /// which the owning DocumentModel keeps current.
 @MainActor
-final class EditorBridge: NSObject, WKScriptMessageHandler {
+final class EditorBridge: NSObject, JavaScriptBridge {
   /// Name of the JavaScript message handler. JS calls
   /// `window.webkit.messageHandlers.editor.postMessage({ line: N })`.
   static let messageName = "editor"
