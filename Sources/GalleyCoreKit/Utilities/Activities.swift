@@ -13,6 +13,7 @@ public struct GenerilizedDocumentActivity<Scheme>: URLSerializable,
                                                    CustomStringConvertible
 where Scheme: SchemeProtocol
 {
+  public static var scheme: String { Scheme.scheme }
   public let target: DocumentTarget
   public var documentURL: URL { target.documentURL }
   public var scrollLine: Int? { target.scrollLine }

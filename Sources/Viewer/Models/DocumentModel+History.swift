@@ -2,7 +2,7 @@
 import AppKit
 #endif
 import Foundation
-import ALFoundation
+import KosmosAppKit
 
 extension DocumentModel {
   var canGoBack: Bool { currentIndex > 0 }
@@ -78,6 +78,10 @@ extension DocumentModel {
 struct HistorySnapshot: Codable, Sendable, Equatable {
   let urls: [URL]
   let currentIndex: Int
+
+  var nilIfEmpty: HistorySnapshot? {
+    urls.isEmpty ? nil : self
+  }
 
   /// The URL the snapshot says the window was last viewing, or `nil`
   /// when `currentIndex` is out of range (corrupted store).

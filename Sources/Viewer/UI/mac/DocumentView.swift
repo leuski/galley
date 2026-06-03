@@ -72,7 +72,8 @@ struct DocumentView: View {
   /// piece of per-window state has, since the `preferring:` dedup
   /// keeps one window per URL and the per-file store already carries
   /// the same fields.
-  @SceneStorage("history") private var historyJSON: String = ""
+  @SceneStorage("history")
+  private var history: SceneStoragePayload<HistorySnapshot>?
 
   var body: some View {
     @Bindable var model = model
@@ -438,7 +439,7 @@ struct DocumentView: View {
       target: target,
       didFirstBind: model.didFirstBind,
       didRestore: didRestore,
-      historyJSON: historyJSON,
+      history: try? history?.value,
       perFileState: { Defaults.shared.perFileStateStore[$0] })
 
     // `setZoom` only updates a JS rule on the live page; the next
@@ -472,7 +473,7 @@ struct DocumentView: View {
   }
 
   private func saveHistory() {
-    historyJSON = model.historySnapshot?.encodedAsJSON() ?? ""
+    history = model.historySnapshot.flatMap { try? .init($0) }
   }
 
   @ToolbarContentBuilder

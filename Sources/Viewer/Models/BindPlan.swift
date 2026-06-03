@@ -75,15 +75,13 @@ extension BindPlan {
     target: DocumentTarget,
     didFirstBind: Bool,
     didRestore: Bool,
-    historyJSON: String,
+    history: HistorySnapshot?,
     perFileState: (URL) -> PerFileState
   ) -> BindPlan {
     // Skip snapshot decode after the restore branch has already
     // fired — `didRestore` is the gate that prevents a re-fire of
     // .task from re-entering restore.
-    let snapshot = !didRestore
-      ? HistorySnapshot.decode(json: historyJSON)
-      : nil
+    let snapshot = !didRestore ? history?.nilIfEmpty : nil
     let restoreURL = snapshot?.currentURL
     let stored = perFileState(restoreURL ?? target.documentURL)
 

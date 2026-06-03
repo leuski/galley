@@ -313,63 +313,6 @@ struct EditorPresetTests {
   }
 }
 
-
-// MARK: - HistorySnapshot JSON adapter
-
-@Suite("HistorySnapshot JSON adapter")
-struct HistorySnapshotJSONTests {
-  private let urlA = URL(fileURLWithPath: "/tmp/a.md")
-  private let urlB = URL(fileURLWithPath: "/tmp/b.md")
-
-  @Test("encode → decode round-trips through a String")
-  func roundTripString() throws {
-    let original = HistorySnapshot(
-      urls: [urlA, urlB], currentIndex: 1)
-    let encoded = try #require(original.encodedAsJSON())
-    let decoded = try #require(HistorySnapshot.decode(json: encoded))
-    #expect(decoded == original)
-  }
-
-  /// `@SceneStorage` initial state is `""`. The decode adapter must
-  /// treat that as "no snapshot" — the production caller's launch
-  /// path branches on nil here.
-  @Test("Empty string decodes to nil")
-  func emptyStringIsNil() {
-    #expect(HistorySnapshot.decode(json: "") == nil)
-  }
-
-  /// Defensive: malformed JSON (corrupt store, schema mismatch) must
-  /// not crash. The launch path falls back to a fresh bind on nil.
-  @Test("Malformed JSON decodes to nil")
-  func malformedJSONIsNil() {
-    #expect(HistorySnapshot.decode(json: "{") == nil)
-    #expect(HistorySnapshot.decode(json: "not-json") == nil)
-    #expect(HistorySnapshot.decode(json: "[1,2,3]") == nil)
-  }
-
-  /// A snapshot with empty `urls` is semantically equivalent to "no
-  /// snapshot" — pin that the decoder treats it as nil so the
-  /// initial-bind path runs in the launchTask interpreter.
-  @Test("Decode of {urls: [], currentIndex: 0} returns nil")
-  func emptyURLsIsNil() throws {
-    let empty = HistorySnapshot(urls: [], currentIndex: 0)
-    let json = try #require(empty.encodedAsJSON())
-    #expect(HistorySnapshot.decode(json: json) == nil)
-  }
-
-  /// Out-of-range `currentIndex` is preserved on decode (it's the
-  /// caller's job to detect via `currentURL`). This pins the contract
-  /// that the JSON adapter is dumb storage — it doesn't normalize.
-  @Test("Decode preserves out-of-range currentIndex")
-  func decodePreservesNegativeIndex() throws {
-    let original = HistorySnapshot(urls: [urlA], currentIndex: -1)
-    let encoded = try #require(original.encodedAsJSON())
-    let decoded = try #require(HistorySnapshot.decode(json: encoded))
-    #expect(decoded.currentIndex == -1)
-    #expect(decoded.currentURL == nil)
-  }
-}
-
 // MARK: - BindPlan
 
 @Suite("BindPlan")
@@ -380,10 +323,10 @@ struct BindPlanTests {
   /// Build a snapshot whose `currentURL` is `url`. Pre-encode it as
   /// JSON so tests pass it through `decide`'s `historyJSON` argument
   /// the way `@SceneStorage` would.
-  private func snapshotJSON(currentURL: URL) -> String {
+  private func snapshotJSON(currentURL: URL) -> HistorySnapshot {
     let snapshot = HistorySnapshot(
       urls: [currentURL], currentIndex: 0)
-    return snapshot.encodedAsJSON() ?? ""
+    return snapshot
   }
 
   /// Build a perFileState lookup that returns `state` for any URL —
@@ -400,7 +343,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: "",
+      history: nil,
       perFileState: uniformStore(PerFileState()))
     #expect(plan.action == .initialBind(
       target: DocumentTarget(url: fileURL), scrollY: nil,
@@ -417,7 +360,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: "",
+      history: nil,
       perFileState: uniformStore(stored))
     #expect(plan.zoom == 1.5)
   }
@@ -431,7 +374,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: "",
+      history: nil,
       perFileState: uniformStore(stored))
     #expect(plan.action == .initialBind(
       target: DocumentTarget(url: fileURL), scrollY: 240.0,
@@ -449,7 +392,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: snapshotJSON(currentURL: fileURL),
+      history: snapshotJSON(currentURL: fileURL),
       perFileState: uniformStore(PerFileState()))
     if case .restore(let snapshot, _, _) = plan.action {
       #expect(snapshot.currentURL == fileURL)
@@ -477,7 +420,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: snapshotJSON(currentURL: restoredURL),
+      history: snapshotJSON(currentURL: restoredURL),
       perFileState: store)
     #expect(plan.applyChoiceOverrides)
     #expect(plan.templateOverride == "github")
@@ -499,7 +442,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: snapshotJSON(currentURL: restoredURL),
+      history: snapshotJSON(currentURL: restoredURL),
       perFileState: store)
     #expect(plan.zoom == 2.0)
     if case .restore(_, let scrollY, _) = plan.action {
@@ -520,7 +463,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: true,
       didRestore: false,
-      historyJSON: snapshotJSON(currentURL: restoredURL),
+      history: snapshotJSON(currentURL: restoredURL),
       perFileState: uniformStore(PerFileState()))
     #expect(plan.action == .alreadyBound)
   }
@@ -540,7 +483,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: true,
       didRestore: false,
-      historyJSON: snapshotJSON(currentURL: restoredURL),
+      history: snapshotJSON(currentURL: restoredURL),
       perFileState: store)
     #expect(plan.action == .alreadyBound)
     #expect(plan.applyChoiceOverrides)
@@ -559,7 +502,7 @@ struct BindPlanTests {
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: true,
-      historyJSON: snapshotJSON(currentURL: restoredURL),
+      history: snapshotJSON(currentURL: restoredURL),
       perFileState: uniformStore(PerFileState()))
     // No restore action even though JSON exists; falls through to
     // initialBind on fileURL with no override.
@@ -571,34 +514,16 @@ struct BindPlanTests {
 
   // MARK: Defensive — corrupt snapshot
 
-  /// Corrupt JSON in `@SceneStorage` falls through to initialBind
-  /// rather than crashing. The end-to-end equivalent (corrupt store
-  /// at relaunch) is hard to drive from XCUITest; here it's one
-  /// assertion.
-  @Test("Corrupt historyJSON falls through to initialBind")
-  func corruptSnapshotFallsThrough() {
-    let plan = BindPlan.decide(
-      target: DocumentTarget(url: fileURL),
-      didFirstBind: false,
-      didRestore: false,
-      historyJSON: "{this is not valid json",
-      perFileState: uniformStore(PerFileState()))
-    #expect(plan.action == .initialBind(
-      target: DocumentTarget(url: fileURL), scrollY: nil,
-      showsTOC: false))
-  }
-
   /// A snapshot whose `currentIndex` is out of range has nil
   /// `currentURL`. Treat as "no snapshot" — initialBind takes over.
   @Test("Snapshot with out-of-range index falls through to initialBind")
   func outOfRangeIndexFallsThrough() throws {
     let snapshot = HistorySnapshot(urls: [fileURL], currentIndex: 99)
-    let json = try #require(snapshot.encodedAsJSON())
     let plan = BindPlan.decide(
       target: DocumentTarget(url: fileURL),
       didFirstBind: false,
       didRestore: false,
-      historyJSON: json,
+      history: snapshot,
       perFileState: uniformStore(PerFileState()))
     // Snapshot decodes successfully (urls is non-empty), so the
     // restore branch fires — but `currentURL` is nil, so the

@@ -265,8 +265,8 @@ struct GalleyActionTests {
 
   @Test("openSettings builds a galley-settings URL that parses back",
         arguments: SettingsTab.allCases)
-  func settingsURLRoundTrip(tab: SettingsTab) {
-    let url = OpenSettingsActivity(tab).url
+  func settingsURLRoundTrip(tab: SettingsTab) throws {
+    let url = try #require(OpenSettingsActivity(tab).url)
     #expect(url.scheme == "galley-settings")
     #expect(OpenSettingsActivity(from: url) == .init(tab))
   }
@@ -274,9 +274,9 @@ struct GalleyActionTests {
   // MARK: - Help URL helpers
 
   @Test("galley-help URL round-trips to the bundle file path")
-  func helpURLRoundTrip() {
+  func helpURLRoundTrip() throws {
     let file = URL(fileURLWithPath: "/App.app/Contents/Resources/help.md")
-    let url = OpenHelpActivity(documentURL: file).url
+    let url = try #require(OpenHelpActivity(documentURL: file).url)
     #expect(url.scheme == "galley-help")
     #expect(OpenHelpActivity(from: url)?.documentURL == file)
   }

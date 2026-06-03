@@ -1,33 +1,35 @@
 {
-  "configurations": [
+  "configurations" : [
     {
-      "id": "00000000-0000-0000-0000-000000000001",
-      "name": "Default",
-      "options": {}
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Default",
+      "options" : {
+
+      }
     }
   ],
-  "defaultOptions": {
-    "targetForVariableExpansion": {
-      "containerPath": "container:Galley.xcodeproj",
-      "identifier": "626E8D5B2F9DD1C800BD51F9",
-      "name": "Tests"
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Galley.xcodeproj",
+      "identifier" : "626E8D5B2F9DD1C800BD51F9",
+      "name" : "Tests"
     }
   },
-  "testTargets": [
+  "testTargets" : [
     {
-      "target": {
-        "containerPath": "container:Galley.xcodeproj",
-        "identifier": "626E8D5B2F9DD1C800BD51F9",
-        "name": "Tests"
+      "target" : {
+        "containerPath" : "container:Galley.xcodeproj",
+        "identifier" : "626E8D5B2F9DD1C800BD51F9",
+        "name" : "Tests"
       }
     },
     {
-      "target": {
-        "containerPath": "container:Galley.xcodeproj",
-        "identifier": "62CC3C5E2FA7B8F90018F091",
-        "name": "UITests"
+      "target" : {
+        "containerPath" : "container:Galley.xcodeproj",
+        "identifier" : "62CC3C5E2FA7B8F90018F091",
+        "name" : "UITests"
       }
     }
   ],
-  "version": 1
+  "version" : 1
 }
