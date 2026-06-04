@@ -30,7 +30,7 @@ import KosmosAppKit
 /// altogether: LaunchServices hands the URL to Server's
 /// `application(_:open:)` directly.
 public struct GalleyHelperScheme: SchemeProtocol {
-  public static let scheme = "galley-helper"
+  public static let name = "galley-helper"
 }
 
 public typealias GalleyBridgeRequest = GenerilizedDocumentActivity<

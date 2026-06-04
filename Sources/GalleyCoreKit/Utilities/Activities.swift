@@ -13,7 +13,7 @@ public struct GenerilizedDocumentActivity<Scheme>: URLSerializable,
                                                    CustomStringConvertible
 where Scheme: SchemeProtocol
 {
-  public static var scheme: String { Scheme.scheme }
+  public static var scheme: String { Scheme.name }
   public let target: DocumentTarget
   public var documentURL: URL { target.documentURL }
   public var scrollLine: Int? { target.scrollLine }
@@ -31,19 +31,19 @@ where Scheme: SchemeProtocol
   }
 
   public init?(from url: URL) {
-    guard let target = DocumentTarget(from: url, scheme: Scheme.scheme) else {
+    guard let target = DocumentTarget(from: url, scheme: Self.scheme) else {
       return nil
     }
     self.target = target
   }
 
   public var url: URL? {
-    target.url(scheme: Scheme.scheme)
+    target.url(scheme: Self.scheme)
   }
 }
 
 public struct GalleyScheme: SchemeProtocol {
-  public static let scheme = "galley"
+  public static let name = "galley"
 }
 
 public typealias OpenDocumentActivity = GenerilizedDocumentActivity<
