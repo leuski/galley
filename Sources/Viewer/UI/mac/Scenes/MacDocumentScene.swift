@@ -11,7 +11,7 @@ import GalleyCoreKit
 
 struct MacDocumentScene: Scene {
   static let id = "document"
-  static let events = Set(["file:", "\(OpenDocumentActivity.scheme):"])
+  static let events = Set(["file:", OpenDocumentActivity.schemeExternalToken])
   @Environment(AppBoot.self) var boot: AppBoot
 
   var body: some Scene {

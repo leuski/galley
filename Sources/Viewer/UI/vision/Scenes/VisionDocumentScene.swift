@@ -11,7 +11,7 @@ import GalleyCoreKit
 
 struct VisionDocumentScene: Scene {
   static let id = "document"
-  static let events = Set(["file:", "\(OpenDocumentActivity.scheme):"])
+  static let events = Set(["file:", OpenDocumentActivity.schemeExternalToken])
 
   var body: some Scene {
     WindowGroup(id: Self.id, for: DocumentTarget.self) { $target in

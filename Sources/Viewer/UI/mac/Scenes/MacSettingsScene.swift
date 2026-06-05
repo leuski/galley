@@ -11,7 +11,7 @@ import GalleyCoreKit
 
 struct MacSettingsScene: Scene {
   static let id = "settings"
-  static let events = Set(["\(OpenSettingsActivity.scheme):"])
+  static let events = Set([OpenSettingsActivity.schemeExternalToken])
   @Environment(AppBoot.self) var boot: AppBoot
 
   var body: some Scene {

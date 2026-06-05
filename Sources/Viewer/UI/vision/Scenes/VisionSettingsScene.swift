@@ -11,7 +11,7 @@ import GalleyCoreKit
 
 struct VisionSettingsScene: Scene {
   static let id = "settings"
-  static let events = Set(["\(OpenSettingsActivity.scheme):"])
+  static let events = Set([OpenSettingsActivity.schemeExternalToken])
   @Environment(AppBoot.self) private var boot
 
   var body: some Scene {

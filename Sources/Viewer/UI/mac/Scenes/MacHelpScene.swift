@@ -11,7 +11,7 @@ import GalleyCoreKit
 
 struct MacHelpScene: Scene {
   static let id = "help"
-  static let events = Set(["\(OpenHelpActivity.scheme):"])
+  static let events = Set([OpenHelpActivity.schemeExternalToken])
 
   var body: some Scene {
     // Singleton Help window. It claims the `galley-help://` scheme via

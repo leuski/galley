@@ -14,6 +14,8 @@ public struct GenerilizedDocumentActivity<Scheme>: URLSerializable,
 where Scheme: SchemeProtocol
 {
   public static var scheme: String { Scheme.name }
+  public static var schemeExternalToken: String { Scheme.externalToken }
+
   public let target: DocumentTarget
   public var documentURL: URL { target.documentURL }
   public var scrollLine: Int? { target.scrollLine }
@@ -58,8 +60,14 @@ public enum SettingsTab: String, Sendable, CaseIterable {
   case server
 }
 
+public struct OpenSettingsScheme: SchemeProtocol {
+  public static let name = "galley-settings"
+}
+
 public struct OpenSettingsActivity: URLSerializable, Hashable {
-  public static let scheme = "galley-settings"
+  typealias Scheme = OpenSettingsScheme
+  public static var scheme: String { Scheme.name }
+  public static var schemeExternalToken: String { Scheme.externalToken }
   public let tab: SettingsTab?
   public init(_ tab: SettingsTab? = nil) {
     self.tab = tab
@@ -89,8 +97,14 @@ public struct OpenSettingsActivity: URLSerializable, Hashable {
   }
 }
 
+public struct OpenHelpScheme: SchemeProtocol {
+  public static let name = "galley-help"
+}
+
 public struct OpenHelpActivity: URLSerializable, Hashable {
-  public static let scheme = "galley-help"
+  typealias Scheme = OpenHelpScheme
+  public static var scheme: String { Scheme.name }
+  public static var schemeExternalToken: String { Scheme.externalToken }
   public let documentURL: URL
 
   public init(documentURL: URL) {
