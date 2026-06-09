@@ -28,8 +28,8 @@ final class BackgroundColorBridge: NSObject, JavaScriptBridge {
   /// Reader script. Source lives in
   /// `Resources/Scripts/backgroundColorReader.js`; the message name
   /// is hardcoded there and must match `messageName`.
-  static let userScript: String = Bundle.main.requiredString(
-    forResource: "backgroundColorReader", withExtension: "js")
+  static let userScript: String = Bundle(for: BackgroundColorBridge.self)
+    .requiredString(forResource: "backgroundColorReader", withExtension: "js")
 
   /// Set by the owning DocumentModel. Receives the parsed color
   /// (`nil` for transparent / malformed payloads) and the

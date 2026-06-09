@@ -1,11 +1,12 @@
 import Foundation
-import GalleyCoreKit
 import Observation
 import OSLog
 import WebKit
+import KosmosAppKit
 
 private let log = Logger(
-  subsystem: bundleIdentifier, category: "FindSession")
+  subsystem: Bundle.main.bundleIdentifier ?? "net.leuski.KosmosAppKit",
+  category: "FindSession")
 
 /// Per-window find-text session — owns the query, options, match
 /// counters, and the visibility / dismissal flags driven by the
@@ -15,12 +16,25 @@ private let log = Logger(
 ///
 /// JS calls go through the host `WebPage`. `clearHighlights` and the
 /// search / next / prev calls are no-ops while the page is between
-/// renders or before `window.galleyFind` binds — `FindBridge`'s user
+/// renders or before the find function binds — `FindBridge`'s user
 /// script wires it in at `documentEnd` of every load.
 @Observable
 @MainActor
 final class FindSession: SearchModel {
   @ObservationIgnored private let page: WebPage
+
+  /// Document-start CSS so highlight styles are present before the
+  /// renderer's body markup is parsed; avoids a flash of unstyled
+  /// `<mark>` on the very first match after a reload.
+  static let styleScript: String = Bundle(for: FindSession.self).requiredString(
+    forResource: "findStyle", withExtension: "js")
+
+  /// Document-end controller. Re-creates the JS find function on every
+  /// load so a freshly-rendered DOM picks up a clean state.
+  static let userScript: String = Bundle(for: FindSession.self).requiredString(
+    forResource: "findController", withExtension: "js")
+
+  private let findFunction = "window.ourFindFunction"
 
   /// Whether the find-text bar is showing in the host window.
   /// Per-document; not persisted across launches.
@@ -137,7 +151,7 @@ final class FindSession: SearchModel {
     let caseFlag = ignoresCase ? "false" : "true"
     let wholeFlag = wholeWord ? "true" : "false"
     let script = """
-      var r = window.galleyFind.search(\(escaped), \(caseFlag), \(wholeFlag));
+      var r = \(findFunction).search(\(escaped), \(caseFlag), \(wholeFlag));
       return [r.count, r.index];
       """
     do {
@@ -160,7 +174,7 @@ final class FindSession: SearchModel {
     guard matchCount > 0 else { return }
     do {
       let value = try await page.callJavaScript(
-        "return window.galleyFind.next();")
+        "return \(findFunction).next();")
       matchIndex = decodeIntScalar(value) ?? matchIndex
     } catch {
       // Leave index unchanged on JS error — UI stays consistent.
@@ -176,7 +190,7 @@ final class FindSession: SearchModel {
     guard matchCount > 0 else { return }
     do {
       let value = try await page.callJavaScript(
-        "return window.galleyFind.prev();")
+        "return \(findFunction).prev();")
       matchIndex = decodeIntScalar(value) ?? matchIndex
     } catch {
       // Leave index unchanged on JS error — UI stays consistent.
@@ -200,7 +214,7 @@ final class FindSession: SearchModel {
   /// an empty marks list.
   private func clearHighlights() async {
     _ = try? await page.callJavaScript(
-      "if (window.galleyFind) window.galleyFind.clear();")
+      "if (\(findFunction)) \(findFunction).clear();")
   }
 
   /// Decode `[count, index]` returned by the JS side. Defensive — JS

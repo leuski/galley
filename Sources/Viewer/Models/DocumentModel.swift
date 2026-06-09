@@ -234,7 +234,7 @@ final class DocumentModel {
   /// Find-text state and JS calls for this window. Owns the query,
   /// options, match counters, and visibility / dismissal flags.
   /// Constructed once `page` is built so it can drive
-  /// `window.galleyFind` directly. `SearchModel`-conforming so the
+  /// js find directly. `SearchModel`-conforming so the
   /// `FindBar` view can `@Bindable` it.
   let find: FindSession
 

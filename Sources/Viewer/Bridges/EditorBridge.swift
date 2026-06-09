@@ -19,8 +19,8 @@ final class EditorBridge: NSObject, JavaScriptBridge {
   /// `Resources/Scripts/editorClick.js` — message names are
   /// hardcoded there and must match `messageName` here and
   /// `LinkBridge.messageName`.
-  static let userScript: String = Bundle.main.requiredString(
-    forResource: "editorClick", withExtension: "js")
+  static let userScript: String = Bundle(for: EditorBridge.self)
+    .requiredString(forResource: "editorClick", withExtension: "js")
 
   var documentURL: URL?
 

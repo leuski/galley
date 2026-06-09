@@ -1,6 +1,6 @@
 // Find-text controller. Loaded by FindBridge.swift via
 // `Bundle.requiredString(forResource:withExtension:)`. Re-creates
-// `window.galleyFind` on every load so a freshly-rendered DOM picks
+// the JS find function on every load so a freshly-rendered DOM picks
 // up a clean state — old marks are gone with the previous document,
 // and re-running a query after a file-watcher reload starts from
 // zero.
@@ -31,7 +31,7 @@
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  window.galleyFind = {
+  window.ourFindFunction = {
     marks: [],
     currentIndex: -1,
 

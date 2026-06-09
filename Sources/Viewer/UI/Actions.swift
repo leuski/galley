@@ -96,8 +96,8 @@ extension Action {
         (session?.isVisible ?? false) ? "Hide Find" : "Find…"
       },
       image: "magnifyingglass",
-      perform: { reduceMotion in
-        session?.toggleFind(reduceMotion: reduceMotion)
+      perform: { env in
+        session?.toggleFind(reduceMotion: env.reduceMotion)
       },
       shortcut: .init("f", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.find
@@ -108,9 +108,10 @@ extension Action {
     Action(
       title: "Use Selection for Find",
       image: "text.magnifyingglass",
-      perform: { reduceMotion in
+      perform: { env in
         guard let session else { return }
-        Task { await session.useSelectionForFind(reduceMotion: reduceMotion) }
+        Task { await session
+          .useSelectionForFind(reduceMotion: env.reduceMotion) }
       },
       shortcut: .init("e", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.useSelectionForFind
@@ -157,8 +158,8 @@ extension Action {
           : "Show Status Bar"
       },
       image: "ruler",
-      perform: { reduceMotion in
-        withAnimationAsNeeded(reduceMotion) {
+      perform: { env in
+        withAnimationAsNeeded(env.reduceMotion) {
           Defaults.shared.showsStatusBar.toggle()
         }
       },
@@ -180,9 +181,9 @@ extension Action {
           : "Show Table of Contents"
       },
       image: "sidebar.left",
-      perform: { reduceMotion in
+      perform: { env in
         guard let model else { return }
-        model.toggleTOC(reduceMotion: reduceMotion)
+        model.toggleTOC(reduceMotion: env.reduceMotion)
       },
       shortcut: .init("1", modifiers: [.command, .control]),
       accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
