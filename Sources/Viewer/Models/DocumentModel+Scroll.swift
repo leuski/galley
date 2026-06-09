@@ -8,6 +8,7 @@
 import Foundation
 import OSLog
 import WebKit
+import KosmosAppKit
 
 extension DocumentModel {
 
@@ -16,7 +17,7 @@ extension DocumentModel {
   /// `TOCBridge` user script reported back — either the renderer-
   /// supplied anchor or our slugified fallback.
   func scrollToHeading(id: String) async {
-    let escaped = jsStringLiteral(id)
+    let escaped = id.jsStringLiteral
     let script = """
       (function() {
         var node = document.getElementById(\(escaped));
@@ -93,30 +94,4 @@ extension DocumentModel {
     _ = try? await page.callJavaScript("window.scrollTo(0, \(yPos));")
   }
 
-}
-
-/// Escape a Swift string into a JavaScript double-quoted string
-/// literal. Only used for a CSS rule we control, but kept strict so
-/// future zoom-related callers can pass arbitrary text safely.
-func jsStringLiteral(_ value: String) -> String {
-  var out = "\""
-  for scalar in value.unicodeScalars {
-    switch scalar {
-    case "\\": out += "\\\\"
-    case "\"": out += "\\\""
-    case "\n": out += "\\n"
-    case "\r": out += "\\r"
-    case "\t": out += "\\t"
-    case "\u{2028}": out += "\\u2028"
-    case "\u{2029}": out += "\\u2029"
-    default:
-      if scalar.value < 0x20 {
-        out += String(format: "\\u%04x", scalar.value)
-      } else {
-        out += String(scalar)
-      }
-    }
-  }
-  out += "\""
-  return out
 }

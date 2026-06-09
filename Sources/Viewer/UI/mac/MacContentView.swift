@@ -52,7 +52,7 @@ struct MacContentView: View {
             // Born-as-tab into the key window's group (the "+" source is
             // key). No host argument needed — see `ViewerOpenModel`.
             NSWindow.allowsAutomaticWindowTabbing = true
-            openWindow(id: MacDocumentScene.id, value: DocumentTarget(url: url))
+            openWindow(id: DocumentScene.id, value: DocumentTarget(url: url))
           }
         }
       }
@@ -83,7 +83,7 @@ struct MacContentView: View {
     target = DocumentTarget(url: first)
 
     for url in picks.dropFirst() {
-      openWindow(id: MacDocumentScene.id, value: DocumentTarget(url: url))
+      openWindow(id: DocumentScene.id, value: DocumentTarget(url: url))
     }
   }
 

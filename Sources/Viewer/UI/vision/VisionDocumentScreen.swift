@@ -41,7 +41,7 @@ struct VisionDocumentScreen: View {
     .handlesExternalEvents(
       preferring: target.documentURL.galleyPreferringTokens,
       allowing: Defaults.shared.openBehavior == .replaceCurrent
-      ? VisionDocumentScene.events : []
+      ? DocumentScene.events : []
     )
     .onOpenURL { url in
       guard let activity = OpenDocumentActivity(from: url) else { return }
@@ -281,7 +281,7 @@ struct VisionDocumentScreen: View {
       Divider()
 
       Button {
-        openWindow(id: VisionSettingsScene.id)
+        openWindow(id: SettingsScene.id)
       } label: {
         Label("Settings…", systemImage: "gearshape")
       }
@@ -320,7 +320,7 @@ struct VisionDocumentScreen: View {
                 target = fresh
               case .newTab: break
               case .newWindow:
-                openWindow(id: VisionDocumentScene.id, value: fresh)
+                openWindow(id: DocumentScene.id, value: fresh)
               }
             }
           } label: {

@@ -1,43 +1,48 @@
-#if os(visionOS)
 import GalleyCoreKit
-import KosmosAppKit
 import SwiftUI
+import KosmosAppKit
 
-/// visionOS entry point for Galley. Simpler than the macOS counterpart
-/// (no AppDelegate, no `WindowDispatcher`).
-///
-/// Process lifecycle rests on **at least one window always being
-/// alive** — visionOS suspends apps with zero scenes, which kills
-/// Kosmos and breaks Mac → AVP routing. We achieve that without a
-/// dedicated anchor scene by having the document `WindowGroup` host
-/// an "empty" instance (nil-URL) whenever no real documents are
-/// open: that empty is the welcome surface.
 @main
-struct VisionViewerApp: App {
-  /// The document `WindowGroup`. An instance bound to a nil URL is
-  /// the welcome / empty surface; an instance bound to a real URL is
-  /// a document window.
+struct ViewerApp: App {
   @State private var boot = AppBoot()
   @State private var recents = RecentDocumentsModel()
+#if os(macOS)
+  @State private var kosmos = ViewerKosmosService()
+#else
   @State private var kosmos = VisionKosmosService()
   @Environment(\.openWindow) private var openWindow
-
   /// Read at the **App** level so SwiftUI hands us the aggregate
   /// phase across all live scenes (`.active` if any scene is active,
   /// `.background` only when every scene is). Reading the same key
   /// inside a Scene's content view would give per-scene phase, which
   /// would fire spuriously on every window close.
   @Environment(\.scenePhase) private var scenePhase
+#endif
 
   init() {
+#if os(macOS)
+    URL.createLocalizedApplicationSupportDirectory()
+    UserDefaults.forceTabs()
+    // If the active server-agent backend persists an absolute path
+    // to the helper, the user moving `Galley.app` would leave that
+    // record pointing at a stale location. Detect and repair before
+    // any UI reflects stale state. No-op when nothing is installed.
+    // Fire-and-forget: scenes don't need to wait on it.
+    Task { await ActiveServerAgent.shared.validateAndRepair() }
+    // Start the Kosmos surface so the peer set populates by the
+    // time the menu / pill consult it. Independent of `AppBoot`.
+#else
+
+#endif
     kosmos.start()
   }
 
   var body: some Scene {
-    VisionDocumentScene()
+    DocumentScene()
       .environment(boot)
       .environment(recents)
       .environment(kosmos)
+#if os(visionOS)
       .onChange(of: scenePhase, initial: false) { _, newPhase in
         // App-level (aggregate) phase. Drives Kosmos suspend/resume,
         // and tells the registry to suppress `onNeedEmpty` while the
@@ -45,7 +50,7 @@ struct VisionViewerApp: App {
         // `.background` transitions during app backgrounding would
         // each look like a fresh dismissal and try to spawn empties.
         boot.model?.didChangePhase(scenePhase: newPhase) {
-          openWindow(id: VisionDocumentScene.id)
+          openWindow(id: DocumentScene.id)
         }
         switch newPhase {
         case .active, .inactive:
@@ -56,10 +61,16 @@ struct VisionViewerApp: App {
           break
         }
       }
+#endif
 
-    VisionSettingsScene()
+#if os(macOS)
+    MacHelpScene()
       .environment(boot)
+      .environment(recents)
+#endif
+
+    SettingsScene()
+      .environment(boot)
+      .environment(kosmos)
   }
 }
-
-#endif

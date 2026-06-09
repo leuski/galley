@@ -11,6 +11,7 @@ import KosmosHTTPTunnel
 #endif
 import SwiftUI
 import WebKit
+import KosmosAppKit
 
 extension DocumentModel {
   /// Build the `WebPage.Configuration`: register every script-message
@@ -66,7 +67,7 @@ extension DocumentModel {
     // would still scale on touch. Force a non-scalable viewport so
     // pinch gestures inside the WebView don't fight the app's own
     // zoom action.
-    controller.addUserScript(disablePinchZoomScript)
+    controller.addUserScript(DisablePinchZoomBridge.script)
 #endif
     // Custom URL scheme so template-bundled assets (CSS, fonts,
     // images) resolve from disk through the SwiftUI WebView. The

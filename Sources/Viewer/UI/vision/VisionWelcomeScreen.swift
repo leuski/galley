@@ -43,10 +43,7 @@ struct VisionWelcomeScreen: View {
         recentsList
       }
     }
-    .handlesExternalEvents(
-      preferring: ["*"],
-      allowing: VisionDocumentScene.events
-    )
+    .handlesExternalEvents(preferring: ["*"], allowing: DocumentScene.events)
     .onOpenURL { url in
       guard let activity = OpenDocumentActivity(from: url) else { return }
       target = activity.target

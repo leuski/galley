@@ -47,7 +47,7 @@ extension DocumentModel {
           s.id = 'md-eye-zoom';
           document.head.appendChild(s);
         }
-        s.textContent = \(jsStringLiteral(css));
+        s.textContent = \(css.jsStringLiteral);
       })();
       """
     _ = try? await page.callJavaScript(script)

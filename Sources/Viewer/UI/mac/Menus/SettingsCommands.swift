@@ -16,7 +16,7 @@ struct SettingsCommands: Commands {
   var body: some Commands {
     CommandGroup(replacing: .appSettings) {
       Button("Settings…", systemImage: "gearshape") {
-        openWindow(id: MacSettingsScene.id)
+        openWindow(id: SettingsScene.id)
       }
       .keyboardShortcut(",", modifiers: .command)
     }
