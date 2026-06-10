@@ -49,14 +49,14 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    guard let body = message.body as? [String: Any],
-          let href = body["href"] as? String
-    else {
+    guard let msg = try? message.decodedBody(Message.self) else {
       logMalformedMessage(message.body)
       return
     }
-    handle(href: href)
+    handle(href: msg.href)
   }
+
+  private struct Message: Decodable { let href: String }
 
   private func handle(href: String) {
     guard let target = resolve(href: href) else {

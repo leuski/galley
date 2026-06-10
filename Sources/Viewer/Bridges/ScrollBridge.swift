@@ -35,26 +35,14 @@ final class ScrollBridge: NSObject, JavaScriptBridge {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    let value: Double?
-    if let body = message.body as? [String: Any],
-       let raw = body["y"]
-    {
-      if let number = raw as? Double {
-        value = number
-      } else if let number = raw as? NSNumber {
-        value = number.doubleValue
-      } else {
-        value = nil
-      }
-    } else {
-      value = nil
-    }
-    guard let y = value else {
+    guard let msg = try? message.decodedBody(Message.self) else {
       logMalformedMessage(message.body)
       return
     }
-    onScroll?(y)
+    onScroll?(msg.y)
   }
+
+  private struct Message: Decodable { let y: Double }
 
   private func logMalformedMessage(_ body: Any) {
     logger.warning("""

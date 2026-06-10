@@ -14,7 +14,7 @@
     timer = setTimeout(function () {
       timer = null;
       window.webkit.messageHandlers.scroll.postMessage(
-        { y: window.scrollY });
+        JSON.stringify({ y: window.scrollY }));
     }, 150);
   }, { passive: true });
 })();

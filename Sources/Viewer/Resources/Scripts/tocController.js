@@ -48,7 +48,8 @@
     });
     headingEls.push(node);
   }
-  window.webkit.messageHandlers.toc.postMessage({ items: items });
+  window.webkit.messageHandlers.toc.postMessage(
+    JSON.stringify({ items: items }));
 
   var threshold = 100;
   var lastActive = undefined;
@@ -67,7 +68,7 @@
     if (newActive !== lastActive) {
       lastActive = newActive;
       window.webkit.messageHandlers.toc.postMessage(
-        { activeId: newActive });
+        JSON.stringify({ activeId: newActive }));
     }
   }
   function onScroll() {

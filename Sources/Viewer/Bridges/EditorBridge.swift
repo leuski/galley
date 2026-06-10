@@ -37,14 +37,14 @@ final class EditorBridge: NSObject, JavaScriptBridge {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    guard let body = message.body as? [String: Any],
-          let line = body["line"] as? Int
-    else {
+    guard let msg = try? message.decodedBody(Message.self) else {
       logMalformedMessage(message.body)
       return
     }
-    onEditorClick?(line)
+    onEditorClick?(msg.line)
   }
+
+  private struct Message: Decodable { let line: Int }
 
   private func logMalformedMessage(_ body: Any) {
     logger.warning("""

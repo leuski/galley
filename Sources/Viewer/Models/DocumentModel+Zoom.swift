@@ -37,9 +37,10 @@ extension DocumentModel {
   /// Push the current `pageZoom` to the live document. Idempotent —
   /// updates the dedicated `<style>` element if present, otherwise
   /// inserts it.
-  private func applyZoomToPage() async {
-    let css = "html{zoom:\(pageZoom);}"
-    let script = """
+  private struct ApplyZoomToPage: JavaScriptCallable<Void> {
+    let pageZoom: Double
+    var body: String {
+      """
       (function(){
         var s = document.getElementById('md-eye-zoom');
         if (!s) {
@@ -47,10 +48,14 @@ extension DocumentModel {
           s.id = 'md-eye-zoom';
           document.head.appendChild(s);
         }
-        s.textContent = \(css.jsStringLiteral);
+        s.textContent = \("html{zoom:\(pageZoom);}".jsStringLiteral);
       })();
       """
-    _ = try? await page.callJavaScript(script)
+    }
+  }
+
+  private func applyZoomToPage() async {
+    try? await page.callJavaScript(ApplyZoomToPage(pageZoom: pageZoom))
   }
 
   /// Embed the current zoom as a `<style>` element in the rendered

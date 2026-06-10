@@ -16,17 +16,23 @@ extension DocumentModel {
   /// The TOC sidebar's row taps call this; the id is whatever the
   /// `TOCBridge` user script reported back — either the renderer-
   /// supplied anchor or our slugified fallback.
-  func scrollToHeading(id: String) async {
-    let escaped = id.jsStringLiteral
-    let script = """
+  private struct ScrollToHeading: JavaScriptCallable<Void> {
+    let id: String
+
+    var body: String {
+      """
       (function() {
-        var node = document.getElementById(\(escaped));
+        var node = document.getElementById(\(id.jsStringLiteral));
         if (node) {
           node.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }
       })();
       """
-    _ = try? await page.callJavaScript(script)
+    }
+  }
+
+  func scrollToHeading(id: String) async {
+    try? await page.callJavaScript(ScrollToHeading(id: id))
   }
 
   /// Find the rendered block whose source line is closest to (but not
@@ -44,8 +50,12 @@ extension DocumentModel {
   /// Public so ContentView can fire a scroll-only update when a
   /// `galley://` open targets a URL already bound to a window —
   /// we don't want to reset history just to re-jump the cursor.
-  func scrollToSourceLine(_ line: Int) async {
-    let script = """
+
+  private struct ScrollToSourceLine: JavaScriptCallable<Void> {
+    let line: Int
+
+    var body: String {
+      """
       (function() {
         var nodes = document.querySelectorAll(
           '[data-source-line], [data-pos], [data-sourcepos]');
@@ -72,15 +82,22 @@ extension DocumentModel {
         }
       })();
       """
-    _ = try? await page.callJavaScript(script)
+    }
+  }
+
+  func scrollToSourceLine(_ line: Int) async {
+    try? await page.callJavaScript(ScrollToSourceLine(line: line))
+  }
+
+  private struct CurrentScrollY: JavaScriptCallable<Double> {
+    var body: String {
+      "return window.scrollY;"
+    }
   }
 
   func currentScrollY() async -> Double? {
     do {
-      let value = try await page.callJavaScript("return window.scrollY;")
-      if let number = value as? Double { return number }
-      if let number = value as? NSNumber { return number.doubleValue }
-      return nil
+      return try await page.callJavaScript(CurrentScrollY())
     } catch {
       logger.debug("""
         currentScrollY JS failed: \
@@ -90,8 +107,15 @@ extension DocumentModel {
     }
   }
 
+  private struct RestoreScrollY: JavaScriptCallable<Void> {
+    let yPos: Double
+    var body: String {
+      "window.scrollTo(0, \(yPos));"
+    }
+  }
+
   func restoreScrollY(_ yPos: Double) async {
-    _ = try? await page.callJavaScript("window.scrollTo(0, \(yPos));")
+    try? await page.callJavaScript(RestoreScrollY(yPos: yPos))
   }
 
 }

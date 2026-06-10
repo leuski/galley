@@ -30,7 +30,8 @@ document.addEventListener('click', (event) => {
     if (line !== null) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      window.webkit.messageHandlers.editor.postMessage({ line });
+      window.webkit.messageHandlers.editor.postMessage(
+        JSON.stringify({ line }));
       return;
     }
     // Cmd-click missed a source-line target — still suppress any
@@ -45,5 +46,6 @@ document.addEventListener('click', (event) => {
   if (!href || href.startsWith('#')) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  window.webkit.messageHandlers.linkclick.postMessage({ href });
+  window.webkit.messageHandlers.linkclick.postMessage(
+    JSON.stringify({ href }));
 }, true);

@@ -46,27 +46,30 @@ final class TOCBridge: NSObject, JavaScriptBridge {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    guard let body = message.body as? [String: Any] else {
+    guard let msg = try? message.decodedBody(Message.self) else {
       logMalformedMessage(message.body)
       return
     }
-    if let items = body["items"] as? [[String: Any]] {
-      let headings: [TOCEntry] = items.compactMap { entry in
-        guard let id = entry["id"] as? String,
-              let text = entry["text"] as? String,
-              let level = entry["level"] as? Int
-        else { return nil }
-        return TOCEntry(id: id, level: level, text: text)
-      }
-      onHeadings?(headings)
-      return
+    // A headings message always carries `items` (possibly empty); an
+    // active-heading message never does. `activeId == nil` means the
+    // reader scrolled above the first heading.
+    if let items = msg.items {
+      onHeadings?(items.map {
+        TOCEntry(id: $0.id, level: $0.level, text: $0.text)
+      })
+    } else {
+      onActiveHeading?(msg.activeId)
     }
-    if body.keys.contains("activeId") {
-      let id = body["activeId"] as? String
-      onActiveHeading?(id)
-      return
+  }
+
+  private struct Message: Decodable {
+    let items: [Item]?
+    let activeId: String?
+    struct Item: Decodable {
+      let id: String
+      let level: Int
+      let text: String
     }
-    logMalformedMessage(message.body)
   }
 
   private func logMalformedMessage(_ body: Any) {

@@ -67,7 +67,7 @@
     if (window.webkit
         && window.webkit.messageHandlers
         && window.webkit.messageHandlers.stats) {
-      window.webkit.messageHandlers.stats.postMessage(payload);
+      window.webkit.messageHandlers.stats.postMessage(JSON.stringify(payload));
     }
   }
 

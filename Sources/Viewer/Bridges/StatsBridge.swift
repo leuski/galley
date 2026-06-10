@@ -35,26 +35,20 @@ final class StatsBridge: NSObject, JavaScriptBridge {
     _ controller: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    guard let body = message.body as? [String: Any],
-          let words = intValue(body["words"]),
-          let characters = intValue(body["characters"]),
-          let headings = intValue(body["headings"])
-    else {
+    guard let msg = try? message.decodedBody(Message.self) else {
       logMalformedMessage(message.body)
       return
     }
     onStats?(DocumentStats(
-      wordCount: words,
-      characterCount: characters,
-      headingCount: headings))
+      wordCount: msg.words,
+      characterCount: msg.characters,
+      headingCount: msg.headings))
   }
 
-  /// JS numbers cross the bridge as either `Int` or `NSNumber`
-  /// depending on size; accept both rather than assume one.
-  private func intValue(_ raw: Any?) -> Int? {
-    if let value = raw as? Int { return value }
-    if let value = raw as? NSNumber { return value.intValue }
-    return nil
+  private struct Message: Decodable {
+    let words: Int
+    let characters: Int
+    let headings: Int
   }
 
   private func logMalformedMessage(_ body: Any) {

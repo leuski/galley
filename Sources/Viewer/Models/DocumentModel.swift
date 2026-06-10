@@ -433,18 +433,16 @@ final class DocumentModel {
   /// `Resources/Scripts/topmostVisibleSourceLine.js`. `callJavaScript`
   /// wraps it in an async function and captures a top-level `return`,
   /// so the script must NOT be wrapped in an IIFE.
-  private static let topmostVisibleSourceLineScript: String =
-  Bundle.main.requiredString(
-    forResource: "topmostVisibleSourceLine", withExtension: "js")
+
+  private struct TopmostVisibleSourceLineScript: JavaScriptCallable<Int> {
+    static let script = Bundle.main.requiredString(
+      forResource: "topmostVisibleSourceLine", withExtension: "js")
+    var body: String { Self.script }
+  }
 
   private func topmostVisibleSourceLine() async -> Int? {
     do {
-      let value = try await page.callJavaScript(
-        Self.topmostVisibleSourceLineScript)
-      if let number = value as? Int { return number }
-      if let number = value as? Double { return Int(number) }
-      if let number = value as? NSNumber { return number.intValue }
-      return nil
+      return try await page.callJavaScript(TopmostVisibleSourceLineScript())
     } catch {
       logger.debug("""
         topmostVisibleSourceLine JS failed: \
