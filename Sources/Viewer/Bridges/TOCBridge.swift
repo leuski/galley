@@ -19,7 +19,7 @@ import KosmosAppKit
 ///   reader's section without a cursor. `nil` means the user is
 ///   scrolled above the first heading.
 @MainActor
-final class TOCBridge: NSObject, JavaScriptBridge {
+final class TOCBridge: JavaScriptBridge {
   static let messageName = "toc"
 
   /// Heading extraction + active-section tracker. Source lives in
@@ -38,18 +38,7 @@ final class TOCBridge: NSObject, JavaScriptBridge {
   /// (or `nil` when the user is above all headings) on every change.
   var onActiveHeading: ((String?) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "TOCBridge")
-
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let msg = try? message.decodedBody(Message.self) else {
-      logMalformedMessage(message.body)
-      return
-    }
+  func handle(value msg: Value) {
     // A headings message always carries `items` (possibly empty); an
     // active-heading message never does. `activeId == nil` means the
     // reader scrolled above the first heading.
@@ -62,7 +51,7 @@ final class TOCBridge: NSObject, JavaScriptBridge {
     }
   }
 
-  private struct Message: Decodable {
+  struct Value: Decodable {
     let items: [Item]?
     let activeId: String?
     struct Item: Decodable {
@@ -70,12 +59,5 @@ final class TOCBridge: NSObject, JavaScriptBridge {
       let level: Int
       let text: String
     }
-  }
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning("""
-      Ignoring malformed toc message: \
-      \(String(describing: body), privacy: .public)
-      """)
   }
 }

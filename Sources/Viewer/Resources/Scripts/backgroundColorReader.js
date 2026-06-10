@@ -36,7 +36,7 @@
           && window.webkit.messageHandlers
           && window.webkit.messageHandlers.backgroundColor) {
         window.webkit.messageHandlers.backgroundColor.postMessage(
-          { color: color, templateID: currentTemplateID() });
+          JSON.stringify({ color: color, templateID: currentTemplateID() }));
       }
     };
 

@@ -20,7 +20,7 @@ import KosmosAppKit
 /// two diverge while the user switches templates faster than the
 /// WebView can reload.
 @MainActor
-final class BackgroundColorBridge: NSObject, JavaScriptBridge {
+final class BackgroundColorBridge: JavaScriptBridge {
   /// JS handler name. Script calls
   /// `window.webkit.messageHandlers.backgroundColor.postMessage(...)`.
   static let messageName = "backgroundColor"
@@ -38,28 +38,21 @@ final class BackgroundColorBridge: NSObject, JavaScriptBridge {
   /// user template).
   var onColor: ((Color?, String?) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "BackgroundColorBridge")
+  func handle(message: WKScriptMessage, error: any Error) {
+    Self.handle(message: message, error: error)
+    onColor?(nil, nil)
+  }
 
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let body = message.body as? [String: Any] else {
-      logMalformedMessage(message.body)
-      onColor?(nil, nil)
-      return
-    }
-    let templateID = body["templateID"] as? String
-    if let raw = body["color"] as? String {
-      onColor?(Self.parseCSSColor(raw), templateID)
-    } else {
-      // Explicit `null` from JS — both `html` and `body` were
-      // transparent. Surface as nil so the host falls back to the
-      // system default.
-      onColor?(nil, templateID)
-    }
+  func handle(value msg: Value) {
+    // `color == nil` is an explicit JS `null` — both `html` and `body`
+    // were transparent — so the host falls back to the system default.
+    // A present-but-unparseable color also resolves to `nil` here.
+    onColor?(msg.color.flatMap(Self.parseCSSColor), msg.templateID)
+  }
+
+  struct Value: Decodable {
+    let color: String?
+    let templateID: String?
   }
 
   /// Parses the two shapes `getComputedStyle(...).backgroundColor`
@@ -97,12 +90,5 @@ final class BackgroundColorBridge: NSObject, JavaScriptBridge {
       green: green / 255,
       blue: blue / 255,
       opacity: alpha)
-  }
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning("""
-      Ignoring malformed background message: \
-      \(String(describing: body), privacy: .public)
-      """)
   }
 }

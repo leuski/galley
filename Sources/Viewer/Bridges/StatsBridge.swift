@@ -14,7 +14,7 @@ import KosmosAppKit
 /// would understate (or, for verbatim include syntax that survives
 /// the render, overstate) what the reader actually sees.
 @MainActor
-final class StatsBridge: NSObject, JavaScriptBridge {
+final class StatsBridge: JavaScriptBridge {
   static let messageName = "stats"
 
   /// Reader script. Source lives in
@@ -27,34 +27,16 @@ final class StatsBridge: NSObject, JavaScriptBridge {
   /// counts every time the rendered document finishes loading.
   var onStats: ((DocumentStats) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "StatsBridge")
-
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let msg = try? message.decodedBody(Message.self) else {
-      logMalformedMessage(message.body)
-      return
-    }
+  func handle(value msg: Value) {
     onStats?(DocumentStats(
       wordCount: msg.words,
       characterCount: msg.characters,
       headingCount: msg.headings))
   }
 
-  private struct Message: Decodable {
+  struct Value: Decodable {
     let words: Int
     let characters: Int
     let headings: Int
-  }
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning("""
-      Ignoring malformed stats message: \
-      \(String(describing: body), privacy: .public)
-      """)
   }
 }

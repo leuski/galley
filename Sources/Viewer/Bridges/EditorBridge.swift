@@ -9,7 +9,7 @@ import KosmosAppKit
 /// own knowledge of the file path — it reads it from `documentURL`,
 /// which the owning DocumentModel keeps current.
 @MainActor
-final class EditorBridge: NSObject, JavaScriptBridge {
+final class EditorBridge: JavaScriptBridge {
   /// Name of the JavaScript message handler. JS calls
   /// `window.webkit.messageHandlers.editor.postMessage({ line: N })`.
   static let messageName = "editor"
@@ -29,27 +29,9 @@ final class EditorBridge: NSObject, JavaScriptBridge {
   /// the user's `EditorChoice` from `AppModel`.
   var onEditorClick: ((Int) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "EditorBridge")
-
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let msg = try? message.decodedBody(Message.self) else {
-      logMalformedMessage(message.body)
-      return
-    }
+  func handle(value msg: Value) {
     onEditorClick?(msg.line)
   }
 
-  private struct Message: Decodable { let line: Int }
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning("""
-      Ignoring malformed editor message: \
-      \(String(describing: body), privacy: .public)
-      """)
-  }
+  struct Value: Decodable { let line: Int }
 }

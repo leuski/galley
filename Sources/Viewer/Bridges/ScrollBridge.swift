@@ -13,7 +13,7 @@ import KosmosAppKit
 /// on every frame; @SceneStorage only needs the eventual resting
 /// position, and per-frame updates would churn observation.
 @MainActor
-final class ScrollBridge: NSObject, JavaScriptBridge {
+final class ScrollBridge: JavaScriptBridge {
   /// JS handler name. Script calls
   /// `window.webkit.messageHandlers.scroll.postMessage({ y: ... })`.
   static let messageName = "scroll"
@@ -27,27 +27,9 @@ final class ScrollBridge: NSObject, JavaScriptBridge {
   /// Set by the owning DocumentModel; receives the latest position.
   var onScroll: ((Double) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "ScrollBridge")
-
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let msg = try? message.decodedBody(Message.self) else {
-      logMalformedMessage(message.body)
-      return
-    }
+  func handle(value msg: Value) {
     onScroll?(msg.y)
   }
 
-  private struct Message: Decodable { let y: Double }
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning("""
-      Ignoring malformed scroll message: \
-      \(String(describing: body), privacy: .public)
-      """)
-  }
+  struct Value: Decodable { let y: Double }
 }
