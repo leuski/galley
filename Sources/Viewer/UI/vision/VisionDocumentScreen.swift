@@ -166,25 +166,25 @@ struct VisionDocumentScreen: View {
   @ToolbarContentBuilder
   private func toolbarContent(model: DocumentModel) -> some ToolbarContent {
     ToolbarItemGroup(placement: .bottomOrnament) {
-      Action.back(model).toolbarItem(imageOnly: true)
-      Action.forward(model).toolbarItem(imageOnly: true)
-      Action.reload(model).toolbarItem(imageOnly: true)
+      Action.back(model).button()
+      Action.forward(model).button()
+      Action.reload(model).button()
 
       Spacer()
 
-      Action.toggleTOC(model).toolbarItem(imageOnly: true)
+      Action.toggleTOC(model).button()
 
       Spacer()
 
       ControlGroup {
-        Action.zoomOut(model).toolbarItem(imageOnly: true)
-        Action.resetZoom(model).toolbarItem(imageOnly: true)
-        Action.zoomIn(model).toolbarItem(imageOnly: true)
+        Action.zoomOut(model).button()
+        Action.resetZoom(model).button()
+        Action.zoomIn(model).button()
       }
 
       Spacer()
 
-      Action.find(model.find).toolbarItem(imageOnly: true)
+      Action.find(model.find).button()
 
       Spacer()
 

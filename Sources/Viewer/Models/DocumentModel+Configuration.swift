@@ -14,83 +14,40 @@ import WebKit
 import KosmosAppKit
 
 extension DocumentModel {
-  /// Build the `WebPage.Configuration`: register every script-message
-  /// handler, inject the user scripts each bridge needs, and wire the
-  /// custom URL scheme that resolves template-bundled assets through
-  /// `templateProvider`. Static so it can run before `self` is fully
-  /// initialized; pure plumbing — no closures capture the model.
-  static func makeConfiguration(
-    editorBridge: EditorBridge,
-    linkBridge: LinkBridge,
-    scrollBridge: ScrollBridge,
-    tocBridge: TOCBridge,
-    statsBridge: StatsBridge,
-    backgroundBridge: BackgroundColorBridge,
-    templateProvider: @escaping @MainActor @Sendable () -> Template,
-    kosmosTunnel: KosmosTunnelClientRef? = nil
-  ) -> WebPage.Configuration {
-    var configuration = WebPage.Configuration()
-    configuration.defaultNavigationPreferences.preferredContentMode = .desktop
-    let controller = configuration.userContentController
-    controller.add(
-      // One script handles both cmd-click → editor and plain click →
-      // in-window nav, so we don't depend on capture-phase ordering
-      // between two listeners — which appears to drop the editor
-      // listener after the first navigation in macOS 26 WebPage.
-      editorBridge,
-      // Debounced scroll listener — feeds `currentScrollY` so
-      // ContentView can persist the resting position via `@SceneStorage`.
-      scrollBridge,
-      // Heading extraction. Runs once per load, assigns synthetic ids
-      // to headings that lack one, and posts the list back. Renderer-
-      // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
-      tocBridge,
-      // Word / character / heading counts for the optional status bar.
-      // Reads `body.innerText`, so CSS-hidden chrome (template anchors,
-      // copy-button glyphs) is excluded from the totals.
-      statsBridge,
-      // Computed background-color reader. Runs after layout so the
-      // host can paint a matching tint behind translucent chrome.
-      backgroundBridge
+  func tocColumnVisibility(reduceMotion: Bool)
+  -> Binding<NavigationSplitViewVisibility>
+  {
+    Binding(
+      get: { [weak self] in self?.showsTOC == true ? .all : .detailOnly },
+      set: { [weak self] newValue in
+        self?.setShowsTOC(newValue != .detailOnly, reduceMotion: reduceMotion)
+      }
     )
-    controller.add(linkBridge, name: LinkBridge.messageName)
-    // Find-text controller. The style script runs at document-start
-    // so the highlight CSS is in place before any match is wrapped;
-    // the controller script runs at document-end so `document.body`
-    // exists when js find function is wired up.
-    controller.addUserScript(FindSession.styleScript)
-    controller.addUserScript(FindSession.userScript)
-#if !os(macOS)
-    // visionOS pinches the WebView's content like an iOS WKWebView
-    // unless the document opts out via viewport meta. Templates we
-    // ship don't all declare one, and even when they do the page
-    // would still scale on touch. Force a non-scalable viewport so
-    // pinch gestures inside the WebView don't fight the app's own
-    // zoom action.
-    controller.addUserScript(DisablePinchZoomBridge.script)
-#endif
-    // Custom URL scheme so template-bundled assets (CSS, fonts,
-    // images) resolve from disk through the SwiftUI WebView. The
-    // provider closure reads the live template selection on every
-    // asset request, so a mid-session template switch is reflected
-    // in the next `/template/<id>/<file>` lookup without any
-    // explicit invalidation.
-    let handler = PreviewSchemeHandler(templateProvider: templateProvider)
-    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
+  }
 
-#if os(visionOS)
-    // AVP renders Mac-hosted documents by tunneling each WebKit fetch
-    // through Kosmos via the `galley://` scheme. The handler holds a
-    // reference to the shared `Client` owned by
-    // `VisionKosmosService`.
-    if let kosmosTunnel = kosmosTunnel?.client {
-      let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
-      configuration.urlSchemeHandlers[KosmosTunnelSchemeHandler.scheme]
-        = tunnelHandler
+  func toggleTOC(reduceMotion: Bool) {
+    setShowsTOC(!showsTOC, reduceMotion: reduceMotion)
+  }
+
+  func setShowsTOC(_ value: Bool, reduceMotion: Bool) {
+    willToggleTOC()
+    withAnimationAsNeeded(reduceMotion) {
+      showsTOC = value
+    } completion: {
+      self.didToggleTOC()
     }
-#endif
+  }
 
-    return configuration
+  private func willToggleTOC() {
+#if os(visionOS)
+    pinnedDetailWidth = pinnedDetailWidth ?? liveDetailWidth
+#endif
+  }
+
+  private func didToggleTOC() {
+#if os(visionOS)
+    pinnedDetailWidth = nil
+#endif
   }
 }
 

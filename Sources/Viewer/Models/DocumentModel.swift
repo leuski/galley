@@ -31,12 +31,12 @@ final class DocumentModel {
     case help
   }
 
-  let zoom = WebPageZoomController()
   let page: WebPage
+  let zoom: WebPageZoomController
   let kind: Kind
 
   @ObservationIgnored private let watcher = DocumentWatcher()
-  @ObservationIgnored private let bridge = EditorBridge()
+  @ObservationIgnored private let editorBridge = EditorBridge()
   @ObservationIgnored private let linkBridge = LinkBridge()
   @ObservationIgnored private let scrollBridge = ScrollBridge()
   @ObservationIgnored private let tocBridge = TOCBridge()
@@ -294,21 +294,75 @@ final class DocumentModel {
     // is still uninitialized below.
     let templatesRef = self.templates
     let appModelRef = self.appModel
-    self.page = WebPage(
-      configuration: Self.makeConfiguration(
-        editorBridge: bridge,
-        linkBridge: linkBridge,
-        scrollBridge: scrollBridge,
-        tocBridge: tocBridge,
-        statsBridge: statsBridge,
-        backgroundBridge: backgroundBridge,
-        templateProvider: {
-          Self.resolveTemplate(
-            templates: templatesRef, appModel: appModelRef)
-        },
-        kosmosTunnel: kosmosTunnel))
+
+    var configuration = WebPage.Configuration()
+    configuration.defaultNavigationPreferences.preferredContentMode = .desktop
+    let controller = configuration.userContentController
+    controller.add(
+      // One script handles both cmd-click → editor and plain click →
+      // in-window nav, so we don't depend on capture-phase ordering
+      // between two listeners — which appears to drop the editor
+      // listener after the first navigation in macOS 26 WebPage.
+      editorBridge,
+      // Debounced scroll listener — feeds `currentScrollY` so
+      // ContentView can persist the resting position via `@SceneStorage`.
+      scrollBridge,
+      // Heading extraction. Runs once per load, assigns synthetic ids
+      // to headings that lack one, and posts the list back. Renderer-
+      // agnostic — every Markdown processor we ship outputs `<h1>…<h6>`.
+      tocBridge,
+      // Word / character / heading counts for the optional status bar.
+      // Reads `body.innerText`, so CSS-hidden chrome (template anchors,
+      // copy-button glyphs) is excluded from the totals.
+      statsBridge,
+      // Computed background-color reader. Runs after layout so the
+      // host can paint a matching tint behind translucent chrome.
+      backgroundBridge
+    )
+    controller.add(linkBridge, name: LinkBridge.messageName)
+    // Find-text controller. The style script runs at document-start
+    // so the highlight CSS is in place before any match is wrapped;
+    // the controller script runs at document-end so `document.body`
+    // exists when js find function is wired up.
+    controller.addUserScript(FindSession.styleScript)
+    controller.addUserScript(FindSession.userScript)
+    controller.addUserScript(WebPageZoomController.userScript)
+#if !os(macOS)
+    // visionOS pinches the WebView's content like an iOS WKWebView
+    // unless the document opts out via viewport meta. Templates we
+    // ship don't all declare one, and even when they do the page
+    // would still scale on touch. Force a non-scalable viewport so
+    // pinch gestures inside the WebView don't fight the app's own
+    // zoom action.
+    controller.addUserScript(DisablePinchZoomBridge.script)
+#endif
+    // Custom URL scheme so template-bundled assets (CSS, fonts,
+    // images) resolve from disk through the SwiftUI WebView. The
+    // provider closure reads the live template selection on every
+    // asset request, so a mid-session template switch is reflected
+    // in the next `/template/<id>/<file>` lookup without any
+    // explicit invalidation.
+    let handler = PreviewSchemeHandler {
+      Self.resolveTemplate(
+        templates: templatesRef, appModel: appModelRef)
+    }
+    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
+
+#if os(visionOS)
+    // AVP renders Mac-hosted documents by tunneling each WebKit fetch
+    // through Kosmos via the `galley://` scheme. The handler holds a
+    // reference to the shared `Client` owned by
+    // `VisionKosmosService`.
+    if let kosmosTunnel = kosmosTunnel?.client {
+      let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
+      configuration.urlSchemeHandlers[KosmosTunnelSchemeHandler.scheme]
+      = tunnelHandler
+    }
+#endif
+
+    self.page = WebPage(configuration: configuration)
     self.find = FindSession(page: self.page)
-    zoom.page = page
+    self.zoom = WebPageZoomController(page: self.page)
 
     wireBridges()
   }
@@ -327,7 +381,7 @@ final class DocumentModel {
     }
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
-    bridge.onEditorClick = { [weak self] line in
+    editorBridge.onEditorClick = { [weak self] line in
       guard let self else { return }
       Task { await self.openInEditor(line: line) }
     }
@@ -600,7 +654,7 @@ final class DocumentModel {
     // gap with the cached page bg until BackgroundColorBridge
     // reports a fresh post-layout color.
     isPageRendered = false
-    bridge.documentURL = url
+    editorBridge.documentURL = url
     linkBridge.documentURL = url
     // Drop the old document's TOC entries so the sidebar doesn't
     // flash stale headings during the reload window. The TOCBridge
@@ -729,41 +783,5 @@ final class DocumentModel {
 
   private func logLoadingHTML(byteCount: Int) {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
-  }
-
-  func tocColumnVisibility(reduceMotion: Bool)
-  -> Binding<NavigationSplitViewVisibility>
-  {
-    Binding(
-      get: { [weak self] in self?.showsTOC == true ? .all : .detailOnly },
-      set: { [weak self] newValue in
-        self?.setShowsTOC(newValue != .detailOnly, reduceMotion: reduceMotion)
-      }
-    )
-  }
-
-  func toggleTOC(reduceMotion: Bool) {
-    setShowsTOC(!showsTOC, reduceMotion: reduceMotion)
-  }
-
-  func setShowsTOC(_ value: Bool, reduceMotion: Bool) {
-    willToggleTOC()
-    withAnimationAsNeeded(reduceMotion) {
-      showsTOC = value
-    } completion: {
-      self.didToggleTOC()
-    }
-  }
-
-  private func willToggleTOC() {
-#if os(visionOS)
-    pinnedDetailWidth = pinnedDetailWidth ?? liveDetailWidth
-#endif
-  }
-
-  private func didToggleTOC() {
-#if os(visionOS)
-    pinnedDetailWidth = nil
-#endif
   }
 }
