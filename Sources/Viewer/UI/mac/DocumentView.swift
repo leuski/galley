@@ -445,7 +445,7 @@ struct DocumentView: View {
     // `setZoom` only updates a JS rule on the live page; the next
     // render reads `model.pageZoom` to inject the matching CSS so
     // the first frame comes up at the right size.
-    model.setZoom(plan.zoom)
+    model.zoom.setZoom(plan.zoom)
 
     if plan.applyChoiceOverrides {
       model.templates.persistent = plan.templateOverride
@@ -544,7 +544,7 @@ struct DocumentView: View {
   }
 
   private var zoomLabel: String {
-    let percent = Int((model.pageZoom * 100).rounded())
+    let percent = Int((model.zoom.scale * 100).rounded())
     return "\(percent)%"
   }
 }
@@ -584,7 +584,7 @@ private struct ChangeHandlers: ViewModifier {
         onRendererPersistent(new)
         reload()
       }
-      .onChange(of: model.pageZoom) { _, new in onZoom(new) }
+      .onChange(of: model.zoom.scale) { _, new in onZoom(new) }
       .onChange(of: model.currentScrollY) { _, new in onScrollY(new) }
       .onChange(of: model.showsTOC) { _, new in onShowsTOC(new) }
   }

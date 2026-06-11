@@ -16,8 +16,8 @@ extension Action {
     Action(
       title: "Zoom In",
       image: "plus.magnifyingglass",
-      perform: { model?.zoomIn() },
-      isEnabled: { model?.canZoomOut ?? false },
+      perform: { model?.zoom.zoomIn() },
+      isEnabled: { model?.zoom.canZoomOut ?? false },
       shortcut: .init("+", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.zoomIn
     )
@@ -27,8 +27,8 @@ extension Action {
     Action(
       title: "Zoom Out",
       image: "minus.magnifyingglass",
-      perform: { model?.zoomOut() },
-      isEnabled: { model?.canZoomOut ?? false },
+      perform: { model?.zoom.zoomOut() },
+      isEnabled: { model?.zoom.canZoomOut ?? false },
       shortcut: .init("-", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.zoomOut
     )
@@ -38,8 +38,8 @@ extension Action {
     Action(
       title: "Actual Size",
       image: "1.magnifyingglass",
-      perform: { model?.resetZoom() },
-      isEnabled: { model?.canResetZoom ?? false },
+      perform: { model?.zoom.resetZoom() },
+      isEnabled: { model?.zoom.canResetZoom ?? false },
       shortcut: .init("0", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ViewMenu.actualSize
     )

@@ -31,6 +31,7 @@ final class DocumentModel {
     case help
   }
 
+  let zoom = WebPageZoomController()
   let page: WebPage
   let kind: Kind
 
@@ -138,23 +139,6 @@ final class DocumentModel {
   /// Observed — SwiftUI re-evaluates the chrome's container
   /// background, scheme, and overlay color the moment this flips.
   private(set) var renderedTemplateID: String?
-
-  /// Page zoom factor for the rendered preview. Applied via a CSS
-  /// `zoom` rule injected into the document head; updated live via JS
-  /// when the user changes it without re-rendering.
-  var pageZoom: Double = 1.0
-
-  /// Discrete zoom stops, matching what Safari and Preview offer so
-  /// repeated ⌘+ presses land on familiar values.
-  static let zoomStops: [Double] = [
-    0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0
-  ]
-  static let minZoom: Double = 0.5
-  static let maxZoom: Double = 3.0
-
-  var canZoomIn: Bool { pageZoom < Self.maxZoom - 0.001 }
-  var canZoomOut: Bool { pageZoom > Self.minZoom + 0.001 }
-  var canResetZoom: Bool { abs(pageZoom - 1.0) > 0.001 }
 
   /// Visited documents in chronological order; `currentIndex` points
   /// at the one currently rendered. Navigation actions move
@@ -324,6 +308,7 @@ final class DocumentModel {
         },
         kosmosTunnel: kosmosTunnel))
     self.find = FindSession(page: self.page)
+    zoom.page = page
 
     wireBridges()
   }
@@ -678,7 +663,7 @@ final class DocumentModel {
         documentContent: body,
         documentURL: url,
         origin: PreviewSchemeHandler.originURL)
-      let html = injectZoomStyle(into: composed.html)
+      let html = composed.html
       logLoadingHTML(byteCount: html.count)
       do {
         for try await _ in page.load(html: html, baseURL: composed.baseURL) {}

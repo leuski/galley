@@ -33,9 +33,9 @@ where Model: SearchFieldModel
         .textFieldStyle(.plain)
         .focused(isFocused)
         .onSubmit(onSubmit)
-        #if os(macOS)
+#if os(macOS)
         .onExitCommand(perform: onCancel)
-        #endif
+#endif
         .frame(maxWidth: .infinity)
         .onChange(of: model.query) {
           Task { await model.performSearch() }
@@ -46,9 +46,9 @@ where Model: SearchFieldModel
 
       if !model.query.isEmpty {
         if model.matchCount > 0 {
-          Action.findPrevious(model).toolbarItem(imageOnly: true)
+          Action.findPrevious(model).button()
             .buttonStyle(.borderless)
-          Action.findNext(model).toolbarItem(imageOnly: true)
+          Action.findNext(model).button()
             .buttonStyle(.borderless)
         }
 
@@ -91,9 +91,9 @@ where Model: SearchFieldModel
       Image(systemName: "magnifyingglass")
         .foregroundStyle(.secondary)
     }
-    #if os(macOS)
+#if os(macOS)
     .menuStyle(.borderlessButton)
-    #endif
+#endif
     .menuIndicator(.visible)
     .help("Find options")
     .accessibilityLabel("Find options")
