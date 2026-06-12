@@ -27,8 +27,7 @@ final class TOCBridge: JavaScriptBridge {
   /// 100px active-threshold (matches GitBook / MDN; a touch below the
   /// typical title-bar / toolbar inset) are hardcoded there. Update
   /// the JS file in lockstep with `messageName` here.
-  static let userScript: String = Bundle(for: TOCBridge.self)
-    .requiredString(forResource: "tocController", withExtension: "js")
+  static let userScript = scriptFromResource(name: "tocController")
 
   /// Set by the owning DocumentModel; receives the freshly-extracted
   /// heading list every time the page loads.

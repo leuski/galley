@@ -19,10 +19,7 @@ final class EditorBridge: JavaScriptBridge {
   /// `Resources/Scripts/editorClick.js` — message names are
   /// hardcoded there and must match `messageName` here and
   /// `LinkBridge.messageName`.
-  static let userScript: String = Bundle(for: EditorBridge.self)
-    .requiredString(forResource: "editorClick", withExtension: "js")
-
-  var documentURL: URL?
+  static let userScript = scriptFromResource(name: "editorClick")
 
   /// Set by the owning DocumentModel; receives the line clicked.
   /// Routing the actual open call through the model lets it consult

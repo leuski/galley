@@ -220,7 +220,7 @@ final class DocumentModel {
   /// Constructed once `page` is built so it can drive
   /// js find directly. `SearchModel`-conforming so the
   /// `FindBar` view can `@Bindable` it.
-  let find: FindSession
+  let find: WebPageFindController
 
   /// Whether the SwiftUI `.fileExporter` for "Export as PDF" is
   /// presented. Flipped by `requestExportPDF()` (typically from the
@@ -317,15 +317,15 @@ final class DocumentModel {
       statsBridge,
       // Computed background-color reader. Runs after layout so the
       // host can paint a matching tint behind translucent chrome.
-      backgroundBridge
+      backgroundBridge,
+      linkBridge
     )
-    controller.add(linkBridge, name: LinkBridge.messageName)
     // Find-text controller. The style script runs at document-start
     // so the highlight CSS is in place before any match is wrapped;
     // the controller script runs at document-end so `document.body`
     // exists when js find function is wired up.
-    controller.addUserScript(FindSession.styleScript)
-    controller.addUserScript(FindSession.userScript)
+    controller.addUserScript(WebPageFindController.Style.userScript)
+    controller.addUserScript(WebPageFindController.Controller.userScript)
     controller.addUserScript(WebPageZoomController.userScript)
 #if !os(macOS)
     // visionOS pinches the WebView's content like an iOS WKWebView
@@ -361,7 +361,7 @@ final class DocumentModel {
 #endif
 
     self.page = WebPage(configuration: configuration)
-    self.find = FindSession(page: self.page)
+    self.find = WebPageFindController(page: self.page)
     self.zoom = WebPageZoomController(page: self.page)
 
     wireBridges()
@@ -376,59 +376,56 @@ final class DocumentModel {
     // rendered preview pushes onto our history and rebinds this same
     // model rather than opening a new document window.
     linkBridge.onMarkdownLink = { [weak self] url in
-      guard let self else { return }
-      Task { await self.navigate(to: url) }
+      Task { await self?.navigate(to: url) }
     }
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
     editorBridge.onEditorClick = { [weak self] line in
-      guard let self else { return }
-      Task { await self.openInEditor(line: line) }
+      Task { await self?.openInEditor(line: line) }
     }
     // Latest debounced scroll position. `@ObservationIgnored` would
     // suppress the SwiftUI invalidation that lets ContentView mirror
     // this to `@SceneStorage`, so we leave it observed — the listener
     // fires at most every ~150 ms, well below per-frame cost.
     scrollBridge.onScroll = { [weak self] yPos in
-      guard let self else { return }
-      currentScrollY = yPos
+      self?.currentScrollY = yPos
     }
     tocBridge.onHeadings = { [weak self] items in
-      guard let self else { return }
-      headings = items
+      self?.headings = items
     }
     tocBridge.onActiveHeading = { [weak self] identifier in
-      guard let self else { return }
-      activeHeadingID = identifier
+      self?.activeHeadingID = identifier
     }
     statsBridge.onStats = { [weak self] value in
-      guard let self else { return }
-      stats = value
+      self?.stats = value
     }
     backgroundBridge.onColor = { [weak self] color, templateID in
-      guard let self else { return }
-      // Bridge fires post-layout regardless of whether the page
-      // declared an opaque bg, so any fire = "WebView has painted"
-      // and we can drop DocumentView's anti-flash overlay.
-      isPageRendered = true
-      isRenderingNewTemplate = false
-      // Attribute the post to the template that's actually painted
-      // in the WebView, identified by the `galley-template-id` meta
-      // the composer injected (echoed back by the JS reader). When
-      // that template is no longer in the catalog (uninstalled
-      // mid-render — extremely rare), fall back to the selected
-      // template; better a slightly-stale write than no write.
-      let painted = templateID.flatMap {
-        appModel.templates.findValue(forID: $0)
-      } ?? resolvedTemplate()
-      renderedTemplateID = painted.persistentID
-      // Always persist — `color: nil` records a sentinel so a
-      // template that *used to* paint a bg but no longer does (CSS
-      // edited) overwrites its stale hex entry. Every other
-      // DocumentModel using this template observes the change
-      // through their own `pageBackgroundColor` computed property.
-      painted.setBackgroundColor(color)
+      self?.onBackgroundColor(color, templateID)
     }
+  }
+
+  private func onBackgroundColor(_ color: Color?, _ templateID: String?) {
+    // Bridge fires post-layout regardless of whether the page
+    // declared an opaque bg, so any fire = "WebView has painted"
+    // and we can drop DocumentView's anti-flash overlay.
+    isPageRendered = true
+    isRenderingNewTemplate = false
+    // Attribute the post to the template that's actually painted
+    // in the WebView, identified by the `galley-template-id` meta
+    // the composer injected (echoed back by the JS reader). When
+    // that template is no longer in the catalog (uninstalled
+    // mid-render — extremely rare), fall back to the selected
+    // template; better a slightly-stale write than no write.
+    let painted = templateID.flatMap {
+      appModel.templates.findValue(forID: $0)
+    } ?? resolvedTemplate()
+    renderedTemplateID = painted.persistentID
+    // Always persist — `color: nil` records a sentinel so a
+    // template that *used to* paint a bg but no longer does (CSS
+    // edited) overwrites its stale hex entry. Every other
+    // DocumentModel using this template observes the change
+    // through their own `pageBackgroundColor` computed property.
+    painted.setBackgroundColor(color)
   }
 
   /// Open the current document in the user's chosen editor.
@@ -474,8 +471,7 @@ final class DocumentModel {
   /// so the script must NOT be wrapped in an IIFE.
 
   private struct TopmostVisibleSourceLineScript: JavaScriptCallable<Int> {
-    static let script = Bundle.main.requiredString(
-      forResource: "topmostVisibleSourceLine", withExtension: "js")
+    static let script = Bundle.main.jsScript(name: "topmostVisibleSourceLine")
     var body: String { Self.script }
   }
 
@@ -654,7 +650,6 @@ final class DocumentModel {
     // gap with the cached page bg until BackgroundColorBridge
     // reports a fresh post-layout color.
     isPageRendered = false
-    editorBridge.documentURL = url
     linkBridge.documentURL = url
     // Drop the old document's TOC entries so the sidebar doesn't
     // flash stale headings during the reload window. The TOCBridge

@@ -20,8 +20,7 @@ final class StatsBridge: JavaScriptBridge {
   /// Reader script. Source lives in
   /// `Resources/Scripts/statsReader.js`; the message name is
   /// hardcoded there and must match `messageName`.
-  static let userScript: String = Bundle(for: StatsBridge.self)
-    .requiredString(forResource: "statsReader", withExtension: "js")
+  static let userScript = scriptFromResource(name: "statsReader")
 
   /// Set by the owning DocumentModel. Receives the freshly-computed
   /// counts every time the rendered document finishes loading.

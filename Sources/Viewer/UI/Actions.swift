@@ -90,7 +90,7 @@ extension Action {
   /// show/hide affordance Safari and Preview surface in their
   /// toolbars. Title flips so the tooltip and accessibility label
   /// reflect the current state, just like `toggleTOC`.
-  static func find(_ session: FindSession?) -> Action {
+  static func find(_ session: WebPageFindController?) -> Action {
     Action(
       title: {
         (session?.isVisible ?? false) ? "Hide Find" : "Find…"
@@ -104,7 +104,7 @@ extension Action {
     )
   }
 
-  static func useSelectionForFind(_ session: FindSession?) -> Action {
+  static func useSelectionForFind(_ session: WebPageFindController?) -> Action {
     Action(
       title: "Use Selection for Find",
       image: "text.magnifyingglass",

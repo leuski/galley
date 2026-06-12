@@ -21,8 +21,7 @@ final class ScrollBridge: JavaScriptBridge {
   /// Debounced scroll listener. Source lives in
   /// `Resources/Scripts/scrollListener.js`; the message name is
   /// hardcoded there and must match `messageName` here.
-  static let userScript: String = Bundle(for: ScrollBridge.self)
-    .requiredString(forResource: "scrollListener", withExtension: "js")
+  static let userScript = scriptFromResource(name: "scrollListener")
 
   /// Set by the owning DocumentModel; receives the latest position.
   var onScroll: ((Double) -> Void)?

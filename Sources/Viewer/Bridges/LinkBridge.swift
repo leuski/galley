@@ -7,13 +7,19 @@ import WebKit
 import OSLog
 import KosmosAppKit
 
+private let logger = Logger(
+  subsystem: bundleIdentifier,
+  category: "LinkBridge")
+
 /// Handles plain-click on `<a href>` elements inside the rendered
 /// preview: resolves relative paths against the current document, and
 /// opens the target. Markdown files open as new Viewer documents
 /// (which then participate in macOS native window tabbing); everything
 /// else is handed off to LaunchServices.
 @MainActor
-final class LinkBridge: NSObject, WKScriptMessageHandler {
+final class LinkBridge: JavaScriptBridge {
+  static let userScript: String = ""
+
   /// JS message handler name. JS calls
   /// `window.webkit.messageHandlers.linkclick.postMessage({ href })`.
   static let messageName = "linkclick"
@@ -41,24 +47,10 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
   /// never see this fire.
   var onFinderReveal: ((URL) -> Void)?
 
-  private let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "LinkBridge")
+  struct Value: Decodable { let href: String }
 
-  func userContentController(
-    _ controller: WKUserContentController,
-    didReceive message: WKScriptMessage
-  ) {
-    guard let msg = try? message.decodedBody(Message.self) else {
-      logMalformedMessage(message.body)
-      return
-    }
-    handle(href: msg.href)
-  }
-
-  private struct Message: Decodable { let href: String }
-
-  private func handle(href: String) {
+  func handle(value: Value) {
+    let href = value.href
     guard let target = resolve(href: href) else {
       logUnresolvableHref(href)
       return
@@ -145,11 +137,6 @@ final class LinkBridge: NSObject, WKScriptMessageHandler {
   /// than open it." `finder:///Applications/Galley.app/Contents/...`
   /// is a regular file path; the scheme just flips the dispatch.
   private static let finderScheme = "finder"
-
-  private func logMalformedMessage(_ body: Any) {
-    logger.warning(
-      "Ignoring malformed link message: \(String(describing: body))")
-  }
 
   private func logUnresolvableHref(_ href: String) {
     logger.warning("Could not resolve link href: \(href, privacy: .public)")
