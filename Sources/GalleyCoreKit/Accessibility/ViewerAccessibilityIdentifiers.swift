@@ -34,19 +34,8 @@ public enum ViewerA11yID {
   // MARK: View menu
 
   public enum ViewMenu {
-    public static let back = "viewer.view.back"
-    public static let forward = "viewer.view.forward"
-    public static let reload = "viewer.view.reload"
-    public static let zoomIn = "viewer.view.zoomIn"
-    public static let zoomOut = "viewer.view.zoomOut"
-    public static let actualSize = "viewer.view.actualSize"
     public static let toggleTOC = "viewer.view.toggleTOC"
     public static let toggleStatusBar = "viewer.view.toggleStatusBar"
-    public static let find = "viewer.view.find"
-    public static let useSelectionForFind =
-      "viewer.view.useSelectionForFind"
-    public static let findNext = "viewer.view.findNext"
-    public static let findPrevious = "viewer.view.findPrevious"
   }
 
   // MARK: Find bar
@@ -54,12 +43,8 @@ public enum ViewerA11yID {
   public enum Find {
     public static let toolbar = "viewer.find.toolbar"
     public static let field = "viewer.find.field"
-    public static let next = "viewer.find.next"
-    public static let previous = "viewer.find.previous"
     public static let close = "viewer.find.close"
     public static let optionsMenu = "viewer.find.optionsMenu"
-    public static let ignoreCase = "viewer.find.ignoreCase"
-    public static let wholeWord = "viewer.find.wholeWord"
   }
 
   // MARK: Rendering menu / toolbar

@@ -27,7 +27,7 @@ where Model: SearchFieldModel
 
   var body: some View {
     HStack(spacing: 4) {
-      optionsMenu
+      FindOptionsView(model: model)
 
       TextField(prompt, text: $model.query)
         .textFieldStyle(.plain)
@@ -42,26 +42,23 @@ where Model: SearchFieldModel
         }
         .accessibilityIdentifier(ViewerA11yID.Find.field)
 
-      countLabel
+      FindMatchStateView(model: model)
 
       if !model.query.isEmpty {
-        if model.matchCount > 0 {
+        if model.match.count > 0 {
           Action.findPrevious(model).button()
             .buttonStyle(.borderless)
           Action.findNext(model).button()
             .buttonStyle(.borderless)
         }
 
-        Button {
+        Action.clear { _ in
           model.query = ""
           isFocused.wrappedValue = true
-        } label: {
-          Image(systemName: "xmark.circle.fill")
-            .foregroundStyle(.secondary)
         }
+        .button()
         .buttonStyle(.plain)
-        .help("Clear")
-        .accessibilityLabel("Clear")
+        .foregroundStyle(.secondary)
       }
     }
     .padding(.horizontal, 6)
@@ -73,56 +70,5 @@ where Model: SearchFieldModel
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .strokeBorder(.separator))
     .frame(minWidth: searchMinWidth, maxWidth: searchMaxWidth)
-  }
-
-  /// Dropdown anchored to the magnifying-glass glyph, mirroring the
-  /// affordance Safari and Preview use to host find options. Each
-  /// toggle re-runs the search through `.onChange` so highlights
-  /// update immediately.
-  @ViewBuilder
-  private var optionsMenu: some View {
-    Menu {
-      Toggle("Ignore Case", isOn: $model.ignoresCase)
-        .accessibilityIdentifier(ViewerA11yID.Find.ignoreCase)
-
-      Toggle("Whole Word", isOn: $model.wholeWord)
-        .accessibilityIdentifier(ViewerA11yID.Find.wholeWord)
-    } label: {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(.secondary)
-    }
-#if os(macOS)
-    .menuStyle(.borderlessButton)
-#endif
-    .menuIndicator(.visible)
-    .help("Find options")
-    .accessibilityLabel("Find options")
-    .accessibilityIdentifier(ViewerA11yID.Find.optionsMenu)
-    .onChange(of: model.ignoresCase) {
-      Task { await model.performSearch() }
-    }
-    .onChange(of: model.wholeWord) {
-      Task { await model.performSearch() }
-    }
-  }
-
-  /// "n of N" indicator. Empty while the query is empty (no search
-  /// has run) and "No results" when the query yielded zero matches —
-  /// both clearer than a bare "0 of 0".
-  @ViewBuilder
-  private var countLabel: some View {
-    if model.query.isEmpty {
-      EmptyView()
-    } else if model.matchCount == 0 {
-      Text("No results")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-    } else {
-      Text("\(model.matchIndex + 1) of \(model.matchCount)")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .monospacedDigit()
-    }
   }
 }

@@ -528,23 +528,23 @@ struct DocumentView: View {
   @ToolbarContentBuilder
   private var zoomToolbarItems: some CustomizableToolbarContent {
     ToolbarItem(id: "zoomOut", placement: .confirmationAction) {
-      Action.zoomOut(model).toolbarItem()
+      Action.zoomOut(model.zoom).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
     ToolbarItem(id: "zoomReset", placement: .confirmationAction) {
-      Action.resetZoom(model).toolbarItem()
+      Action.resetZoom(model.zoom).toolbarItem()
     }
     .defaultCustomization(.hidden)
 
     ToolbarItem(id: "zoomIn", placement: .confirmationAction) {
-      Action.zoomIn(model).toolbarItem()
+      Action.zoomIn(model.zoom).toolbarItem()
     }
     .defaultCustomization(.hidden)
   }
 
   private var zoomLabel: String {
-    let percent = Int((model.zoom.scale * 100).rounded())
+    let percent = Int((model.zoom.zoomScale * 100).rounded())
     return "\(percent)%"
   }
 }
@@ -584,7 +584,7 @@ private struct ChangeHandlers: ViewModifier {
         onRendererPersistent(new)
         reload()
       }
-      .onChange(of: model.zoom.scale) { _, new in onZoom(new) }
+      .onChange(of: model.zoom.zoomScale) { _, new in onZoom(new) }
       .onChange(of: model.currentScrollY) { _, new in onScrollY(new) }
       .onChange(of: model.showsTOC) { _, new in onShowsTOC(new) }
   }

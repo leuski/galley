@@ -16,9 +16,9 @@ struct ViewCommands: Commands {
 
       Divider()
 
-      Action.zoomIn(model).menuItem()
-      Action.zoomOut(model).menuItem()
-      Action.resetZoom(model).menuItem()
+      Action.zoomIn(model?.zoom).menuItem()
+      Action.zoomOut(model?.zoom).menuItem()
+      Action.resetZoom(model?.zoom).menuItem()
 
       Divider()
 

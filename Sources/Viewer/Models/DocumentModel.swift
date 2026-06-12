@@ -17,7 +17,9 @@ import UserNotifications
 /// URLs; toolbar buttons drive `goBack`, `goForward`, and `reload`.
 @Observable
 @MainActor
-final class DocumentModel {
+final class DocumentModel: NavigationModel, ReloadableModel {
+  var canReload: Bool { true }
+
   /// Distinguishes a normal document window from the singleton Help
   /// window. Help mode opts out of inbound-URL receipt + dedup
   /// (`handlesInboundURLs(enabled: false)`), so a help window never
@@ -255,6 +257,15 @@ final class DocumentModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
+  @MainActor @Observable
+  final class ZoomController: WebPageZoomController {
+    var zoomScale: Double = 0
+
+    var page: WebPage? { model?.page }
+
+    weak var model: DocumentModel?
+  }
+
   init(
     initialURL: URL,
     appModel: AppModel,
@@ -324,9 +335,7 @@ final class DocumentModel {
     // so the highlight CSS is in place before any match is wrapped;
     // the controller script runs at document-end so `document.body`
     // exists when js find function is wired up.
-    controller.addUserScript(WebPageFindController.Style.userScript)
-    controller.addUserScript(WebPageFindController.Controller.userScript)
-    controller.addUserScript(WebPageZoomController.userScript)
+    controller.add(WebPageFindController.self)
 #if !os(macOS)
     // visionOS pinches the WebView's content like an iOS WKWebView
     // unless the document opts out via viewport meta. Templates we
@@ -342,11 +351,15 @@ final class DocumentModel {
     // asset request, so a mid-session template switch is reflected
     // in the next `/template/<id>/<file>` lookup without any
     // explicit invalidation.
+
+    let zoom = ZoomController()
+
     let handler = PreviewSchemeHandler {
       Self.resolveTemplate(
         templates: templatesRef, appModel: appModelRef)
     }
-    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = handler
+    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = zoom
+      .zoomUrlSchemeHandler(wrapping: handler)
 
 #if os(visionOS)
     // AVP renders Mac-hosted documents by tunneling each WebKit fetch
@@ -362,7 +375,8 @@ final class DocumentModel {
 
     self.page = WebPage(configuration: configuration)
     self.find = WebPageFindController(page: self.page)
-    self.zoom = WebPageZoomController(page: self.page)
+    self.zoom = zoom
+    zoom.model = self
 
     wireBridges()
   }
