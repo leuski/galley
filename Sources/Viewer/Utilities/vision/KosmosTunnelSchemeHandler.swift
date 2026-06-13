@@ -42,20 +42,7 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
     stamped.setValue(
       TunnelScheme.originURL.absoluteString,
       forHTTPHeaderField: TunnelHeaders.origin)
-    return AsyncThrowingStream { continuation in
-      let task = Task { @MainActor [stamped] in
-        let stream = tunnel.reply(for: stamped)
-        do {
-          for try await result in stream {
-            continuation.yield(result)
-          }
-          continuation.finish()
-        } catch {
-          continuation.finish(throwing: error)
-        }
-      }
-      continuation.onTermination = { _ in task.cancel() }
-    }
+    return tunnel.reply(for: stamped)
   }
 }
 #endif

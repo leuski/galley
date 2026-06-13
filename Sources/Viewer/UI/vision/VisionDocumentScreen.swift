@@ -22,8 +22,7 @@ struct VisionDocumentScreen: View {
   @Environment(\.openURL) private var openURL
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(RecentDocumentsModel.self) private var recents
-  @Environment(VisionKosmosService.self) private var kosmos
+  private var recents: RecentDocumentsModel { AppBoot.shared.recents }
 
   var body: some View {
     Group {
@@ -309,6 +308,7 @@ struct VisionDocumentScreen: View {
   /// empty so users don't see a dead entry on first launch.
   @ViewBuilder
   private var openRecentMenu: some View {
+    @Bindable var recents = AppBoot.shared.recents
     if !recents.urls.isEmpty {
       Menu {
         ForEach(recents.urls, id: \.self) { url in
@@ -371,8 +371,7 @@ struct VisionDocumentScreen: View {
       templatePersistent: perFile.templatePersistent,
       processorPersistent: perFile.rendererPersistent,
       colorSchemePersistent: perFile.colorSchemePersistent,
-      kind: .document,
-      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.tunnel))
+      kind: .document)
     model = created
     return created
   }

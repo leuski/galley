@@ -50,17 +50,3 @@ extension DocumentModel {
 #endif
   }
 }
-
-/// Type-erased holder so the (visionOS-only) tunnel-client type
-/// doesn't leak into the shared `makeConfiguration` signature on
-/// macOS. The macOS slice ignores the parameter; visionOS reads the
-/// inner client and registers the scheme handler.
-struct KosmosTunnelClientRef {
-#if os(visionOS)
-  let client: Client
-#else
-  /// macOS keeps the type around for source compatibility but
-  /// can't construct it.
-  var client: Never? { nil }
-#endif
-}

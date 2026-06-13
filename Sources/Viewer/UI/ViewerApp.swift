@@ -4,12 +4,9 @@ import KosmosAppKit
 
 @main
 struct ViewerApp: App {
-  @State private var boot = AppBoot()
-  @State private var recents = RecentDocumentsModel()
+  @State private var boot = AppBoot.shared
 #if os(macOS)
-  @State private var kosmos = ViewerKosmosService()
 #else
-  @State private var kosmos = VisionKosmosService()
   @Environment(\.openWindow) private var openWindow
   /// Read at the **App** level so SwiftUI hands us the aggregate
   /// phase across all live scenes (`.active` if any scene is active,
@@ -34,14 +31,10 @@ struct ViewerApp: App {
 #else
 
 #endif
-    kosmos.start()
   }
 
   var body: some Scene {
     DocumentScene()
-      .environment(boot)
-      .environment(recents)
-      .environment(kosmos)
 #if os(visionOS)
       .onChange(of: scenePhase, initial: false) { _, newPhase in
         // App-level (aggregate) phase. Drives Kosmos suspend/resume,
@@ -54,9 +47,9 @@ struct ViewerApp: App {
         }
         switch newPhase {
         case .active, .inactive:
-          kosmos.publishResume()
+          boot.kosmos.publishResume()
         case .background:
-          kosmos.publishSuspend()
+          boot.kosmos.publishSuspend()
         @unknown default:
           break
         }
@@ -65,12 +58,8 @@ struct ViewerApp: App {
 
 #if os(macOS)
     MacHelpScene()
-      .environment(boot)
-      .environment(recents)
 #endif
 
     SettingsScene()
-      .environment(boot)
-      .environment(kosmos)
   }
 }

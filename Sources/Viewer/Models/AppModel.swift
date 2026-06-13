@@ -4,6 +4,7 @@ import KosmosAppKit
 import SwiftUI
 import OSLog
 import UserNotifications
+import WebKit
 
 private let defaultsLog = Logger(
   subsystem: bundleIdentifier, category: "Defaults")
@@ -32,6 +33,12 @@ final class AppModel {
   @ObservationIgnored private var open: (@MainActor () -> Void)?
 #endif
 
+#if ENABLE_TUNNEL
+  @ObservationIgnored private var tunnelHandler =
+  KosmosTunnelSchemeHandler(tunnel: AppBoot.shared.kosmos.tunnel)
+    .schemeHandler
+#endif
+
   /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
   /// expected to have run async catalog discovery
   /// (`await processorStore.discover()`) before invoking this so the
@@ -47,15 +54,6 @@ final class AppModel {
 #if os(macOS)
     self.editors = EditorChoice()
 #endif
-
-//  #if ENABLE_TUNNEL
-//      self.scemeHandler = SelectingDotSchemeHandler(
-//        local: LocalDotSchemeHandler(catalog: catalog),
-//        tunnel: TunnelDotSchemeHandler(tunnel: kosmos.tunnel)).schemeHandler
-//      kosmos.start()
-//  #else
-//      self.scemeHandler = PreviewSchemeHandler().schemeHandler
-//  #endif
 
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
@@ -113,6 +111,33 @@ final class AppModel {
           template: Defaults.shared.template)
       }
     }
+  }
+
+  public func resolvedTemplate(
+    templates: SceneTemplateChoice?) -> Template
+  {
+    if let templates, Defaults.shared.enablePerDocumentOverrides {
+      return templates.selected.value
+    }
+    return self.templates.selected.value
+  }
+
+  public func urlSchemeHandler(
+    templates: SceneTemplateChoice) -> [URLScheme: AnySchemeHandler]
+  {
+    let localHandler = PreviewSchemeHandler { [weak templates] in
+      self.resolvedTemplate(templates: templates)
+    }.schemeHandler
+#if ENABLE_TUNNEL
+    return [
+      PreviewSchemeHandler.scheme: localHandler,
+      KosmosTunnelSchemeHandler.scheme: tunnelHandler
+    ]
+#else
+    return [
+      PreviewSchemeHandler.scheme: localHandler
+    ]
+#endif
   }
 
   private static func notify(
@@ -176,6 +201,16 @@ final class AppModel {
 /// `boot.model` being non-nil.
 @Observable @MainActor
 final class AppBoot {
+  static let shared = AppBoot()
+
+#if os(macOS)
+  let kosmos = ViewerKosmosService()
+#else
+  let kosmos = VisionKosmosService()
+#endif
+
+  let recents = RecentDocumentsModel()
+
   private(set) var model: AppModel?
 
   /// Synchronize the `@ObservableDefaults` macro's per-property cache
@@ -217,14 +252,15 @@ final class AppBoot {
     Task { @MainActor in
 #if os(macOS)
       await ActiveServerAgent.shared.restartHelperIfStale {
-          Defaults.shared.serverGalleyHash
-        } cleaner: {
-          Defaults.shared.serverGalleyHash = nil
-        }
+        Defaults.shared.serverGalleyHash
+      } cleaner: {
+        Defaults.shared.serverGalleyHash = nil
+      }
 #endif
       await ProcessorStore.shared.discover()
       self.model = AppModel()
     }
+    kosmos.start()
   }
 }
 

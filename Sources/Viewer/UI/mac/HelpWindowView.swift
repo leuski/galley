@@ -9,13 +9,12 @@ import SwiftUI
 /// We parse it back to the bundled file and mount `DocumentView` in
 /// `.help` mode (which bypasses dedup, recents, and the tab "+").
 struct HelpWindowView: View {
-  @Environment(AppBoot.self) private var boot
   @State private var target: DocumentTarget?
 
   var body: some View {
     Group {
       if let targetBinding = Binding($target),
-         let appModel = boot.model
+         let appModel = AppBoot.shared.model
       {
         DocumentView(
           target: targetBinding,

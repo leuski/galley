@@ -18,8 +18,6 @@ import SwiftUI
 /// them straight to those singleton scenes. A document window therefore
 /// only ever sees `galley://<path>` and `file://` document URLs.
 struct InboundURLHandler: ViewModifier {
-  @Environment(RecentDocumentsModel.self) private var recents
-
   let enabled: Bool
   /// Tokens this window prefers for dedup (empty for the bootstrap
   /// window).

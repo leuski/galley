@@ -11,7 +11,7 @@ import GalleyCoreKit
 struct SettingsScene: Scene {
   static let id = "settings"
   static let events = Set([OpenSettingsActivity.schemeExternalToken])
-  @Environment(AppBoot.self) var boot: AppBoot
+  @Bindable private var boot = AppBoot.shared
 
   var body: some Scene {
     Window("Settings", id: Self.id) {

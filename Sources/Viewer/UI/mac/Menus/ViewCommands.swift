@@ -33,12 +33,11 @@ struct ViewCommands: Commands {
 }
 
 struct WindowCommands: Commands {
-  @Environment(ViewerKosmosService.self) var kosmos: ViewerKosmosService
   @FocusedValue(\.documentModel) private var model
 
   var body: some Commands {
     CommandGroup(before: .windowArrangement) {
-      Action.showOnVisionPro(model, kosmos: kosmos).menuItem()
+      Action.showOnVisionPro(model, kosmos: AppBoot.shared.kosmos).menuItem()
     }
   }
 }

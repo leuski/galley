@@ -12,7 +12,7 @@ import ALFoundation
 /// `fileURL` are available.
 struct VisionContentView: View {
   @Binding var target: DocumentTarget?
-  @Environment(AppBoot.self) private var boot
+  @Bindable private var boot = AppBoot.shared
 
   @Environment(\.dismissWindow) private var dismissWindow
   /// Per-scene phase. `.background` fires for *this* window when

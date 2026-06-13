@@ -4,8 +4,6 @@ import SwiftUI
 import GalleyCoreKit
 
 struct ServerSettingsView: View {
-  @Environment(ViewerKosmosService.self) private var kosmos
-
   private let agent = ActiveServerAgent.shared
 
   /// Number of seconds we tolerate "intent on, no Kosmos peer yet"
@@ -27,8 +25,8 @@ struct ServerSettingsView: View {
   @State private var graceExpired: Bool = false
 
   var body: some View {
-    let peerConnected = kosmos.isServerPeerConnected
-    let serverURL = kosmos.serverPeerHTTPURL
+    let peerConnected = AppBoot.shared.kosmos.isServerPeerConnected
+    let serverURL = AppBoot.shared.kosmos.serverPeerHTTPURL
     let agentEnabled = agent.isEnabled
     let status = Self.computeStatus(
       peerConnected: peerConnected,

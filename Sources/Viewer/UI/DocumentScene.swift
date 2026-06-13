@@ -36,7 +36,7 @@ struct DocumentScene: Scene {
   }
 
 #if os(macOS)
-  @Environment(AppBoot.self) var boot: AppBoot
+  @Bindable private var boot = AppBoot.shared
   @CommandsBuilder
   var commands: some Commands {
     FileCommands()

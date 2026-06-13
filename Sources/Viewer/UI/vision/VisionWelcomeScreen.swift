@@ -16,7 +16,7 @@ import GalleyCoreKit
 /// rather than spawning a second window.
 struct VisionWelcomeScreen: View {
   @Binding var target: DocumentTarget?
-  @Environment(RecentDocumentsModel.self) private var recents
+  @Bindable var recents = AppBoot.shared.recents
   @State private var isFilePickerPresented = false
 
   var body: some View {

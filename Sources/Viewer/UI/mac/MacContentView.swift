@@ -14,8 +14,7 @@ import SwiftUI
 /// supplies a real target).
 struct MacContentView: View {
   @Binding var target: DocumentTarget?
-  @Environment(AppBoot.self) private var boot
-  @Environment(RecentDocumentsModel.self) private var recents
+  @Bindable private var boot = AppBoot.shared
   @Environment(\.openWindow) private var openWindow
   @Environment(\.dismissWindow) private var dismissWindow
 
@@ -47,7 +46,7 @@ struct MacContentView: View {
     .task {
       NewTabAction.handler = { _ in
         Task { @MainActor in
-          let picks = await recents.runOpenPanel()
+          let picks = await boot.recents.runOpenPanel()
           for url in picks {
             // Born-as-tab into the key window's group (the "+" source is
             // key). No host argument needed — see `ViewerOpenModel`.
@@ -73,7 +72,7 @@ struct MacContentView: View {
       return
     }
 
-    let picks = await recents.runOpenPanel()
+    let picks = await boot.recents.runOpenPanel()
     if Task.isCancelled || target != nil { return }
 
     guard let first = picks.first else {

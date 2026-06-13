@@ -18,7 +18,7 @@ private let log = Logger(
 struct DocumentView: View {
   @Binding var target: DocumentTarget
   let appModel: AppModel
-  @Environment(RecentDocumentsModel.self) private var recents
+  private var recents: RecentDocumentsModel { AppBoot.shared.recents }
   @Environment(\.openWindow) private var openWindow
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var model: DocumentModel

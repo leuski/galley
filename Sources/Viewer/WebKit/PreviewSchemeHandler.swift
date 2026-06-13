@@ -21,7 +21,7 @@ import KosmosAppKit
 /// `PlaceholderContext.substitute`; templates without it fall back
 /// to the page baseURL and end up at the same place.
 @MainActor
-struct PreviewSchemeHandler: URLSchemeHandler {
+struct PreviewSchemeHandler: SchemeHandler {
   static let scheme = URLScheme(PreviewScheme.name)
   !! "Failed to make URLScheme for \(PreviewScheme.name)"
   static var originURL: URL { PreviewScheme.originURL }

@@ -272,8 +272,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     templatePersistent: String?,
     processorPersistent: String?,
     colorSchemePersistent: String? = nil,
-    kind: Kind,
-    kosmosTunnel: KosmosTunnelClientRef? = nil
+    kind: Kind
   ) {
     self.kind = kind
     self.documentURL = initialURL
@@ -298,13 +297,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       source: appModel.colorSchemes,
       persistent: colorSchemePersistent
     ) { _ in }
-
-    // Capture the choice envelopes (reference types) into locals so
-    // the scheme-handler closure can read the live template selection
-    // without needing `self` — which isn't usable yet because `page`
-    // is still uninitialized below.
-    let templatesRef = self.templates
-    let appModelRef = self.appModel
 
     var configuration = WebPage.Configuration()
     configuration.defaultNavigationPreferences.preferredContentMode = .desktop
@@ -354,24 +346,13 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
     let zoom = ZoomController()
 
-    let handler = PreviewSchemeHandler {
-      Self.resolveTemplate(
-        templates: templatesRef, appModel: appModelRef)
-    }
-    configuration.urlSchemeHandlers[PreviewSchemeHandler.scheme] = zoom
-      .zoomUrlSchemeHandler(wrapping: handler)
-
-#if os(visionOS)
-    // AVP renders Mac-hosted documents by tunneling each WebKit fetch
-    // through Kosmos via the `galley://` scheme. The handler holds a
-    // reference to the shared `Client` owned by
-    // `VisionKosmosService`.
-    if let kosmosTunnel = kosmosTunnel?.client {
-      let tunnelHandler = KosmosTunnelSchemeHandler(tunnel: kosmosTunnel)
-      configuration.urlSchemeHandlers[KosmosTunnelSchemeHandler.scheme]
-      = tunnelHandler
-    }
-#endif
+    configuration
+      .urlSchemeHandlers
+      .merge(appModel
+        .urlSchemeHandler(templates: templates)
+        .mapValues { handler in
+          zoom.zoomUrlSchemeHandler(wrapping: handler)
+        }, uniquingKeysWith: { _, new in new })
 
     self.page = WebPage(configuration: configuration)
     self.find = WebPageFindController(page: self.page)
@@ -760,8 +741,8 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
   private func loadRemote(url: URL, preserveScroll: Bool) async {
     let savedScrollY: Double = preserveScroll
-      ? await currentScrollY() ?? 0
-      : 0
+    ? await currentScrollY() ?? 0
+    : 0
     do {
       for try await _ in page.load(URLRequest(url: url)) {}
       // Source-line jumps (`galley://...?line=N`) don't translate to
