@@ -1282,6 +1282,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_SWIFT_FLAGS = "-DENABLE_TUNNEL";
+				"OTHER_SWIFT_FLAGS[sdk=macosx*]" = "";
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -1314,6 +1316,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_SWIFT_FLAGS = "-DENABLE_TUNNEL";
+				"OTHER_SWIFT_FLAGS[sdk=macosx*]" = "";
 				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.galley;
 				PRODUCT_NAME = Galley;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

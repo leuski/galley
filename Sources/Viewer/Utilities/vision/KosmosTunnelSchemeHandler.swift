@@ -44,7 +44,7 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
       forHTTPHeaderField: TunnelHeaders.origin)
     return AsyncThrowingStream { continuation in
       let task = Task { @MainActor [stamped] in
-        let stream = tunnel.openTunnel(for: stamped)
+        let stream = tunnel.reply(for: stamped)
         do {
           for try await result in stream {
             continuation.yield(result)

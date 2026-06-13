@@ -177,9 +177,9 @@ struct VisionDocumentScreen: View {
       Spacer()
 
       ControlGroup {
-        Action.zoomOut(model).button()
-        Action.resetZoom(model).button()
-        Action.zoomIn(model).button()
+        Action.zoomOut(model.zoom).button()
+        Action.resetZoom(model.zoom).button()
+        Action.zoomIn(model.zoom).button()
       }
 
       Spacer()
@@ -372,7 +372,7 @@ struct VisionDocumentScreen: View {
       processorPersistent: perFile.rendererPersistent,
       colorSchemePersistent: perFile.colorSchemePersistent,
       kind: .document,
-      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.httpTunnelClient))
+      kosmosTunnel: KosmosTunnelClientRef(client: kosmos.tunnel))
     model = created
     return created
   }

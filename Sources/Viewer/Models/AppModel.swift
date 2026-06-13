@@ -48,6 +48,15 @@ final class AppModel {
     self.editors = EditorChoice()
 #endif
 
+//  #if ENABLE_TUNNEL
+//      self.scemeHandler = SelectingDotSchemeHandler(
+//        local: LocalDotSchemeHandler(catalog: catalog),
+//        tunnel: TunnelDotSchemeHandler(tunnel: kosmos.tunnel)).schemeHandler
+//      kosmos.start()
+//  #else
+//      self.scemeHandler = PreviewSchemeHandler().schemeHandler
+//  #endif
+
     self.templates = TemplateChoice(
       source: TemplateStore.shared,
       persistent: Defaults.shared.template) { name in
@@ -218,3 +227,17 @@ final class AppBoot {
     }
   }
 }
+
+#if os(macOS)
+extension ActiveServerAgent {
+  static let shared = ActiveServerAgent(
+    agent: LaunchctlServerAgent(bundle: Bundle.main.serverBundle))
+}
+
+extension Bundle {
+  public var serverBundle: Bundle? {
+    url(forResource: "Galley Server", withExtension: "app")
+      .flatMap { url in Bundle(url: url) }
+  }
+}
+#endif

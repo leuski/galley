@@ -32,20 +32,23 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   /// AVP-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
-  let httpTunnelClient: Client
+#if ENABLE_TUNNEL
+  let tunnel: Client
+#endif
 
   @ObservationIgnored private let host = ServiceHost(role: .visionViewer)
 
   struct WindowInfo {
     var reloadHandler: (@MainActor () -> Void)?
-    var url: URL?
   }
 
   @ObservationIgnored
   private var windows: [KosmosCore.WindowID: WindowInfo] = [:]
 
   init() {
-    self.httpTunnelClient = Client(client: nil)
+#if ENABLE_TUNNEL
+    self.tunnel = Client(client: nil)
+#endif
   }
 
   /// Begin advertising and browsing. Idempotent.
@@ -54,7 +57,9 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   func stop() async {
-    httpTunnelClient.stopAll()
+#if ENABLE_TUNNEL
+    tunnel.stopAll()
+#endif
     windows.removeAll()
     await host.stop()
   }
@@ -66,12 +71,7 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   func configure(host: ServiceHost, client: KosmosClient) async {
-    httpTunnelClient.attach(client: client)
-
-    host.subscribe(OpenURL.self) { [weak self] _, message in
-      self?.handleOpenURL(message)
-    }
-
+#if ENABLE_TUNNEL
     host.subscribe(OpenDocument.self) { [weak self] sender, message in
       self?.handleOpenDocument(message, from: sender)
     }
@@ -83,7 +83,15 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
     // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
     // `ProxyHTTPResponseChunk` → the in-flight request) is shared in
     // `KosmosHTTPTunnel`.
-    httpTunnelClient.install(on: host)
+    tunnel.install(on: host, pendingClient: client)
+    tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
+#endif
+  }
+
+  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
+#if ENABLE_TUNNEL
+    tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
+#endif
   }
 
   // Link start/fail logging is handled uniformly by
@@ -124,12 +132,6 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   // MARK: - Inbound handling
-
-  private func handleOpenURL(_ message: OpenURL) {
-    windows[message.windowID, default: .init()].url = message.url
-    OpenDocumentActivity(url: message.url).open()
-  }
-
   private func handleOpenDocument(
     _ message: OpenDocument, from sender: PeerID
   ) {
@@ -142,7 +144,6 @@ final class VisionKosmosService: KosmosService<GalleyKosmosRole> {
         """)
       return
     }
-    windows[message.docID, default: .init()].url = url
     OpenDocumentActivity(url: url, scrollLine: message.scrollLineHint).open()
   }
 }
