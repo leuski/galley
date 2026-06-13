@@ -1,47 +1,67 @@
-#if os(macOS)
 import Foundation
 import GalleyCoreKit
 import KosmosCore
+#if ENABLE_TUNNEL
+import KosmosHTTPTunnel
+#endif
 import KosmosTransport
 import Observation
+import OSLog
 
-// All message I/O and peer/link diagnostics for this surface are logged
-// uniformly by `KosmosServiceHost`; this file has no logger of its own.
+private let log = Logger(
+  subsystem: bundleIdentifier, category: "ViewerKosmosService")
 
-/// Mac Viewer's Kosmos surface. Narrow by design: peer presence for
-/// two UI gates (Server pill, "Show on Vision Pro" enabledness) and
-/// a single outbound `RouteToAVP` request. The Mac Viewer does not
-/// own dispatch state — Server is the routing authority.
+/// Viewer-side Kosmos surface. Advertises as a `visionViewer`, mirrors
+/// the discovered peer set, subscribes to bridge messages (open-document,
+/// content changes), and publishes lifecycle to the bridge so the Mac
+/// can gate Viewer reachability on suspend / resume.
+///
+/// Also owns the Viewer end of the HTTP tunnel — every `galley://` URL
+/// the WebView fetches becomes a `ProxyHTTPRequest` Kosmos broadcast,
+/// and the response chunks are routed back through
+/// `Client`. The service is the single subscription point
+/// for the two response message types so we don't spin up a per-request
+/// subscription.
 ///
 /// Conforms to `KosmosService`; the `KosmosServiceHost` owns the
 /// bootstrap / peer-watch / stop boilerplate and calls back through
 /// the protocol.
-///
-/// Peer presence is resolved by the host's product-scoped queries:
-/// `presentPeer(role:onHost:)` for *this* Mac's Server, and
-/// `reachablePeer(deviceType:.vision)` for the AVP. The AVP query is
-/// resume-gated — identical to the policy the Server uses for dispatch
-/// — so "Show on Vision Pro" is enabled exactly when a route would
-/// actually land on AVP. (The AVP only emits `AppWillSuspend` on real
-/// suspension, reading aggregate App-level `scenePhase`, so gating here
-/// no longer risks the focus-blip flicker that an earlier membership-
-/// only workaround was guarding against.)
 @MainActor
 @Observable
 final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
+  /// Viewer-side HTTP tunnel client. Exposed so `WebPage` configuration
+  /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
+  /// the `galley://` scheme.
+#if ENABLE_TUNNEL
+  let tunnel: Client
+#endif
+
   /// `kosmos.host` of this Mac, used to recognise the local Server
   /// out of any other Servers reachable on the network.
   @ObservationIgnored private let localHostUUID = UUID.hostStable?
     .uuidString.lowercased()
 
+#if os(macOS)
   @ObservationIgnored private let host = ServiceHost(role: .macViewer)
+#else
+  @ObservationIgnored private let host = ServiceHost(role: .visionViewer)
+#endif
 
-  /// Begin advertising. Idempotent.
+  init() {
+#if ENABLE_TUNNEL
+    self.tunnel = Client(client: nil)
+#endif
+  }
+
+  /// Begin advertising and browsing. Idempotent.
   func start() {
     host.start(service: self)
   }
 
   func stop() async {
+#if ENABLE_TUNNEL
+    tunnel.stopAll()
+#endif
     await host.stop()
   }
 
@@ -51,12 +71,56 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
     await host.makeLink()
   }
 
-  // Peer-snapshot and link-start/fail logging are handled uniformly by
-  // `KosmosServiceHost`; this surface overrides neither `peersChanged`
-  // nor `linkDidStart`.
+  func configure(host: ServiceHost, client: KosmosClient) async {
+#if ENABLE_TUNNEL
+    host.subscribe(OpenDocument.self) { _, message in
+      guard let url = TunnelScheme.originURL.galleyPreviewURL(
+        forFile: message.documentPath)
+      else {
+        log.error("""
+        Cannot build galley:// URL for path \
+        \(message.documentPath, privacy: .public)
+        """)
+        return
+      }
+      OpenDocumentActivity(url: url, scrollLine: message.scrollLineHint).open()
+    }
 
-  // MARK: - Derived state
+    host.subscribe(WindowContentChanged.self) { _, _ in
+    }
 
+    // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
+    // `ProxyHTTPResponseChunk` → the in-flight request) is shared in
+    // `KosmosHTTPTunnel`.
+    tunnel.install(on: host, pendingClient: client)
+    tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
+#endif
+  }
+
+  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
+#if ENABLE_TUNNEL
+    tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
+#endif
+  }
+
+  /// Notify peers that AVP is about to suspend (`scenePhase`
+  /// transitioned to `.background` — every scene gone, i.e. real
+  /// suspension). The Server folds this into its per-peer resumed flag
+  /// and falls back to the local Mac for subsequent opens until
+  /// `publishResume` fires. Emission is a generic host capability — any
+  /// surface can announce its lifecycle; AVP is just the one that does.
+  func publishSuspend() {
+    host.publishSuspend()
+  }
+
+  /// Notify peers that AVP is serviceable again.
+  func publishResume() {
+    host.publishResume()
+  }
+}
+
+#if os(macOS)
+extension ViewerKosmosService {
   /// This Mac's local Server, if present. `onHost:` restricts the
   /// match to a Server on *this* Mac (others on the LAN are visible but
   /// ignored), and `presentPeer(role:)` is product-scoped, so a Dot

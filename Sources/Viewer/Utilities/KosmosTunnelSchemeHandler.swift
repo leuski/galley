@@ -1,4 +1,4 @@
-#if os(visionOS)
+#if ENABLE_TUNNEL
 import ALFoundation
 import Foundation
 import GalleyCoreKit

@@ -203,12 +203,7 @@ final class AppModel {
 final class AppBoot {
   static let shared = AppBoot()
 
-#if os(macOS)
   let kosmos = ViewerKosmosService()
-#else
-  let kosmos = VisionKosmosService()
-#endif
-
   let recents = RecentDocumentsModel()
 
   private(set) var model: AppModel?
