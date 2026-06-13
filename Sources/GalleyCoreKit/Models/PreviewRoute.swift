@@ -1,4 +1,5 @@
 import Foundation
+import KosmosAppKit
 
 /// One of the well-known asset routes shared between the live HTTP
 /// server and the in-process URL scheme handler.
@@ -15,6 +16,22 @@ public enum PreviewRoute: Sendable, Equatable {
   /// `/preview/<absolute-path>` — a file referenced relative to the
   /// previewed document, expressed as an absolute filesystem path.
   case documentAsset(absolutePath: String)
+
+  /// Cache window for template assets — long enough to stop per-navigation
+  /// refetches (notably over the AVP tunnel), short enough that editing a
+  /// custom template shows up without a hard reload.
+  public static let templateAssetMaxAge = 300
+
+  /// How a response for this route may be cached. Template assets are static
+  /// per template — but a user can edit a custom template's files, so they
+  /// get a bounded window rather than `.immutable`. Document-relative assets
+  /// are live-edited siblings of the previewed file, so they are never stored.
+  public var cachePolicy: CachePolicy {
+    switch self {
+    case .templateAsset: .maxAge(seconds: Self.templateAssetMaxAge)
+    case .documentAsset: .noStore
+    }
+  }
 
   /// Parse a URL path (`url.path` for the scheme handler,
   /// `request.path` for the HTTP server). Percent-decoded.

@@ -158,10 +158,18 @@ enum Routes {
     return .ok(html: composed.html, documentURL: documentURL)
   }
 
-  private static func serveFile(at url: URL) -> Response {
+  /// Serve a file's bytes. `cache` defaults to `.noStore` — correct for a
+  /// document-relative asset (a live-edited sibling of the previewed file);
+  /// the template-asset route passes a bounded `.maxAge` so static template
+  /// files aren't re-fetched on every navigation.
+  private static func serveFile(
+    at url: URL, cache: CachePolicy = .noStore
+  ) -> Response {
     do {
       return .data(
-        try Data(contentsOf: url), mime: MIMETypes.mimeType(for: url))
+        try Data(contentsOf: url),
+        mime: MIMETypes.mimeType(for: url),
+        cacheControl: cache.cacheControl)
     } catch {
       return .notFound(error.localizedDescription)
     }
@@ -185,7 +193,9 @@ enum Routes {
     guard let assetURL = template.resolveAsset(file: file) else {
       return .notFound("No such asset in template '\(template.name)': \(file)")
     }
-    return serveFile(at: assetURL)
+    return serveFile(
+      at: assetURL,
+      cache: PreviewRoute.templateAsset(id: templateID, file: file).cachePolicy)
   }
 
   // MARK: - /events/<path> (SSE)

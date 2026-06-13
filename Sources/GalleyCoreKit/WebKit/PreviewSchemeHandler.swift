@@ -2,6 +2,7 @@ import Foundation
 import WebKit
 import OSLog
 import ALFoundation
+import KosmosAppKit
 
 /// Custom URL scheme that lets an in-process `WKWebView` resolve the
 /// same template-asset and document-relative URLs the HTTP server
@@ -25,7 +26,7 @@ public enum PreviewScheme {
   public static func resolve(
     request: URLRequest,
     templateProvider: () -> Template
-  ) throws -> (Data, String) {
+  ) throws -> ResolvedBytes {
     guard let url = request.url else { throw URLError(.badURL) }
     guard let route = PreviewRoute(path: url.path) else {
       throw URLError(.unsupportedURL)
@@ -33,7 +34,12 @@ public enum PreviewScheme {
     let assetURL = try resolveAssetURL(
       for: route, templateProvider: templateProvider)
     let data = try Data(contentsOf: assetURL)
-    return (data, MIMETypes.mimeType(for: assetURL))
+    // The route kind decides cacheability: template assets are static (bounded
+    // cache), document-relative siblings are live-edited (`no-store`).
+    return ResolvedBytes(
+      data: data,
+      mime: MIMETypes.mimeType(for: assetURL),
+      cache: route.cachePolicy)
   }
 
   @MainActor
@@ -80,19 +86,27 @@ public final class ClassicPreviewSchemeHandler:
     _ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask
   ) {
     do {
-      let (data, mime) = try PreviewScheme.resolve(
+      let resolved = try PreviewScheme.resolve(
         request: urlSchemeTask.request,
         templateProvider: templateProvider)
-      guard let url = urlSchemeTask.request.url else {
+      // An `HTTPURLResponse` (not a bare `URLResponse`) so we can carry the
+      // resolver's `Cache-Control` — lets WebKit reuse static template assets
+      // instead of re-resolving them on every navigation.
+      guard let url = urlSchemeTask.request.url,
+            let response = HTTPURLResponse(
+              url: url,
+              statusCode: 200,
+              httpVersion: "HTTP/1.1",
+              headerFields: [
+                "Content-Type": resolved.mime,
+                "Content-Length": "\(resolved.data.count)",
+                "Cache-Control": resolved.cache.cacheControl
+              ])
+      else {
         throw URLError(.badURL)
       }
-      let response = URLResponse(
-        url: url,
-        mimeType: mime,
-        expectedContentLength: data.count,
-        textEncodingName: nil)
       urlSchemeTask.didReceive(response)
-      urlSchemeTask.didReceive(data)
+      urlSchemeTask.didReceive(resolved.data)
       urlSchemeTask.didFinish()
     } catch {
       Self.logAssetLoadFailed(

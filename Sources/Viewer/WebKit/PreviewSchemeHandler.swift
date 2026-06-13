@@ -3,6 +3,7 @@ import GalleyCoreKit
 import WebKit
 import OSLog
 import ALFoundation
+import KosmosAppKit
 
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible
 /// `WebPage`. The actual asset resolution lives in
@@ -41,19 +42,27 @@ struct PreviewSchemeHandler: URLSchemeHandler {
     AsyncThrowingStream { continuation in
       let task = Task { @MainActor in
         do {
-          let (data, mime) = try PreviewScheme.resolve(
+          let resolved = try PreviewScheme.resolve(
             request: request,
             templateProvider: templateProvider)
-          guard let url = request.url else {
+          // An `HTTPURLResponse` so we can carry the resolver's `Cache-Control`
+          // — lets WebKit reuse static template assets instead of re-resolving
+          // them on every navigation.
+          guard let url = request.url,
+                let response = HTTPURLResponse(
+                  url: url,
+                  statusCode: 200,
+                  httpVersion: "HTTP/1.1",
+                  headerFields: [
+                    "Content-Type": resolved.mime,
+                    "Content-Length": "\(resolved.data.count)",
+                    "Cache-Control": resolved.cache.cacheControl
+                  ])
+          else {
             throw URLError(.badURL)
           }
-          let response = URLResponse(
-            url: url,
-            mimeType: mime,
-            expectedContentLength: data.count,
-            textEncodingName: nil)
           continuation.yield(.response(response))
-          continuation.yield(.data(data))
+          continuation.yield(.data(resolved.data))
           continuation.finish()
         } catch {
           Self.logAssetLoadFailed(request: request, error: error)

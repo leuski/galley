@@ -28,9 +28,7 @@ struct VisionContentView: View {
     Group {
       if let model = boot.model {
         if let target = Binding($target) {
-          VisionDocumentScreen(
-            target: target,
-            appModel: model)
+          VisionDocumentScreen(target: target, appModel: model)
           .navigationSplitViewStyle(.balanced)
         } else {
           VisionWelcomeScreen(target: $target)
