@@ -1,5 +1,5 @@
 //
-//  GalleyBridgeRequest.swift
+//  GalleyHelperRequestActivity.swift
 //  Galley
 //
 //  Created by Anton Leuski on 5/29/26.
@@ -33,5 +33,5 @@ public struct GalleyHelperScheme: SchemeProtocol {
   public static let name = "galley-helper"
 }
 
-public typealias GalleyBridgeRequest = GenerilizedDocumentActivity<
+public typealias GalleyHelperRequestActivity = GenerilizedDocumentActivity<
   GalleyHelperScheme>

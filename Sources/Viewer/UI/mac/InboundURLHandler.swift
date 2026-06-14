@@ -37,7 +37,7 @@ struct InboundURLHandler: ViewModifier {
   }
 
   private func route(_ url: URL) {
-    guard let document = OpenDocumentActivity(from: url) else {
+    guard let document = GalleyRequestActivity(from: url) else {
       return
     }
     onDocument(document.target)

@@ -200,14 +200,14 @@
 		6273A0782FCA334E00205507 /* Exceptions for "Server" folder in "GalleyCoreKit" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/GalleyBridgeRequest.swift,
+				App/GalleyHelperRequestActivity.swift,
 			);
 			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
 		};
 		629150AD2FBD78A200088C1F /* Exceptions for "Server" folder in "Server" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/GalleyBridgeRequest.swift,
+				App/GalleyHelperRequestActivity.swift,
 				Resources/Info.plist,
 			);
 			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;

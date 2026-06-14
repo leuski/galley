@@ -31,9 +31,16 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
     // and `galley-bridge://<path>` URLs from Galley.app's
     // "Show on Vision Pro" command (see `BridgeURL`). Normalize both
     // to file URLs before dispatching.
-    let fileURLs = urls.compactMap { url -> GalleyBridgeRequest? in
-      if url.isFileURL { return GalleyBridgeRequest(target: .init(url: url)) }
-      if let bridged = GalleyBridgeRequest(from: url) { return bridged }
+    let targets = urls.compactMap { url in
+      if url.isFileURL {
+        return DocumentTarget(url: url)
+      }
+      if let activity = GalleyHelperRequestActivity(from: url) {
+        return activity.target
+      }
+      if let activity = GalleyRequestActivity(from: url) {
+        return activity.target
+      }
       log.error("""
         Ignoring open request with unrecognized URL scheme: \
         \(url.absoluteString, privacy: .public)
@@ -42,12 +49,12 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
     }
     log.notice("""
       application(_:open:) received=\(urls.count, privacy: .public) \
-      resolved=\(fileURLs.count, privacy: .public)
+      resolved=\(targets.count, privacy: .public)
       """)
     let kosmos = boot?.model?.kosmos
     Task {
-      for fileURL in fileURLs {
-        await ServerKosmosService.dispatchOpenURL(fileURL, with: kosmos)
+      for target in targets {
+        await ServerKosmosService.dispatch(target, with: kosmos)
       }
     }
   }

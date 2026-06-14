@@ -48,8 +48,15 @@ public struct GalleyScheme: SchemeProtocol {
   public static let name = "galley"
 }
 
-public typealias OpenDocumentActivity = GenerilizedDocumentActivity<
+public struct GalleyViewerScheme: SchemeProtocol {
+  public static let name = "galley-viewer"
+}
+
+public typealias GalleyRequestActivity = GenerilizedDocumentActivity<
   GalleyScheme>
+
+public typealias GalleyViewerRequestActivity = GenerilizedDocumentActivity<
+  GalleyViewerScheme>
 
 /// Tabs of the Viewer's Settings scene. Carried on inbound
 /// `galley://settings?tab=<id>` URLs so external callers (e.g. the

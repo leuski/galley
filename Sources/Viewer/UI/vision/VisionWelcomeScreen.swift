@@ -45,7 +45,7 @@ struct VisionWelcomeScreen: View {
     }
     .handlesExternalEvents(preferring: ["*"], allowing: DocumentScene.events)
     .onOpenURL { url in
-      guard let activity = OpenDocumentActivity(from: url) else { return }
+      guard let activity = GalleyRequestActivity(from: url) else { return }
       target = activity.target
     }
     .frame(minWidth: 600, minHeight: 800)

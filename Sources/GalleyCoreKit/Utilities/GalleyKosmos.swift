@@ -82,3 +82,29 @@ public struct RouteToAVP: KosmosMessage, Equatable {
     }
   }
 }
+
+/// Mac Viewer → Server. "Show on Vision Pro". The reply
+/// reports whether a reachable AVP peer accepted it, so the Mac Viewer
+/// can fall back to local presentation when it didn't.
+public struct RouteToTunnelClient: KosmosMessage, Equatable {
+  public static let messageType = "net.leuski.galley.route-to-tunnel-client.v1"
+
+  public let target: DocumentTarget
+  public let deviceType: DeviceType?
+
+  public init(target: DocumentTarget, deviceType: DeviceType? = nil) {
+    self.target = target
+    self.deviceType = deviceType
+  }
+
+  public struct Reply: KosmosMessage, Equatable {
+    public static let messageType
+    = "net.leuski.galley.route-to-tunnel-client.reply.v1"
+
+    public let accepted: Bool
+
+    public init(accepted: Bool) {
+      self.accepted = accepted
+    }
+  }
+}

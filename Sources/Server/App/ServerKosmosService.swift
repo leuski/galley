@@ -55,18 +55,6 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   /// metadata. `nil` if the listener hadn't bound by `start()`.
   @ObservationIgnored private var advertisedHTTPURL: URL?
 
-  /// Per-window state for files currently delegated to AVP.
-  struct OpenWindow {
-    let fileURL: URL
-    let peerID: PeerID
-    let watchTask: Task<Void, Never>
-  }
-
-  @ObservationIgnored private var openOnAVP: [KosmosCore.WindowID: OpenWindow]
-  = [:]
-  @ObservationIgnored private let windowIDAllocator = KosmosCore
-    .WindowIDAllocator()
-
   init(server: PreviewServerController) {
     self.server = server
     self.httpTunnelResponder = Responder(
@@ -86,10 +74,6 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
 
   func stop() {
     httpTunnelResponder.stop()
-    for (_, window) in openOnAVP {
-      window.watchTask.cancel()
-    }
-    openOnAVP.removeAll()
     Task { await host.stop() }
   }
 
@@ -102,93 +86,70 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   func configure(host: ServiceHost, client: KosmosClient) async {
     await registerHandlers(host: host)
     httpTunnelResponder.install(on: host, client: client)
-    // Lifecycle (AppWillSuspend/Resume) reachability gating, and the
-    // `← RECV` logging below, are wired by the host itself.
-    host.subscribe(CloseWindow.self) { [weak self] _, message in
-      self?.handleCloseWindow(message)
-    }
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
     // The host logs the snapshot and mirrors reachability; the Server's
     // only reaction is to migrate any windows back to the Mac when the
     // AVP they were delegated to drops out of the peer set.
-    migrateWindowsForDepartedPeers(present: Set(snapshot.keys))
   }
 
-  /// Called by `application(_:open:)` (and the Mac Viewer's
-  /// `RouteToAVP` handler) when a file should be dispatched to AVP if
-  /// possible. Returns true if dispatched; false if AVP is unavailable
-  /// and the caller should fall back.
-  func dispatchOpenURLToAVP(_ fileURL: GalleyBridgeRequest) async -> Bool {
-    guard let visionPeer = host.reachablePeer(deviceType: .vision) else {
+  private func reachablePeers() -> String {
+    host.peers.values
+      .map { $0.role ?? "?" }
+      .sorted()
+      .joined(separator: ", ")
+  }
+
+  /// Send a routing target to the reachable AVP peer. Returns false when
+  /// no AVP peer is reachable (caller falls back to the local Viewer).
+  @discardableResult
+  func dispatchToClient(
+    _ target: DocumentTarget, deviceType: DeviceType) -> Bool
+  {
+    let peers = host.reachablePeers(deviceType: deviceType).asSet()
+    guard !peers.isEmpty else {
       log.notice("""
-        Cannot dispatch — no reachable vision peer for \
-        \(fileURL, privacy: .public)
+        dispatch: no reachable AVP peer — \
+        \(self.host.peers.count, privacy: .public) peer(s): \
+        [\(self.reachablePeers(), privacy: .public)]
         """)
       return false
     }
-    let windowID = trackOpenWindow(
-      fileURL: fileURL.target.documentURL, peerID: visionPeer)
-    publishOpenDocument(fileURL: fileURL, windowID: windowID)
+    let message = RouteToTunnelClient(target: target)
+    host.publish(message) { peers.contains($0) }
     return true
-  }
-
-  /// Allocates the per-window state and subscribes the watcher to the
-  /// file. Each file-change event publishes a `WindowContentChanged`
-  /// (logged by the host) so AVP can reload the preview.
-  private func trackOpenWindow(
-    fileURL: URL,
-    peerID: PeerID
-  ) -> KosmosCore.WindowID {
-    let windowID = windowIDAllocator.next()
-    let watcher = server.watcher
-    let watchTask = Task { @MainActor [weak self] in
-      let changes = await watcher.subscribe(to: fileURL)
-      for await _ in changes {
-        self?.host.publish(WindowContentChanged(windowID: windowID))
-      }
-    }
-    openOnAVP[windowID] = OpenWindow(
-      fileURL: fileURL, peerID: peerID, watchTask: watchTask)
-    return windowID
-  }
-
-  /// Publishes the `OpenDocument` for a freshly-delegated window. The
-  /// data plane rides Kosmos via `ProxyHTTPRequest` — AVP synthesizes
-  /// its own `galley://preview/<path>` URL from `documentPath` and
-  /// tunnels each subresource fetch back through the `Responder`.
-  private func publishOpenDocument(
-    fileURL: GalleyBridgeRequest,
-    windowID: KosmosCore.WindowID
-  ) {
-    host.publish(OpenDocument(
-      docID: windowID,
-      documentPath: fileURL.target.documentURL.path,
-      displayName: fileURL.target.documentURL.lastPathComponent,
-      scrollLineHint: fileURL.target.scrollLine,
-      openBehavior: .newWindow))
-  }
-
-  public static func openInLocalGalleyApp(_ request: GalleyBridgeRequest) {
-    OpenDocumentActivity(target: request.target).open()
   }
 
   @MainActor
   @discardableResult
-  public static func dispatchOpenURL(
-    _ url: GalleyBridgeRequest, with kosmos: ServerKosmosService?) async -> Bool
+  public static func dispatch(
+    _ target: DocumentTarget,
+    with kosmos: ServerKosmosService?) async -> Bool
   {
-    // AVP reachable over Kosmos → dispatch and we're done. Otherwise
-    // (no peer, or peer suspended) the doc opens in local Galley.app.
-    // AVP shows up automatically the next time the user activates
-    // Galley on AVP — the peer reconnects and subsequent opens land
-    // there again.
-    if await kosmos?.dispatchOpenURLToAVP(url) == true {
+    if kosmos?.dispatchToClient(target, deviceType: .vision) == true {
       return true
     }
-    Self.openInLocalGalleyApp(url)
+    log.notice("""
+      dispatch → local Viewer (no AVP): \
+      \(target, privacy: .public)
+      """)
+    if kosmos?.dispatchToClient(target, deviceType: .mac) == true {
+      return true
+    }
+    log.notice("""
+      dispatch → local Viewer (no tunnel): \
+      \(target, privacy: .public)
+      """)
+    openInLocalViewer(target)
     return false
+  }
+
+  /// Surface a request in the Mac Viewer via its forced-local `dot://`
+  /// URL — `.entry` navigates to the entry, `.search` opens search
+  /// pre-populated. LaunchServices launches the Viewer if it isn't up.
+  static func openInLocalViewer(_ request: DocumentTarget) {
+    GalleyViewerRequestActivity(target: request).open()
   }
 
   // MARK: - Subscription wiring
@@ -199,39 +160,9 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     // decision stays in one place. The host logs the request and reply.
     await host.handle(RouteToAVP.self)
     { [weak self] _, request -> RouteToAVP.Reply in
-      let dispatched = await Self.dispatchOpenURL(
-        GalleyBridgeRequest(target: request.target), with: self
-      )
+      let dispatched = await (self?.dispatchToClient(
+        request.target, deviceType: .vision) == true)
       return RouteToAVP.Reply(accepted: dispatched)
     }
-  }
-
-  // MARK: - Window migration
-
-  /// When an AVP peer we've delegated windows to drops out of the peer
-  /// set, re-open those documents on the local Mac. Driven by
-  /// `peersChanged` — the Server tracks which peer each window lives on,
-  /// so a simple set-difference against the live peers replaces the old
-  /// join/leave callback bookkeeping. (No bind-mode flip on join: the
-  /// Mac HTTP listener stays loopback-only; AVP traffic rides the Kosmos
-  /// tunnel via `Responder`.)
-  private func migrateWindowsForDepartedPeers(present: Set<PeerID>) {
-    let toMigrate = openOnAVP.filter { !present.contains($0.value.peerID) }
-    for (windowID, window) in toMigrate {
-      openOnAVP.removeValue(forKey: windowID)
-      window.watchTask.cancel()
-      log.notice("""
-        Migrating to Mac: \(window.fileURL.path, privacy: .public)
-        """)
-      Self.openInLocalGalleyApp(
-        GalleyBridgeRequest(target: DocumentTarget(url: window.fileURL)))
-    }
-  }
-
-  private func handleCloseWindow(_ message: CloseWindow) {
-    if let window = openOnAVP.removeValue(forKey: message.windowID) {
-      window.watchTask.cancel()
-    }
-    log.debug("CloseWindow \(message.windowID, privacy: .public)")
   }
 }

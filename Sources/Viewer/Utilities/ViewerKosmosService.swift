@@ -73,20 +73,8 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
 
   func configure(host: ServiceHost, client: KosmosClient) async {
 #if ENABLE_TUNNEL
-    host.subscribe(OpenDocument.self) { _, message in
-      guard let url = TunnelScheme.originURL.galleyPreviewURL(
-        forFile: message.documentPath)
-      else {
-        log.error("""
-        Cannot build galley:// URL for path \
-        \(message.documentPath, privacy: .public)
-        """)
-        return
-      }
-      OpenDocumentActivity(url: url, scrollLine: message.scrollLineHint).open()
-    }
-
-    host.subscribe(WindowContentChanged.self) { _, _ in
+    host.subscribe(RouteToTunnelClient.self) { _, message in
+      GalleyViewerRequestActivity(target: message.target).open()
     }
 
     // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
@@ -102,25 +90,10 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
     tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
 #endif
   }
-
-  /// Notify peers that AVP is about to suspend (`scenePhase`
-  /// transitioned to `.background` — every scene gone, i.e. real
-  /// suspension). The Server folds this into its per-peer resumed flag
-  /// and falls back to the local Mac for subsequent opens until
-  /// `publishResume` fires. Emission is a generic host capability — any
-  /// surface can announce its lifecycle; AVP is just the one that does.
-  func publishSuspend() {
-    host.publishSuspend()
-  }
-
-  /// Notify peers that AVP is serviceable again.
-  func publishResume() {
-    host.publishResume()
-  }
 }
 
-#if os(macOS)
 extension ViewerKosmosService {
+#if os(macOS)
   /// This Mac's local Server, if present. `onHost:` restricts the
   /// match to a Server on *this* Mac (others on the LAN are visible but
   /// ignored), and `presentPeer(role:)` is product-scoped, so a Dot
@@ -184,5 +157,22 @@ extension ViewerKosmosService {
       }
     }
   }
-}
+#else
+
+  /// Notify peers that AVP is about to suspend (`scenePhase`
+  /// transitioned to `.background` — every scene gone, i.e. real
+  /// suspension). The Server folds this into its per-peer resumed flag
+  /// and falls back to the local Mac for subsequent opens until
+  /// `publishResume` fires. Emission is a generic host capability — any
+  /// surface can announce its lifecycle; AVP is just the one that does.
+  func publishSuspend() {
+    host.publishSuspend()
+  }
+
+  /// Notify peers that AVP is serviceable again.
+  func publishResume() {
+    host.publishResume()
+  }
+
 #endif
+}

@@ -18,7 +18,7 @@ struct GalleyActionTests {
     fragment: String? = nil
   ) -> URL {
     var components = URLComponents()
-    components.scheme = OpenDocumentActivity.scheme
+    components.scheme = GalleyRequestActivity.scheme
     components.path = fileURL.absoluteString.percentEncodedForPath
     components.queryItems = query
     components.fragment = fragment
@@ -28,7 +28,7 @@ struct GalleyActionTests {
   @Test("file:// URL passes through unchanged with no scroll line")
   func fileURLPassthrough() {
     let url = URL(fileURLWithPath: "/tmp/note.md")
-    let outcome = OpenDocumentActivity(from: url)
+    let outcome = GalleyRequestActivity(from: url)
     #expect(outcome == .init(url: url))
   }
 
@@ -67,12 +67,12 @@ struct GalleyActionTests {
   @Test("galley:// document scheme must be lowercase")
   func schemeMustBeLowercase() {
     let file = URL(fileURLWithPath: "/tmp/a.md")
-    #expect(OpenDocumentActivity(from: galleyDocURL(file)) == .init(url: file))
+    #expect(GalleyRequestActivity(from: galleyDocURL(file)) == .init(url: file))
     for scheme in ["Galley", "GALLEY"] {
       var components = URLComponents()
       components.scheme = scheme
       components.path = file.absoluteString.percentEncodedForPath
-      #expect(OpenDocumentActivity(from: components.url!) == nil)
+      #expect(GalleyRequestActivity(from: components.url!) == nil)
     }
   }
 
@@ -96,7 +96,7 @@ struct GalleyActionTests {
   func scrollLineExtracted() {
     let file = URL(fileURLWithPath: "/tmp/note.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "42")])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file, scrollLine: 42))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file, scrollLine: 42))
   }
 
   @Test("Non-positive scroll lines are dropped")
@@ -104,21 +104,21 @@ struct GalleyActionTests {
     let file = URL(fileURLWithPath: "/tmp/note.md")
     let zero = galleyDocURL(file, query: [.init(name: "line", value: "0")])
     let negative = galleyDocURL(file, query: [.init(name: "line", value: "-5")])
-    #expect(OpenDocumentActivity(from: zero) == .init(url: file))
-    #expect(OpenDocumentActivity(from: negative) == .init(url: file))
+    #expect(GalleyRequestActivity(from: zero) == .init(url: file))
+    #expect(GalleyRequestActivity(from: negative) == .init(url: file))
   }
 
   @Test("Non-numeric line is dropped")
   func nonNumericLineDropped() {
     let file = URL(fileURLWithPath: "/tmp/note.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "foo")])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file))
   }
 
   @Test("galley:// with empty path is unparseable")
   func emptyPathUnparseable() {
     let url = URL(string: "galley://")!
-    let document = OpenDocumentActivity(from: url)
+    let document = GalleyRequestActivity(from: url)
     if nil == document {
       // expected
     } else {
@@ -134,7 +134,7 @@ struct GalleyActionTests {
       .init(name: "line", value: "7"),
       .init(name: "baz", value: "qux"),
     ])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file, scrollLine: 7))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file, scrollLine: 7))
   }
 
   /// The retired `URL.galleyAction` passed any non-`galley` URL through
@@ -146,8 +146,8 @@ struct GalleyActionTests {
   func foreignSchemesRejected() {
     let http = URL(string: "https://example.com/page.md")!
     let xGalley = URL(string: "x-galley://local/template/foo.html")!
-    #expect(OpenDocumentActivity(from: http) == nil)
-    #expect(OpenDocumentActivity(from: xGalley) == nil)
+    #expect(GalleyRequestActivity(from: http) == nil)
+    #expect(GalleyRequestActivity(from: xGalley) == nil)
   }
 
   // MARK: - Path encoding edge cases
@@ -155,13 +155,13 @@ struct GalleyActionTests {
   @Test("Percent-encoded space in galley:// path decodes to a real path")
   func pathPercentEncodedSpace() {
     let file = URL(fileURLWithPath: "/tmp/foo bar.md")
-    #expect(OpenDocumentActivity(from: galleyDocURL(file)) == .init(url: file))
+    #expect(GalleyRequestActivity(from: galleyDocURL(file)) == .init(url: file))
   }
 
   @Test("Path with unicode characters round-trips")
   func pathUnicode() {
     let file = URL(fileURLWithPath: "/tmp/привет.md")
-    #expect(OpenDocumentActivity(from: galleyDocURL(file)) == .init(url: file))
+    #expect(GalleyRequestActivity(from: galleyDocURL(file)) == .init(url: file))
   }
 
   /// Fragments (`#anchor`) are dropped — `DocumentTarget` has no use
@@ -172,7 +172,7 @@ struct GalleyActionTests {
     let file = URL(fileURLWithPath: "/tmp/note.md")
     let url = galleyDocURL(
       file, query: [.init(name: "line", value: "12")], fragment: "anchor")
-    #expect(OpenDocumentActivity(from: url) == .init(url: file, scrollLine: 12))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file, scrollLine: 12))
   }
 
   // MARK: - Query item edge cases
@@ -181,21 +181,21 @@ struct GalleyActionTests {
   func lineEmptyValueDropped() {
     let file = URL(fileURLWithPath: "/tmp/a.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "")])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file))
   }
 
   @Test("Floating-point line is dropped (Int parse only)")
   func lineFloatDropped() {
     let file = URL(fileURLWithPath: "/tmp/a.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "3.14")])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file))
   }
 
   @Test("Scientific notation line is dropped")
   func lineScientificDropped() {
     let file = URL(fileURLWithPath: "/tmp/a.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "1e3")])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file))
   }
 
   @Test("Multiple line= query items: first wins")
@@ -205,7 +205,7 @@ struct GalleyActionTests {
       .init(name: "line", value: "10"),
       .init(name: "line", value: "20"),
     ])
-    #expect(OpenDocumentActivity(from: url) == .init(url: file, scrollLine: 10))
+    #expect(GalleyRequestActivity(from: url) == .init(url: file, scrollLine: 10))
   }
 
   @Test("Very large positive line is preserved as-is")
@@ -213,7 +213,7 @@ struct GalleyActionTests {
     let file = URL(fileURLWithPath: "/tmp/a.md")
     let url = galleyDocURL(file, query: [.init(name: "line", value: "999999")])
     #expect(
-      OpenDocumentActivity(from: url) == .init(url: file, scrollLine: 999_999))
+      GalleyRequestActivity(from: url) == .init(url: file, scrollLine: 999_999))
   }
 
   // MARK: - Settings host edge cases
@@ -245,7 +245,7 @@ struct GalleyActionTests {
   func emptyPathWithQueryUnparseable() {
     // host is nil and path is empty — neither settings nor a doc.
     let url = URL(string: "galley://?line=10")!
-    let document = OpenDocumentActivity(from: url)
+    let document = GalleyRequestActivity(from: url)
     if nil == document { /* expected */ } else {
       Issue.record("Expected .unparseable, got \(document)")
     }

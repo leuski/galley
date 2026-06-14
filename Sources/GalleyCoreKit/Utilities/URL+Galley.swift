@@ -34,7 +34,7 @@ public extension URL {
     [
       self,
       isFileURL ? standardizedFileURL : nil,
-      isFileURL ? OpenDocumentActivity(url: standardizedFileURL).url : nil
+      isFileURL ? GalleyRequestActivity(url: standardizedFileURL).url : nil
     ]
       .compactMap { url in url?.withoutQueryOrFragment.absoluteString }
       .filter { path in !path.isEmpty }

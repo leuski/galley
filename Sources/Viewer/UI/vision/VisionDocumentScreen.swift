@@ -43,7 +43,7 @@ struct VisionDocumentScreen: View {
       ? DocumentScene.events : []
     )
     .onOpenURL { url in
-      guard let activity = OpenDocumentActivity(from: url) else { return }
+      guard let activity = GalleyRequestActivity(from: url) else { return }
       target = activity.target
     }
     // The "Open Document…" entry in the More menu drives this — the
