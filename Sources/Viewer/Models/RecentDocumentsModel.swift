@@ -129,7 +129,7 @@ final class RecentDocumentsModel {
   /// Open one previously-opened URL through the same path as
   /// Finder/NSOpenPanel (fire-at-self) — used by the Open Recent menu.
   func openRecent(_ url: URL) {
-    GalleyRequestActivity(url: url).open()
+    GalleyViewerRequestActivity(url: url).open()
   }
 
   /// Run NSOpenPanel and route picks through the app's own URL handler
@@ -138,7 +138,7 @@ final class RecentDocumentsModel {
     Task {
       let picks = await runOpenPanel()
       for url in picks {
-        GalleyRequestActivity(url: url).open()
+        GalleyViewerRequestActivity(url: url).open()
       }
     }
   }

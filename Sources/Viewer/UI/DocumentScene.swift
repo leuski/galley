@@ -10,7 +10,8 @@ import GalleyCoreKit
 
 struct DocumentScene: Scene {
   static let id = "document"
-  static let events = Set(["file:", GalleyRequestActivity.schemeExternalToken])
+  static let events = Set([
+    "file:", GalleyViewerRequestActivity.schemeExternalToken])
 
   var body: some Scene {
     // The document scene. SwiftUI materializes one `url == nil` member
