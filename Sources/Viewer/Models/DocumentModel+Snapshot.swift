@@ -16,16 +16,14 @@ extension DocumentModel {
   /// Every field after `history`/`currentIndex` defaults to "unset" so a
   /// blank window (welcome) round-trips as an empty snapshot.
   struct Snapshot: Codable, Hashable, Sendable {
-    /// Back/forward stack in visit order. Empty == no document.
-    var history: [URL] = []
-    /// Index of the currently-shown entry within `history`.
-    var currentIndex: Int = 0
-    /// Resting scroll position of the current page; `nil` == top.
-    var scrollY: Double?
-    /// TOC sidebar visibility; `nil` == platform default.
-    var showsTOC: Bool?
-    /// Page zoom factor; `nil` == 1.0.
-    var pageZoom: Double?
+    /// Back/forward stack in visit order.
+    var history: History
+    /// Resting scroll position of the current page.
+    var scrollY: Double = 0
+    /// TOC sidebar visibility.
+    var showsTOC: Bool = false
+    /// Page zoom factor.
+    var pageZoom: Double = 1.0
     /// Per-window template override (`Template.persistentID`).
     var templatePersistent: String?
     /// Per-window renderer override (`Processor.persistentID`).
@@ -37,11 +35,9 @@ extension DocumentModel {
 
     /// The entry the window is currently showing, or `nil` for a blank
     /// window or an out-of-range index (format drift degrades, not traps).
-    var currentURL: URL? {
-      history.indices.contains(currentIndex) ? history[currentIndex] : nil
+    var currentURL: URL {
+      history.currentURL
     }
-
-    var hasDocument: Bool { currentURL != nil }
   }
 
   /// Collect the model's current persistent state into a `Snapshot`.
@@ -53,10 +49,9 @@ extension DocumentModel {
   var snapshot: Snapshot {
     Snapshot(
       history: history,
-      currentIndex: currentIndex,
-      scrollY: currentScrollY == 0 ? nil : currentScrollY,
+      scrollY: currentScrollY,
       showsTOC: showsTOC,
-      pageZoom: zoomFactorIfNonDefault,
+      pageZoom: zoom.zoomScale,
       templatePersistent: templates.persistent,
       rendererPersistent: processors.persistent,
       colorSchemePersistent: colorSchemes.persistent,
@@ -68,16 +63,8 @@ extension DocumentModel {
   /// stack collapses to the one file.
   func fileSnapshot(for url: URL) -> Snapshot {
     var projection = snapshot
-    projection.history = [url]
-    projection.currentIndex = 0
+    projection.history = History(url: url)
     return projection
-  }
-
-  /// Zoom factor, or `nil` when at the 1.0 default / not yet initialized
-  /// (the controller seeds `0` before the first `setZoom`).
-  private var zoomFactorIfNonDefault: Double? {
-    let scale = zoom.zoomScale
-    return (scale == 0 || scale == 1) ? nil : scale
   }
 }
 
@@ -114,7 +101,7 @@ extension DocumentModel {
     id: DocumentSceneID, appModel: AppModel
   ) -> DocumentModel? {
     if let existing = cached(id) { return existing }
-    guard let snapshot = DocumentStore[id], snapshot.hasDocument else {
+    guard let snapshot = DocumentStore[id] else {
       return nil
     }
     let model = DocumentModel(snapshot: snapshot, id: id, appModel: appModel)
@@ -131,20 +118,9 @@ extension DocumentModel {
     target: DocumentTarget, id: DocumentSceneID, appModel: AppModel
   ) -> DocumentModel {
     if let existing = cached(id) { return existing }
-    var seed = DocumentStore[file: target.documentURL]
-    let model = DocumentModel(
-      id: id,
-      appModel: appModel,
-      history: [target.documentURL],
-      currentIndex: 0,
-      templatePersistent: seed?.templatePersistent,
-      processorPersistent: seed?.rendererPersistent,
-      colorSchemePersistent: seed?.colorSchemePersistent,
-      initialScrollY: seed?.scrollY,
-      initialScrollLine: target.scrollLine,
-      initialShowsTOC: seed?.showsTOC ?? false,
-      initialZoom: seed?.pageZoom ?? 1,
-      kind: .document)
+    let seed = DocumentStore[file: target.documentURL]
+    ?? Snapshot(history: History(url: target.documentURL))
+    let model = DocumentModel(snapshot: seed, id: id, appModel: appModel)
     remember(model)
     return model
   }
@@ -153,7 +129,7 @@ extension DocumentModel {
   /// persisted (`kind: .help` skips the persistence observer).
   static func help(url: URL, appModel: AppModel) -> DocumentModel {
     DocumentModel(
-      id: .next(), appModel: appModel, history: [url], kind: .help)
+      id: .next(), appModel: appModel, history: History(url: url), kind: .help)
   }
 
   /// Construct from a restored snapshot.
@@ -164,13 +140,12 @@ extension DocumentModel {
       id: id,
       appModel: appModel,
       history: snapshot.history,
-      currentIndex: snapshot.currentIndex,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
       colorSchemePersistent: snapshot.colorSchemePersistent,
-      initialScrollY: snapshot.scrollY,
-      initialShowsTOC: snapshot.showsTOC ?? false,
-      initialZoom: snapshot.pageZoom ?? 1,
+      initialScroll: .location(snapshot.scrollY),
+      initialShowsTOC: snapshot.showsTOC,
+      initialZoom: snapshot.pageZoom,
       kind: .document)
   }
 }
@@ -188,7 +163,6 @@ extension DocumentModel {
       track: { [weak self] in
         guard let self else { return }
         _ = self.history
-        _ = self.currentIndex
         _ = self.showsTOC
         _ = self.templates.persistent
         _ = self.processors.persistent

@@ -13,7 +13,7 @@ extension DocumentModel {
   /// the toolbar's zoom label updates.
   @MainActor @Observable
   final class ZoomController: WebPageZoomController {
-    var zoomScale: Double = 0
+    var zoomScale: Double = 1
 
     var page: WebPage? { model?.page }
 

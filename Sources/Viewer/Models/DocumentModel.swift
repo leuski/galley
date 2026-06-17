@@ -92,7 +92,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// from the WindowGroup's URL and updated synchronously at the
   /// start of every `rebindCurrent` (in-window navigation, restore,
   /// rename, reload).
-  private(set) var documentURL: URL
+  var documentURL: URL { history.currentURL }
 
   /// Single user-visible error / status channel. Replaces the prior
   /// scattered `lastError = …` writes. `nil` means "no notice." Set
@@ -151,8 +151,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// `currentIndex` and rebind without truncating the stack — so
   /// pressing Forward after Back works. Mutated by the History
   /// extension's `navigate`/`goBack`/`goForward` and by `rename`.
-  var history: [URL] = []
-  var currentIndex: Int = -1
+  var history: History
 
   /// Increments on every `bind(to:)` call. Watcher loops captured by
   /// older bind invocations check this and bail out when superseded.
@@ -162,14 +161,12 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// Set by `bind(to:scrollToLine:)` for `galley://...?line=N` opens
   /// dispatched from BBEdit's preview script; cleared after the JS
   /// scroll runs so subsequent file-watcher reloads don't re-jump.
-  @ObservationIgnored private var pendingScrollLine: Int?
-
   /// One-shot pixel scroll target consumed by the next render. Set
   /// by `bind` / `restore` from the window's persisted
   /// `@SceneStorage` slot so a freshly-launched window comes back at
   /// the position it was left. Cleared after one apply so in-window
   /// navigation and file-watcher reloads aren't jerked back.
-  @ObservationIgnored private var pendingScrollY: Double?
+  @ObservationIgnored private var pendingScroll: Scroll?
 
   /// Latest known scroll position, updated by `ScrollBridge` from a
   /// debounced JS listener. ContentView mirrors this to
@@ -264,24 +261,18 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   init(
     id: DocumentSceneID,
     appModel: AppModel,
-    history: [URL],
-    currentIndex: Int = 0,
+    history: History,
     templatePersistent: String? = nil,
     processorPersistent: String? = nil,
     colorSchemePersistent: String? = nil,
-    initialScrollY: Double? = nil,
-    initialScrollLine: Int? = nil,
+    initialScroll: Scroll? = nil,
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1,
     kind: Kind = .document
   ) {
-    precondition(!history.isEmpty, "DocumentModel requires a document URL")
-    let index = history.indices.contains(currentIndex) ? currentIndex : 0
     self.id = id
     self.kind = kind
-    self.documentURL = history[index]
     self.history = history
-    self.currentIndex = index
     self.appModel = appModel
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
@@ -366,8 +357,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     wireBridges()
 
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
-    pendingScrollY = initialScrollY
-    pendingScrollLine = initialScrollLine
+    pendingScroll = initialScroll
     savedShowsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
     if kind == .document {
@@ -511,33 +501,16 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// reloads preserve current scroll normally. `scrollToLine` wins
   /// over `initialScrollY` if both happen to be set.
   func bind(
-    to target: DocumentTarget,
-    initialScrollY: Double? = nil,
-    initialShowsTOC: Bool? = nil
+    to target: DocumentTarget
   ) async {
-    pendingScrollLine = target.scrollLine
-    await finishBind(
-      urls: [target.documentURL],
-      currentIndex: 0,
-      initialScrollY: initialScrollY,
-      initialShowsTOC: initialShowsTOC)
-  }
-
-  private func finishBind(
-    urls: [URL],
-    currentIndex: Int,
-    initialScrollY: Double?,
-    initialShowsTOC: Bool?) async
-  {
-    history = urls
-    self.currentIndex = currentIndex
-    pendingScrollY = initialScrollY
+    pendingScroll = target.scrollLine.map { line in .line(line) }
+    history = History(url: target.documentURL)
     // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
     // to apply pre-first-paint. `showsTOC` itself stays `true` so
     // NavigationSplitView is born with the sidebar visible and
     // AppKit wires `NSSplitViewItem.behavior = .sidebar` — without
     // that, a later toggle puts sidebar content below the tab bar.
-    savedShowsTOC = initialShowsTOC ?? false
+    savedShowsTOC = false
     await rebindCurrent()
   }
 
@@ -601,7 +574,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Patch every history entry that referenced the old URL — Back
     // would otherwise lead to a now-missing path and trip the
     // unreachable-link guard.
-    history = history.map { $0 == oldURL ? newURL : $0 }
+    history.replace(oldURL, with: newURL)
     await rebindCurrent()
     return newURL
   }
@@ -626,13 +599,11 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// the initial render and keeps reloading on file changes until
   /// another rebind supersedes this one.
   func rebindCurrent() async {
-    guard currentIndex >= 0, currentIndex < history.count else { return }
-    let url = history[currentIndex]
+    let url = history.currentURL
 
     bindGeneration &+= 1
     let myGeneration = bindGeneration
     logBinding(to: url)
-    documentURL = url
     // The WebView's pre-paint canvas is system-white regardless of
     // CSS — clear the rendered flag so DocumentView can mask that
     // gap with the cached page bg until BackgroundColorBridge
@@ -704,21 +675,8 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       logLoadingHTML(byteCount: html.count)
       do {
         for try await _ in page.load(html: html, baseURL: composed.baseURL) {}
-        if let line = pendingScrollLine {
-          // One-shot — consume before the JS call so an in-flight
-          // file-watcher reload doesn't re-jump.
-          pendingScrollLine = nil
-          pendingScrollY = nil
-          await scrollToSourceLine(line)
-        } else if let y = pendingScrollY {
-          pendingScrollY = nil
-          if y > 0 {
-            currentScrollY = y
-            await restoreScrollY(y)
-          }
-        } else if savedScrollY > 0 {
-          await restoreScrollY(savedScrollY)
-        }
+        await applyPendingScroll(
+          savedScrollY: savedScrollY, locationOnly: false)
         // Old marks died with the previous DOM, but the user's query
         // and the visible find bar are per-window state we want to
         // honor across file-watcher reloads — re-run the search so
@@ -732,6 +690,28 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     }
   }
 
+  private func applyPendingScroll(
+    savedScrollY: Double, locationOnly: Bool = true) async
+  {
+    switch pendingScroll {
+    case .line(let line):
+      pendingScroll = nil
+      if !locationOnly {
+        await scrollToSourceLine(line)
+      }
+    case .location(let location):
+      pendingScroll = nil
+      if location > 0 {
+        currentScrollY = location
+        await restoreScrollY(location)
+      }
+    case nil:
+      if savedScrollY > 0 {
+        await restoreScrollY(savedScrollY)
+      }
+    }
+  }
+
   private func loadRemote(url: URL, preserveScroll: Bool) async {
     let savedScrollY: Double = preserveScroll
     ? await currentScrollY() ?? 0
@@ -742,16 +722,8 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       // a remote render — the Server hasn't surfaced source positions
       // over the wire. Drop the request so a stray value doesn't
       // chase the next file-URL bind.
-      pendingScrollLine = nil
-      if let y = pendingScrollY {
-        pendingScrollY = nil
-        if y > 0 {
-          currentScrollY = y
-          await restoreScrollY(y)
-        }
-      } else if savedScrollY > 0 {
-        await restoreScrollY(savedScrollY)
-      }
+      await applyPendingScroll(
+        savedScrollY: savedScrollY, locationOnly: true)
       await find.reapplyIfActive()
     } catch {
       report(failure: error, context: "navigation", lifetime: .renderBound)

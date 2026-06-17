@@ -38,7 +38,6 @@ struct VisionDocumentScreen: View {
         guard case .success(let urls) = result, let url = urls.first
         else { return }
         _ = url.startAccessingSecurityScopedResource()
-        recents.record(url)
         GalleyViewerRequestActivity(url: url).open()
       }
   }

@@ -12,6 +12,11 @@ import KosmosAppKit
 
 extension DocumentModel {
 
+  enum Scroll: Codable, Hashable, Sendable {
+    case line(Int)
+    case location(Double)
+  }
+
   /// Scroll the rendered preview to the heading identified by `id`.
   /// The TOC sidebar's row taps call this; the id is whatever the
   /// `TOCBridge` user script reported back — either the renderer-

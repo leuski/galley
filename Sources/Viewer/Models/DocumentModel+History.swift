@@ -5,9 +5,55 @@ import Foundation
 import KosmosAppKit
 
 extension DocumentModel {
-  var canGoBack: Bool { currentIndex > 0 }
-  var canGoForward: Bool {
-    currentIndex >= 0 && currentIndex < history.count - 1 }
+  struct History: Codable, Hashable, Sendable {
+    private(set) var urls: [URL]
+    private var currentIndex: Int
+
+    var currentURL: URL {
+      return urls[currentIndex]
+    }
+
+    var isEmpty: Bool { urls.isEmpty }
+
+    var canGoBack: Bool {
+      currentIndex > urls.startIndex
+    }
+
+    var canGoForward: Bool {
+      currentIndex < urls.index(before: urls.endIndex)
+    }
+
+    init(url: URL) {
+      urls = [url]
+      currentIndex = 0
+    }
+
+    mutating func navigate(to url: URL) {
+      urls.removeSubrange((currentIndex + 1)..<urls.count)
+      urls.append(url)
+      currentIndex = urls.count - 1
+    }
+
+    mutating func goBack() -> Bool {
+      guard currentIndex > urls.startIndex else { return false}
+      currentIndex = urls.index(before: currentIndex)
+      return true
+    }
+
+    mutating func goForward() -> Bool {
+      guard currentIndex < urls.index(before: urls.endIndex)
+      else { return false}
+      currentIndex = urls.index(after: currentIndex)
+      return true
+    }
+
+    mutating func replace(_ old: URL, with new: URL) {
+      urls = urls.map { $0 == old ? new : $0 }
+    }
+  }
+
+  var canGoBack: Bool { history.canGoBack }
+  var canGoForward: Bool { history.canGoForward }
 
   /// Push a new URL onto the history and navigate to it. Truncates
   /// any forward entries (browser-standard new-link behaviour).
@@ -17,47 +63,17 @@ extension DocumentModel {
   /// a broken link click doesn't strand the window with a corrupted
   /// base URL the link bridge would resolve subsequent clicks against.
   func navigate(to url: URL) async {
-    guard reportIfUnreachable(url) else { return }
-    if currentIndex >= 0, currentIndex < history.count {
-      history.removeSubrange((currentIndex + 1)..<history.count)
-    }
-    history.append(url)
-    currentIndex = history.count - 1
+    history.navigate(to: url)
     await rebindCurrent()
   }
 
   func goBack() async {
-    guard canGoBack else { return }
-    let target = history[currentIndex - 1]
-    guard reportIfUnreachable(target) else { return }
-    currentIndex -= 1
+    guard history.goBack() else { return }
     await rebindCurrent()
   }
 
   func goForward() async {
-    guard canGoForward else { return }
-    let target = history[currentIndex + 1]
-    guard reportIfUnreachable(target) else { return }
-    currentIndex += 1
+    guard history.goForward() else { return }
     await rebindCurrent()
-  }
-
-  /// Verify a link target is readable before we commit to navigating
-  /// to it. Returns `true` when the file exists; otherwise posts an
-  /// ephemeral notice + beep and returns `false`. Ephemeral because
-  /// the current document's state is unaffected — only the user's
-  /// just-clicked link was bad — so a brief receipt is appropriate.
-  func reportIfUnreachable(_ url: URL) -> Bool {
-    if FileManager.default.isReadableFile(atPath: url.path) {
-      return true
-    }
-    report(
-      String(localized:
-        "Cannot open \(url.lastPathComponent): file not found."),
-      lifetime: .ephemeral)
-    #if os(macOS)
-    NSSound.beep()
-    #endif
-    return false
   }
 }
