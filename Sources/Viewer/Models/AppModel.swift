@@ -65,6 +65,18 @@ final class AppModel {
       template: Defaults.shared.template)
 #if os(macOS)
     self.editors = EditorChoice()
+    /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
+    /// activity URL. The "+" only exists when windows are already tabbed
+    /// (new-tab behavior → `syncWindowTabbing` left the toggle on), so the
+    /// picks are born-as-tab.
+    NewTabAction.handler = { _ in
+      Task { @MainActor in
+        let picks = await AppModel.shared.recents.runOpenPanel()
+        for url in picks {
+          GalleyViewerRequestActivity(url: url).open()
+        }
+      }
+    }
 #endif
 
     self.templates = TemplateChoice(

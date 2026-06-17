@@ -42,7 +42,6 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
 #if os(macOS)
       .onAppear {
-        installNewTabHandler()
         syncWindowTabbing()
       }
       .onChange(of: Defaults.shared.openBehavior) { _, _ in
@@ -135,21 +134,6 @@ struct DocumentSceneContent: View {
   private func syncWindowTabbing() {
     NSWindow.allowsAutomaticWindowTabbing =
       Defaults.shared.openBehavior == .newTab
-  }
-
-  /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
-  /// activity URL. The "+" only exists when windows are already tabbed
-  /// (new-tab behavior → `syncWindowTabbing` left the toggle on), so the
-  /// picks are born-as-tab.
-  private func installNewTabHandler() {
-    NewTabAction.handler = { _ in
-      Task { @MainActor in
-        let picks = await AppModel.shared.recents.runOpenPanel()
-        for url in picks {
-          GalleyViewerRequestActivity(url: url).open()
-        }
-      }
-    }
   }
 #endif
 }
