@@ -21,12 +21,12 @@ extension DocumentModel {
       return renderer
     }
 
-    return appModel.processors.selected.value.renderer
+    return AppModel.shared.processors.selected.value.renderer
     ?? SwiftMarkdownRenderer()
   }
 
   func resolvedTemplate() -> Template {
-    appModel.resolvedTemplate(templates: templates)
+    AppModel.shared.resolvedTemplate(templates: templates)
   }
 
   /// Resolved document color scheme for the WebView. Per-document
@@ -43,7 +43,7 @@ extension DocumentModel {
     if Defaults.shared.enablePerDocumentOverrides {
       return colorSchemes.selected.value.colorScheme
     }
-    return appModel.colorSchemes.selected.value.colorScheme
+    return AppModel.shared.colorSchemes.selected.value.colorScheme
 #endif
   }
 
@@ -56,7 +56,7 @@ extension DocumentModel {
   /// (template uninstalled mid-session).
   func renderedTemplate() -> Template {
     if let id = renderedTemplateID,
-       let template = appModel.templates.findValue(forID: id)
+       let template = AppModel.shared.templates.findValue(forID: id)
     {
       return template
     }

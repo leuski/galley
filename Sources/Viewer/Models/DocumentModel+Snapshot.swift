@@ -97,14 +97,12 @@ extension DocumentModel {
   /// Live-or-restored model for a window. Returns `nil` when the window
   /// has no stored document (the welcome state). Synchronous — safe to
   /// call from a `@State` initial value.
-  static func forScene(
-    id: DocumentSceneID, appModel: AppModel
-  ) -> DocumentModel? {
+  static func forScene(id: DocumentSceneID) -> DocumentModel? {
     if let existing = cached(id) { return existing }
     guard let snapshot = DocumentStore[id] else {
       return nil
     }
-    let model = DocumentModel(snapshot: snapshot, id: id, appModel: appModel)
+    let model = DocumentModel(snapshot: snapshot, id: id)
     remember(model)
     return model
   }
@@ -115,30 +113,26 @@ extension DocumentModel {
   /// the file store so reopening a known file restores where you were.
   @discardableResult
   static func open(
-    target: DocumentTarget, id: DocumentSceneID, appModel: AppModel
-  ) -> DocumentModel {
+    target: DocumentTarget, id: DocumentSceneID) -> DocumentModel
+  {
     if let existing = cached(id) { return existing }
     let seed = DocumentStore[file: target.documentURL]
     ?? Snapshot(history: History(url: target.documentURL))
-    let model = DocumentModel(snapshot: seed, id: id, appModel: appModel)
+    let model = DocumentModel(snapshot: seed, id: id)
     remember(model)
     return model
   }
 
   /// The singleton Help window's model — a bundled file, never
   /// persisted (`kind: .help` skips the persistence observer).
-  static func help(url: URL, appModel: AppModel) -> DocumentModel {
-    DocumentModel(
-      id: .next(), appModel: appModel, history: History(url: url), kind: .help)
+  static func help(url: URL) -> DocumentModel {
+    DocumentModel(id: .next(), history: History(url: url), kind: .help)
   }
 
   /// Construct from a restored snapshot.
-  convenience init(
-    snapshot: Snapshot, id: DocumentSceneID, appModel: AppModel
-  ) {
+  convenience init(snapshot: Snapshot, id: DocumentSceneID) {
     self.init(
       id: id,
-      appModel: appModel,
       history: snapshot.history,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
@@ -190,8 +184,8 @@ extension DocumentModel {
     reloadObservation = onObservedChange(
       track: { [weak self] in
         guard let self else { return }
-        _ = self.appModel.processors.selected
-        _ = self.appModel.templates.selected
+        _ = AppModel.shared.processors.selected
+        _ = AppModel.shared.templates.selected
         _ = Defaults.shared.enablePerDocumentOverrides
         _ = self.templates.persistent
         _ = self.processors.persistent

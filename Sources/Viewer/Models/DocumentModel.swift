@@ -56,7 +56,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   @ObservationIgnored private let tocBridge = TOCBridge()
   @ObservationIgnored private let statsBridge = StatsBridge()
   @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
-  @ObservationIgnored let appModel: AppModel
 
   /// Chrome reads through this. Drives off `renderedTemplate()` —
   /// the template *actually painted* in the WebView right now — so
@@ -260,7 +259,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
   init(
     id: DocumentSceneID,
-    appModel: AppModel,
     history: History,
     templatePersistent: String? = nil,
     processorPersistent: String? = nil,
@@ -273,15 +271,14 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     self.id = id
     self.kind = kind
     self.history = history
-    self.appModel = appModel
     self.templates = SceneTemplateChoice(
-      source: appModel.templates,
+      source: AppModel.shared.templates,
       persistent: templatePersistent
     ) { name in
       UNUserNotificationCenter.post(kind: .template, displaced: name)
     }
     self.processors = SceneProcessorChoice(
-      source: appModel.processors,
+      source: AppModel.shared.processors,
       persistent: processorPersistent
     ) { name in
       UNUserNotificationCenter.post(kind: .processor, displaced: name)
@@ -289,7 +286,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Color-scheme catalog is static — same no-op notifier reasoning
     // as `AppModel.colorSchemes`.
     self.colorSchemes = SceneColorSchemeChoice(
-      source: appModel.colorSchemes,
+      source: AppModel.shared.colorSchemes,
       persistent: colorSchemePersistent
     ) { _ in }
 
@@ -343,7 +340,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
     configuration
       .urlSchemeHandlers
-      .merge(appModel
+      .merge(AppModel.shared
         .urlSchemeHandler(templates: templates)
         .mapValues { handler in
           zoom.zoomUrlSchemeHandler(wrapping: handler)
@@ -417,7 +414,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // mid-render — extremely rare), fall back to the selected
     // template; better a slightly-stale write than no write.
     let painted = templateID.flatMap {
-      appModel.templates.findValue(forID: $0)
+      AppModel.shared.templates.findValue(forID: $0)
     } ?? resolvedTemplate()
     renderedTemplateID = painted.persistentID
     // Always persist — `color: nil` records a sentinel so a
@@ -450,7 +447,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       resolvedLine = await topmostVisibleSourceLine()
     }
     await openFileInEditor(
-      appModel.editors.selected,
+      AppModel.shared.editors.selected,
       fileURL: url,
       line: resolvedLine,
       logger: logger)

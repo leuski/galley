@@ -28,9 +28,7 @@ struct DocumentSceneContent: View {
 
   init(sceneID: DocumentSceneID) {
     self.sceneID = sceneID
-    _model = State(
-      initialValue: DocumentModel.forScene(
-        id: sceneID, appModel: AppModel.shared))
+    _model = State(initialValue: DocumentModel.forScene(id: sceneID))
   }
 
   var body: some View {
@@ -99,8 +97,7 @@ struct DocumentSceneContent: View {
 
     guard let live = model else {
       // Empty window adopts the document in place (welcome → document).
-      model = DocumentModel
-        .open(target: target, id: sceneID, appModel: AppModel.shared)
+      model = DocumentModel.open(target: target, id: sceneID)
       AppModel.shared.recents.record(target.documentURL)
       return
     }

@@ -26,8 +26,7 @@ struct HelpWindowView: View {
       guard let help = OpenHelpActivity(from: url) else {
         return
       }
-      model = DocumentModel.help(
-        url: help.documentURL, appModel: AppModel.shared)
+      model = DocumentModel.help(url: help.documentURL)
     }
   }
 }
