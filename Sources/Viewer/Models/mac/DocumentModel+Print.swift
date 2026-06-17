@@ -7,12 +7,9 @@
 
 #if os(macOS)
 import AppKit
-import CoreTransferable
 import GalleyCoreKit
-import UniformTypeIdentifiers
 import WebKit
 import OSLog
-import ALFoundation
 
 extension DocumentModel {
   // MARK: - Print / Export
@@ -29,18 +26,6 @@ extension DocumentModel {
   /// modal on the same window would clash. Both `showsPrintPanel`
   /// and `showsProgressPanel` are off, so the modal is invisible —
   /// just a run-loop attachment point for `runModal(for:)`.
-  /// `Transferable` representation of this document's exportable
-  /// PDF. SwiftUI's `.fileExporter(item:)` invokes `render` only
-  /// after the user picks a destination, then moves the returned
-  /// temp file via `SentTransferredFile(_:allowAccessingOriginalFile:
-  /// true)` — no `Data` round-trip, no manual cleanup.
-  var pdfExport: PDFExport {
-    PDFExport { [weak self] in
-      guard let self else { throw CocoaError(.featureUnsupported) }
-      return try await self.exportPDF()
-    }
-  }
-
   func exportPDF() async throws -> URL {
     let destination = URL.temporaryDirectory / "\(UUID().uuidString).pdf"
     let host = Self.makeOffscreenHostWindow()
@@ -138,7 +123,7 @@ extension DocumentModel {
     let webView = await loadOffscreenWebView(
       composed: composed,
       template: template,
-      paperSize: baseInfo.paperSize)
+      size: baseInfo.paperSize)
 
     let operation = webView.printOperation(with: baseInfo)
     operation.view?.frame = NSRect(
@@ -162,57 +147,6 @@ extension DocumentModel {
     withExtendedLifetime(webView) {}
   }
 
-  /// Build a fresh `WKWebView` configured with our scheme handler,
-  /// load `html` into it, and await `didFinish` before returning.
-  /// Sized to the print paper so layout matches what the print
-  /// pipeline will paginate.
-  private func loadOffscreenWebView(
-    composed: ComposedPreview,
-    template: Template,
-    paperSize: NSSize
-  ) async -> WKWebView {
-    let configuration = WKWebViewConfiguration()
-    let handler = ClassicPreviewSchemeHandler(
-      templateProvider: { template })
-    configuration.setURLSchemeHandler(
-      handler, forURLScheme: PreviewSchemeHandler.scheme.rawValue)
-
-    let webView = WKWebView(
-      frame: NSRect(origin: .zero, size: paperSize),
-      configuration: configuration)
-
-    let bridge = PrintLoadBridge()
-    webView.navigationDelegate = bridge
-
-    return await withCheckedContinuation { continuation in
-      bridge.completion = { [weak webView] in
-        guard let webView else {
-          continuation.resume(returning: WKWebView())
-          return
-        }
-        continuation.resume(returning: webView)
-      }
-      webView.loadHTMLString(composed.html, baseURL: composed.baseURL)
-    }
-  }
-
-  /// Build the preview the print/export web view loads — same
-  /// `composeHTML` pipeline `renderCurrent` uses, minus the live-zoom
-  /// style. Print renders at 100 % regardless of the on-screen zoom
-  /// factor.
-  private func buildComposedPreview(
-    template: Template
-  ) async throws -> ComposedPreview {
-    let url = documentURL
-    let renderer = resolvedRenderer()
-    let source = try String(contentsOf: url, encoding: .utf8)
-    let body = try await renderer.render(source, baseURL: url)
-    return try template.composeHTML(
-      documentContent: body,
-      documentURL: url,
-      origin: PreviewSchemeHandler.originURL)
-  }
-
   /// Last-resort host window for `runModal(for:)` when no other
   /// window is available. Stays offscreen — the user never sees it,
   /// it just gives the print pipeline something to attach to.
@@ -222,64 +156,6 @@ extension DocumentModel {
       styleMask: [],
       backing: .buffered,
       defer: true)
-  }
-
-}
-
-/// Tiny `WKNavigationDelegate` adapter that bridges WebKit's load
-/// completion into a continuation. Used by the offscreen print web
-/// view so the print operation only runs after layout has settled.
-@MainActor
-private final class PrintLoadBridge: NSObject, WKNavigationDelegate {
-  var completion: (() -> Void)?
-  private var didFire = false
-
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    fire()
-  }
-
-  func webView(
-    _ webView: WKWebView,
-    didFail navigation: WKNavigation!,
-    withError error: any Error
-  ) {
-    fire()
-  }
-
-  func webView(
-    _ webView: WKWebView,
-    didFailProvisionalNavigation navigation: WKNavigation!,
-    withError error: any Error
-  ) {
-    fire()
-  }
-
-  private func fire() {
-    guard !didFire else { return }
-    didFire = true
-    completion?()
-    completion = nil
-  }
-}
-
-/// `Transferable` wrapper around a lazy "render to a temp PDF file"
-/// closure. SwiftUI's `.fileExporter(item:)` invokes the closure only
-/// after the user confirms the destination, then moves the returned
-/// file via `SentTransferredFile(_:allowAccessingOriginalFile: true)`
-/// — so cancellation does no work and there's no `Data` round-trip.
-/// The closure is `@MainActor` because `DocumentModel` is main-actor-
-/// isolated; main-actor-isolated function values are `Sendable`, so
-/// `PDFExport` satisfies `Transferable`'s `Sendable` requirement
-/// without further annotation.
-struct PDFExport: Transferable {
-  let render: @MainActor () async throws -> URL
-
-  static var transferRepresentation: some TransferRepresentation {
-    FileRepresentation(exportedContentType: .pdf) { item in
-      let url = try await item.render()
-      return SentTransferredFile(
-        url, allowAccessingOriginalFile: true)
-    }
   }
 }
 

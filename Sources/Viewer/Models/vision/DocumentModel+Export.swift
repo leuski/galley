@@ -4,28 +4,13 @@
 //
 
 #if !os(macOS)
-import CoreTransferable
 import Foundation
 import GalleyCoreKit
 import UIKit
-import UniformTypeIdentifiers
 import WebKit
-import ALFoundation
 
 extension DocumentModel {
   // MARK: - PDF export
-
-  /// `Transferable` representation of this document's exportable
-  /// PDF. The render closure runs only when the user actually picks
-  /// the PDF row in the Share menu — until then no PDF is generated.
-  var pdfExport: PDFExport {
-    PDFExport(
-      suggestedName: documentURL.deletingPathExtension().lastPathComponent
-    ) { [weak self] in
-      guard let self else { throw CocoaError(.featureUnsupported) }
-      return try await self.exportPDF()
-    }
-  }
 
   /// Build a fresh offscreen `WKWebView`, load the current rendered
   /// HTML into it, await layout, then paginate the rendered content
@@ -55,15 +40,17 @@ extension DocumentModel {
     let paperRect = CGRect(x: 0, y: 0, width: 612, height: 792)
     let printableRect = paperRect.insetBy(dx: 36, dy: 36)
 
+    // The print formatter respects the web view's bounds.width when
+    // laying out content. Sizing the web view to the printable width
+    // up front lets the formatter paginate at the right horizontal
+    // measure without a separate scale factor. Height is generous so
+    // all content renders before the formatter queries
+    // `numberOfPages`.
     let webView = await loadOffscreenWebView(
       composed: composed,
       template: template,
-      contentWidth: printableRect.width)
+      size: CGSize(width: printableRect.width, height: 1))
 
-    // The print formatter respects the web view's bounds.width when
-    // laying out content. We sized the web view to `printableRect`
-    // width above so the formatter paginates at the right horizontal
-    // measure without needing a separate scale factor.
     let formatter = webView.viewPrintFormatter()
     let pageRenderer = UIPrintPageRenderer()
     pageRenderer.addPrintFormatter(formatter, startingAtPageAt: 0)
@@ -95,118 +82,6 @@ extension DocumentModel {
     let destination = dir / "\(documentURL.fileName).pdf"
     try data.write(to: destination, options: .atomic)
     return destination
-  }
-
-  /// Compose the preview HTML the same way `renderCurrent` does —
-  /// renderer → template → placeholder substitution — minus the
-  /// live-zoom style. PDF renders at 100% regardless of on-screen
-  /// zoom.
-  private func buildComposedPreview(
-    template: Template
-  ) async throws -> ComposedPreview {
-    let url = documentURL
-    let renderer = resolvedRenderer()
-    let source = try String(contentsOf: url, encoding: .utf8)
-    let body = try await renderer.render(source, baseURL: url)
-    return try template.composeHTML(
-      documentContent: body,
-      documentURL: url,
-      origin: PreviewSchemeHandler.originURL)
-  }
-
-  /// Spin up a fresh `WKWebView` configured with the shared scheme
-  /// handler, load `composed.html` under `composed.baseURL`, and
-  /// resume once `didFinish` fires plus one extra runloop turn so
-  /// auto layout has had a chance to settle before the print
-  /// formatter inspects the view.
-  ///
-  /// Width is fixed to `contentWidth` (the printable rect width).
-  /// `UIPrintPageRenderer` uses `viewPrintFormatter()` and the print
-  /// formatter scales content to fit the web view's bounds.width,
-  /// so matching the printable measure up front avoids a mid-render
-  /// rescale that can introduce blurry text and clipped wide blocks.
-  /// Height is generous so all content renders before the formatter
-  /// queries `numberOfPages`.
-  private func loadOffscreenWebView(
-    composed: ComposedPreview,
-    template: Template,
-    contentWidth: CGFloat
-  ) async -> WKWebView {
-    let configuration = WKWebViewConfiguration()
-    let handler = ClassicPreviewSchemeHandler(
-      templateProvider: { template })
-    configuration.setURLSchemeHandler(
-      handler, forURLScheme: PreviewSchemeHandler.scheme.rawValue)
-
-    let webView = WKWebView(
-      frame: CGRect(x: 0, y: 0, width: contentWidth, height: 1),
-      configuration: configuration)
-
-    let bridge = ExportLoadBridge()
-    webView.navigationDelegate = bridge
-
-    return await withCheckedContinuation { continuation in
-      bridge.completion = { [weak webView] in
-        continuation.resume(returning: webView ?? WKWebView())
-      }
-      webView.loadHTMLString(composed.html, baseURL: composed.baseURL)
-    }
-  }
-}
-
-/// Tiny `WKNavigationDelegate` adapter that bridges WebKit's load
-/// completion into a continuation. Sibling of macOS's
-/// `PrintLoadBridge` — kept separate so neither file leaks AppKit /
-/// UIKit imports across `#if` walls.
-@MainActor
-private final class ExportLoadBridge: NSObject, WKNavigationDelegate {
-  var completion: (() -> Void)?
-  private var didFire = false
-
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    fire()
-  }
-
-  func webView(
-    _ webView: WKWebView,
-    didFail navigation: WKNavigation!,
-    withError error: any Error
-  ) {
-    fire()
-  }
-
-  func webView(
-    _ webView: WKWebView,
-    didFailProvisionalNavigation navigation: WKNavigation!,
-    withError error: any Error
-  ) {
-    fire()
-  }
-
-  private func fire() {
-    guard !didFire else { return }
-    didFire = true
-    completion?()
-    completion = nil
-  }
-}
-
-/// `Transferable` wrapper around a lazy "render to a temp PDF file"
-/// closure. `ShareLink(item:)` invokes the closure only when the
-/// user actually shares — cancelling or never opening the PDF row
-/// does no work. `suggestedName` becomes the filename the receiving
-/// app sees (no extension; `FileRepresentation` appends `.pdf`).
-struct PDFExport: Transferable {
-  let suggestedName: String
-  let render: @MainActor () async throws -> URL
-
-  static var transferRepresentation: some TransferRepresentation {
-    FileRepresentation(exportedContentType: .pdf) { item in
-      let url = try await item.render()
-      return SentTransferredFile(
-        url, allowAccessingOriginalFile: true)
-    }
-    .suggestedFileName { $0.suggestedName }
   }
 }
 
