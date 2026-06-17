@@ -19,7 +19,10 @@ struct GalleyActionTests {
   ) -> URL {
     var components = URLComponents()
     components.scheme = GalleyRequestActivity.scheme
-    components.path = fileURL.absoluteString.percentEncodedForPath
+    // Match the production encoder (`DocumentTarget.url(scheme:)`): a
+    // file URL is carried as its plain `.path`, percent-encoded by
+    // URLComponents when the URL is materialized.
+    components.path = fileURL.path
     components.queryItems = query
     components.fragment = fragment
     return components.url!

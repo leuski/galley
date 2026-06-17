@@ -37,6 +37,18 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let zoom: WebPageZoomController
   let kind: Kind
 
+  /// Stable per-window identity; the persistence store is keyed by it.
+  let id: DocumentSceneID
+
+  /// Token for the persistence observer (`startTrackingPersistentState`).
+  @ObservationIgnored var saveObservation: Cancelable?
+
+  /// Token for the render-inputs observer (`startTrackingRenderInputs`).
+  @ObservationIgnored var reloadObservation: Cancelable?
+
+  /// True once this window holds a document (blank windows have no model).
+  var hasDocument: Bool { !history.isEmpty }
+
   @ObservationIgnored private let watcher = DocumentWatcher()
   @ObservationIgnored private let editorBridge = EditorBridge()
   @ObservationIgnored private let linkBridge = LinkBridge()
@@ -79,8 +91,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// The URL the model is currently bound to. Set at construction
   /// from the WindowGroup's URL and updated synchronously at the
   /// start of every `rebindCurrent` (in-window navigation, restore,
-  /// rename, reload). Render-state visibility is tracked separately
-  /// by `didFirstBind`.
+  /// rename, reload).
   private(set) var documentURL: URL
 
   /// Single user-visible error / status channel. Replaces the prior
@@ -100,13 +111,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// timers can't blow away a fresher notice. Owned by the `+Notice`
   /// extension; nothing else writes it.
   @ObservationIgnored var ephemeralClearTask: Task<Void, Never>?
-
-  /// Set to `true` at the start of the first `rebindCurrent` call.
-  /// Distinguishes "model exists, has a URL, but render hasn't been
-  /// triggered yet" from "render has begun." DocumentView uses this
-  /// to gate window-reveal alpha and to short-circuit duplicate
-  /// `.task(id:)` fires from triggering re-binds.
-  private(set) var didFirstBind: Bool = false
 
   /// True once the WebView has finished painting the *current* bind's
   /// HTML (signalled by the BackgroundColorBridge firing post-layout).
@@ -176,7 +180,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// hosting this model. Per-document live state — preserved across
   /// in-window link navigation so a child doc inherits the parent's
   /// pick. Cold opens / Replace-current rebinds reset this from the
-  /// destination URL's `PerFileStateStore` entry instead.
+  /// destination URL's `DocumentStore` file snapshot instead.
   ///
   /// Starts `true` so `NavigationSplitView` is born with a visible
   /// sidebar — AppKit only wires `NSSplitViewItem.behavior = .sidebar`
@@ -257,27 +261,27 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
-  @MainActor @Observable
-  final class ZoomController: WebPageZoomController {
-    var zoomScale: Double = 0
-
-    var page: WebPage? { model?.page }
-
-    weak var model: DocumentModel?
-  }
-
   init(
-    initialURL: URL,
+    id: DocumentSceneID,
     appModel: AppModel,
-    templatePersistent: String?,
-    processorPersistent: String?,
+    history: [URL],
+    currentIndex: Int = 0,
+    templatePersistent: String? = nil,
+    processorPersistent: String? = nil,
     colorSchemePersistent: String? = nil,
-    kind: Kind
+    initialScrollY: Double? = nil,
+    initialScrollLine: Int? = nil,
+    initialShowsTOC: Bool = false,
+    initialZoom: Double = 1,
+    kind: Kind = .document
   ) {
+    precondition(!history.isEmpty, "DocumentModel requires a document URL")
+    let index = history.indices.contains(currentIndex) ? currentIndex : 0
+    self.id = id
     self.kind = kind
-    self.documentURL = initialURL
-    self.history = [initialURL]
-    self.currentIndex = 0
+    self.documentURL = history[index]
+    self.history = history
+    self.currentIndex = index
     self.appModel = appModel
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
@@ -360,6 +364,17 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     zoom.model = self
 
     wireBridges()
+
+    // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
+    pendingScrollY = initialScrollY
+    pendingScrollLine = initialScrollLine
+    savedShowsTOC = initialShowsTOC
+    zoom.setZoom(initialZoom)
+    if kind == .document {
+      startTrackingPersistentState()
+      startTrackingRenderInputs()
+    }
+    Task { await rebindCurrent() }
   }
 
   /// Attach `[weak self]` callbacks to each bridge. Lifted out of
@@ -508,27 +523,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       initialShowsTOC: initialShowsTOC)
   }
 
-  /// Restore a previously-saved history stack. Used at window
-  /// re-open time to pick up where the user left off — the active
-  /// document and the back/forward stack are both re-established.
-  /// `initialScrollY` hydrates the resting scroll position the same
-  /// way `bind` does.
-  func restore(
-    snapshot: HistorySnapshot,
-    initialScrollY: Double? = nil,
-    initialShowsTOC: Bool? = nil
-  ) async {
-    guard !snapshot.urls.isEmpty,
-          snapshot.currentIndex >= 0,
-          snapshot.currentIndex < snapshot.urls.count
-    else { return }
-    await finishBind(
-      urls: snapshot.urls,
-      currentIndex: snapshot.currentIndex,
-      initialScrollY: initialScrollY,
-      initialShowsTOC: initialShowsTOC)
-  }
-
   private func finishBind(
     urls: [URL],
     currentIndex: Int,
@@ -598,8 +592,8 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     } catch {
       report(
         failure: error, context: "rename",
-        message: String(localized:
-                          "Rename failed: \(error.localizedDescription)"),
+        message: String(
+          localized: "Rename failed: \(error.localizedDescription)"),
         lifetime: .ephemeral)
       throw error
     }
@@ -639,7 +633,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     let myGeneration = bindGeneration
     logBinding(to: url)
     documentURL = url
-    didFirstBind = true
     // The WebView's pre-paint canvas is system-white regardless of
     // CSS — clear the rendered flag so DocumentView can mask that
     // gap with the cached page bg until BackgroundColorBridge

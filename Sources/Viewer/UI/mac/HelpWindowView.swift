@@ -9,21 +9,16 @@ import SwiftUI
 /// We parse it back to the bundled file and mount `DocumentView` in
 /// `.help` mode (which bypasses dedup, recents, and the tab "+").
 struct HelpWindowView: View {
-  @State private var target: DocumentTarget?
+  @State private var model: DocumentModel?
 
   var body: some View {
     Group {
-      if let targetBinding = Binding($target),
-         let appModel = AppBoot.shared.model
-      {
-        DocumentView(
-          target: targetBinding,
-          appModel: appModel,
-          kind: .help)
+      if let model {
+        DocumentView(model: model)
       } else {
-        // Window brought forward before any help URL arrived, or boot
-        // still resolving. Transient — the scene only opens via a
-        // `galley-help://` URL that sets `helpURL` on arrival.
+        // Window brought forward before any help URL arrived.
+        // Transient — the scene only opens via a `galley-help://` URL
+        // that builds the model on arrival.
         Color.clear
       }
     }
@@ -31,7 +26,8 @@ struct HelpWindowView: View {
       guard let help = OpenHelpActivity(from: url) else {
         return
       }
-      target = DocumentTarget(url: help.documentURL)
+      model = DocumentModel.help(
+        url: help.documentURL, appModel: AppModel.shared)
     }
   }
 }

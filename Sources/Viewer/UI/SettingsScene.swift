@@ -11,21 +11,15 @@ import GalleyCoreKit
 struct SettingsScene: Scene {
   static let id = "settings"
   static let events = Set([OpenSettingsActivity.schemeExternalToken])
-  @Bindable private var boot = AppBoot.shared
+  private var model: AppModel { AppModel.shared }
 
   var body: some Scene {
     Window("Settings", id: Self.id) {
-      if let model = boot.model {
 #if os(macOS)
-        MacSettingsView(appModel: model)
+      MacSettingsView(appModel: model)
 #else
-        VisionSettingsView(appModel: model)
+      VisionSettingsView(appModel: model)
 #endif
-      } else {
-        ProgressView("Starting…")
-          .padding()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
     }
     .handlesExternalEvents(matching: Self.events)
     .windowResizability(.contentSize)

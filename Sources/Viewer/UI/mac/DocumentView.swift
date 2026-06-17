@@ -11,18 +11,19 @@ private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentView")
 
 /// The viewer surface for a single document window. Mounted by
-/// `ContentView` only when both the WindowGroup binding has resolved
-/// to a non-nil URL and the global `AppBoot` has finished processor
-/// catalog discovery — so this view always has a concrete URL and a
-/// hydrated `AppModel` to work with.
+/// `ContentView` once the window has a `DocumentModel` (built from a
+/// restored snapshot or an inbound URL) — so this view always has a
+/// concrete document and a hydrated `AppModel` to work with.
 struct DocumentView: View {
-  @Binding var target: DocumentTarget
-  let appModel: AppModel
-  private var recents: RecentDocumentsModel { AppBoot.shared.recents }
-  @Environment(\.openWindow) private var openWindow
+  /// The window's document model — built and cached by `ContentView`
+  /// (`DocumentModel.forScene` / `.open`), already populated and
+  /// rendering. The view never constructs it, never owns persistence,
+  /// and never observes it to mutate another model.
+  let model: DocumentModel
+
+  private var appModel: AppModel { model.appModel }
+  private var recents: RecentDocumentsModel { AppModel.shared.recents }
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var model: DocumentModel
-  @State private var didRestore = false
   @State private var hostWindow: NSWindow?
 
   /// Transient text-field value for the rename alert. Seeded from
@@ -37,43 +38,9 @@ struct DocumentView: View {
   /// dismissed.
   @State private var exportPDFError: String?
 
-  /// Constructs the model with the WindowGroup's bound URL plus the
-  /// per-file persisted choice IDs so `documentURL`, `templates`, and
-  /// `processors` are all set synchronously at view-identity creation.
-  /// `didFirstBind` is still false until `.task` triggers the first
-  /// render — that's the signal `WindowAccessor` and `ChangeHandlers`
-  /// use for window-reveal alpha and history persistence.
-  ///
-  /// State-restored windows that come back to a different URL than
-  /// the WindowGroup's binding will have their persistent IDs updated
-  /// in `launchTask` once the snapshot is decoded.
-  init(
-    target: Binding<DocumentTarget>,
-    appModel: AppModel,
-    kind: DocumentModel.Kind = .document
-  ) {
-    self._target = target
-    self.appModel = appModel
-    let url = target.wrappedValue.documentURL
-    let stored = Defaults.shared.perFileStateStore[url]
-    self._model = State(wrappedValue: DocumentModel(
-      initialURL: url,
-      appModel: appModel,
-      templatePersistent: stored.templatePersistent,
-      processorPersistent: stored.rendererPersistent,
-      kind: kind))
+  init(model: DocumentModel) {
+    self.model = model
   }
-
-  /// Per-window persisted back/forward stack. SwiftUI's `@SceneStorage`
-  /// gives each WindowGroup window its own keyspace, so two windows
-  /// each get their own history that survives app relaunch. The
-  /// stack is genuinely per-window (a sequence of files visited in
-  /// order), so it can't move to `PerFileStateStore` — every other
-  /// piece of per-window state has, since the `preferring:` dedup
-  /// keeps one window per URL and the per-file store already carries
-  /// the same fields.
-  @SceneStorage("history")
-  private var history: SceneStoragePayload<HistorySnapshot>?
 
   var body: some View {
     @Bindable var model = model
@@ -89,30 +56,17 @@ struct DocumentView: View {
       }
       .animation(reduceMotion ? nil : .default, value: model.notice)
       .windowAccessor { window in
-        // Reveal whenever the resolved NSWindow changes identity —
-        // skip a no-op re-attach to the same host. SwiftUI caches
-        // scene `@State` for a freshly-closed `WindowGroup`
-        // window and reuses it when the same target is reopened; a plain
-        // `nil` guard would leave the reopened tab toolbar-less.
+        // The window is always visible — no reveal gate. Resolve it
+        // once to patch the AppKit tab-bar "+" (so a user "+" click
+        // opens via the Open panel + activity URL). Help skips it.
+        // Inbound-URL routing lives in `ContentView`, not here.
         guard let window, window !== hostWindow else { return }
         hostWindow = window
-        window.alphaValue = model.didFirstBind ? 1 : 0
-        // Tabs are born into the key group at creation (born-as-tab,
-        // no post-hoc `addTabbedWindow` flash — WindowProbe FINDINGS
-        // §8). We only still patch the AppKit tab-bar "+" so a user
-        // "+" click runs the Open panel + opens a tab. Help skips it.
+        window.alphaValue = 1
         if model.kind == .document {
           NewTabAction.install(on: window)
         }
       }
-      // A document window prefers its own URL so a repeat-open routes
-      // back here (dedup) instead of duplicating; the token list
-      // tracks `model.documentURL` reactively, covering in-window
-      // navigation. Help windows opt out — they never receive URLs.
-      .handlesInboundURLs(
-        enabled: model.kind == .document,
-        preferring: model.documentURL.galleyPreferringTokens,
-        onDocument: handleInbound)
       .focusedSceneValue(\.documentModel, model)
       .alert(
         "Rename Document",
@@ -150,21 +104,6 @@ struct DocumentView: View {
       }
       .fileDialogDefaultDirectory(
         model.documentURL.parent)
-    // No `id:` — `replaceDocument` drives in-window URL changes
-    // directly through `model.bind(to:)`, so re-firing on every
-    // `fileURL` write would be wasted work that the early-return
-    // in `launchTask` already short-circuits.
-      .task { await launchTask() }
-      .modifier(ChangeHandlers(
-        model: model,
-        appModel: appModel,
-        onBindStateChanged: handleDocumentBound,
-        onTemplatePersistent: mirrorPerFileTemplate,
-        onRendererPersistent: mirrorPerFileRenderer,
-        onZoom: mirrorPerFileZoom,
-        onScrollY: mirrorPerFileScrollY,
-        onShowsTOC: mirrorPerFileShowsTOC,
-        reload: reloadModel))
       .navigationDocument(model.documentURL, when: model.kind == .document)
       .navigationTitle(
         model.kind == .help
@@ -277,82 +216,6 @@ struct DocumentView: View {
       : (model.pageBackgroundColor.isLuminanceDark ? .dark : .light))
   }
 
-  /// Called whenever the model's bind state changes — first render,
-  /// in-window link navigation, restore, rename. Persists the
-  /// back/forward stack and reveals the window once the first bind
-  /// completes. Idempotent; safe to call from multiple `.onChange`
-  /// observers.
-  private func handleDocumentBound() {
-    saveHistory()
-    // The window's `preferring:` dedup tokens track `model.documentURL`
-    // reactively (see `handlesInboundURLs` in `body`), so in-window
-    // navigation re-advertises this window's claim with no extra work.
-    if model.didFirstBind {
-      hostWindow?.alphaValue = 1
-    }
-  }
-
-  /// Apply an inbound document URL that SwiftUI routed to this window.
-  /// Re-open of the doc this window already shows → just scroll +
-  /// focus (dedup). Otherwise honor the user's open-behavior:
-  /// `replaceCurrent` rebinds this window in place; `newWindow` /
-  /// `newTab` spawn a fresh window (born standalone or born-as-tab via
-  /// `allowsAutomaticWindowTabbing` — WindowProbe FINDINGS §9).
-  private func handleInbound(_ info: DocumentTarget) {
-    if model.documentURL.standardizedFileURL == info
-      .documentURL.standardizedFileURL
-    {
-      if let line = info.scrollLine {
-        Task { await model.scrollToSourceLine(line) }
-      }
-      NSApp.activate(ignoringOtherApps: true)
-      hostWindow?.makeKeyAndOrderFront(nil)
-      return
-    }
-    recents.record(info.documentURL)
-    switch Defaults.shared.openBehavior {
-    case .replaceCurrent:
-      replaceDocument(info)
-    case .newTab, .newWindow:
-      NSWindow.allowsAutomaticWindowTabbing =
-        Defaults.shared.openBehavior == .newTab
-      openWindow(id: DocumentScene.id, value: info)
-    }
-  }
-
-  private func reloadModel() {
-    Task { await model.reload() }
-  }
-
-  /// Persist changes to `PerFileStateStore` keyed by the model's
-  /// current document URL. Each writer nils the field for that
-  /// field's default value so the dictionary doesn't accumulate dead
-  /// entries.
-  private func mirrorPerFileZoom(_ value: Double) {
-    Defaults.shared.perFileStateStore[model.documentURL]
-      .pageZoom = value == 1.0 ? nil : value
-  }
-
-  private func mirrorPerFileScrollY(_ value: Double) {
-    Defaults.shared.perFileStateStore[model.documentURL]
-      .scrollY = value == 0 ? nil : value
-  }
-
-  private func mirrorPerFileTemplate(_ value: String?) {
-    Defaults.shared.perFileStateStore[model.documentURL]
-      .templatePersistent = value
-  }
-
-  private func mirrorPerFileRenderer(_ value: String?) {
-    Defaults.shared.perFileStateStore[model.documentURL]
-      .rendererPersistent = value
-  }
-
-  private func mirrorPerFileShowsTOC(_ value: Bool) {
-    Defaults.shared.perFileStateStore[model.documentURL]
-      .showsTOC = value ? true : nil
-  }
-
   /// Bridges the optional error string to the boolean the
   /// `.alert(... isPresented:)` modifier expects: clearing the error
   /// dismisses the alert and vice versa.
@@ -377,7 +240,6 @@ struct DocumentView: View {
       do {
         let newURL = try await model.renameCurrentDocument(toName: trimmed)
         recents.record(newURL)
-        if target.documentURL != newURL { target = .init(url: newURL) }
       } catch {
         // `renameCurrentDocument` already posted a notice banner via
         // `report(failure:)`. Beep matches the prior NSAlert UX; log
@@ -389,91 +251,6 @@ struct DocumentView: View {
         NSSound.beep()
       }
     }
-  }
-
-  /// Swap this window's bound document for `newURL` in place. Used by
-  /// the `replaceCurrent` open behavior. Updates the WindowGroup
-  /// binding so state restoration follows, and rebinds the model so
-  /// history/watcher restart on the new URL.
-  private func replaceDocument(_ target: DocumentTarget) {
-    recents.record(target.documentURL)
-    if self.target != target { self.target = target }
-    let line = target.scrollLine
-    // Replace-current is a fresh-doc switch, not a parent→child
-    // navigation, so re-seed the TOC sidebar from the destination's
-    // own per-file pref rather than inheriting the previous doc's
-    // live setting.
-    let initialShowsTOC = Defaults.shared.perFileStateStore[target.documentURL]
-      .showsTOC ?? false
-    Task {
-      // Same URL re-dispatch (e.g. BBEdit's preview script firing
-      // again on a file already showing): just scroll, don't tear
-      // down history. A fresh URL takes the full bind path.
-      if model.documentURL == target.documentURL, let line {
-        await model.scrollToSourceLine(line)
-      } else {
-        await model.bind(
-          to: target,
-          initialShowsTOC: initialShowsTOC)
-      }
-    }
-  }
-
-  /// Drives initial bind for a document window. Mounted only after
-  /// `boot.model` is non-nil, so by the time this fires processor
-  /// discovery has completed and the persisted pick has been decoded
-  /// against the live catalog.
-  ///
-  /// The pure decision lives in `BindPlan.decide(...)`; this method
-  /// is its interpreter — applies zoom / choice overrides, then
-  /// dispatches to `model.restore` or `model.bind` (or returns when
-  /// the model is already bound).
-  private func launchTask() async {
-    DispatchQueue.main.async {
-      NSApp.activate(ignoringOtherApps: true)
-      hostWindow?.makeKeyAndOrderFront(nil)
-      hostWindow?.tabGroup?.selectedWindow = hostWindow
-    }
-
-    let plan = BindPlan.decide(
-      target: target,
-      didFirstBind: model.didFirstBind,
-      didRestore: didRestore,
-      history: try? history?.value,
-      perFileState: { Defaults.shared.perFileStateStore[$0] })
-
-    // `setZoom` only updates a JS rule on the live page; the next
-    // render reads `model.pageZoom` to inject the matching CSS so
-    // the first frame comes up at the right size.
-    model.zoom.setZoom(plan.zoom)
-
-    if plan.applyChoiceOverrides {
-      model.templates.persistent = plan.templateOverride
-      model.processors.persistent = plan.rendererOverride
-    }
-
-    switch plan.action {
-    case .alreadyBound:
-      return
-
-    case .restore(let snapshot, let scrollY, let showsTOC):
-      didRestore = true
-      await model.restore(
-        snapshot: snapshot,
-        initialScrollY: scrollY,
-        initialShowsTOC: showsTOC)
-
-    case .initialBind(let target, let scrollY, let showsTOC):
-      recents.record(target.documentURL)
-      await model.bind(
-        to: target,
-        initialScrollY: scrollY,
-        initialShowsTOC: showsTOC)
-    }
-  }
-
-  private func saveHistory() {
-    history = model.historySnapshot.flatMap { try? .init($0) }
   }
 
   @ToolbarContentBuilder
@@ -546,47 +323,6 @@ struct DocumentView: View {
   private var zoomLabel: String {
     let percent = Int((model.zoom.zoomScale * 100).rounded())
     return "\(percent)%"
-  }
-}
-
-/// Bundles every `.onChange` handler `DocumentView` needs. Keeps the
-/// view body short and isolates the mirroring logic between model
-/// state and the enclosing scene's `@SceneStorage` slots.
-private struct ChangeHandlers: ViewModifier {
-  let model: DocumentModel
-  let appModel: AppModel
-  let onBindStateChanged: () -> Void
-  let onTemplatePersistent: (String?) -> Void
-  let onRendererPersistent: (String?) -> Void
-  let onZoom: (Double) -> Void
-  let onScrollY: (Double) -> Void
-  let onShowsTOC: (Bool) -> Void
-  let reload: () -> Void
-
-  func body(content: Content) -> some View {
-    content
-    // Two signals feed the same handler. `documentURL` covers
-    // every URL change after the first bind (in-window navigation,
-    // restore to a different URL, rename). `didFirstBind` covers
-    // the initial bind — necessary because `bind(to: initialURL)`
-    // assigns the same value `init(initialURL:)` already wrote, so
-    // `.onChange(of: documentURL)` doesn't fire on first run.
-      .onChange(of: model.documentURL) { _, _ in onBindStateChanged() }
-      .onChange(of: model.didFirstBind) { _, _ in onBindStateChanged() }
-      .onChange(of: appModel.processors.selected) { reload() }
-      .onChange(of: appModel.templates.selected) { reload() }
-      .onChange(of: Defaults.shared.enablePerDocumentOverrides) { reload() }
-      .onChange(of: model.templates.persistent) { _, new in
-        onTemplatePersistent(new)
-        reload()
-      }
-      .onChange(of: model.processors.persistent) { _, new in
-        onRendererPersistent(new)
-        reload()
-      }
-      .onChange(of: model.zoom.zoomScale) { _, new in onZoom(new) }
-      .onChange(of: model.currentScrollY) { _, new in onScrollY(new) }
-      .onChange(of: model.showsTOC) { _, new in onShowsTOC(new) }
   }
 }
 

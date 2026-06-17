@@ -13,9 +13,18 @@ private let defaultsLog = Logger(
 final class AppModel {
   // MARK: - In-memory state (not persisted by the macro)
 
+  /// The app's single instance. `AppModel` is now the boot point — it
+  /// builds synchronously, so there's nothing to defer behind a separate
+  /// wrapper (the old `AppBoot`).
+  static let shared = AppModel()
+
   let templates: TemplateChoice
   let processors: ProcessorChoice
   let colorSchemes: ColorSchemeChoice
+
+  /// App-wide collaborators that used to live on `AppBoot`.
+  let kosmos = ViewerKosmosService()
+  let recents = RecentDocumentsModel()
 
   @ObservationIgnored private var persistenceTokens: [Cancelable] = []
 
@@ -34,19 +43,22 @@ final class AppModel {
 #endif
 
 #if ENABLE_TUNNEL
-  @ObservationIgnored private var tunnelHandler =
-  KosmosTunnelSchemeHandler(tunnel: AppBoot.shared.kosmos.tunnel)
+  // Lazy so it can read `self.kosmos` (a stored property is available
+  // only after phase-1 init); resolved on first use in `urlSchemeHandler`.
+  @ObservationIgnored private lazy var tunnelHandler =
+  KosmosTunnelSchemeHandler(tunnel: kosmos.tunnel)
     .schemeHandler
 #endif
 
-  /// Constructs an already-hydrated AppModel. Caller (`AppBoot`) is
-  /// expected to have run async catalog discovery
-  /// (`await processorStore.discover()`) before invoking this so the
-  /// initial decode lands honestly. Once constructed, processor and
-  /// template selections stay in sync with the shared defaults suite
-  /// in both directions — Server writes propagate here automatically
-  /// via `limitToInstance: false`.
+  /// The app's single boot point (replaces the old `AppBoot`). Builds
+  /// synchronously: choices decode from the shared defaults suite now,
+  /// and processor discovery runs *after* in a background task — the
+  /// `ProcessorChoice` reflects the expanded catalog reactively, so
+  /// nothing waits. Processor / template selections stay in sync with
+  /// the suite both ways (Server writes propagate via
+  /// `limitToInstance: false`).
   init() {
+    Self.warmCache()
     Self.logInit(
       bundle: Bundle.main.bundleIdentifier,
       renderer: Defaults.shared.renderer,
@@ -111,6 +123,22 @@ final class AppModel {
           template: Defaults.shared.template)
       }
     }
+
+    // Boot side-effects (formerly `AppBoot.init`). Fired in parallel so
+    // they never block the first scene; the processor catalog expands
+    // behind the already-built `ProcessorChoice`.
+    Task { await UNUserNotificationCenter.requestAuthorization() }
+    Task { @MainActor in
+#if os(macOS)
+      await ActiveServerAgent.shared.restartHelperIfStale {
+        Defaults.shared.serverGalleyHash
+      } cleaner: {
+        Defaults.shared.serverGalleyHash = nil
+      }
+#endif
+      await ProcessorStore.shared.discover()
+    }
+    kosmos.start()
   }
 
   public func resolvedTemplate(
@@ -144,6 +172,25 @@ final class AppModel {
     _ kind: UNUserNotificationCenter.Kind, _ name: String)
   {
     UNUserNotificationCenter.post(kind: kind, displaced: name)
+  }
+
+  /// Synchronize the `@ObservableDefaults` macro's per-property cache
+  /// with the on-disk values, BEFORE any SwiftUI layout pass. Called
+  /// first thing in `init`.
+  ///
+  /// Why: the macro seeds each `_<property>` cache to the *declared*
+  /// default, updating only inside its `userDefaultsDidChange` handler.
+  /// WebKit posts a synchronous `UserDefaults.didChangeNotification`
+  /// from inside the first `WKWebView.init` (during a SwiftUI layout
+  /// pass); the resulting `withMutation` re-enters AttributeGraph and
+  /// trips `AG::Graph::value_set`. Posting one notification now warms the
+  /// cache so the WebKit-triggered one finds no diffs and skips the
+  /// mutation.
+  @MainActor static func warmCache() {
+    _ = Defaults.shared
+    NotificationCenter.default.post(
+      name: UserDefaults.didChangeNotification,
+      object: UserDefaults.standard)
   }
 
   private static func logInit(
@@ -192,71 +239,6 @@ final class AppModel {
   }
 #endif
 
-}
-
-/// Boot wrapper that runs async processor discovery before
-/// constructing the real AppModel. ContentView always mounts as
-/// the WindowGroup's content (so `@SceneStorage` and URL
-/// restoration work as usual) and branches its body on
-/// `boot.model` being non-nil.
-@Observable @MainActor
-final class AppBoot {
-  static let shared = AppBoot()
-
-  let kosmos = ViewerKosmosService()
-  let recents = RecentDocumentsModel()
-
-  private(set) var model: AppModel?
-
-  /// Synchronize the `@ObservableDefaults` macro's per-property cache
-  /// with the actual on-disk values. Must be called once at app boot,
-  /// BEFORE any SwiftUI layout pass.
-  ///
-  /// Why: the macro maintains a `_<property>` cache that backs its
-  /// `userDefaultsDidChange` handler. The cache is initialized to each
-  /// property's literal default (not the persisted value) and is only
-  /// updated from inside the notification handler. So the FIRST
-  /// `UserDefaults.didChangeNotification` received in the process
-  /// triggers `withMutation` for every property whose persisted value
-  /// differs from its declared default.
-  ///
-  /// WebKit's `+[NSParagraphArbitrator initialize]` calls
-  /// `[NSUserDefaults registerDefaults:]` the first time `WKWebView`
-  /// initializes, which posts that notification synchronously from
-  /// inside a SwiftUI layout pass (`sizeThatFits` → `makeNSViewController`
-  /// → `WKWebView.initWithFrame:configuration:`). The resulting
-  /// `withMutation` re-enters `GraphHost.flushTransactions` and trips
-  /// the `AG::Graph::value_set` precondition.
-  ///
-  /// Posting one synchronous notification during boot warms the cache
-  /// so the WebKit-triggered notification finds no diffs and skips
-  /// the mutation entirely.
-  @MainActor static func warmCache() {
-    _ = Defaults.shared
-    NotificationCenter.default.post(
-      name: UserDefaults.didChangeNotification,
-      object: UserDefaults.standard)
-  }
-
-  init() {
-    Self.warmCache()
-    // Notification permission is presented as a system sheet on
-    // first run; awaiting it would block boot until the user
-    // responds. Fire it in parallel and let it resolve whenever.
-    Task { await UNUserNotificationCenter.requestAuthorization() }
-    Task { @MainActor in
-#if os(macOS)
-      await ActiveServerAgent.shared.restartHelperIfStale {
-        Defaults.shared.serverGalleyHash
-      } cleaner: {
-        Defaults.shared.serverGalleyHash = nil
-      }
-#endif
-      await ProcessorStore.shared.discover()
-      self.model = AppModel()
-    }
-    kosmos.start()
-  }
 }
 
 #if os(macOS)

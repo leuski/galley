@@ -19,9 +19,9 @@ import SwiftUI
 ///
 /// macOS adopts the user's system appearance directly; this enum is
 /// not surfaced there. The type lives in shared code so
-/// `PerFileState` carries a uniform Codable shape across platforms,
-/// which lets the same on-disk plist round-trip cleanly through the
-/// Server (macOS) suite.
+/// `DocumentModel.Snapshot` carries a uniform Codable shape across
+/// platforms, which lets the same on-disk plist round-trip cleanly
+/// through the Server (macOS) suite.
 enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
                           Hashable, Sendable,
                           CustomLocalizedStringResourceConvertible

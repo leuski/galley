@@ -9,16 +9,6 @@ extension DocumentModel {
   var canGoForward: Bool {
     currentIndex >= 0 && currentIndex < history.count - 1 }
 
-  /// Codable view of the back/forward stack for `@SceneStorage`.
-  /// Returns nil when there is nothing meaningful to persist.
-  var historySnapshot: HistorySnapshot? {
-    guard !history.isEmpty,
-          currentIndex >= 0,
-          currentIndex < history.count
-    else { return nil }
-    return HistorySnapshot(urls: history, currentIndex: currentIndex)
-  }
-
   /// Push a new URL onto the history and navigate to it. Truncates
   /// any forward entries (browser-standard new-link behaviour).
   ///
@@ -69,23 +59,5 @@ extension DocumentModel {
     NSSound.beep()
     #endif
     return false
-  }
-}
-
-/// Serializable form of a window's back/forward stack. Persisted via
-/// `@SceneStorage` so each window restores to whichever document the
-/// user was viewing when the app last quit.
-struct HistorySnapshot: Codable, Sendable, Equatable {
-  let urls: [URL]
-  let currentIndex: Int
-
-  var nilIfEmpty: HistorySnapshot? {
-    urls.isEmpty ? nil : self
-  }
-
-  /// The URL the snapshot says the window was last viewing, or `nil`
-  /// when `currentIndex` is out of range (corrupted store).
-  var currentURL: URL? {
-    urls.indices.contains(currentIndex) ? urls[currentIndex] : nil
   }
 }

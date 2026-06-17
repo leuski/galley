@@ -38,7 +38,18 @@ final class Defaults: GalleyRenderDefaults,
   @DefaultsKey var template: String?
   @DefaultsKey var enablePerDocumentOverrides: Bool = false
   @DefaultsKey var openBehavior: OpenBehavior = .newWindow
-  @DefaultsKey var perFileStateStore: [String: PerFileState] = [:]
+  /// Per-window persisted state, keyed by `DocumentSceneID.description`.
+  /// The window-keyed half of `DocumentStore` — SwiftUI restores the
+  /// `WindowGroup` value (the id), and the window rehydrates its
+  /// document from this map. Replaces the old `@SceneStorage("history")`
+  /// slot (broken on visionOS). See docs/rebuild-document-windowing.md.
+  @DefaultsKey var windowSnapshots: [String: DocumentModel.Snapshot] = [:]
+  /// Per-file persisted state, keyed by `DocumentStore.fileKey(_:)`. The
+  /// url-keyed half of `DocumentStore`: a fresh window opening a known
+  /// file re-seeds its zoom/scroll/TOC/choices from here. Same
+  /// `Snapshot` type as `windowSnapshots`; the nav stack collapses to
+  /// the single file.
+  @DefaultsKey var fileSnapshots: [String: DocumentModel.Snapshot] = [:]
   /// When on, the active page's background color is painted behind
   /// the window glass via `.containerBackground(_:for:.window)` so
   /// the toolbar/ornament/sidebar chrome sample it through their

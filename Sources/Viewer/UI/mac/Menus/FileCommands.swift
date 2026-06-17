@@ -8,7 +8,7 @@ import SwiftUI
 /// so we build it ourselves from `RecentDocumentsModel.urls`.
 struct FileCommands: Commands {
   @FocusedValue(\.documentModel) private var model
-  @Bindable var recents = AppBoot.shared.recents
+  @Bindable var recents = AppModel.shared.recents
 
   var visibleWindows: [NSWindow] {
     NSApp.windows.filter { window in
@@ -23,7 +23,7 @@ struct FileCommands: Commands {
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
       Button("Open…", systemImage: "arrow.up.forward") {
-        AppBoot.shared.recents.presentOpenPanel()
+        AppModel.shared.recents.presentOpenPanel()
       }
         .keyboardShortcut("o", modifiers: .command)
         .accessibilityIdentifier(ViewerA11yID.FileMenu.open)

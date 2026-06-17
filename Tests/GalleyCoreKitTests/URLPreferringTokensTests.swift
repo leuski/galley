@@ -22,8 +22,12 @@ struct URLPreferringTokensTests {
     let tokens = url.galleyPreferringTokens
     // The file:// form so Finder re-opens route here…
     #expect(tokens.contains { $0.hasPrefix("file://") && $0.hasSuffix("/Users/me/a.md") })
-    // …and the galley:// form so BBEdit / in-process menu opens do too.
-    #expect(tokens.contains { $0.hasPrefix("galley:") && $0.hasSuffix("/Users/me/a.md") })
+    // …and the galley-viewer:// form so menu / Server opens route here
+    // too (the Viewer claims `galley-viewer://`; `galley://` is the
+    // Server's scheme).
+    #expect(tokens.contains {
+      $0.hasPrefix("galley-viewer:") && $0.hasSuffix("/Users/me/a.md")
+    })
   }
 
   @Test("Adds the standardized file form when it differs")

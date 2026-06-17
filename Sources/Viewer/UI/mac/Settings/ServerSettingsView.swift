@@ -25,8 +25,8 @@ struct ServerSettingsView: View {
   @State private var graceExpired: Bool = false
 
   var body: some View {
-    let peerConnected = AppBoot.shared.kosmos.isServerPeerConnected
-    let serverURL = AppBoot.shared.kosmos.serverPeerHTTPURL
+    let peerConnected = AppModel.shared.kosmos.isServerPeerConnected
+    let serverURL = AppModel.shared.kosmos.serverPeerHTTPURL
     let agentEnabled = agent.isEnabled
     let status = Self.computeStatus(
       peerConnected: peerConnected,

@@ -1,30 +1,35 @@
 //
-//  DcoumentScene.swift
+//  DocumentScene.swift
 //  Galley
-//
-//  Created by Anton Leuski on 5/31/26.
 //
 
 import SwiftUI
 import GalleyCoreKit
 
+/// The document window group, shared by macOS and visionOS.
+///
+/// The `WindowGroup` value type is `DocumentSceneID` — a minted UUID, so
+/// SwiftUI hands the content view a non-nil id for every window (via
+/// `defaultValue:`) and persists/restores it. There is no nil-value
+/// bootstrap member; the document a window shows is resolved from
+/// `DocumentStore` by id (restored) or arrives via `onOpenURL` (remote).
 struct DocumentScene: Scene {
   static let id = "document"
   static let events = Set([
     "file:", GalleyViewerRequestActivity.schemeExternalToken])
 
   var body: some Scene {
-    // The document scene. SwiftUI materializes one `url == nil` member
-    // at cold launch (WindowProbe FINDINGS §3) which `MacContentView`
-    // uses as the invisible bootstrap anchor — capturing `openWindow`,
-    // hosting `.onOpenURL`, and running the FTUE Open panel. No
-    // separate welcome scene is needed.
-    WindowGroup(id: Self.id, for: DocumentTarget.self) { $target in
-#if os(macOS)
-      MacContentView(target: $target)
-#else
-      VisionContentView(target: $target)
-#endif
+    // Optional value (no `defaultValue:`). The `defaultValue:` variant
+    // force-unwraps the restored binding, which TRAPS when SwiftUI
+    // restores a window whose persisted value can't decode as a
+    // `DocumentSceneID` (e.g. saved state from a build that used a
+    // different value type, or corrupt state) — a launch crash before
+    // any of our code runs. With the optional variant an undecodable
+    // value is simply `nil`, and `ContentView` mints a fresh id.
+    WindowGroup(id: Self.id, for: DocumentSceneID.self) { $sceneID in
+      ContentView(sceneID: sceneID)
+    } defaultValue: {
+      DocumentSceneID.next()
     }
     .handlesExternalEvents(matching: Self.events)
 #if os(macOS)
@@ -37,7 +42,8 @@ struct DocumentScene: Scene {
   }
 
 #if os(macOS)
-  @Bindable private var boot = AppBoot.shared
+  private var appModel: AppModel { AppModel.shared }
+
   @CommandsBuilder
   var commands: some Commands {
     SettingsCommands()
@@ -45,9 +51,7 @@ struct DocumentScene: Scene {
     EditCommands()
     ToolbarCommands()
     ViewCommands()
-    if let model = boot.model {
-      FormatCommands(appModel: model)
-    }
+    FormatCommands(appModel: appModel)
     WindowCommands()
     HelpCommands()
   }

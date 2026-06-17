@@ -4,7 +4,9 @@ import KosmosAppKit
 
 @main
 struct ViewerApp: App {
-  @State private var boot = AppBoot.shared
+  // Holding the singleton here builds it (and runs `warmCache`) at app
+  // launch, before any scene body — it *is* the boot point now.
+  @State private var app = AppModel.shared
 #if os(macOS)
 #else
   @Environment(\.openWindow) private var openWindow
@@ -26,8 +28,7 @@ struct ViewerApp: App {
     // any UI reflects stale state. No-op when nothing is installed.
     // Fire-and-forget: scenes don't need to wait on it.
     Task { await ActiveServerAgent.shared.validateAndRepair() }
-    // Start the Kosmos surface so the peer set populates by the
-    // time the menu / pill consult it. Independent of `AppBoot`.
+    // (Kosmos starts in `AppModel.init`, the app's boot point.)
 #else
 
 #endif
@@ -42,14 +43,14 @@ struct ViewerApp: App {
         // whole app is on its way out — otherwise per-scene
         // `.background` transitions during app backgrounding would
         // each look like a fresh dismissal and try to spawn empties.
-        boot.model?.didChangePhase(scenePhase: newPhase) {
+        app.didChangePhase(scenePhase: newPhase) {
           openWindow(id: DocumentScene.id)
         }
         switch newPhase {
         case .active, .inactive:
-          boot.kosmos.publishResume()
+          app.kosmos.publishResume()
         case .background:
-          boot.kosmos.publishSuspend()
+          app.kosmos.publishSuspend()
         @unknown default:
           break
         }

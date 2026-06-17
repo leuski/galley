@@ -34,7 +34,7 @@ public struct DocumentTarget: Sendable, Hashable, Codable,
     guard
       let components = URLComponents(
         url: url, resolvingAgainstBaseURL: false),
-      components.scheme?.lowercased() == scheme.lowercased()
+      components.scheme == scheme
     else
     {
       return nil
@@ -47,9 +47,11 @@ public struct DocumentTarget: Sendable, Hashable, Codable,
 
       if let urlString {
         return URL(string: urlString)
-      } else {
-        return URL(fileURLWithPath: components.path)
       }
+      // A document scheme with no path carries no document — reject it
+      // rather than fabricating a file URL from an empty path.
+      guard !components.path.isEmpty else { return nil }
+      return URL(fileURLWithPath: components.path)
     }
 
     guard let documentURL = parseURL() else { return nil }
