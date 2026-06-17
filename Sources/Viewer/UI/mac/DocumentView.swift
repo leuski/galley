@@ -11,32 +11,19 @@ private let log = Logger(
   subsystem: bundleIdentifier, category: "DocumentView")
 
 /// The viewer surface for a single document window. Mounted by
-/// `ContentView` once the window has a `DocumentModel` (built from a
+/// `DocumentSceneContent` once the window has a `DocumentModel` (built from a
 /// restored snapshot or an inbound URL) — so this view always has a
 /// concrete document and a hydrated `AppModel` to work with.
 struct DocumentView: View {
-  /// The window's document model — built and cached by `ContentView`
+  /// The window's document model — built and cached by `DocumentSceneContent`
   /// (`DocumentModel.forScene` / `.open`), already populated and
   /// rendering. The view never constructs it, never owns persistence,
   /// and never observes it to mutate another model.
   let model: DocumentModel
 
   private var appModel: AppModel { model.appModel }
-  private var recents: RecentDocumentsModel { AppModel.shared.recents }
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var hostWindow: NSWindow?
-
-  /// Transient text-field value for the rename alert. Seeded from
-  /// `model.documentURL.lastPathComponent` whenever
-  /// `model.isRenameRequested` flips true (see the `.onChange` in
-  /// `body`). Lives on the view because it has no meaning outside
-  /// the alert's lifetime.
-  @State private var renameInput = ""
-
-  /// Non-nil while the SwiftUI "Couldn't export PDF" alert is up.
-  /// Set by the export flow on failure; cleared when the alert is
-  /// dismissed.
-  @State private var exportPDFError: String?
 
   init(model: DocumentModel) {
     self.model = model
@@ -45,21 +32,12 @@ struct DocumentView: View {
   var body: some View {
     @Bindable var model = model
     return splitView
-      .overlay(alignment: .bottom) {
-        if let notice = model.notice {
-          NoticeBanner(message: notice.message) {
-            model.dismissNotice()
-          }
-          .padding()
-          .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-      }
-      .animation(reduceMotion ? nil : .default, value: model.notice)
+      .modifier(NoticeModifier(model: model))
       .windowAccessor { window in
         // The window is always visible — no reveal gate. Resolve it
         // once to patch the AppKit tab-bar "+" (so a user "+" click
         // opens via the Open panel + activity URL). Help skips it.
-        // Inbound-URL routing lives in `ContentView`, not here.
+        // Inbound-URL routing lives in `DocumentSceneContent`, not here.
         guard let window, window !== hostWindow else { return }
         hostWindow = window
         window.alphaValue = 1
@@ -67,48 +45,9 @@ struct DocumentView: View {
           NewTabAction.install(on: window)
         }
       }
-      .focusedSceneValue(\.documentModel, model)
-      .alert(
-        "Rename Document",
-        isPresented: $model.isRenameRequested
-      ) {
-        TextField(
-          model.documentURL.lastPathComponent, text: $renameInput)
-        Button("Rename") { performRename() }
-        Button("Cancel", role: .cancel) { }
-      } message: {
-        Text("Enter a new file name for this document.")
-      }
-      .onChange(of: model.isRenameRequested) { _, new in
-        if new { renameInput = model.documentURL.lastPathComponent }
-      }
-      .alert(
-        "Couldn’t export PDF",
-        isPresented: exportPDFErrorPresented,
-        presenting: exportPDFError
-      ) { _ in
-        Button("OK") { exportPDFError = nil }
-      } message: { message in
-        Text(message)
-      }
-      .fileExporter(
-        isPresented: $model.isExportingPDF,
-        item: model.pdfExport,
-        contentTypes: [.pdf],
-        defaultFilename: model.documentURL
-          .deletingPathExtension().lastPathComponent
-      ) { result in
-        if case .failure(let error) = result {
-          exportPDFError = error.localizedDescription
-        }
-      }
-      .fileDialogDefaultDirectory(
-        model.documentURL.parent)
+      .modifier(RenameModifier(model: model))
+      .modifier(ExportModifier(model: model))
       .navigationDocument(model.documentURL, when: model.kind == .document)
-      .navigationTitle(
-        model.kind == .help
-          ? Text("Help")
-          : Text(model.documentURL.lastPathComponent))
       .navigationSubtitle(model.page.title)
   }
 
@@ -134,8 +73,7 @@ struct DocumentView: View {
       // auto-injected one and provide our own non-customizable toggle in
       // `navigationToolbarItems` instead.
     } detail: {
-      WebView(model.page)
-        .frame(minWidth: webViewMinWidth)
+      DocumentMainContent(model: model)
         // Collapse the TOC sidebar just before the very first paint
         // of this split view if the user wanted it closed. `showsTOC`
         // starts `true` so NavigationSplitView is born with a sidebar
@@ -150,34 +88,6 @@ struct DocumentView: View {
             model.savedShowsTOC = true
             model.showsTOC = false
           }
-        }
-        // The WebView's pre-paint canvas paints system-white during
-        // the gap between mount and the first HTML layout — visible
-        // as a white flash on tab open / reload regardless of CSS.
-        // Cover that gap with the resolved page bg (which falls
-        // back through last-seen → system bg) until `isPageRendered`
-        // flips true via the BackgroundColorBridge post-layout fire.
-        .overlay {
-          if !model.isPageRendered {
-            model.pageBackgroundColor.allowsHitTesting(false)
-          }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-          if model.find.isVisible {
-            FindBar(model: model.find)
-              .transition(.move(edge: .top).combined(with: .opacity))
-          }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-          if Defaults.shared.showsStatusBar {
-            StatusBar(
-              stats: model.stats,
-              wordsPerMinute: Defaults.shared.readingWordsPerMinute)
-              .transition(.move(edge: .bottom).combined(with: .opacity))
-          }
-        }
-        .toolbar(id: model.kind == .document ? "viewer.main" : "viewer.help") {
-          toolbarContent(appModel: appModel)
         }
     }
     .navigationSplitViewStyle(.balanced)
@@ -215,151 +125,6 @@ struct DocumentView: View {
       ? .userSystem
       : (model.pageBackgroundColor.isLuminanceDark ? .dark : .light))
   }
-
-  /// Bridges the optional error string to the boolean the
-  /// `.alert(... isPresented:)` modifier expects: clearing the error
-  /// dismisses the alert and vice versa.
-  private var exportPDFErrorPresented: Binding<Bool> {
-    Binding(
-      get: { exportPDFError != nil },
-      set: { if !$0 { exportPDFError = nil } })
-  }
-
-  /// Run the rename triggered by the SwiftUI alert's "Rename" button.
-  /// Trims whitespace, no-ops on empty / unchanged input, beeps on
-  /// failure (matches the prior NSAlert flow), and on success records
-  /// the renamed URL with Open Recent and follows the WindowGroup
-  /// binding to the new path.
-  private func performRename() {
-    let trimmed = renameInput
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    let currentURL = model.documentURL
-    guard !trimmed.isEmpty, trimmed != currentURL.lastPathComponent
-    else { return }
-    Task { @MainActor in
-      do {
-        let newURL = try await model.renameCurrentDocument(toName: trimmed)
-        recents.record(newURL)
-      } catch {
-        // `renameCurrentDocument` already posted a notice banner via
-        // `report(failure:)`. Beep matches the prior NSAlert UX; log
-        // the underlying error so support reports retain context.
-        log.error("""
-          Rename failed for \(model.documentURL.path, privacy: .private): \
-          \(error.localizedDescription, privacy: .public)
-          """)
-        NSSound.beep()
-      }
-    }
-  }
-
-  @ToolbarContentBuilder
-  private func toolbarContent(
-    appModel: AppModel
-  ) -> some CustomizableToolbarContent {
-    navigationToolbarItems
-    //    ToolbarSpacer(.flexible, placement: .automatic)
-    if model.kind == .document {
-      mainToolbarItems(appModel: appModel)
-    }
-    zoomToolbarItems
-    //    ToolbarSpacer(.fixed, placement: .automatic)
-  }
-
-  @ToolbarContentBuilder
-  private var navigationToolbarItems: some CustomizableToolbarContent {
-    ToolbarItem(id: "backForward", placement: .navigation) {
-      Label {
-        Text("Back/Forward")
-      } icon: {
-        ControlGroup {
-          Action.back(model).toolbarItem()
-          Action.forward(model).toolbarItem()
-        }
-        .controlGroupStyle(.navigation)
-      }
-    }
-    .defaultCustomization(.hidden)
-  }
-
-  @ToolbarContentBuilder
-  private func mainToolbarItems(
-    appModel: AppModel
-  ) -> some CustomizableToolbarContent {
-    ToolbarItem(id: "renderer", placement: .confirmationAction) {
-      RendererToolbarPicker(appModel: appModel, docModel: model)
-    }
-    .defaultCustomization(.hidden)
-
-    ToolbarItem(id: "template", placement: .confirmationAction) {
-      TemplateToolbarPicker(appModel: appModel, docModel: model)
-    }
-    .defaultCustomization(.hidden)
-
-    ToolbarItem(id: "reload", placement: .confirmationAction) {
-      Action.reload(model).toolbarItem()
-    }
-    .defaultCustomization(.hidden)
-  }
-
-  @ToolbarContentBuilder
-  private var zoomToolbarItems: some CustomizableToolbarContent {
-    ToolbarItem(id: "zoomOut", placement: .confirmationAction) {
-      Action.zoomOut(model.zoom).toolbarItem()
-    }
-    .defaultCustomization(.hidden)
-
-    ToolbarItem(id: "zoomReset", placement: .confirmationAction) {
-      Action.resetZoom(model.zoom).toolbarItem()
-    }
-    .defaultCustomization(.hidden)
-
-    ToolbarItem(id: "zoomIn", placement: .confirmationAction) {
-      Action.zoomIn(model.zoom).toolbarItem()
-    }
-    .defaultCustomization(.hidden)
-  }
-
-  private var zoomLabel: String {
-    let percent = Int((model.zoom.zoomScale * 100).rounded())
-    return "\(percent)%"
-  }
-}
-
-/// Brings a toolbar `Menu` icon down to the visual size of sibling
-/// toolbar buttons. SwiftUI hosts toolbar menus as `NSMenuToolbarItem`
-/// at AppKit's larger metric, and font / imageScale / controlSize all
-/// get dropped at the bridge — only `.scaleEffect` survives because it
-/// runs at the SwiftUI compositor before AppKit sees the rendered
-/// layer. Hit-testing keeps the original frame, which is fine.
-/// This is only needed (0.8) for unifiedCompact toolbar style. .unified
-/// style works correctly with scale set to 1.
-private let toolbarMenuIconScale: CGFloat = 1.0
-
-private struct RendererToolbarPicker: View {
-  @Bindable var appModel: AppModel
-  @Bindable var docModel: DocumentModel
-
-  var body: some View {
-    processorMenu(
-      appModel: appModel,
-      documentModel: docModel)
-    .scaleEffect(toolbarMenuIconScale, anchor: .center)
-    .help("Markdown processor")
-  }
-}
-
-private struct TemplateToolbarPicker: View {
-  @Bindable var appModel: AppModel
-  @Bindable var docModel: DocumentModel
-
-  var body: some View {
-    templateMenu(
-      appModel: appModel,
-      documentModel: docModel)
-    .scaleEffect(toolbarMenuIconScale, anchor: .center)
-    .help("Template")
-  }
 }
 
 private extension View {
@@ -395,4 +160,125 @@ private struct NoticeBanner: View {
     .background(.regularMaterial, in: .rect(cornerRadius: 8))
   }
 }
+
+struct NoticeModifier: ViewModifier {
+  @Bindable var model: DocumentModel
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  func body(content: Content) -> some View {
+    content
+      .overlay(alignment: .bottom) {
+        if let notice = model.notice {
+          NoticeBanner(message: notice.message) {
+            model.dismissNotice()
+          }
+          .padding()
+          .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+      }
+      .animation(reduceMotion ? nil : .default, value: model.notice)
+  }
+}
+
+struct ExportModifier: ViewModifier {
+  @Bindable var model: DocumentModel
+
+  /// Non-nil while the SwiftUI "Couldn't export PDF" alert is up.
+  /// Set by the export flow on failure; cleared when the alert is
+  /// dismissed.
+  @State private var exportPDFError: String?
+
+  /// Bridges the optional error string to the boolean the
+  /// `.alert(... isPresented:)` modifier expects: clearing the error
+  /// dismisses the alert and vice versa.
+  private var exportPDFErrorPresented: Binding<Bool> {
+    Binding(
+      get: { exportPDFError != nil },
+      set: { if !$0 { exportPDFError = nil } })
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .alert(
+        "Couldn’t export PDF",
+        isPresented: exportPDFErrorPresented,
+        presenting: exportPDFError
+      ) { _ in
+        Button("OK") { exportPDFError = nil }
+      } message: { message in
+        Text(message)
+      }
+      .fileExporter(
+        isPresented: $model.isExportingPDF,
+        item: model.pdfExport,
+        contentTypes: [.pdf],
+        defaultFilename: model.documentURL
+          .deletingPathExtension().lastPathComponent
+      ) { result in
+        if case .failure(let error) = result {
+          exportPDFError = error.localizedDescription
+        }
+      }
+      .fileDialogDefaultDirectory(
+        model.documentURL.parent)
+  }
+}
+
+struct RenameModifier: ViewModifier {
+  @Bindable var model: DocumentModel
+  /// Transient text-field value for the rename alert. Seeded from
+  /// `model.documentURL.lastPathComponent` whenever
+  /// `model.isRenameRequested` flips true (see the `.onChange` in
+  /// `body`). Lives on the view because it has no meaning outside
+  /// the alert's lifetime.
+  @State private var renameInput = ""
+  private var recents: RecentDocumentsModel { AppModel.shared.recents }
+
+  func body(content: Content) -> some View {
+    content
+      .alert(
+        "Rename Document",
+        isPresented: $model.isRenameRequested
+      ) {
+        TextField(
+          model.documentURL.lastPathComponent, text: $renameInput)
+        Button("Rename") { performRename() }
+        Button("Cancel", role: .cancel) { }
+      } message: {
+        Text("Enter a new file name for this document.")
+      }
+      .onChange(of: model.isRenameRequested) { _, new in
+        if new { renameInput = model.documentURL.lastPathComponent }
+      }
+  }
+
+  /// Run the rename triggered by the SwiftUI alert's "Rename" button.
+  /// Trims whitespace, no-ops on empty / unchanged input, beeps on
+  /// failure (matches the prior NSAlert flow), and on success records
+  /// the renamed URL with Open Recent and follows the WindowGroup
+  /// binding to the new path.
+  private func performRename() {
+    let trimmed = renameInput
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let currentURL = model.documentURL
+    guard !trimmed.isEmpty, trimmed != currentURL.lastPathComponent
+    else { return }
+    Task { @MainActor in
+      do {
+        let newURL = try await model.renameCurrentDocument(toName: trimmed)
+        recents.record(newURL)
+      } catch {
+        // `renameCurrentDocument` already posted a notice banner via
+        // `report(failure:)`. Beep matches the prior NSAlert UX; log
+        // the underlying error so support reports retain context.
+        log.error("""
+          Rename failed for \(model.documentURL.path, privacy: .private): \
+          \(error.localizedDescription, privacy: .public)
+          """)
+        NSSound.beep()
+      }
+    }
+  }
+}
+
 #endif

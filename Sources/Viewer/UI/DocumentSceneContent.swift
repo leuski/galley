@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  DocumentSceneContent.swift
 //  Galley
 //
 //  Shared (macOS + visionOS) root content for one document window.
@@ -16,7 +16,7 @@ import SwiftUI
 import AppKit
 #endif
 
-struct ContentView: View {
+struct DocumentSceneContent: View {
   let sceneID: DocumentSceneID
 
   /// `nil` == welcome (no document). Built synchronously in `init` from

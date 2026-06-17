@@ -169,7 +169,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   @ObservationIgnored private var pendingScroll: Scroll?
 
   /// Latest known scroll position, updated by `ScrollBridge` from a
-  /// debounced JS listener. ContentView mirrors this to
+  /// debounced JS listener. DocumentSceneContent mirrors this to
   /// `@SceneStorage` so the next session can hydrate `pendingScrollY`.
   private(set) var currentScrollY: Double = 0
 
@@ -303,7 +303,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       // listener after the first navigation in macOS 26 WebPage.
       editorBridge,
       // Debounced scroll listener — feeds `currentScrollY` so
-      // ContentView can persist the resting position via `@SceneStorage`.
+      // DocumentSceneContent can persist the resting position.
       scrollBridge,
       // Heading extraction. Runs once per load, assigns synthetic ids
       // to headings that lack one, and posts the list back. Renderer-
@@ -384,7 +384,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       Task { await self?.openInEditor(line: line) }
     }
     // Latest debounced scroll position. `@ObservationIgnored` would
-    // suppress the SwiftUI invalidation that lets ContentView mirror
+    // suppress the SwiftUI invalidation that lets DocumentSceneContent mirror
     // this to `@SceneStorage`, so we leave it observed — the listener
     // fires at most every ~150 ms, well below per-frame cost.
     scrollBridge.onScroll = { [weak self] yPos in

@@ -212,7 +212,7 @@ final class UITests: XCTestCase {
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
 
     // A real document window must become visible. The
-    // `.navigationTitle(...)` on ContentView surfaces the file
+    // `.navigationTitle(...)` on DocumentSceneContent surfaces the file
     // basename to AppKit; we wait for a window with that title to
     // become hittable (alpha=1, which only happens when a document
     // binds — exactly the production behavior we're pinning).

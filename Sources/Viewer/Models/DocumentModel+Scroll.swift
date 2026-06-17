@@ -52,7 +52,7 @@ extension DocumentModel {
   /// (multimarkdown, discount, Markdown.pl) — the user just lands at
   /// the top of the document.
   ///
-  /// Public so ContentView can fire a scroll-only update when a
+  /// Public so DocumentSceneContent can fire a scroll-only update when a
   /// `galley://` open targets a URL already bound to a window —
   /// we don't want to reset history just to re-jump the cursor.
 

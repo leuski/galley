@@ -25,9 +25,9 @@ struct DocumentScene: Scene {
     // `DocumentSceneID` (e.g. saved state from a build that used a
     // different value type, or corrupt state) — a launch crash before
     // any of our code runs. With the optional variant an undecodable
-    // value is simply `nil`, and `ContentView` mints a fresh id.
+    // value is simply `nil`, and `DocumentSceneContent` mints a fresh id.
     WindowGroup(id: Self.id, for: DocumentSceneID.self) { $sceneID in
-      ContentView(sceneID: sceneID)
+      DocumentSceneContent(sceneID: sceneID)
     } defaultValue: {
       DocumentSceneID.next()
     }

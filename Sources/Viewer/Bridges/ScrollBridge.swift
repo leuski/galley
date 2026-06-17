@@ -6,7 +6,7 @@ import KosmosAppKit
 
 /// Receives `{ "y": <Double> }` messages from a debounced scroll
 /// listener in the rendered preview, so the owning DocumentModel can
-/// keep the latest scroll position observable and ContentView can
+/// keep the latest scroll position observable and DocumentSceneContent can
 /// mirror it to `@SceneStorage` for cross-launch state restoration.
 ///
 /// The listener fires ~150 ms after the last scroll event rather than

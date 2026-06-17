@@ -10,7 +10,7 @@ import SwiftUI
 import GalleyCoreKit
 
 struct MoreMenu: View {
-  @Binding var isFilePickerPresented: Bool
+  @State var isFilePickerPresented = false
   @Bindable var model: DocumentModel
   @Bindable var appModel = AppModel.shared
   @Environment(\.openWindow) private var openWindow
@@ -78,11 +78,23 @@ struct MoreMenu: View {
       Label("More", systemImage: "ellipsis.circle")
     }
     .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
-
+    // The "Open Document…" entry in the More menu drives this. Picks
+    // fire an activity URL (open-behavior handled in `DocumentSceneContent`) —
+    // the same path every other open takes.
+    .fileImporter(
+      isPresented: $isFilePickerPresented,
+      allowedContentTypes: MarkdownFileTypes.allTypesAndPlainText,
+      allowsMultipleSelection: false
+    ) { result in
+      guard case .success(let urls) = result, let url = urls.first
+      else { return }
+      _ = url.startAccessingSecurityScopedResource()
+      GalleyViewerRequestActivity(url: url).open()
+    }
   }
 
   /// Open Recent submenu. Each pick fires an activity URL; the user's
-  /// open-behavior (replace / new window) is applied in `ContentView`.
+  /// open-behavior (replace / new window) is applied in `DocumentSceneContent`.
   @ViewBuilder
   private var openRecentMenu: some View {
     @Bindable var recents = AppModel.shared.recents

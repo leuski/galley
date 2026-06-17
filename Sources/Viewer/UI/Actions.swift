@@ -37,7 +37,7 @@ extension Action {
 
   /// Sidebar / Table-of-Contents toggle. Single source of truth shared
   /// by the View menu (via `menuItem`) and the document toolbar (via
-  /// `toolbarItem`). Title flips Show/Hide in the menu; the toolbar
+  /// `toolbarButton`). Title flips Show/Hide in the menu; the toolbar
   /// uses the static "Toggle…" label as its tooltip / accessibility
   /// label.
   static func toggleTOC(_ model: DocumentModel?) -> Action {
