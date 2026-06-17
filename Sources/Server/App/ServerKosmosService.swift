@@ -134,13 +134,13 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
       dispatch → local Viewer (no AVP): \
       \(target, privacy: .public)
       """)
-    if kosmos?.dispatchToClient(target, deviceType: .mac) == true {
-      return true
-    }
-    log.notice("""
-      dispatch → local Viewer (no tunnel): \
-      \(target, privacy: .public)
-      """)
+//    if kosmos?.dispatchToClient(target, deviceType: .mac) == true {
+//      return true
+//    }
+//    log.notice("""
+//      dispatch → local Viewer (no tunnel): \
+//      \(target, privacy: .public)
+//      """)
     openInLocalViewer(target)
     return false
   }

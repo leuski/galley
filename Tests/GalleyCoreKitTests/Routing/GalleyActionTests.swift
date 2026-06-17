@@ -271,6 +271,17 @@ struct GalleyActionTests {
     #expect(OpenSettingsActivity(from: url) == .init(tab))
   }
 
+  /// The plain "Settings…" menu item (`SettingsCommands`) opens the
+  /// Settings window with no preselected tab. Pin that the no-tab
+  /// activity emits a `galley-settings://` URL that parses back to an
+  /// empty (tab-less) activity — the contract that menu path relies on.
+  @Test("openSettings with no tab round-trips to a tab-less activity")
+  func settingsNoTabURLRoundTrip() throws {
+    let url = try #require(OpenSettingsActivity().url)
+    #expect(url.scheme == "galley-settings")
+    #expect(OpenSettingsActivity(from: url) == .init(nil))
+  }
+
   // MARK: - Help URL helpers
 
   @Test("galley-help URL round-trips to the bundle file path")

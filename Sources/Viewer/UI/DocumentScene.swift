@@ -40,6 +40,7 @@ struct DocumentScene: Scene {
   @Bindable private var boot = AppBoot.shared
   @CommandsBuilder
   var commands: some Commands {
+    SettingsCommands()
     FileCommands()
     EditCommands()
     ToolbarCommands()

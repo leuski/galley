@@ -2,6 +2,10 @@
 import AppKit
 import GalleyCoreKit
 import SwiftUI
+import OSLog
+
+private let logger = Logger(
+  subsystem: bundleIdentifier, category: "MacContentView")
 
 /// Thin parent for a document window's root scene. Splits the
 /// optional `Binding<DocumentTarget?>` SwiftUI hands us from
@@ -34,7 +38,10 @@ struct MacContentView: View {
         // adopts a document. Replaces the old `Window("welcome")`.
         Color.clear
           .background(BootWindowHider())
-          .handlesInboundURLs { self.target = $0 }
+          .handlesInboundURLs(preferring: ["*"]) {
+            logger.notice("received \($0, privacy: .public)")
+            self.target = $0
+          }
           .task(id: boot.model != nil) {
             guard boot.model != nil else { return }
             await runFTUEIfNeeded()
