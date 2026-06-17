@@ -19,36 +19,30 @@ struct DocumentView: View {
   /// (`DocumentModel.forScene` / `.open`), already populated and
   /// rendering. The view never constructs it, never owns persistence,
   /// and never observes it to mutate another model.
-  let model: DocumentModel
+  @Bindable var model: DocumentModel
 
-  private var appModel: AppModel { model.appModel }
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var hostWindow: NSWindow?
 
-  init(model: DocumentModel) {
-    self.model = model
-  }
-
   var body: some View {
-    @Bindable var model = model
-    return splitView
+    splitView
       .modifier(NoticeModifier(model: model))
-      .windowAccessor { window in
-        // The window is always visible — no reveal gate. Resolve it
-        // once to patch the AppKit tab-bar "+" (so a user "+" click
-        // opens via the Open panel + activity URL). Help skips it.
-        // Inbound-URL routing lives in `DocumentSceneContent`, not here.
-        guard let window, window !== hostWindow else { return }
-        hostWindow = window
-        window.alphaValue = 1
-        if model.kind == .document {
-          NewTabAction.install(on: window)
-        }
-      }
+      .modifier(WindowAttachedModifier(
+          hostWindow: $hostWindow,
+          installNewTabAction: model.kind == .document))
       .modifier(RenameModifier(model: model))
       .modifier(ExportModifier(model: model))
       .navigationDocument(model.documentURL, when: model.kind == .document)
       .navigationSubtitle(model.page.title)
+    // Flip the view's color scheme so AppKit-rendered chrome text
+    // (window title, toolbar labels) inverts when the page bg is
+    // dark — otherwise the system black title disappears against a
+    // black body. While re-rendering after a template change,
+    // pin the scheme to the user's system pref instead so WebKit's
+    // `prefers-color-scheme` media queries on the new template pick
+    // the user's preferred variant — not whichever variant was
+    // current under the previous template's bg-luminance scheme.
+      .preferredColorScheme(model.resolvedColorScheme)
   }
 
   /// The window's main split: TOC sidebar (column-visibility bound to
@@ -111,19 +105,6 @@ struct DocumentView: View {
     .containerBackground(
       Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
-    // Flip the view's color scheme so AppKit-rendered chrome text
-    // (window title, toolbar labels) inverts when the page bg is
-    // dark — otherwise the system black title disappears against a
-    // black body. While re-rendering after a template change,
-    // pin the scheme to the user's system pref instead so WebKit's
-    // `prefers-color-scheme` media queries on the new template pick
-    // the user's preferred variant — not whichever variant was
-    // current under the previous template's bg-luminance scheme.
-    .preferredColorScheme(
-      model.isRenderingNewTemplate
-      || !Defaults.shared.tintWindowWithPageBackground
-      ? .userSystem
-      : (model.pageBackgroundColor.isLuminanceDark ? .dark : .light))
   }
 }
 
@@ -135,6 +116,27 @@ private extension View {
   @ViewBuilder
   func navigationDocument(_ url: URL, when condition: Bool) -> some View {
     if condition { navigationDocument(url) } else { self }
+  }
+}
+
+struct WindowAttachedModifier: ViewModifier {
+  @Binding var hostWindow: NSWindow?
+  let installNewTabAction: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .windowAccessor { window in
+        // The window is always visible — no reveal gate. Resolve it
+        // once to patch the AppKit tab-bar "+" (so a user "+" click
+        // opens via the Open panel + activity URL). Help skips it.
+        // Inbound-URL routing lives in `DocumentSceneContent`, not here.
+        guard let window, window !== hostWindow else { return }
+        hostWindow = window
+        window.alphaValue = 1
+        if installNewTabAction {
+          NewTabAction.install(on: window)
+        }
+      }
   }
 }
 

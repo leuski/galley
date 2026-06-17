@@ -26,9 +26,6 @@ struct DocumentSceneContent: View {
 
   @Environment(\.openWindow) private var openWindow
 
-  private var appModel: AppModel { AppModel.shared }
-  private var recents: RecentDocumentsModel { AppModel.shared.recents }
-
   init(sceneID: DocumentSceneID) {
     self.sceneID = sceneID
     _model = State(
@@ -89,7 +86,6 @@ struct DocumentSceneContent: View {
       DocumentView(model: model)
 #else
       VisionDocumentScreen(model: model)
-        .navigationSplitViewStyle(.balanced)
 #endif
     } else {
       WelcomeView()
@@ -104,8 +100,8 @@ struct DocumentSceneContent: View {
     guard let live = model else {
       // Empty window adopts the document in place (welcome → document).
       model = DocumentModel
-        .open(target: target, id: sceneID, appModel: appModel)
-      recents.record(target.documentURL)
+        .open(target: target, id: sceneID, appModel: AppModel.shared)
+      AppModel.shared.recents.record(target.documentURL)
       return
     }
     // Same document → just scroll + focus (dedup).
@@ -123,7 +119,7 @@ struct DocumentSceneContent: View {
     // new-window / new-tab the window declines foreign docs, so SwiftUI
     // spawns a fresh window instead and this line is never reached for
     // them. So: replace in place.
-    recents.record(target.documentURL)
+    AppModel.shared.recents.record(target.documentURL)
     Task { await live.bind(to: target) }
   }
 

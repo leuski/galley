@@ -4,8 +4,8 @@
 //
 //  Pins the foundational value types for the windowing rebuild
 //  (docs/rebuild-document-windowing.md): the per-window identity
-//  `DocumentSceneID` and the single persistent shape
-//  `DocumentModel.Snapshot`.
+//  `DocumentSceneID`, the always-non-empty `DocumentModel.History`,
+//  and the single persistent shape `DocumentModel.Snapshot`.
 //
 
 import Foundation
@@ -29,29 +29,50 @@ struct DocumentSnapshotTests {
     #expect(decoded.description == a.description)
   }
 
-  @Test("Snapshot currentURL/hasDocument track history + index")
-  func snapshotCurrentURL() {
-    let empty = DocumentModel.Snapshot()
-    #expect(empty.currentURL == nil)
-    #expect(!empty.hasDocument)
+  @Test("History always holds at least one URL")
+  func historyIsNeverEmpty() {
+    let url = URL(fileURLWithPath: "/tmp/a.md")
+    let history = DocumentModel.History(url: url)
+    #expect(!history.isEmpty)
+    #expect(history.currentURL == url)
+    #expect(!history.canGoBack)
+    #expect(!history.canGoForward)
+  }
 
+  @Test("History navigate/back/forward tracks the current URL")
+  func historyNavigation() {
     let a = URL(fileURLWithPath: "/tmp/a.md")
     let b = URL(fileURLWithPath: "/tmp/b.md")
-    var s = DocumentModel.Snapshot(history: [a, b], currentIndex: 1)
-    #expect(s.currentURL == b)
-    #expect(s.hasDocument)
+    var history = DocumentModel.History(url: a)
 
-    // Out-of-range index degrades to nil rather than trapping.
-    s.currentIndex = 9
-    #expect(s.currentURL == nil)
+    history.navigate(to: b)
+    #expect(history.currentURL == b)
+    #expect(history.canGoBack)
+    #expect(!history.canGoForward)
+
+    let wentBack = history.goBack()
+    #expect(wentBack)
+    #expect(history.currentURL == a)
+    #expect(!history.canGoBack)
+    #expect(history.canGoForward)
+
+    let wentForward = history.goForward()
+    #expect(wentForward)
+    #expect(history.currentURL == b)
+  }
+
+  @Test("Snapshot currentURL reflects its history")
+  func snapshotCurrentURL() {
+    let url = URL(fileURLWithPath: "/tmp/doc.md")
+    let snapshot = DocumentModel.Snapshot(history: .init(url: url))
+    #expect(snapshot.currentURL == url)
   }
 
   @Test("Snapshot is Codable round-trip with all persistent fields")
   func snapshotCoding() throws {
     let url = URL(fileURLWithPath: "/tmp/doc.md")
     let original = DocumentModel.Snapshot(
-      history: [url],
-      currentIndex: 0,
+      history: .init(url: url),
       scrollY: 120.5,
       showsTOC: true,
       pageZoom: 1.25,

@@ -13,11 +13,7 @@ import WebKit
 /// — this view only renders chrome and forwards user intent as activity
 /// URLs. Inbound-URL routing lives in `DocumentSceneContent`, not here.
 struct VisionDocumentScreen: View {
-  let model: DocumentModel
-
-  init(model: DocumentModel) {
-    self.model = model
-  }
+  @Bindable var model: DocumentModel
 
   var body: some View {
     HStack(spacing: 0) {

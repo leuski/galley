@@ -29,18 +29,23 @@ extension DocumentModel {
     appModel.resolvedTemplate(templates: templates)
   }
 
-#if !os(macOS)
   /// Resolved document color scheme for the WebView. Per-document
   /// override wins when `enablePerDocumentOverrides` is on; otherwise
   /// the global default applies. visionOS-only — macOS adopts the
   /// system appearance directly.
   var resolvedColorScheme: ColorScheme {
+#if os(macOS)
+    isRenderingNewTemplate
+    || !Defaults.shared.tintWindowWithPageBackground
+    ? .userSystem
+    : (pageBackgroundColor.isLuminanceDark ? .dark : .light)
+#else
     if Defaults.shared.enablePerDocumentOverrides {
       return colorSchemes.selected.value.colorScheme
     }
     return appModel.colorSchemes.selected.value.colorScheme
-  }
 #endif
+  }
 
   /// Template whose HTML is currently painted in the WebView, per
   /// the last `BackgroundColorBridge` report. Falls back to the

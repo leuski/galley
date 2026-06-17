@@ -259,12 +259,13 @@ final class UITests: XCTestCase {
   /// preference as the most common cause.
   @MainActor
   func testWindowsRestoreOnRelaunch() throws {
-    throw XCTSkip("""
-      Deferred: pre-existing state-restoration failure (independent of \
-      the window-routing refactor). SwiftUI/talagentd save+restore of \
-      WindowGroup<DocumentTarget> values is not deterministic under the shared \
-      test container. Re-enable when the restoration path is revisited.
-      """)
+//    throw XCTSkip("""
+//      Deferred: pre-existing state-restoration failure (independent of \
+//      the window-routing refactor). SwiftUI/talagentd save+restore of \
+//      WindowGroup<DocumentTarget> values is not deterministic under \
+//      the shared \
+//      test container. Re-enable when the restoration path is revisited.
+//      """)
     // Phase 1 — seed a doc and wait for its window. Don't pass
     // `-ApplePersistenceIgnoreState YES` here: that flag suppresses
     // saving as well as loading, and we need talagentd to capture
