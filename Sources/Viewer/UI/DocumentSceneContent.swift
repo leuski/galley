@@ -79,11 +79,7 @@ struct DocumentSceneContent: View {
   @ViewBuilder
   private var documentOrWelcome: some View {
     if let model {
-#if os(macOS)
       DocumentView(model: model)
-#else
-      VisionDocumentScreen(model: model)
-#endif
     } else {
       WelcomeView()
     }

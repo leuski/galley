@@ -1,8 +1,5 @@
-#if os(macOS)
-import AppKit
 import GalleyCoreKit
 import SwiftUI
-import WebKit
 import KosmosAppKit
 
 /// The viewer surface for a single document window. Mounted by
@@ -17,36 +14,14 @@ struct DocumentView: View {
   @Bindable var model: DocumentModel
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var hostWindow: NSWindow?
+
+#if os(macOS)
+  private let defaultBackground: Color = .userSystemWindowBackground
+#else
+  private let defaultBackground: Color = .clear
+#endif
 
   var body: some View {
-    splitView
-      .modifier(NoticeModifier(model: model))
-      .modifier(WindowAttachedModifier(
-          hostWindow: $hostWindow,
-          installNewTabAction: model.kind == .document))
-      .modifier(RenameModifier(model: model))
-      .modifier(ExportModifier(model: model))
-      .navigationDocument(model.documentURL, when: model.kind == .document)
-      .navigationSubtitle(model.page.title)
-    // Flip the view's color scheme so AppKit-rendered chrome text
-    // (window title, toolbar labels) inverts when the page bg is
-    // dark — otherwise the system black title disappears against a
-    // black body. While re-rendering after a template change,
-    // pin the scheme to the user's system pref instead so WebKit's
-    // `prefers-color-scheme` media queries on the new template pick
-    // the user's preferred variant — not whichever variant was
-    // current under the previous template's bg-luminance scheme.
-      .preferredColorScheme(model.resolvedColorScheme)
-  }
-
-  /// The window's main split: TOC sidebar (column-visibility bound to
-  /// `model.showsTOC`) and the rendered preview. Hoisted to a
-  /// `NavigationSplitView` so AppKit's tab bar spans only the detail
-  /// column — a sidebar nested inside an `HStack` would render with
-  /// the tab bar bisecting it.
-  @ViewBuilder
-  private var splitView: some View {
     NavigationSplitView(
       columnVisibility: model.tocColumnVisibility(reduceMotion: reduceMotion))
     {
@@ -63,23 +38,41 @@ struct DocumentView: View {
       // `navigationToolbarItems` instead.
     } detail: {
       DocumentMainContent(model: model)
-        // Collapse the TOC sidebar just before the very first paint
-        // of this split view if the user wanted it closed. `showsTOC`
-        // starts `true` so NavigationSplitView is born with a sidebar
-        // and AppKit wires the column as `.behavior = .sidebar` (so
-        // it extends up under the tab bar). `savedShowsTOC` holds the
-        // user's actual preference; we apply it inside `viewWillDraw`
-        // — same runloop turn as the first paint, so the visible
-        // state never includes the open-sidebar frame. One-shot via
-        // the `savedShowsTOC` flag flip.
+#if os(macOS)
+      // Collapse the TOC sidebar just before the very first paint
+      // of this split view if the user wanted it closed. `showsTOC`
+      // starts `true` so NavigationSplitView is born with a sidebar
+      // and AppKit wires the column as `.behavior = .sidebar` (so
+      // it extends up under the tab bar). `savedShowsTOC` holds the
+      // user's actual preference; we apply it inside `viewWillDraw`
+      // — same runloop turn as the first paint, so the visible
+      // state never includes the open-sidebar frame. One-shot via
+      // the `savedShowsTOC` flag flip.
         .willPresent {
           if !model.savedShowsTOC {
             model.savedShowsTOC = true
             model.showsTOC = false
           }
         }
+#endif
     }
     .navigationSplitViewStyle(.balanced)
+    // Flip the view's color scheme so AppKit-rendered chrome text
+    // (window title, toolbar labels) inverts when the page bg is
+    // dark — otherwise the system black title disappears against a
+    // black body. While re-rendering after a template change,
+    // pin the scheme to the user's system pref instead so WebKit's
+    // `prefers-color-scheme` media queries on the new template pick
+    // the user's preferred variant — not whichever variant was
+    // current under the previous template's bg-luminance scheme.
+    .preferredColorScheme(model.resolvedColorScheme)
+    // `model.pageBackgroundColor` already resolves through the
+    // template state → last-seen → system-bg fallback chain, so
+    // it's always a real color; no second `??` needed here.
+    .background(
+      Defaults.shared.tintWindowWithPageBackground
+      ? model.pageBackgroundColor : defaultBackground)
+#if os(macOS)
     // Paint the page's own background color into the window's
     // container background so the translucent toolbar / sidebar
     // chrome samples it as the surface behind their glass material.
@@ -91,18 +84,21 @@ struct DocumentView: View {
     .toolbarBackgroundVisibility(
       Defaults.shared.tintWindowWithPageBackground ? .hidden : .visible,
       for: .windowToolbar)
-    // `model.pageBackgroundColor` already resolves through the
-    // template state → last-seen → system-bg fallback chain, so
-    // it's always a real color; no second `??` needed here.
-    .background(
-      Defaults.shared.tintWindowWithPageBackground
-      ? model.pageBackgroundColor : .userSystemWindowBackground)
     .containerBackground(
       Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
+    .modifier(NoticeModifier(model: model))
+    .modifier(WindowAttachedModifier(
+      installNewTabAction: model.kind == .document))
+    .modifier(RenameModifier(model: model))
+    .modifier(ExportModifier(model: model))
+    .navigationDocument(model.documentURL, when: model.kind == .document)
+    .navigationSubtitle(model.page.title)
+#endif
   }
 }
 
+#if os(macOS)
 private extension View {
   /// Gates `.navigationDocument(_:)` on a condition. The Help window's
   /// `DocumentView` opts out so AppKit doesn't attach a proxy icon or
@@ -113,6 +109,7 @@ private extension View {
     if condition { navigationDocument(url) } else { self }
   }
 }
+#endif
 
 /// Bottom-overlay banner for `DocumentModel.notice`. Owns no state —
 /// the close button calls `onDismiss` so the model can cancel any
@@ -155,6 +152,3 @@ struct NoticeModifier: ViewModifier {
       .animation(reduceMotion ? nil : .default, value: model.notice)
   }
 }
-
-
-#endif

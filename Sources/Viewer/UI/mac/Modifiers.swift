@@ -11,7 +11,6 @@ import GalleyCoreKit
 import UniformTypeIdentifiers
 
 struct WindowAttachedModifier: ViewModifier {
-  @Binding var hostWindow: NSWindow?
   let installNewTabAction: Bool
 
   func body(content: Content) -> some View {
@@ -21,8 +20,7 @@ struct WindowAttachedModifier: ViewModifier {
         // once to patch the AppKit tab-bar "+" (so a user "+" click
         // opens via the Open panel + activity URL). Help skips it.
         // Inbound-URL routing lives in `DocumentSceneContent`, not here.
-        guard let window, window !== hostWindow else { return }
-        hostWindow = window
+        guard let window else { return }
         window.alphaValue = 1
         if installNewTabAction {
           NewTabAction.install(on: window)

@@ -64,6 +64,8 @@ final class AppModel {
       renderer: Defaults.shared.renderer,
       template: Defaults.shared.template)
 #if os(macOS)
+    URL.createLocalizedApplicationSupportDirectory()
+    UserDefaults.forceTabs()
     self.editors = EditorChoice()
     /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
     /// activity URL. The "+" only exists when windows are already tabbed
@@ -147,6 +149,12 @@ final class AppModel {
       } cleaner: {
         Defaults.shared.serverGalleyHash = nil
       }
+      // If the active server-agent backend persists an absolute path
+      // to the helper, the user moving `Galley.app` would leave that
+      // record pointing at a stale location. Detect and repair before
+      // any UI reflects stale state. No-op when nothing is installed.
+      // Fire-and-forget: scenes don't need to wait on it.
+      await ActiveServerAgent.shared.validateAndRepair()
 #endif
       await ProcessorStore.shared.discover()
     }

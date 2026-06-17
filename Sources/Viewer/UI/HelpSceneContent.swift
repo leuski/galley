@@ -1,4 +1,3 @@
-#if os(macOS)
 import GalleyCoreKit
 import SwiftUI
 
@@ -8,7 +7,7 @@ import SwiftUI
 /// app opens this window and delivers the URL here through `.onOpenURL`.
 /// We parse it back to the bundled file and mount `DocumentView` in
 /// `.help` mode (which bypasses dedup, recents, and the tab "+").
-struct HelpWindowView: View {
+struct HelpSceneContent: View {
   @State private var model: DocumentModel?
 
   var body: some View {
@@ -23,11 +22,8 @@ struct HelpWindowView: View {
       }
     }
     .onOpenURL { url in
-      guard let help = OpenHelpActivity(from: url) else {
-        return
-      }
+      guard let help = OpenHelpActivity(from: url) else { return }
       model = DocumentModel.help(url: help.documentURL)
     }
   }
 }
-#endif
