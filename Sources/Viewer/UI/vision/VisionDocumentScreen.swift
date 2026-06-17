@@ -16,10 +16,6 @@ struct VisionDocumentScreen: View {
   let model: DocumentModel
 
   @State private var isFilePickerPresented = false
-  @Environment(\.openURL) private var openURL
-  @Environment(\.openWindow) private var openWindow
-  private var appModel: AppModel { model.appModel }
-  private var recents: RecentDocumentsModel { AppModel.shared.recents }
 
   init(model: DocumentModel) {
     self.model = model
@@ -131,129 +127,9 @@ struct VisionDocumentScreen: View {
 
       Spacer()
 
-      shareMenu(model: model)
+      ShareMenu(model: model)
 
-      moreMenu(model: model)
-    }
-  }
-
-  @ViewBuilder
-  private func shareMenu(model: DocumentModel) -> some View {
-    Menu {
-      if model.documentURL.isFileURL {
-        ShareLink(
-          item: model.documentURL,
-          subject: Text(model.documentURL.lastPathComponent),
-          message: Text(model.documentURL.lastPathComponent)
-        ) {
-          Label("Markdown Source", systemImage: "doc.text")
-        }
-        .accessibilityIdentifier(ViewerA11yID.Toolbar.shareMarkdown)
-      }
-      ShareLink(
-        item: model.pdfExport,
-        preview: SharePreview(
-          model.pdfExport.suggestedName,
-          image: Image(systemName: "doc.richtext"))
-      ) {
-        Label("Rendered PDF", systemImage: "doc.richtext")
-      }
-      .accessibilityIdentifier(ViewerA11yID.Toolbar.sharePDF)
-    } label: {
-      Label("Share", systemImage: "square.and.arrow.up")
-    }
-    .accessibilityIdentifier(ViewerA11yID.Toolbar.share)
-  }
-
-  @ViewBuilder
-  private func moreMenu(model: DocumentModel) -> some View {
-    Menu {
-      Button {
-        isFilePickerPresented = true
-      } label: {
-        Label("Open Document…", systemImage: "folder")
-      }
-
-      openRecentMenu
-
-      Divider()
-
-      Action.toggleStatusBar().menuItem()
-
-      Divider()
-
-      templateMenu(
-        appModel: appModel,
-        documentModel: model)
-      .disabled(!model.documentURL.isFileURL)
-      .help(
-        model.documentURL.isFileURL
-        ? ""
-        : "Rendered on Mac — change template in Galley on your Mac.")
-      colorSchemeMenu(
-        appModel: appModel,
-        documentModel: model)
-      .disabled(!model.documentURL.isFileURL)
-      .help(
-        model.documentURL.isFileURL
-        ? ""
-        : "Rendered on Mac — change color scheme on your Mac.")
-      if appModel.processors.values.count > 1 {
-        processorMenu(
-          appModel: appModel,
-          documentModel: model)
-      }
-
-      Divider()
-
-      Button {
-        openWindow(id: SettingsScene.id)
-      } label: {
-        Label("Settings…", systemImage: "gearshape")
-      }
-      .accessibilityIdentifier(ViewerA11yID.ToolbarSettings.settings)
-
-      if let helpURL = Bundle.main.url(
-        forResource: "template-authoring",
-        withExtension: "md") {
-        Button {
-          GalleyViewerRequestActivity(url: helpURL).open()
-        } label: {
-          Label(
-            "How to Make a Template",
-            systemImage: "questionmark.circle")
-        }
-        .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)
-      }
-    } label: {
-      Label("More", systemImage: "ellipsis.circle")
-    }
-    .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
-  }
-
-  /// Open Recent submenu. Each pick fires an activity URL; the user's
-  /// open-behavior (replace / new window) is applied in `ContentView`.
-  @ViewBuilder
-  private var openRecentMenu: some View {
-    @Bindable var recents = AppModel.shared.recents
-    if !recents.urls.isEmpty {
-      Menu {
-        ForEach(recents.urls, id: \.self) { url in
-          Button {
-            if let fresh = recents.resolveRecentURL(url) {
-              GalleyViewerRequestActivity(url: fresh).open()
-            }
-          } label: {
-            Label(url.lastPathComponent, systemImage: "doc.text")
-          }
-        }
-        Divider()
-        Button("Clear Menu", role: .destructive) {
-          recents.clearAll()
-        }
-      } label: {
-        Label("Open Recent", systemImage: "clock")
-      }
+      MoreMenu(isFilePickerPresented: $isFilePickerPresented, model: model)
     }
   }
 }

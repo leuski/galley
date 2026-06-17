@@ -177,9 +177,8 @@ extension DocumentModel {
   private func save() {
     let snapshot = self.snapshot
     DocumentStore[id] = snapshot
-    if let url = snapshot.currentURL {
-      DocumentStore[file: url] = fileSnapshot(for: url)
-    }
+    let url = snapshot.currentURL
+    DocumentStore[file: url] = fileSnapshot(for: url)
   }
 
   /// Re-render when a render input changes: the global processor /
