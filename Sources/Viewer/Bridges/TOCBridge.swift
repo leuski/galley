@@ -18,7 +18,7 @@ import KosmosAppKit
 ///   viewport — the convention every doc site uses to track the
 ///   reader's section without a cursor. `nil` means the user is
 ///   scrolled above the first heading.
-@MainActor
+@MainActor @Observable
 final class TOCBridge: JavaScriptBridge {
   static let messageName = "toc"
 
@@ -29,25 +29,39 @@ final class TOCBridge: JavaScriptBridge {
   /// the JS file in lockstep with `messageName` here.
   static let userScript = scriptFromResource(name: "tocController")
 
-  /// Set by the owning DocumentModel; receives the freshly-extracted
-  /// heading list every time the page loads.
-  var onHeadings: (([TOCEntry]) -> Void)?
+  /// Headings extracted from the rendered DOM after each load. The
+  /// `TOCBridge` user script walks `<h1>…<h6>`, assigns synthetic ids
+  /// to any heading without one, and posts the flat list. The
+  /// sidebar reads this and indents by `level`.
+  private(set) var headings: [TOCEntry] = []
 
-  /// Set by the owning DocumentModel; receives the active heading id
-  /// (or `nil` when the user is above all headings) on every change.
-  var onActiveHeading: ((String?) -> Void)?
+  /// Id of the heading whose section the reader is currently in,
+  /// updated by `TOCBridge` on scroll. `nil` means the user is
+  /// scrolled above the first heading. The sidebar highlights the
+  /// matching row.
+  var activeHeadingID: TOCEntry.ID?
+
+  @ObservationIgnored var isScrolling = false
 
   func handle(value msg: Value) {
     // A headings message always carries `items` (possibly empty); an
     // active-heading message never does. `activeId == nil` means the
     // reader scrolled above the first heading.
     if let items = msg.items {
-      onHeadings?(items.map {
-        TOCEntry(id: $0.id, level: $0.level, text: $0.text)
-      })
+      headings = items.map {
+        TOCEntry(
+          id: TOCEntry.ID(rawValue: $0.id), level: $0.level, text: $0.text)
+      }
     } else {
-      onActiveHeading?(msg.activeId)
+      guard !isScrolling else { return }
+      activeHeadingID = msg.activeId.map { identifier in
+        TOCEntry.ID(rawValue: identifier) }
     }
+  }
+
+  func clear() {
+    headings = []
+    activeHeadingID = nil
   }
 
   struct Value: Decodable {

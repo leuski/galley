@@ -23,6 +23,11 @@ func galleyModuleLoads() {
 // No-op marker: the visionOS VisionWelcomeScreen icon swap is an asset/view
 // change (Image asset + sizing) with no testable logic.
 
+// No-op marker: DocumentModel.scrollToHeading's settle-until-stable JS body
+// (keeps isScrollingTOC true across the smooth-scroll animation so the
+// tocController's activeId posts are suppressed) is a JS string executed
+// inside WebKit with no Swift-side seam to unit-test.
+
 // MARK: - EditorPreset / substituteEditorTemplate
 
 @Suite("EditorPreset")

@@ -14,6 +14,7 @@ import KosmosAppKit
 /// would understate (or, for verbatim include syntax that survives
 /// the render, overstate) what the reader actually sees.
 @MainActor
+@Observable
 final class StatsBridge: JavaScriptBridge {
   static let messageName = "stats"
 
@@ -24,16 +25,20 @@ final class StatsBridge: JavaScriptBridge {
 
   /// Set by the owning DocumentModel. Receives the freshly-computed
   /// counts every time the rendered document finishes loading.
-  var onStats: ((DocumentStats) -> Void)?
+  private(set) var stats: DocumentStats = .empty
 
-  func handle(value msg: Value) {
-    onStats?(DocumentStats(
-      wordCount: msg.words,
-      characterCount: msg.characters,
-      headingCount: msg.headings))
+  func clear() {
+    stats = .empty
   }
 
-  struct Value: Decodable {
+  func handle(value msg: Value) {
+    stats = DocumentStats(
+      wordCount: msg.words,
+      characterCount: msg.characters,
+      headingCount: msg.headings)
+  }
+
+  struct Value: Decodable, Hashable, Sendable {
     let words: Int
     let characters: Int
     let headings: Int

@@ -73,7 +73,7 @@ extension DocumentModel {
   var snapshot: Snapshot {
     Snapshot(
       history: history,
-      scrollY: currentScrollY,
+      scrollY: scrollBridge.currentScrollY,
       showsTOC: showsTOC,
       pageZoom: zoom.zoomScale,
       templatePersistent: templates.persistent,
@@ -189,7 +189,6 @@ extension DocumentModel {
         _ = self.colorSchemes.persistent
         _ = self.zoom.zoomScale
         _ = self.renderedTemplateID
-        _ = self.currentScrollY
       },
       onChange: { [weak self] in self?.save() })
   }

@@ -26,7 +26,7 @@ struct DocumentView: View {
     NavigationSplitView(
       columnVisibility: model.tocColumnVisibility(reduceMotion: reduceMotion))
     {
-      TOCSidebar(model: model)
+      TOCSidebar(model: model.tocBridge) { model.scrollToHeading(id: $0) }
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 220, max: 320)
       // SwiftUI auto-injects a sidebar toggle item into NavigationSplitView's

@@ -24,10 +24,10 @@ final class ScrollBridge: JavaScriptBridge {
   static let userScript = scriptFromResource(name: "scrollListener")
 
   /// Set by the owning DocumentModel; receives the latest position.
-  var onScroll: ((Double) -> Void)?
+  var currentScrollY: Double = 0
 
   func handle(value msg: Value) {
-    onScroll?(msg.y)
+    currentScrollY = msg.y
   }
 
   struct Value: Decodable { let y: Double }

@@ -40,9 +40,9 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   @ObservationIgnored private let watcher = DocumentWatcher()
   @ObservationIgnored private let editorBridge = EditorBridge()
   @ObservationIgnored private let linkBridge = LinkBridge()
-  @ObservationIgnored private let scrollBridge = ScrollBridge()
-  @ObservationIgnored private let tocBridge = TOCBridge()
-  @ObservationIgnored private let statsBridge = StatsBridge()
+  @ObservationIgnored let scrollBridge = ScrollBridge()
+  @ObservationIgnored let tocBridge = TOCBridge()
+  let statsBridge = StatsBridge()
   @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
 
   /// Chrome reads through this. Drives off `renderedTemplate()` —
@@ -155,11 +155,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// navigation and file-watcher reloads aren't jerked back.
   @ObservationIgnored private var pendingScroll: Scroll?
 
-  /// Latest known scroll position, updated by `ScrollBridge` from a
-  /// debounced JS listener. DocumentSceneContent mirrors this to
-  /// `@SceneStorage` so the next session can hydrate `pendingScrollY`.
-  private(set) var currentScrollY: Double = 0
-
   /// Whether the table-of-contents sidebar is visible in the window
   /// hosting this model. Per-document live state — preserved across
   /// in-window link navigation so a child doc inherits the parent's
@@ -186,24 +181,16 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// `initialShowsTOC` and consumed by `BeforeFirstDrawAccessor`.
   @ObservationIgnored var savedShowsTOC: Bool = true
 
-  /// Headings extracted from the rendered DOM after each load. The
-  /// `TOCBridge` user script walks `<h1>…<h6>`, assigns synthetic ids
-  /// to any heading without one, and posts the flat list. The
-  /// sidebar reads this and indents by `level`.
-  private(set) var headings: [TOCEntry] = []
-
-  /// Id of the heading whose section the reader is currently in,
-  /// updated by `TOCBridge` on scroll. `nil` means the user is
-  /// scrolled above the first heading. The sidebar highlights the
-  /// matching row.
-  private(set) var activeHeadingID: String?
-
-  /// Word / character / heading counts for the rendered document,
-  /// refreshed by `StatsBridge` after each load. Drives the
-  /// optional bottom `StatusBar`. Reset to `.empty` at the start of
-  /// every rebind so a stale count doesn't linger while the next
-  /// render is in flight.
-  private(set) var stats: DocumentStats = .empty
+  /// The in-flight TOC scroll, if any. `scrollToHeading` cancels it
+  /// before starting a new one, so a later row tap preempts the
+  /// current smooth scroll instead of being dropped. Internal
+  /// bookkeeping only — `@ObservationIgnored` so it never invalidates
+  /// a view.
+  @ObservationIgnored var tocScrollTask: Task<Void, Never>? {
+    didSet {
+      tocBridge.isScrolling = tocScrollTask != nil
+    }
+  }
 
   /// Find-text state and JS calls for this window. Owns the query,
   /// options, match counters, and visibility / dismissal flags.
@@ -371,22 +358,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // the current `EditorChoice` from appModel on every click.
     editorBridge.onEditorClick = { [weak self] line in
       Task { await self?.openInEditor(line: line) }
-    }
-    // Latest debounced scroll position. `@ObservationIgnored` would
-    // suppress the SwiftUI invalidation that lets DocumentSceneContent mirror
-    // this to `@SceneStorage`, so we leave it observed — the listener
-    // fires at most every ~150 ms, well below per-frame cost.
-    scrollBridge.onScroll = { [weak self] yPos in
-      self?.currentScrollY = yPos
-    }
-    tocBridge.onHeadings = { [weak self] items in
-      self?.headings = items
-    }
-    tocBridge.onActiveHeading = { [weak self] identifier in
-      self?.activeHeadingID = identifier
-    }
-    statsBridge.onStats = { [weak self] value in
-      self?.stats = value
     }
     backgroundBridge.onColor = { [weak self] color, templateID in
       self?.onBackgroundColor(color, templateID)
@@ -602,9 +573,8 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Drop the old document's TOC entries so the sidebar doesn't
     // flash stale headings during the reload window. The TOCBridge
     // user script repopulates within milliseconds of `page.load`.
-    headings = []
-    activeHeadingID = nil
-    stats = .empty
+    tocBridge.clear()
+    statsBridge.clear()
 
     await renderCurrent(preserveScroll: false)
 

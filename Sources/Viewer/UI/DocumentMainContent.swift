@@ -40,7 +40,7 @@ struct DocumentMainContent: View {
       .safeAreaInset(edge: .bottom, spacing: 0) {
         if Defaults.shared.showsStatusBar {
           StatusBar(
-            stats: model.stats,
+            stats: model.statsBridge.stats,
             wordsPerMinute: Defaults.shared.readingWordsPerMinute)
           .transition(.move(edge: .bottom).combined(with: .opacity))
         }

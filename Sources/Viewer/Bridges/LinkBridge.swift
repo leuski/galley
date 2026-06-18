@@ -1,6 +1,3 @@
-#if os(macOS)
-import AppKit
-#endif
 import Foundation
 import GalleyCoreKit
 import WebKit

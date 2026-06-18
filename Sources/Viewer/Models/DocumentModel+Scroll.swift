@@ -9,6 +9,7 @@ import Foundation
 import OSLog
 import WebKit
 import KosmosAppKit
+import GalleyCoreKit
 
 extension DocumentModel {
 
@@ -21,23 +22,56 @@ extension DocumentModel {
   /// The TOC sidebar's row taps call this; the id is whatever the
   /// `TOCBridge` user script reported back — either the renderer-
   /// supplied anchor or our slugified fallback.
+  /// `scrollIntoView({ behavior: 'smooth' })` returns synchronously and
+  /// only *starts* an animation that runs for several hundred ms after.
+  /// We need the call to stay pending until that animation settles, so
+  /// `scrollToHeading`'s `isScrollingTOC` flag covers the whole scroll
+  /// and the tocController's scroll-driven `activeId` posts are all
+  /// suppressed. Resolve once `window.scrollY` has held steady for a few
+  /// frames — works for smooth, instant, and no-op scrolls alike, with
+  /// no dependency on `scrollend` event support.
   private struct ScrollToHeading: JavaScriptCallable<Void> {
-    let id: String
+    let id: TOCEntry.ID
 
     var body: String {
       """
-      (function() {
-        var node = document.getElementById(\(id.jsStringLiteral));
-        if (node) {
-          node.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      return await new Promise(function(resolve) {
+        var node = document.getElementById(\(id.rawValue.jsStringLiteral));
+        if (!node) { resolve(); return; }
+        node.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        var lastY = null, stableFrames = 0;
+        function tick() {
+          var y = window.scrollY;
+          if (y === lastY) {
+            stableFrames += 1;
+            if (stableFrames >= 3) { resolve(); return; }
+          } else {
+            stableFrames = 0;
+            lastY = y;
+          }
+          requestAnimationFrame(tick);
         }
-      })();
+        requestAnimationFrame(tick);
+      });
       """
     }
   }
 
-  func scrollToHeading(id: String) async {
-    try? await page.callJavaScript(ScrollToHeading(id: id))
+  /// Scroll the rendered preview to `id`, cancelling any scroll already
+  /// in flight so a later tap preempts the current smooth scroll. The
+  /// JS promise resolves only when the scroll settles, so `isScrollingTOC`
+  /// stays `true` across the whole animation (and across a handoff to a
+  /// newer tap) — suppressing the tocController's scroll-driven `activeId`
+  /// posts the entire time. Only the latest, un-cancelled task clears the
+  /// flag; main-actor serialization makes the cancel/clear race-free.
+  func scrollToHeading(id: TOCEntry.ID) {
+    tocScrollTask?.cancel()
+    tocScrollTask = Task { [weak self] in
+      guard let self else { return }
+      try? await page.callJavaScript(ScrollToHeading(id: id))
+      guard !Task.isCancelled else { return }
+      tocScrollTask = nil
+    }
   }
 
   /// Find the rendered block whose source line is closest to (but not

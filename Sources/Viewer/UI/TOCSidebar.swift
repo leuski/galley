@@ -7,7 +7,8 @@ import SwiftUI
 /// row. Indentation reflects heading depth — `<h1>` flush left, each
 /// step deeper adds a fixed inset.
 struct TOCSidebar: View {
-  @Bindable var model: DocumentModel
+  @Bindable var model: TOCBridge
+  let action: @MainActor (TOCEntry.ID) -> Void
 
   /// Inset per level beyond the first. Tuned so an h6 still leaves
   /// room for ~20 characters of text in the standard 220 pt sidebar.
@@ -18,6 +19,15 @@ struct TOCSidebar: View {
   /// outermost row flush left no matter what depth the doc starts at.
   private var baseLevel: Int {
     model.headings.map(\.level).min() ?? 1
+  }
+
+  var selection: Binding<TOCEntry.ID?> {
+    .init { model.activeHeadingID } set: { newValue in
+      model.activeHeadingID = newValue
+      if let newValue {
+        action(newValue)
+      }
+    }
   }
 
   var body: some View {
@@ -37,44 +47,18 @@ struct TOCSidebar: View {
   /// first row at different y-positions — visible as content "jumping"
   /// when the user switches tabs.
   private var list: some View {
-    ScrollView {
-      LazyVStack(alignment: .leading, spacing: 0) {
-        ForEach(model.headings) { heading in
-          row(for: heading)
-        }
-      }
-      .padding(.vertical, 8)
-    }
-  }
-
-  private func row(for heading: TOCEntry) -> some View {
-    let isActive = model.activeHeadingID == heading.id
-    return Button {
-      Task { await model.scrollToHeading(id: heading.id) }
-    } label: {
+    List(model.headings, selection: selection) { heading in
       Text(heading.text)
+        .id(heading.id)
         .font(font(for: heading.level))
-        .foregroundStyle(isActive ? Color.accentColor : .primary)
         .lineLimit(2)
-        .multilineTextAlignment(.leading)
-        .padding(.leading, 16 + indent(for: heading.level))
-        .padding(.trailing, 12)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(rowBackground(isActive: isActive))
-        .contentShape(.rect)
+        .truncationMode(.tail)
+        .padding(.leading, indent(for: heading.level))
     }
-    .buttonStyle(.plain)
-    .animation(.easeOut(duration: 0.12), value: isActive)
-  }
-
-  @ViewBuilder
-  private func rowBackground(isActive: Bool) -> some View {
-    if isActive {
-      Color.accentColor.opacity(0.15)
-    } else {
-      Color.clear
-    }
+#if os(visionOS)
+    .padding(.top, 16)
+#endif
+    .listStyle(.sidebar)
   }
 
   private var emptyState: some View {
