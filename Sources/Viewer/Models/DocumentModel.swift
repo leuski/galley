@@ -632,51 +632,56 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
     let url = documentURL
 
+    // Snapshot scroll position *before* re-rendering so we can hand it
+    // back to the page after load. Best-effort: a nil/throwing read
+    // (e.g. very first render) just leaves us at the top.
+    let savedScrollY = preserveScroll ? await currentScrollY() ?? 0 : 0
+
     // Server-hosted URLs (the AVP Kosmos path): the bridge already
     // returns rendered HTML from `/preview/<path>`. Running that
     // response through `readSource` + the Markdown renderer would
     // feed template HTML to a Markdown parser and bake an empty page.
     // Hand the URL straight to WebPage instead — the Server picked
     // the template, owns livereload (via SSE), and is the renderer.
-    if !url.isFileURL {
-      await loadRemote(url: url, preserveScroll: preserveScroll)
-      return
-    }
-
-    let renderer = resolvedRenderer()
-    let template = resolvedTemplate()
-
-    // Snapshot scroll position *before* re-rendering so we can hand it
-    // back to the page after load. Best-effort: a nil/throwing read
-    // (e.g. very first render) just leaves us at the top.
-    let savedScrollY: Double = preserveScroll
-    ? await currentScrollY() ?? 0
-    : 0
-
     do {
-      let source = try await Self.readSource(at: url)
-      let body = try await renderer.render(source, baseURL: url)
-      let composed = try template.composeHTML(
-        documentContent: body,
-        documentURL: url,
-        origin: PreviewSchemeHandler.originURL)
-      let html = composed.html
-      logLoadingHTML(byteCount: html.count)
-      do {
+      if url.isFileURL {
+        let renderer = resolvedRenderer()
+        let template = resolvedTemplate()
+        let composed: ComposedPreview
+
+        do {
+          let source = try await Self.readSource(at: url)
+          let body = try await renderer.render(source, baseURL: url)
+          composed = try template.composeHTML(
+            documentContent: body,
+            documentURL: url,
+            origin: PreviewSchemeHandler.originURL)
+        } catch {
+          report(failure: error, context: "render", lifetime: .renderBound)
+          return
+        }
+
+        let html = composed.html
+        logLoadingHTML(byteCount: html.count)
         for try await _ in page.load(html: html, baseURL: composed.baseURL) {}
-        await applyPendingScroll(
-          savedScrollY: savedScrollY, locationOnly: false)
-        // Old marks died with the previous DOM, but the user's query
-        // and the visible find bar are per-window state we want to
-        // honor across file-watcher reloads — re-run the search so
-        // highlights and counts come back without user action.
-        await find.reapplyIfActive()
-      } catch {
-        report(failure: error, context: "navigation", lifetime: .renderBound)
+      } else {
+        for try await _ in page.load(URLRequest(url: url)) {}
       }
     } catch {
-      report(failure: error, context: "render", lifetime: .renderBound)
+      report(failure: error, context: "navigation", lifetime: .renderBound)
+      return
     }
+    // Source-line jumps (`galley://...?line=N`) don't translate to
+    // a remote render — the Server hasn't surfaced source positions
+    // over the wire. Drop the request so a stray value doesn't
+    // chase the next file-URL bind.
+    await applyPendingScroll(
+      savedScrollY: savedScrollY, locationOnly: !url.isFileURL)
+    // Old marks died with the previous DOM, but the user's query
+    // and the visible find bar are per-window state we want to
+    // honor across file-watcher reloads — re-run the search so
+    // highlights and counts come back without user action.
+    await find.reapplyIfActive()
   }
 
   private func applyPendingScroll(
@@ -698,24 +703,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       if savedScrollY > 0 {
         await restoreScrollY(savedScrollY)
       }
-    }
-  }
-
-  private func loadRemote(url: URL, preserveScroll: Bool) async {
-    let savedScrollY: Double = preserveScroll
-    ? await currentScrollY() ?? 0
-    : 0
-    do {
-      for try await _ in page.load(URLRequest(url: url)) {}
-      // Source-line jumps (`galley://...?line=N`) don't translate to
-      // a remote render — the Server hasn't surfaced source positions
-      // over the wire. Drop the request so a stray value doesn't
-      // chase the next file-URL bind.
-      await applyPendingScroll(
-        savedScrollY: savedScrollY, locationOnly: true)
-      await find.reapplyIfActive()
-    } catch {
-      report(failure: error, context: "navigation", lifetime: .renderBound)
     }
   }
 
