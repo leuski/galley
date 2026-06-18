@@ -101,7 +101,7 @@ struct DocumentSceneContent: View {
       == target.documentURL.standardizedFileURL
     {
       if let line = target.scrollLine {
-        Task { await live.scrollToSourceLine(line) }
+        Task { await live.scroll(to: .line(line)) }
       }
       focusWindow()
       return

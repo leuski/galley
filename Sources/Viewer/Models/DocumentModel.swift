@@ -622,6 +622,14 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     }
   }
 
+  private func resolveScroll(preserveScroll: Bool) async -> Scroll {
+    if let pendingScroll {
+      self.pendingScroll = nil
+      return pendingScroll
+    }
+    return .location(preserveScroll ? await currentScrollY() ?? 0 : 0)
+  }
+
   private func renderCurrent(preserveScroll: Bool) async {
     // Drop any prior render-bound notice — it described the previous
     // bind and would otherwise sit behind the incoming render until
@@ -635,7 +643,21 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Snapshot scroll position *before* re-rendering so we can hand it
     // back to the page after load. Best-effort: a nil/throwing read
     // (e.g. very first render) just leaves us at the top.
-    let savedScrollY = preserveScroll ? await currentScrollY() ?? 0 : 0
+    let targetScroll: Scroll
+    if let pendingScroll {
+      self.pendingScroll = nil
+      // Source-line jumps (`galley://...?line=N`) don't translate to
+      // a remote render — the Server hasn't surfaced source positions
+      // over the wire. Drop the request so a stray value doesn't
+      // chase the next file-URL bind.
+      if !url.isFileURL, case .line = pendingScroll {
+        targetScroll = .location(0)
+      } else {
+        targetScroll = pendingScroll
+      }
+    } else {
+      targetScroll = .location(preserveScroll ? await currentScrollY() ?? 0 : 0)
+    }
 
     // Server-hosted URLs (the AVP Kosmos path): the bridge already
     // returns rendered HTML from `/preview/<path>`. Running that
@@ -671,39 +693,12 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       report(failure: error, context: "navigation", lifetime: .renderBound)
       return
     }
-    // Source-line jumps (`galley://...?line=N`) don't translate to
-    // a remote render — the Server hasn't surfaced source positions
-    // over the wire. Drop the request so a stray value doesn't
-    // chase the next file-URL bind.
-    await applyPendingScroll(
-      savedScrollY: savedScrollY, locationOnly: !url.isFileURL)
+    await scroll(to: targetScroll)
     // Old marks died with the previous DOM, but the user's query
     // and the visible find bar are per-window state we want to
     // honor across file-watcher reloads — re-run the search so
     // highlights and counts come back without user action.
     await find.reapplyIfActive()
-  }
-
-  private func applyPendingScroll(
-    savedScrollY: Double, locationOnly: Bool = true) async
-  {
-    switch pendingScroll {
-    case .line(let line):
-      pendingScroll = nil
-      if !locationOnly {
-        await scrollToSourceLine(line)
-      }
-    case .location(let location):
-      pendingScroll = nil
-      if location > 0 {
-        currentScrollY = location
-        await restoreScrollY(location)
-      }
-    case nil:
-      if savedScrollY > 0 {
-        await restoreScrollY(savedScrollY)
-      }
-    }
   }
 
   // MARK: - Logging helpers

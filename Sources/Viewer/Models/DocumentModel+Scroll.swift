@@ -90,7 +90,7 @@ extension DocumentModel {
     }
   }
 
-  func scrollToSourceLine(_ line: Int) async {
+  private func scrollToSourceLine(_ line: Int) async {
     try? await page.callJavaScript(ScrollToSourceLine(line: line))
   }
 
@@ -119,8 +119,16 @@ extension DocumentModel {
     }
   }
 
-  func restoreScrollY(_ yPos: Double) async {
+  private func restoreScrollY(_ yPos: Double) async {
     try? await page.callJavaScript(RestoreScrollY(yPos: yPos))
   }
 
+  func scroll(to scroll: Scroll) async {
+    switch scroll {
+    case .line(let line):
+      await scrollToSourceLine(line)
+    case .location(let yPos):
+      await restoreScrollY(max(0, yPos))
+    }
+  }
 }
