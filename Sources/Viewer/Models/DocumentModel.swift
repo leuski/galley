@@ -592,14 +592,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     }
   }
 
-  private func resolveScroll(preserveScroll: Bool) async -> Scroll {
-    if let pendingScroll {
-      self.pendingScroll = nil
-      return pendingScroll
-    }
-    return .location(preserveScroll ? await currentScrollY() ?? 0 : 0)
-  }
-
   private func renderCurrent(preserveScroll: Bool) async {
     // Drop any prior render-bound notice — it described the previous
     // bind and would otherwise sit behind the incoming render until
@@ -626,7 +618,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
         targetScroll = pendingScroll
       }
     } else {
-      targetScroll = .location(preserveScroll ? await currentScrollY() ?? 0 : 0)
+      targetScroll = .location(preserveScroll ? scrollBridge.currentScrollY : 0)
     }
 
     // Server-hosted URLs (the AVP Kosmos path): the bridge already

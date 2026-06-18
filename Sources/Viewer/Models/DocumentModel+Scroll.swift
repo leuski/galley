@@ -128,24 +128,6 @@ extension DocumentModel {
     try? await page.callJavaScript(ScrollToSourceLine(line: line))
   }
 
-  private struct CurrentScrollY: JavaScriptCallable<Double> {
-    var body: String {
-      "return window.scrollY;"
-    }
-  }
-
-  func currentScrollY() async -> Double? {
-    do {
-      return try await page.callJavaScript(CurrentScrollY())
-    } catch {
-      logger.debug("""
-        currentScrollY JS failed: \
-        \(error.localizedDescription, privacy: .public)
-        """)
-      return nil
-    }
-  }
-
   private struct RestoreScrollY: JavaScriptCallable<Void> {
     let yPos: Double
     var body: String {
