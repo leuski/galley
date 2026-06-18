@@ -18,6 +18,20 @@ extension DocumentModel {
     case location(Double)
   }
 
+  /// Where the next render should land. Threaded as an argument from
+  /// each bind entry point down to `renderCurrent` — replaces the
+  /// former one-shot `pendingScroll` field.
+  enum ScrollIntent: Sendable {
+    /// Apply this exact target once: a `@SceneStorage` resting
+    /// position (restore) or a `galley://…?line=N` source-line jump.
+    case explicit(Scroll)
+    /// Keep the reader's current position — file-watcher reload and
+    /// `reload()`.
+    case preserve
+    /// Land at the top — fresh navigation, Back/Forward, rename.
+    case top
+  }
+
   /// Scroll the rendered preview to the heading identified by `id`.
   /// The TOC sidebar's row taps call this; the id is whatever the
   /// `TOCBridge` user script reported back — either the renderer-

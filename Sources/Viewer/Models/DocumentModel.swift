@@ -144,17 +144,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// older bind invocations check this and bail out when superseded.
   @ObservationIgnored private var bindGeneration: Int = 0
 
-  /// One-shot source-line scroll target consumed by the next render.
-  /// Set by `bind(to:scrollToLine:)` for `galley://...?line=N` opens
-  /// dispatched from BBEdit's preview script; cleared after the JS
-  /// scroll runs so subsequent file-watcher reloads don't re-jump.
-  /// One-shot pixel scroll target consumed by the next render. Set
-  /// by `bind` / `restore` from the window's persisted
-  /// `@SceneStorage` slot so a freshly-launched window comes back at
-  /// the position it was left. Cleared after one apply so in-window
-  /// navigation and file-watcher reloads aren't jerked back.
-  @ObservationIgnored private var pendingScroll: Scroll?
-
   /// Whether the table-of-contents sidebar is visible in the window
   /// hosting this model. Per-document live state — preserved across
   /// in-window link navigation so a child doc inherits the parent's
@@ -333,14 +322,14 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     wireBridges()
 
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
-    pendingScroll = initialScroll
     savedShowsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
     if isRegular {
       startTrackingPersistentState()
       startTrackingRenderInputs()
     }
-    Task { await rebindCurrent() }
+    let firstScroll = initialScroll.map(ScrollIntent.explicit) ?? .top
+    Task { await rebindCurrent(firstScroll: firstScroll) }
   }
 
   /// Attach `[weak self]` callbacks to each bridge. Lifted out of
@@ -452,18 +441,16 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// Initial bind (called from DocumentView's `.task`).
   /// Resets history; this URL becomes the only entry on the stack.
   ///
-  /// `scrollToLine` is the source line the rendered preview should
-  /// scroll to once the page finishes loading — non-nil when the open
-  /// came in via `galley://...?line=N` from an editor script.
-  /// `initialScrollY` hydrates the resting scroll position from the
-  /// window's `@SceneStorage` slot. Both are consumed once and apply
-  /// only to the first render of this bind; subsequent file-watcher
-  /// reloads preserve current scroll normally. `scrollToLine` wins
-  /// over `initialScrollY` if both happen to be set.
+  /// `target.scrollLine` (set when the open came in via
+  /// `galley://…?line=N` from an editor script) becomes a one-shot
+  /// `.explicit(.line(_))` intent applied only to the first render of
+  /// this bind; absent it, the first render lands at the top.
+  /// Subsequent file-watcher reloads preserve current scroll normally.
   func bind(
     to target: DocumentTarget
   ) async {
-    pendingScroll = target.scrollLine.map { line in .line(line) }
+    let firstScroll: ScrollIntent =
+      target.scrollLine.map { line in .explicit(.line(line)) } ?? .top
     history = History(url: target.documentURL)
     // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
     // to apply pre-first-paint. `showsTOC` itself stays `true` so
@@ -471,7 +458,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // AppKit wires `NSSplitViewItem.behavior = .sidebar` — without
     // that, a later toggle puts sidebar content below the tab bar.
     savedShowsTOC = false
-    await rebindCurrent()
+    await rebindCurrent(firstScroll: firstScroll)
   }
 
   func reload() async {
@@ -493,7 +480,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       isRenderingNewTemplate = true
     }
     isPageRendered = false
-    await renderCurrent(preserveScroll: true)
+    await renderCurrent(scroll: .preserve)
   }
 
   /// Rename the current document on disk and re-bind the watcher /
@@ -535,7 +522,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // would otherwise lead to a now-missing path and trip the
     // unreachable-link guard.
     history.replace(oldURL, with: newURL)
-    await rebindCurrent()
+    await rebindCurrent(firstScroll: .top)
     return newURL
   }
 
@@ -558,7 +545,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// Rebind the model to whichever URL is at `currentIndex`. Drives
   /// the initial render and keeps reloading on file changes until
   /// another rebind supersedes this one.
-  func rebindCurrent() async {
+  func rebindCurrent(firstScroll: ScrollIntent) async {
     let url = history.currentURL
 
     bindGeneration &+= 1
@@ -576,7 +563,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     tocBridge.clear()
     statsBridge.clear()
 
-    await renderCurrent(preserveScroll: false)
+    await renderCurrent(scroll: firstScroll)
 
     // Only file URLs get a live-reload subscription. Remote
     // documents have no FSEvents source — the user reloads
@@ -588,11 +575,11 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       if Task.isCancelled || bindGeneration != myGeneration { break }
       // Keep the user's place when the file changes on disk —
       // re-rendering otherwise snaps the WebView back to the top.
-      await renderCurrent(preserveScroll: true)
+      await renderCurrent(scroll: .preserve)
     }
   }
 
-  private func renderCurrent(preserveScroll: Bool) async {
+  private func renderCurrent(scroll intent: ScrollIntent) async {
     // Drop any prior render-bound notice — it described the previous
     // bind and would otherwise sit behind the incoming render until
     // the next failure overwrote it. Leaves an in-flight ephemeral
@@ -602,23 +589,26 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
     let url = documentURL
 
-    // Snapshot scroll position *before* re-rendering so we can hand it
-    // back to the page after load. Best-effort: a nil/throwing read
-    // (e.g. very first render) just leaves us at the top.
+    // Resolve where to land *before* re-rendering so we can hand the
+    // position back to the page after load: an explicit one-shot
+    // target (restore / source-line jump), the reader's current
+    // resting position (preserve), or the top.
     let targetScroll: Scroll
-    if let pendingScroll {
-      self.pendingScroll = nil
+    switch intent {
+    case .explicit(let requested):
       // Source-line jumps (`galley://...?line=N`) don't translate to
       // a remote render — the Server hasn't surfaced source positions
       // over the wire. Drop the request so a stray value doesn't
       // chase the next file-URL bind.
-      if !url.isFileURL, case .line = pendingScroll {
+      if !url.isFileURL, case .line = requested {
         targetScroll = .location(0)
       } else {
-        targetScroll = pendingScroll
+        targetScroll = requested
       }
-    } else {
-      targetScroll = .location(preserveScroll ? scrollBridge.currentScrollY : 0)
+    case .preserve:
+      targetScroll = .location(scrollBridge.currentScrollY)
+    case .top:
+      targetScroll = .location(0)
     }
 
     // Server-hosted URLs (the AVP Kosmos path): the bridge already

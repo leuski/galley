@@ -45,20 +45,53 @@ struct DocumentSnapshotTests {
     let b = URL(fileURLWithPath: "/tmp/b.md")
     var history = DocumentModel.History(url: a)
 
-    history.navigate(to: b)
+    history.navigate(to: b, leavingScrollY: 0)
     #expect(history.currentURL == b)
     #expect(history.canGoBack)
     #expect(!history.canGoForward)
 
-    let wentBack = history.goBack()
+    let wentBack = history.goBack(leavingScrollY: 0)
     #expect(wentBack)
     #expect(history.currentURL == a)
     #expect(!history.canGoBack)
     #expect(history.canGoForward)
 
-    let wentForward = history.goForward()
+    let wentForward = history.goForward(leavingScrollY: 0)
     #expect(wentForward)
     #expect(history.currentURL == b)
+  }
+
+  @Test("Back/Forward restores each entry's resting scroll position")
+  func historyPreservesPerEntryScroll() {
+    let a = URL(fileURLWithPath: "/tmp/a.md")
+    let b = URL(fileURLWithPath: "/tmp/b.md")
+    var history = DocumentModel.History(url: a)
+    // A fresh entry starts at the top.
+    #expect(history.currentScrollY == 0)
+
+    // Leaving A at 250 stamps A; B is born at the top.
+    history.navigate(to: b, leavingScrollY: 250)
+    #expect(history.currentScrollY == 0)
+
+    // Coming back to A restores 250; the leave stamps B at 800.
+    _ = history.goBack(leavingScrollY: 800)
+    #expect(history.currentURL == a)
+    #expect(history.currentScrollY == 250)
+
+    // Forward to B restores its 800.
+    _ = history.goForward(leavingScrollY: 0)
+    #expect(history.currentURL == b)
+    #expect(history.currentScrollY == 800)
+  }
+
+  @Test("History decodes a legacy bare-URL snapshot at the top")
+  func historyDecodesLegacyURLArray() throws {
+    let json = #"{"urls":["file:///tmp/a.md","file:///tmp/b.md"],"currentIndex":1}"#
+    let history = try JSONDecoder().decode(
+      DocumentModel.History.self, from: Data(json.utf8))
+    #expect(history.currentURL == URL(fileURLWithPath: "/tmp/b.md"))
+    #expect(history.currentScrollY == 0)
+    #expect(history.canGoBack)
   }
 
   @Test("Snapshot currentURL reflects its history")

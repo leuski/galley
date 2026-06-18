@@ -28,6 +28,11 @@ func galleyModuleLoads() {
 // tocController's activeId posts are suppressed) is a JS string executed
 // inside WebKit with no Swift-side seam to unit-test.
 
+// No-op marker: replacing DocumentModel's one-shot `pendingScroll` field
+// with a `ScrollIntent` argument threaded through rebindCurrent/renderCurrent
+// is a behavior-preserving refactor — same target resolution per call path,
+// no new logic to unit-test.
+
 // MARK: - EditorPreset / substituteEditorTemplate
 
 @Suite("EditorPreset")

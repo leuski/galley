@@ -6,49 +6,105 @@ import KosmosAppKit
 
 extension DocumentModel {
   struct History: Codable, Hashable, Sendable {
-    private(set) var urls: [URL]
+    /// One visited document plus the reader's last resting scroll
+    /// position in it. `scrollY` is stamped when the reader navigates
+    /// *away* from an entry (so Back/Forward can return them to where
+    /// they were); it stays at the top (0) until the first such leave.
+    struct Entry: Codable, Hashable, Sendable {
+      let url: URL
+      var scrollY: Double
+
+      init(url: URL, scrollY: Double = 0) {
+        self.url = url
+        self.scrollY = scrollY
+      }
+    }
+
+    private(set) var entries: [Entry]
     private var currentIndex: Int
 
     var currentURL: URL {
-      return urls[currentIndex]
+      return entries[currentIndex].url
     }
 
-    var isEmpty: Bool { urls.isEmpty }
+    /// Resting scroll position recorded for the current entry — the
+    /// value Back/Forward hands to the next render so the page comes
+    /// back where the reader left it.
+    var currentScrollY: Double {
+      return entries[currentIndex].scrollY
+    }
+
+    var isEmpty: Bool { entries.isEmpty }
 
     var canGoBack: Bool {
-      currentIndex > urls.startIndex
+      currentIndex > entries.startIndex
     }
 
     var canGoForward: Bool {
-      currentIndex < urls.index(before: urls.endIndex)
+      currentIndex < entries.index(before: entries.endIndex)
     }
 
     init(url: URL) {
-      urls = [url]
+      entries = [Entry(url: url)]
       currentIndex = 0
     }
 
-    mutating func navigate(to url: URL) {
-      urls.removeSubrange((currentIndex + 1)..<urls.count)
-      urls.append(url)
-      currentIndex = urls.count - 1
+    /// Push `url` as a new entry, first stamping `leavingScrollY` onto
+    /// the entry being left so a later Back restores it. Truncates any
+    /// forward history (browser-standard new-link behaviour); the new
+    /// entry starts at the top.
+    mutating func navigate(to url: URL, leavingScrollY: Double) {
+      entries[currentIndex].scrollY = leavingScrollY
+      entries.removeSubrange((currentIndex + 1)..<entries.count)
+      entries.append(Entry(url: url))
+      currentIndex = entries.count - 1
     }
 
-    mutating func goBack() -> Bool {
-      guard currentIndex > urls.startIndex else { return false}
-      currentIndex = urls.index(before: currentIndex)
+    mutating func goBack(leavingScrollY: Double) -> Bool {
+      guard currentIndex > entries.startIndex else { return false }
+      entries[currentIndex].scrollY = leavingScrollY
+      currentIndex = entries.index(before: currentIndex)
       return true
     }
 
-    mutating func goForward() -> Bool {
-      guard currentIndex < urls.index(before: urls.endIndex)
-      else { return false}
-      currentIndex = urls.index(after: currentIndex)
+    mutating func goForward(leavingScrollY: Double) -> Bool {
+      guard currentIndex < entries.index(before: entries.endIndex)
+      else { return false }
+      entries[currentIndex].scrollY = leavingScrollY
+      currentIndex = entries.index(after: currentIndex)
       return true
     }
 
     mutating func replace(_ old: URL, with new: URL) {
-      urls = urls.map { $0 == old ? new : $0 }
+      entries = entries.map {
+        $0.url == old ? Entry(url: new, scrollY: $0.scrollY) : $0
+      }
+    }
+
+    // Custom Codable so snapshots persisted before per-entry scroll
+    // (a bare `urls: [URL]`) still rehydrate — legacy entries land at
+    // the top. The extra `urls` key blocks synthesis, so spell both
+    // sides out.
+    private enum CodingKeys: String, CodingKey {
+      case entries, urls, currentIndex
+    }
+
+    init(from decoder: any Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      currentIndex = try container.decode(Int.self, forKey: .currentIndex)
+      if let entries = try container.decodeIfPresent(
+        [Entry].self, forKey: .entries) {
+        self.entries = entries
+      } else {
+        let urls = try container.decode([URL].self, forKey: .urls)
+        self.entries = urls.map { Entry(url: $0) }
+      }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(entries, forKey: .entries)
+      try container.encode(currentIndex, forKey: .currentIndex)
     }
   }
 
@@ -63,17 +119,26 @@ extension DocumentModel {
   /// a broken link click doesn't strand the window with a corrupted
   /// base URL the link bridge would resolve subsequent clicks against.
   func navigate(to url: URL) async {
-    history.navigate(to: url)
-    await rebindCurrent()
+    history.navigate(to: url, leavingScrollY: scrollBridge.currentScrollY)
+    await rebindCurrent(firstScroll: .top)
   }
 
   func goBack() async {
-    guard history.goBack() else { return }
-    await rebindCurrent()
+    guard history.goBack(leavingScrollY: scrollBridge.currentScrollY)
+    else { return }
+    await rebindCurrent(firstScroll: restoringCurrentEntryScroll)
   }
 
   func goForward() async {
-    guard history.goForward() else { return }
-    await rebindCurrent()
+    guard history.goForward(leavingScrollY: scrollBridge.currentScrollY)
+    else { return }
+    await rebindCurrent(firstScroll: restoringCurrentEntryScroll)
+  }
+
+  /// One-shot intent that lands the next render on the current history
+  /// entry's stored resting position — how Back/Forward return the
+  /// reader to where they were.
+  private var restoringCurrentEntryScroll: ScrollIntent {
+    .explicit(.location(history.currentScrollY))
   }
 }
