@@ -63,6 +63,7 @@ final class AppModel {
       bundle: Bundle.main.bundleIdentifier,
       renderer: Defaults.shared.renderer,
       template: Defaults.shared.template)
+
 #if os(macOS)
     URL.createLocalizedApplicationSupportDirectory()
     UserDefaults.forceTabs()
@@ -122,21 +123,7 @@ final class AppModel {
       label: "Viewer.colorScheme",
       property: \Defaults.colorScheme)
 
-    // Log every ObservableDefaults notification arriving in this
-    // process — that's the signal bindPersistent's inbound side
-    // listens to. If this fires but the choice doesn't update,
-    // the gap is in bindPersistent or downstream observation.
-    NotificationCenter.default.addObserver(
-      forName: UserDefaults.didChangeNotification,
-      object: nil,
-      queue: .main
-    ) { _ in
-      MainActor.assumeIsolated {
-        Self.logDidChange(
-          renderer: Defaults.shared.renderer,
-          template: Defaults.shared.template)
-      }
-    }
+    Self.logDefaultsDidChange()
 
     // Boot side-effects (formerly `AppBoot.init`). Fired in parallel so
     // they never block the first scene; the processor catalog expands
@@ -159,6 +146,24 @@ final class AppModel {
       await ProcessorStore.shared.discover()
     }
     kosmos.start()
+  }
+
+  static func logDefaultsDidChange() {
+    // Log every ObservableDefaults notification arriving in this
+    // process — that's the signal bindPersistent's inbound side
+    // listens to. If this fires but the choice doesn't update,
+    // the gap is in bindPersistent or downstream observation.
+    NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      MainActor.assumeIsolated {
+        Self.logDidChange(
+          renderer: Defaults.shared.renderer,
+          template: Defaults.shared.template)
+      }
+    }
   }
 
   public func resolvedTemplate(

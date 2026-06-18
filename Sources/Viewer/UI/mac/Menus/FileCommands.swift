@@ -81,7 +81,7 @@ struct FileCommands: Commands {
       Button("Rename…", systemImage: "pencil") {
         model?.requestRename()
       }
-      .disabled(model?.kind != .document
+      .disabled(model?.isRegular != true
                 || model?.documentURL.isFileURL != true)
       .accessibilityIdentifier(ViewerA11yID.FileMenu.rename)
 

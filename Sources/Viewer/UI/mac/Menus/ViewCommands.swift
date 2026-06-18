@@ -37,7 +37,7 @@ struct WindowCommands: Commands {
 
   var body: some Commands {
     CommandGroup(before: .windowArrangement) {
-      Action.showOnVisionPro(model, kosmos: AppModel.shared.kosmos).menuItem()
+      Action.showOnVisionPro(model).menuItem()
     }
   }
 }

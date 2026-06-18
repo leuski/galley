@@ -1,6 +1,7 @@
 import GalleyCoreKit
 import SwiftUI
 import KosmosAppKit
+import WebKit
 
 /// The viewer surface for a single document window. Mounted by
 /// `DocumentSceneContent` once the window has a `DocumentModel` (built from a
@@ -89,10 +90,10 @@ struct DocumentView: View {
       ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
     .modifier(NoticeModifier(model: model))
     .modifier(WindowAttachedModifier(
-      installNewTabAction: model.kind == .document))
+      installNewTabAction: model.isRegular))
     .modifier(RenameModifier(model: model))
     .modifier(ExportModifier(model: model))
-    .navigationDocument(model.documentURL, when: model.kind == .document)
+    .navigationDocument(model.documentURL, when: model.isRegular)
     .navigationSubtitle(model.page.title)
 #endif
   }

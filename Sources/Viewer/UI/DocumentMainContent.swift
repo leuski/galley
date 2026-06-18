@@ -17,7 +17,7 @@ struct DocumentMainContent: View {
       .focusedSceneValue(\.documentModel, model)
       .frame(minWidth: webViewMinWidth)
       .navigationTitle(
-        model.kind == .help
+        !model.isRegular
         ? Text("Help")
         : Text(model.documentURL.lastPathComponent))
     // The WebView's pre-paint canvas paints system-white during
@@ -45,7 +45,7 @@ struct DocumentMainContent: View {
           .transition(.move(edge: .bottom).combined(with: .opacity))
         }
       }
-      .toolbar(id: model.kind == .document ? "viewer.main" : "viewer.help") {
+      .toolbar(id: model.isRegular ? "viewer.main" : "viewer.help") {
         toolbarContent()
       }
   }
@@ -67,7 +67,7 @@ struct DocumentMainContent: View {
       .defaultCustomization(.hidden)
 
     //    ToolbarSpacer(.flexible, placement: .automatic)
-    if model.kind == .document {
+    if model.isRegular {
 #if os(macOS)
       RendererToolbarPicker(docModel: model).toolbarItem
       TemplateToolbarPicker(docModel: model).toolbarItem

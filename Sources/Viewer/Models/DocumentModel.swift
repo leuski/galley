@@ -20,25 +20,13 @@ import UserNotifications
 final class DocumentModel: NavigationModel, ReloadableModel {
   var canReload: Bool { true }
 
-  /// Distinguishes a normal document window from the singleton Help
-  /// window. Help mode opts out of inbound-URL receipt + dedup
-  /// (`handlesInboundURLs(enabled: false)`), so a help window never
-  /// receives `galley://`/`file://` URLs and is never a dedup /
-  /// replace-current target. `record(_:)` on `RecentDocumentsModel`
-  /// independently refuses bundle URLs, so the inline
-  /// `recents.record(...)` calls below are no-ops in help mode
-  /// without needing a conditional.
-  enum Kind {
-    case document
-    case help
-  }
-
   let page: WebPage
   let zoom: WebPageZoomController
-  let kind: Kind
+
+  var isRegular: Bool { id != nil }
 
   /// Stable per-window identity; the persistence store is keyed by it.
-  let id: DocumentSceneID
+  let id: DocumentSceneID?
 
   /// Token for the persistence observer (`startTrackingPersistentState`).
   @ObservationIgnored var saveObservation: Cancelable?
@@ -257,19 +245,23 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
+  convenience init(
+    url: URL)
+  {
+    self.init(id: nil, history: History(url: url))
+  }
+
   init(
-    id: DocumentSceneID,
+    id: DocumentSceneID?,
     history: History,
     templatePersistent: String? = nil,
     processorPersistent: String? = nil,
     colorSchemePersistent: String? = nil,
     initialScroll: Scroll? = nil,
     initialShowsTOC: Bool = false,
-    initialZoom: Double = 1,
-    kind: Kind = .document
+    initialZoom: Double = 1
   ) {
     self.id = id
-    self.kind = kind
     self.history = history
     self.templates = SceneTemplateChoice(
       source: AppModel.shared.templates,
@@ -357,7 +349,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     pendingScroll = initialScroll
     savedShowsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
-    if kind == .document {
+    if isRegular {
       startTrackingPersistentState()
       startTrackingRenderInputs()
     }

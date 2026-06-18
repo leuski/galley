@@ -38,6 +38,30 @@ extension DocumentModel {
     var currentURL: URL {
       history.currentURL
     }
+
+    init(url: URL) {
+      self.init(history: History(url: url))
+    }
+
+    init(
+      history: History,
+      scrollY: Double = 0,
+      showsTOC: Bool = false,
+      pageZoom: Double = 1.0,
+      templatePersistent: String? = nil,
+      rendererPersistent: String? = nil,
+      colorSchemePersistent: String? = nil,
+      securityScopedBookmark: Data? = nil
+    ) {
+      self.history = history
+      self.scrollY = scrollY
+      self.showsTOC = showsTOC
+      self.pageZoom = pageZoom
+      self.templatePersistent = templatePersistent
+      self.rendererPersistent = rendererPersistent
+      self.colorSchemePersistent = colorSchemePersistent
+      self.securityScopedBookmark = securityScopedBookmark
+    }
   }
 
   /// Collect the model's current persistent state into a `Snapshot`.
@@ -84,13 +108,15 @@ extension DocumentModel {
   /// the model lives exactly as long as its window and is freed when
   /// SwiftUI tears the window down. Empty boxes are swept on lookup.
   private static var cache: [DocumentSceneID: WeakRef] = [:]
+  private(set) static var cacheCounter = 0
 
   private static func cached(_ id: DocumentSceneID) -> DocumentModel? {
     cache[id]?.model
   }
 
-  private static func remember(_ model: DocumentModel) {
-    cache[model.id] = WeakRef(model)
+  private static func remember(_ model: DocumentModel, id: DocumentSceneID) {
+    cacheCounter += 1
+    cache[id] = WeakRef(model)
     cache = cache.filter { $0.value.model != nil }
   }
 
@@ -103,7 +129,7 @@ extension DocumentModel {
       return nil
     }
     let model = DocumentModel(snapshot: snapshot, id: id)
-    remember(model)
+    remember(model, id: id)
     return model
   }
 
@@ -116,17 +142,18 @@ extension DocumentModel {
     target: DocumentTarget, id: DocumentSceneID) -> DocumentModel
   {
     if let existing = cached(id) { return existing }
-    let seed = DocumentStore[file: target.documentURL]
-    ?? Snapshot(history: History(url: target.documentURL))
-    let model = DocumentModel(snapshot: seed, id: id)
-    remember(model)
+    let model = DocumentModel(
+      snapshot: DocumentStore[file: target.documentURL]
+      ?? Snapshot(url: target.documentURL),
+      id: id)
+    remember(model, id: id)
     return model
   }
 
   /// The singleton Help window's model — a bundled file, never
   /// persisted (`kind: .help` skips the persistence observer).
   static func help(url: URL) -> DocumentModel {
-    DocumentModel(id: .next(), history: History(url: url), kind: .help)
+    DocumentModel(url: url)
   }
 
   /// Construct from a restored snapshot.
@@ -139,8 +166,7 @@ extension DocumentModel {
       colorSchemePersistent: snapshot.colorSchemePersistent,
       initialScroll: .location(snapshot.scrollY),
       initialShowsTOC: snapshot.showsTOC,
-      initialZoom: snapshot.pageZoom,
-      kind: .document)
+      initialZoom: snapshot.pageZoom)
   }
 }
 
@@ -169,6 +195,7 @@ extension DocumentModel {
   }
 
   private func save() {
+    guard let id else { return }
     let snapshot = self.snapshot
     DocumentStore[id] = snapshot
     let url = snapshot.currentURL

@@ -60,23 +60,21 @@ extension Action {
 
 #if os(macOS)
 extension Action {
-  static func showOnVisionPro(
-    _ model: DocumentModel?,
-    kosmos: ViewerKosmosService) -> Action
+  static func showOnVisionPro(_ model: DocumentModel?) -> Action
   {
     Action(
       title: { "Show on Vision Pro" },
       help: {
-        kosmos.isAVPReachable
+        AppModel.shared.kosmos.isAVPReachable
         ? "Open this document on the connected Vision Pro."
         : "No Vision Pro is currently paired with the bridge."
       },
       image: "visionpro",
       perform: { _ in
-        model?.showOnVisionPro(kosmos: kosmos)
+        model?.showOnVisionPro(kosmos: AppModel.shared.kosmos)
       },
       isEnabled: {
-        kosmos.isAVPReachable
+        AppModel.shared.kosmos.isAVPReachable
         && model?.documentURL.isFileURL == true
       },
       shortcut: .init("3", modifiers: [.command, .control]),
