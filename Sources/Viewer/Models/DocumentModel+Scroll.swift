@@ -16,20 +16,8 @@ extension DocumentModel {
   enum Scroll: Codable, Hashable, Sendable {
     case line(Int)
     case location(Double)
-  }
 
-  /// Where the next render should land. Threaded as an argument from
-  /// each bind entry point down to `renderCurrent` — replaces the
-  /// former one-shot `pendingScroll` field.
-  enum ScrollIntent: Sendable {
-    /// Apply this exact target once: a `@SceneStorage` resting
-    /// position (restore) or a `galley://…?line=N` source-line jump.
-    case explicit(Scroll)
-    /// Keep the reader's current position — file-watcher reload and
-    /// `reload()`.
-    case preserve
-    /// Land at the top — fresh navigation, Back/Forward, rename.
-    case top
+    static let top = Scroll.location(0)
   }
 
   /// Scroll the rendered preview to the heading identified by `id`.

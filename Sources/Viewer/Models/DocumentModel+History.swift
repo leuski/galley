@@ -119,26 +119,19 @@ extension DocumentModel {
   /// a broken link click doesn't strand the window with a corrupted
   /// base URL the link bridge would resolve subsequent clicks against.
   func navigate(to url: URL) async {
-    history.navigate(to: url, leavingScrollY: scrollBridge.currentScrollY)
+    history.navigate(to: url, leavingScrollY: currentScrollY)
     await rebindCurrent(firstScroll: .top)
   }
 
   func goBack() async {
-    guard history.goBack(leavingScrollY: scrollBridge.currentScrollY)
+    guard history.goBack(leavingScrollY: currentScrollY)
     else { return }
-    await rebindCurrent(firstScroll: restoringCurrentEntryScroll)
+    await rebindCurrent(firstScroll: .location(history.currentScrollY))
   }
 
   func goForward() async {
-    guard history.goForward(leavingScrollY: scrollBridge.currentScrollY)
+    guard history.goForward(leavingScrollY: currentScrollY)
     else { return }
-    await rebindCurrent(firstScroll: restoringCurrentEntryScroll)
-  }
-
-  /// One-shot intent that lands the next render on the current history
-  /// entry's stored resting position — how Back/Forward return the
-  /// reader to where they were.
-  private var restoringCurrentEntryScroll: ScrollIntent {
-    .explicit(.location(history.currentScrollY))
+    await rebindCurrent(firstScroll: .location(history.currentScrollY))
   }
 }

@@ -73,7 +73,7 @@ extension DocumentModel {
   var snapshot: Snapshot {
     Snapshot(
       history: history,
-      scrollY: scrollBridge.currentScrollY,
+      scrollY: currentScrollY,
       showsTOC: showsTOC,
       pageZoom: zoom.zoomScale,
       templatePersistent: templates.persistent,

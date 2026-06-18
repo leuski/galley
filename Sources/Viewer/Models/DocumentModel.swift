@@ -40,10 +40,13 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   @ObservationIgnored private let watcher = DocumentWatcher()
   @ObservationIgnored private let editorBridge = EditorBridge()
   @ObservationIgnored private let linkBridge = LinkBridge()
-  @ObservationIgnored let scrollBridge = ScrollBridge()
+  @ObservationIgnored private let scrollBridge = ScrollBridge()
+  @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
   @ObservationIgnored let tocBridge = TOCBridge()
   let statsBridge = StatsBridge()
-  @ObservationIgnored private let backgroundBridge = BackgroundColorBridge()
+
+  var currentScrollY: Double { scrollBridge.currentScrollY }
+  var currentScroll: Scroll { .location(currentScrollY) }
 
   /// Chrome reads through this. Drives off `renderedTemplate()` —
   /// the template *actually painted* in the WebView right now — so
@@ -328,8 +331,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       startTrackingPersistentState()
       startTrackingRenderInputs()
     }
-    let firstScroll = initialScroll.map(ScrollIntent.explicit) ?? .top
-    Task { await rebindCurrent(firstScroll: firstScroll) }
+    Task { await rebindCurrent(firstScroll: initialScroll ?? .top) }
   }
 
   /// Attach `[weak self]` callbacks to each bridge. Lifted out of
@@ -449,8 +451,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   func bind(
     to target: DocumentTarget
   ) async {
-    let firstScroll: ScrollIntent =
-      target.scrollLine.map { line in .explicit(.line(line)) } ?? .top
     history = History(url: target.documentURL)
     // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
     // to apply pre-first-paint. `showsTOC` itself stays `true` so
@@ -458,7 +458,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // AppKit wires `NSSplitViewItem.behavior = .sidebar` — without
     // that, a later toggle puts sidebar content below the tab bar.
     savedShowsTOC = false
-    await rebindCurrent(firstScroll: firstScroll)
+    await rebindCurrent(firstScroll: target.scroll ?? .top)
   }
 
   func reload() async {
@@ -480,7 +480,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       isRenderingNewTemplate = true
     }
     isPageRendered = false
-    await renderCurrent(scroll: .preserve)
+    await renderCurrent(scroll: currentScroll)
   }
 
   /// Rename the current document on disk and re-bind the watcher /
@@ -545,7 +545,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// Rebind the model to whichever URL is at `currentIndex`. Drives
   /// the initial render and keeps reloading on file changes until
   /// another rebind supersedes this one.
-  func rebindCurrent(firstScroll: ScrollIntent) async {
+  func rebindCurrent(firstScroll: Scroll) async {
     let url = history.currentURL
 
     bindGeneration &+= 1
@@ -575,11 +575,11 @@ final class DocumentModel: NavigationModel, ReloadableModel {
       if Task.isCancelled || bindGeneration != myGeneration { break }
       // Keep the user's place when the file changes on disk —
       // re-rendering otherwise snaps the WebView back to the top.
-      await renderCurrent(scroll: .preserve)
+      await renderCurrent(scroll: currentScroll)
     }
   }
 
-  private func renderCurrent(scroll intent: ScrollIntent) async {
+  private func renderCurrent(scroll targetScroll: Scroll) async {
     // Drop any prior render-bound notice — it described the previous
     // bind and would otherwise sit behind the incoming render until
     // the next failure overwrote it. Leaves an in-flight ephemeral
@@ -588,28 +588,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     clearRenderBoundNotice()
 
     let url = documentURL
-
-    // Resolve where to land *before* re-rendering so we can hand the
-    // position back to the page after load: an explicit one-shot
-    // target (restore / source-line jump), the reader's current
-    // resting position (preserve), or the top.
-    let targetScroll: Scroll
-    switch intent {
-    case .explicit(let requested):
-      // Source-line jumps (`galley://...?line=N`) don't translate to
-      // a remote render — the Server hasn't surfaced source positions
-      // over the wire. Drop the request so a stray value doesn't
-      // chase the next file-URL bind.
-      if !url.isFileURL, case .line = requested {
-        targetScroll = .location(0)
-      } else {
-        targetScroll = requested
-      }
-    case .preserve:
-      targetScroll = .location(scrollBridge.currentScrollY)
-    case .top:
-      targetScroll = .location(0)
-    }
 
     // Server-hosted URLs (the AVP Kosmos path): the bridge already
     // returns rendered HTML from `/preview/<path>`. Running that
@@ -661,5 +639,11 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
   private func logLoadingHTML(byteCount: Int) {
     logger.debug("Loading rendered HTML (\(byteCount) bytes)")
+  }
+}
+
+extension DocumentTarget {
+  var scroll: DocumentModel.Scroll? {
+    scrollLine.map { line in .line(line) }
   }
 }
