@@ -42,8 +42,6 @@ struct DocumentScene: Scene {
   }
 
 #if os(macOS)
-  private var appModel: AppModel { AppModel.shared }
-
   @CommandsBuilder
   var commands: some Commands {
     SettingsCommands()
@@ -51,7 +49,7 @@ struct DocumentScene: Scene {
     EditCommands()
     ToolbarCommands()
     ViewCommands()
-    FormatCommands(appModel: appModel)
+    FormatCommands()
     WindowCommands()
     HelpCommands()
   }

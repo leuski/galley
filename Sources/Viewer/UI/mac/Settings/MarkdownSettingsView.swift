@@ -6,7 +6,7 @@ import GalleyCoreKit
 import KosmosAppKit
 
 struct MarkdownSettingsView: View {
-  @Bindable var appModel: AppModel
+  @Bindable var appModel = AppModel.shared
   @Bindable var defaults = Defaults.shared
 
   /// Drives the SwiftUI `.fileImporter` for the "Other Application…"

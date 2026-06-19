@@ -113,11 +113,9 @@ private struct RendererToolbarPicker: View {
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    processorMenu(
-      appModel: appModel,
-      documentModel: docModel)
-    .scaleEffect(toolbarMenuIconScale, anchor: .center)
-    .help("Markdown processor")
+    processorMenu(documentModel: docModel)
+      .scaleEffect(toolbarMenuIconScale, anchor: .center)
+      .help("Markdown processor")
   }
 
   var toolbarItem: some CustomizableToolbarContent {
@@ -133,11 +131,9 @@ private struct TemplateToolbarPicker: View {
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    templateMenu(
-      appModel: appModel,
-      documentModel: docModel)
-    .scaleEffect(toolbarMenuIconScale, anchor: .center)
-    .help("Template")
+    templateMenu(documentModel: docModel)
+      .scaleEffect(toolbarMenuIconScale, anchor: .center)
+      .help("Template")
   }
 
   var toolbarItem: some CustomizableToolbarContent {

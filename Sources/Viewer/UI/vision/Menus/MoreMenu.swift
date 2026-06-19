@@ -31,26 +31,20 @@ struct MoreMenu: View {
 
       Divider()
 
-      templateMenu(
-        appModel: appModel,
-        documentModel: model)
-      .disabled(!model.documentURL.isFileURL)
-      .help(
-        model.documentURL.isFileURL
-        ? ""
-        : "Rendered on Mac — change template in Galley on your Mac.")
-      colorSchemeMenu(
-        appModel: appModel,
-        documentModel: model)
-      .disabled(!model.documentURL.isFileURL)
-      .help(
-        model.documentURL.isFileURL
-        ? ""
-        : "Rendered on Mac — change color scheme on your Mac.")
+      templateMenu(documentModel: model)
+        .disabled(!model.documentURL.isFileURL)
+        .help(
+          model.documentURL.isFileURL
+          ? ""
+          : "Rendered on Mac — change template in Galley on your Mac.")
+      colorSchemeMenu(documentModel: model)
+        .disabled(!model.documentURL.isFileURL)
+        .help(
+          model.documentURL.isFileURL
+          ? ""
+          : "Rendered on Mac — change color scheme on your Mac.")
       if appModel.processors.values.count > 1 {
-        processorMenu(
-          appModel: appModel,
-          documentModel: model)
+        processorMenu(documentModel: model)
       }
 
       Divider()

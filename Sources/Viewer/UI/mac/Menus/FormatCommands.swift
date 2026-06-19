@@ -12,7 +12,6 @@ import SwiftUI
 /// Setting." When the flag is off, the menus drive the global
 /// selection directly.
 struct FormatCommands: Commands {
-  @Bindable var appModel: AppModel
   @FocusedValue(\.documentModel) private var documentModel
 
   var body: some Commands {
@@ -20,13 +19,8 @@ struct FormatCommands: Commands {
       // Subscribe to per-window selections so this body re-evaluates
       // and the system menu rebuilds when an override flips. NSMenu
       // doesn't pick up internal Toggle invalidations on its own.
-      templateMenu(
-        appModel: appModel,
-        documentModel: documentModel)
-
-      processorMenu(
-        appModel: appModel,
-        documentModel: documentModel)
+      templateMenu(documentModel: documentModel)
+      processorMenu(documentModel: documentModel)
     }
   }
 }

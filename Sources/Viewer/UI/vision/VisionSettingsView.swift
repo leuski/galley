@@ -13,7 +13,6 @@ import SwiftUI
 /// users don't have a tab strip affordance the way macOS does, and
 /// the total knob count is small enough to fit on one page.
 struct VisionSettingsView: View {
-  @Bindable var appModel: AppModel
   @Bindable private var defaults = Defaults.shared
   private let subtitleSpacing: CGFloat = 16
 
@@ -69,7 +68,7 @@ struct VisionSettingsView: View {
 
       VStack(alignment: .leading, spacing: subtitleSpacing) {
         LabeledContent {
-          MyPicker(model: appModel.colorSchemes)
+          MyPicker(model: AppModel.shared.colorSchemes)
         } label: {
           Text("Color scheme")
         }
@@ -116,7 +115,7 @@ struct VisionSettingsView: View {
   private var markdownSection: some View {
     Section("Markdown") {
       LabeledContent {
-        MyPicker(model: appModel.templates)
+        MyPicker(model: AppModel.shared.templates)
       } label: {
         Text("Template")
       }

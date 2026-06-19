@@ -11,14 +11,13 @@ import GalleyCoreKit
 struct SettingsScene: Scene {
   static let id = "settings"
   static let events = Set([OpenSettingsActivity.schemeExternalToken])
-  private var model: AppModel { AppModel.shared }
 
   var body: some Scene {
     Window("Settings", id: Self.id) {
 #if os(macOS)
-      MacSettingsView(appModel: model)
+      MacSettingsView()
 #else
-      VisionSettingsView(appModel: model)
+      VisionSettingsView()
 #endif
     }
     .handlesExternalEvents(matching: Self.events)

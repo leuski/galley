@@ -12,7 +12,6 @@ import SwiftUI
 func templateMenu(
   title: LocalizedStringResource? = "Template",
   globalTitle: LocalizedStringResource? = "Global Template",
-  appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
   let title = (Defaults.shared.enablePerDocumentOverrides
@@ -21,7 +20,7 @@ func templateMenu(
      Defaults.shared.enablePerDocumentOverrides {
     TemplateMenu(title: title, model: documentModel.templates)
   } else {
-    TemplateMenu(title: title, model: appModel.templates)
+    TemplateMenu(title: title, model: AppModel.shared.templates)
   }
 }
 
@@ -29,7 +28,6 @@ func templateMenu(
 func processorMenu(
   title: LocalizedStringResource? = "Markdown Processor",
   globalTitle: LocalizedStringResource? = "Global Markdown Processor",
-  appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
   let title = (Defaults.shared.enablePerDocumentOverrides
@@ -38,7 +36,7 @@ func processorMenu(
      Defaults.shared.enablePerDocumentOverrides {
     ProcessorMenu(title: title, model: documentModel.processors)
   } else {
-    ProcessorMenu(title: title, model: appModel.processors)
+    ProcessorMenu(title: title, model: AppModel.shared.processors)
   }
 }
 
@@ -53,7 +51,6 @@ func processorMenu(
 func colorSchemeMenu(
   title: LocalizedStringResource? = "Color Scheme",
   globalTitle: LocalizedStringResource? = "Global Color Scheme",
-  appModel: AppModel,
   documentModel: DocumentModel? = nil) -> some View
 {
   let title = (Defaults.shared.enablePerDocumentOverrides
@@ -62,7 +59,7 @@ func colorSchemeMenu(
      Defaults.shared.enablePerDocumentOverrides {
     ColorSchemeMenu(title: title, model: documentModel.colorSchemes)
   } else {
-    ColorSchemeMenu(title: title, model: appModel.colorSchemes)
+    ColorSchemeMenu(title: title, model: AppModel.shared.colorSchemes)
   }
 }
 #endif

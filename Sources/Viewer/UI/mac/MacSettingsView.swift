@@ -3,7 +3,7 @@ import GalleyCoreKit
 import SwiftUI
 
 struct MacSettingsView: View {
-  @Bindable var appModel: AppModel
+  @Bindable var appModel = AppModel.shared
 
   var body: some View {
     TabView(selection: $appModel.selectedSettingsTab) {
@@ -59,6 +59,6 @@ extension View {
 }
 
 #Preview {
-  MacSettingsView(appModel: AppModel())
+  MacSettingsView()
 }
 #endif
