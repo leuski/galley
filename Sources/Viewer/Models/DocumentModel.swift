@@ -151,7 +151,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// hosting this model. Per-document live state — preserved across
   /// in-window link navigation so a child doc inherits the parent's
   /// pick. Cold opens / Replace-current rebinds reset this from the
-  /// destination URL's `DocumentStore` file snapshot instead.
+  /// destination URL's file snapshot instead.
   ///
   /// Starts `true` so `NavigationSplitView` is born with a visible
   /// sidebar — AppKit only wires `NSSplitViewItem.behavior = .sidebar`

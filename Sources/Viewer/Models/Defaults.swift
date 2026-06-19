@@ -34,22 +34,22 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  @DefaultsKey var renderer: String?
-  @DefaultsKey var template: String?
-  @DefaultsKey var enablePerDocumentOverrides: Bool = false
-  @DefaultsKey var openBehavior: OpenBehavior = .newWindow
+  var renderer: String?
+  var template: String?
+  var enablePerDocumentOverrides: Bool = false
+  var openBehavior: OpenBehavior = .newWindow
   /// Per-window persisted state, keyed by `DocumentSceneID.description`.
-  /// The window-keyed half of `DocumentStore` — SwiftUI restores the
+  /// The window-keyed half of document store — SwiftUI restores the
   /// `WindowGroup` value (the id), and the window rehydrates its
   /// document from this map. Replaces the old `@SceneStorage("history")`
   /// slot (broken on visionOS). See docs/rebuild-document-windowing.md.
-  @DefaultsKey var windowSnapshots: [String: DocumentModel.Snapshot] = [:]
-  /// Per-file persisted state, keyed by `DocumentStore.fileKey(_:)`. The
-  /// url-keyed half of `DocumentStore`: a fresh window opening a known
+  private var windowSnapshots: [String: DocumentModel.Snapshot] = [:]
+  /// Per-file persisted state, keyed by `fileKey(_:)`. The
+  /// url-keyed half of document store: a fresh window opening a known
   /// file re-seeds its zoom/scroll/TOC/choices from here. Same
   /// `Snapshot` type as `windowSnapshots`; the nav stack collapses to
   /// the single file.
-  @DefaultsKey var fileSnapshots: [String: DocumentModel.Snapshot] = [:]
+  private var fileSnapshots: [String: DocumentModel.Snapshot] = [:]
   /// When on, the active page's background color is painted behind
   /// the window glass via `.containerBackground(_:for:.window)` so
   /// the toolbar/ornament/sidebar chrome sample it through their
@@ -57,13 +57,13 @@ final class Defaults: GalleyRenderDefaults,
   /// surface (system window background on macOS; plain glass on
   /// visionOS). Promoted out of macOS-only scope so visionOS reads
   /// the same key.
-  @DefaultsKey var tintWindowWithPageBackground: Bool = true
+  var tintWindowWithPageBackground: Bool = true
   /// Per-template page background colors, captured by
   /// `BackgroundColorBridge` after each render. Used by
   /// `Template.backgroundState` so a freshly-opened tab can paint
   /// the chrome with the right tint immediately, and by FindBar /
   /// DocumentView for the same reason.
-  @DefaultsKey var templateBackgroundColors: [String: TemplateBackgroundState]
+  var templateBackgroundColors: [String: TemplateBackgroundState]
   = [:]
   /// Most recent opaque page bg observed by *any* template. Used as
   /// a global fallback when the currently-resolved template hasn't
@@ -71,19 +71,19 @@ final class Defaults: GalleyRenderDefaults,
   /// hydrates with this last-seen color instead of flashing to the
   /// system default. Empty string means no color has been observed
   /// in this session or any past session yet.
-  @DefaultsKey var lastTemplateBackgroundColor: TemplateBackgroundState
+  var lastTemplateBackgroundColor: TemplateBackgroundState
   = .unresolved
   /// Whether the bottom `StatusBar` HUD (word count, reading time,
   /// heading count) is visible in document windows. Global pref —
   /// the same toggle applies to every open window.
-  @DefaultsKey var showsStatusBar: Bool = false
+  var showsStatusBar: Bool = false
   /// Words-per-minute used to estimate reading time in the status
   /// bar. 200 is the rough middle of the literature on prose reading
   /// speed (Marked 2 defaults to 220, Hemingway uses 250).
-  @DefaultsKey var readingWordsPerMinute: Int = 200
+  var readingWordsPerMinute: Int = 200
 
 #if os(macOS)
-  @DefaultsKey var editor: EditorChoice.Element = .preset(.bbedit)
+  var editor: EditorChoice.Element = .preset(.bbedit)
 #else
   /// Persisted visionOS Open Recent entries. Each entry carries a
   /// URL and — for local file URLs only — a bookmark blob that lets
@@ -91,7 +91,7 @@ final class Defaults: GalleyRenderDefaults,
   /// Remote (http(s)) URLs persist as URL-only entries. macOS uses
   /// `NSDocumentController` for the same purpose and has no need for
   /// this key.
-  @DefaultsKey var recentEntries: [RecentDocumentEntry] = []
+  var recentEntries: [RecentDocumentEntry] = []
 #endif
 
   /// Persisted (serialized) form of the global color-scheme choice.
@@ -101,14 +101,14 @@ final class Defaults: GalleyRenderDefaults,
   /// `AppModel` writes back via `bindPersistent`. Stored on both
   /// platforms so the shared plist round-trips cleanly; only visionOS
   /// surfaces the setting in UI.
-  @DefaultsKey var colorScheme: String?
+  var colorScheme: String?
 
   /// Hash of the Galley.app bundle the Server saw at its launch.
   /// Published by the Server (via the shared `net.leuski.galley`
   /// plist), read by the Viewer on its launch to detect a stale
   /// Server. Cleared by the Viewer before terminating a stale Server
   /// so a re-read during the kill window doesn't re-trigger the reap.
-  @DefaultsKey var serverGalleyHash: String?
+  var serverGalleyHash: String?
 
   /// OS-assigned port of the running Galley Server's HTTP listener.
   /// Published by the Server when it binds, cleared (set to 0) when
@@ -117,9 +117,62 @@ final class Defaults: GalleyRenderDefaults,
   /// contract honest and surfaces `serverEndpointURL` for any future
   /// reader. Quicklook reads the same plist through its own
   /// `Defaults` class.
-  @DefaultsKey var serverHTTPPort: UInt16 = 0
+  var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 
-  let broadcaster = DefaultsBroadcast(suiteName: GalleyConstants.suiteName)
+  @Ignore let broadcaster = DefaultsBroadcast(
+    suiteName: GalleyConstants.suiteName)
+  @Ignore var accessTimes = Set<String>()
+
+  subscript (snapshot key: DocumentSceneID) -> DocumentModel.Snapshot? {
+    get {
+      let key = key.description
+      accessTimes.insert(key)
+      return windowSnapshots[key]
+    }
+    set {
+      let key = key.description
+      accessTimes.insert(key)
+      windowSnapshots[key] = newValue
+    }
+  }
+
+  /// Stable plist key for a URL: file URLs canonicalize (standardized +
+  /// symlink-resolved) so two paths to the same file share state;
+  /// remote URLs keep host + path (`safe.path()` would drop the host).
+  private func fileKey(_ url: URL) -> String {
+    url.isFileURL ? url.safe.path() : url.absoluteString
+  }
+
+  subscript (snapshot key: URL) -> DocumentModel.Snapshot? {
+    get {
+      let key = fileKey(key)
+      return fileSnapshots[key]
+    }
+    set {
+      let key = fileKey(key)
+      fileSnapshots[key] = newValue
+    }
+  }
+
+  private func purgeSceneSnapshots() {
+    windowSnapshots = windowSnapshots.filter { key, _ in
+      accessTimes.contains(key) }
+  }
+
+  init() {
+    observerStarter()
+    Task { @MainActor in
+      do {
+        // purge all snapshots that have not been accessed in some time
+        // after the init -- it means they have not been restored.
+        try await Task.sleep(for: .seconds(15))
+        Self.shared.purgeSceneSnapshots()
+      } catch {
+        // ignore
+      }
+    }
+  }
+
 }

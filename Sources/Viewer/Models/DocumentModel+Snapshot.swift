@@ -125,7 +125,7 @@ extension DocumentModel {
   /// call from a `@State` initial value.
   static func forScene(id: DocumentSceneID) -> DocumentModel? {
     if let existing = cached(id) { return existing }
-    guard let snapshot = DocumentStore[id] else {
+    guard let snapshot = Defaults.shared[snapshot: id] else {
       return nil
     }
     let model = DocumentModel(snapshot: snapshot, id: id)
@@ -143,7 +143,7 @@ extension DocumentModel {
   {
     if let existing = cached(id) { return existing }
     let model = DocumentModel(
-      snapshot: DocumentStore[file: target.documentURL]
+      snapshot: Defaults.shared[snapshot: target.documentURL]
       ?? Snapshot(url: target.documentURL),
       id: id)
     remember(model, id: id)
@@ -196,9 +196,9 @@ extension DocumentModel {
   private func save() {
     guard let id else { return }
     let snapshot = self.snapshot
-    DocumentStore[id] = snapshot
+    Defaults.shared[snapshot: id] = snapshot
     let url = snapshot.currentURL
-    DocumentStore[file: url] = fileSnapshot(for: url)
+    Defaults.shared[snapshot: url] = fileSnapshot(for: url)
   }
 
   /// Re-render when a render input changes: the global processor /
