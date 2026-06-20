@@ -21,8 +21,8 @@ extension Action {
     Action(
       title: {
         Defaults.shared.showsStatusBar
-          ? "Hide Status Bar"
-          : "Show Status Bar"
+        ? "Hide Status Bar"
+        : "Show Status Bar"
       },
       image: "ruler",
       perform: { env in
@@ -44,8 +44,8 @@ extension Action {
     Action(
       title: {
         (model?.showsTOC ?? false)
-          ? "Hide Table of Contents"
-          : "Show Table of Contents"
+        ? "Hide Table of Contents"
+        : "Show Table of Contents"
       },
       image: "sidebar.left",
       perform: { env in
@@ -56,6 +56,50 @@ extension Action {
       accessibilityID: ViewerA11yID.ViewMenu.toggleTOC
     )
   }
+
+  static func howToMakeTemplate() -> Action {
+    let url = Bundle.main.url(
+      forResource: "template-authoring",
+      withExtension: "md")
+
+    return Action(
+      title: "How to Make a Template",
+      image: "questionmark.circle",
+      perform: { _ in
+        guard let url else { return }
+        OpenHelpActivity(documentURL: url).open()
+      },
+      isEnabled: { url != nil },
+      accessibilityID: ViewerA11yID.HelpMenu.templateAuthoring
+    )
+  }
+
+  static func settings() -> Action {
+    Action(
+      title: "Settings…",
+      image: "gearshape",
+      perform: { _ in
+        OpenSettingsActivity().open()
+      },
+      accessibilityID: ViewerA11yID.ToolbarSettings.settings
+    )
+  }
+
+  static func open() -> Action {
+    Action(
+      title: "Open…",
+      image: "arrow.up.forward",
+      perform: { _ in
+#if os(macOS)
+        AppModel.shared.recents.presentOpenPanel()
+#endif
+      },
+      shortcut: .init("o", modifiers: [.command]),
+      accessibilityID: ViewerA11yID.FileMenu.open
+    )
+  }
+
+  
 }
 
 #if os(macOS)

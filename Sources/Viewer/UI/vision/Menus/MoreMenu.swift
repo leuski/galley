@@ -49,25 +49,9 @@ struct MoreMenu: View {
 
       Divider()
 
-      Button {
-        openWindow(id: SettingsScene.id)
-      } label: {
-        Label("Settings…", systemImage: "gearshape")
-      }
-      .accessibilityIdentifier(ViewerA11yID.ToolbarSettings.settings)
+      Action.settings().menuItem()
+      Action.howToMakeTemplate().menuItem()
 
-      if let helpURL = Bundle.main.url(
-        forResource: "template-authoring",
-        withExtension: "md") {
-        Button {
-          GalleyViewerRequestActivity(url: helpURL).open()
-        } label: {
-          Label(
-            "How to Make a Template",
-            systemImage: "questionmark.circle")
-        }
-        .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)
-      }
     } label: {
       Label("More", systemImage: "ellipsis.circle")
     }

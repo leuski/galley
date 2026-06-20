@@ -11,14 +11,9 @@ import SwiftUI
 /// a plain window gets neither the menu item nor ⌘, for free, so we add
 /// them here. `openWindow` is available via `@Environment` in `Commands`.
 struct SettingsCommands: Commands {
-  @Environment(\.openWindow) private var openWindow
-
   var body: some Commands {
     CommandGroup(replacing: .appSettings) {
-      Button("Settings…", systemImage: "gearshape") {
-        openWindow(id: SettingsScene.id)
-      }
-      .keyboardShortcut(",", modifiers: .command)
+      Action.settings().menuItem()
     }
   }
 }

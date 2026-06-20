@@ -22,11 +22,7 @@ struct FileCommands: Commands {
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
-      Button("Open…", systemImage: "arrow.up.forward") {
-        AppModel.shared.recents.presentOpenPanel()
-      }
-        .keyboardShortcut("o", modifiers: .command)
-        .accessibilityIdentifier(ViewerA11yID.FileMenu.open)
+      Action.open().menuItem()
 
       Menu("Open Recent", systemImage: "clock") {
         ForEach(recents.urls, id: \.self) { url in

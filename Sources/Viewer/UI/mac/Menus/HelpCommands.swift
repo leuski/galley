@@ -17,15 +17,7 @@ import SwiftUI
 struct HelpCommands: Commands {
   var body: some Commands {
     CommandGroup(replacing: .help) {
-      let url = Bundle.main.url(
-        forResource: "template-authoring",
-        withExtension: "md")
-      Button("How to Make a Template") {
-        guard let url else { return }
-        OpenHelpActivity(documentURL: url).open()
-      }
-      .disabled(url == nil)
-      .accessibilityIdentifier(ViewerA11yID.HelpMenu.templateAuthoring)
+      Action.howToMakeTemplate().menuItem()
     }
   }
 }
