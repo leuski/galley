@@ -22,6 +22,8 @@ final class AppModel {
   let processors: ProcessorChoice
   let colorSchemes: ColorSchemeChoice
 
+  var isOpenFilePresented = false
+
   /// App-wide collaborators that used to live on `AppBoot`.
   let kosmos = ViewerKosmosService()
   let recents = RecentDocumentsModel()
@@ -74,10 +76,7 @@ final class AppModel {
     /// picks are born-as-tab.
     NewTabAction.handler = { _ in
       Task { @MainActor in
-        let picks = await AppModel.shared.recents.runOpenPanel()
-        for url in picks {
-          GalleyViewerRequestActivity(url: url).open()
-        }
+        AppModel.shared.isOpenFilePresented = true
       }
     }
 #endif

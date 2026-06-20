@@ -33,6 +33,18 @@ func galleyModuleLoads() {
 // is a behavior-preserving refactor — same target resolution per call path,
 // no new logic to unit-test.
 
+// No-op marker: moving the menu commands out of inline `Button`s and into
+// `Action` factories rendered via `.menuItem()` is a behavior-preserving
+// refactor — identical titles, SF Symbols, shortcuts, disabled conditions, and
+// accessibility identifiers. Covers the mac File-menu commands (Close, Close
+// All, Rename, Open in Editor, Export as PDF, Page Setup, Print) and the
+// Open-Recent list + Clear Menu on both macOS and visionOS (the unified
+// `Action.openRecent` uses `resolveRecentURL`, a no-op passthrough on macOS;
+// the now-dead `RecentDocumentsModel.openRecent` was removed). `Action`'s
+// stored metadata is internal to KosmosAppKit, so there is no Viewer-visible
+// seam to assert against; the menu/toolbar rendering path is exercised by the
+// UITests.
+
 // MARK: - EditorPreset / substituteEditorTemplate
 
 @Suite("EditorPreset")

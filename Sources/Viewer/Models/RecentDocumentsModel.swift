@@ -125,46 +125,6 @@ final class RecentDocumentsModel {
   func resolveRecentURL(_ url: URL) -> URL? {
     url
   }
-
-  /// Open one previously-opened URL through the same path as
-  /// Finder/NSOpenPanel (fire-at-self) — used by the Open Recent menu.
-  func openRecent(_ url: URL) {
-    GalleyViewerRequestActivity(url: url).open()
-  }
-
-  /// Run NSOpenPanel and route picks through the app's own URL handler
-  /// (fire-at-self). The File menu wires its Open command to this.
-  func presentOpenPanel() {
-    Task {
-      let picks = await runOpenPanel()
-      for url in picks {
-        GalleyViewerRequestActivity(url: url).open()
-      }
-    }
-  }
-
-  /// Run NSOpenPanel and return the picks without dispatching.
-  /// Used by the welcome FTUE flow so the caller can route them.
-  ///
-  /// Uses the async `begin` form rather than `runModal` because
-  /// `runModal` cannot start inside a SwiftUI/CoreAnimation
-  /// transaction commit.
-  func runOpenPanel() async -> [URL] {
-    let panel = NSOpenPanel()
-    panel.identifier = .init(rawValue: "open.file.panel")
-    panel.allowsMultipleSelection = true
-    panel.canChooseDirectories = false
-    panel.canChooseFiles = true
-    panel.allowedContentTypes = MarkdownFileTypes.allTypesAndPlainText
-    activeOpenPanel = panel
-    let response: NSApplication.ModalResponse =
-    await withCheckedContinuation { continuation in
-      panel.begin { continuation.resume(returning: $0) }
-    }
-    if activeOpenPanel === panel { activeOpenPanel = nil }
-    guard response == .OK else { return [] }
-    return panel.urls
-  }
 #else
   /// Resolve a recent entry and return a URL the caller can bind to
   /// its `WindowGroup` slot. For file entries that means re-resolving
