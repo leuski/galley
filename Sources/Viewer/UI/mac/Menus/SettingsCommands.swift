@@ -1,5 +1,6 @@
 #if os(macOS)
 import SwiftUI
+import GalleyCoreKit
 
 /// Restores the app-menu "Settings…" item + ⌘, for the Settings window.
 ///
