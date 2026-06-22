@@ -29,10 +29,10 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let id: DocumentSceneID?
 
   /// Token for the persistence observer (`startTrackingPersistentState`).
-  @ObservationIgnored var saveObservation: Cancelable?
+  @ObservationIgnored var saveObservation: Cancellable?
 
   /// Token for the render-inputs observer (`startTrackingRenderInputs`).
-  @ObservationIgnored var reloadObservation: Cancelable?
+  @ObservationIgnored var reloadObservation: Cancellable?
 
   /// True once this window holds a document (blank windows have no model).
   var hasDocument: Bool { !history.isEmpty }

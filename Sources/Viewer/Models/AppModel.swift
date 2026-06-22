@@ -28,7 +28,7 @@ final class AppModel {
   let kosmos = ViewerKosmosService()
   let recents = RecentDocumentsModel()
 
-  @ObservationIgnored private var persistenceTokens: [Cancelable] = []
+  @ObservationIgnored private var persistenceTokens: [Cancellable] = []
 
 #if os(macOS)
   @ObservationIgnored let editors: EditorChoice

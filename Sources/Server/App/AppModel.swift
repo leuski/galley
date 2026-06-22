@@ -48,7 +48,7 @@ final class AppModel {
   let processors: ProcessorChoice
   @ObservationIgnored let server: PreviewServerController
   @ObservationIgnored let kosmos: ServerKosmosService
-  @ObservationIgnored private var persistenceTokens: [Cancelable] = []
+  @ObservationIgnored private var persistenceTokens: [Cancellable] = []
 
   init() {
     Self.logInit(
