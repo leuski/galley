@@ -40,14 +40,10 @@ struct DocumentSceneContent: View {
         preferring: preferringTokens,
         allowing: allowingTokens)
       .onOpenURL(perform: handleOpenURL)
-#if os(macOS)
-      .onAppear {
-        syncWindowTabbing()
+    // state-restored scene ID arrives late on macOS
+      .onChange(of: sceneID) { _, new in
+        self.model = DocumentModel.forScene(id: new)
       }
-      .onChange(of: Defaults.shared.openBehavior) { _, _ in
-        syncWindowTabbing()
-      }
-#endif
   }
 
   /// Tokens this window *prefers* — a re-open of the doc it already shows
@@ -120,16 +116,4 @@ struct DocumentSceneContent: View {
     NSApp.activate(ignoringOtherApps: true)
 #endif
   }
-
-#if os(macOS)
-  /// Pin the per-process tabbing toggle to the current open-behavior so
-  /// that windows SwiftUI spawns on its own (for new-window / new-tab
-  /// inbound docs) are born standalone or born-as-tab as the user asked.
-  /// `forceTabs()` sets the `always` substrate; this is the on/off gate
-  /// layered on top.
-  private func syncWindowTabbing() {
-    NSWindow.allowsAutomaticWindowTabbing =
-      Defaults.shared.openBehavior == .newTab
-  }
-#endif
 }

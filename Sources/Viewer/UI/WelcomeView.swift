@@ -32,6 +32,7 @@ struct WelcomeView: View {
 
       if !recents.urls.isEmpty {
         recentsList
+          .padding()
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

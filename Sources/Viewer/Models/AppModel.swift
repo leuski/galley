@@ -69,6 +69,12 @@ final class AppModel {
 #if os(macOS)
     URL.createLocalizedApplicationSupportDirectory()
     UserDefaults.forceTabs()
+    persistenceTokens.append(onObservedChange {
+      _ = Defaults.shared.openBehavior
+    } onChange: {
+      NSWindow.allowsAutomaticWindowTabbing = Defaults
+        .shared.openBehavior == .newTab
+    })
     self.editors = EditorChoice()
     /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
     /// activity URL. The "+" only exists when windows are already tabbed
@@ -109,7 +115,7 @@ final class AppModel {
     // outbound write fires the cross-process signal.
     Defaults.shared.startListening()
 
-    persistenceTokens = bindPersistent(
+    persistenceTokens += bindPersistent(
       templates,
       label: "Viewer.template",
       property: \Defaults.template)
