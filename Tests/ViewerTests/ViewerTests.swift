@@ -8,6 +8,11 @@
 //  Pure-routing tests for the kit live in
 //  `Tests/GalleyCoreKitTests/Routing/`.
 //
+//  Note: WelcomeView's recents list (inline Picker driving
+//  `Action.openRecent`) is view-only wiring over the already-tested
+//  open path; its visionOS row hover / sizing is verified in the
+//  visionOS simulator, not in a unit test.
+//
 
 import AppKit
 import Foundation

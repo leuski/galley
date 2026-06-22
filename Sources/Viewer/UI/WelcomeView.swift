@@ -38,14 +38,21 @@ struct WelcomeView: View {
   }
 
   private var recentsList: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("Recent")
+    VStack(alignment: .leading, spacing: 6) {
+      Text("Recent Documents")
         .font(.headline)
         .foregroundStyle(.secondary)
-      List(recents.urls.prefix(8), id: \.self) { url in
-        Action.openRecent(url, recents: recents).menuItem()
-          .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+      VStack(spacing: 0) {
+        ForEach(recents.urls.prefix(8), id: \.self) { url in
+          Action.openRecent(url, recents: recents)
+            .listRow()
+        }
       }
+      .padding(6)
+      .background(
+        RoundedRectangle(cornerRadius: Action.listCornerRadius)
+          .fill(.background))
     }
     .frame(maxWidth: 560, alignment: .leading)
   }
