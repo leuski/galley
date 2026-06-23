@@ -97,7 +97,7 @@ extension Action {
   ) -> Action {
     Action(
       title: { "\(url.lastPathComponent)" },
-      help: { url.absoluteString },
+      help: { "\(url.absoluteString)" },
       image: {
         if url.isFileURL {
 #if os(macOS)
