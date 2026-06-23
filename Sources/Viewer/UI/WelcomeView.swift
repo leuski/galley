@@ -16,26 +16,29 @@ struct WelcomeView: View {
   private var recents: RecentDocumentsModel { AppModel.shared.recents }
 
   var body: some View {
-    HStack(spacing: 24) {
+    HStack(spacing: 40) {
       VStack(spacing: 8) {
-        Image(systemName: "doc.richtext")
-          .font(.system(size: 48))
-          .foregroundStyle(.secondary)
+        Image("AppIconImage")
+          .resizable()
+          .aspectRatio(contentMode: .fit)
+          .frame(width: 256)
         Text("Galley")
           .font(.largeTitle.bold())
 
         Action.open().menuItem()
+          .modifier(OpenFileModifier())
           .buttonStyle(.borderedProminent)
       }
-      .padding(40)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       if !recents.urls.isEmpty {
         recentsList
-          .padding()
+          .frame(maxWidth: 600, maxHeight: .infinity)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(40)
+    .frame(
+      minWidth: 900, maxWidth: .infinity,
+      minHeight: 700, maxHeight: .infinity)
   }
 
   private var recentsList: some View {
@@ -55,6 +58,5 @@ struct WelcomeView: View {
         RoundedRectangle(cornerRadius: Action.listCornerRadius)
           .fill(.background))
     }
-    .frame(maxWidth: 560, alignment: .leading)
   }
 }

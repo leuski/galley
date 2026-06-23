@@ -6,7 +6,29 @@
     {
       "layers" : [
         {
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "glass" : true,
+          "hidden" : true,
+          "image-name" : "Canvas 1.png",
+          "name" : "Canvas 1",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              10
+            ]
+          }
+        },
+        {
           "glass" : false,
+          "hidden" : true,
+          "image-name" : "Canvas 2.png",
+          "name" : "Canvas 2"
+        },
+        {
+          "glass" : false,
+          "hidden" : false,
           "image-name" : "Galley1.png",
           "name" : "Galley1",
           "position" : {
@@ -18,6 +40,7 @@
           }
         },
         {
+          "fill" : "none",
           "glass" : false,
           "image-name" : "viewer-background.png",
           "name" : "viewer-background"
