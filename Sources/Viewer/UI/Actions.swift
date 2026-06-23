@@ -81,6 +81,7 @@ extension Action {
       perform: { _ in
         OpenSettingsActivity().open()
       },
+      shortcut: .init(",", modifiers: [.command]),
       accessibilityID: ViewerA11yID.ToolbarSettings.settings
     )
   }
