@@ -96,8 +96,19 @@ extension Action {
     recents: RecentDocumentsModel
   ) -> Action {
     Action(
-      title: "\(url.lastPathComponent)",
-      image: "doc.text",
+      title: { "\(url.lastPathComponent)" },
+      help: { url.absoluteString },
+      image: {
+        if url.isFileURL {
+#if os(macOS)
+          Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+#else
+          Image(systemName: "doc.text")
+#endif
+        } else {
+          Image(systemName: "arrow.up.right.square")
+        }
+      }(),
       perform: { _ in
         guard let fresh = recents.resolveRecentURL(url) else { return }
         GalleyViewerRequestActivity(url: fresh).open()
