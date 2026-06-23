@@ -1,232 +1,164 @@
-#if os(macOS)
-import AppKit
-#endif
 import GalleyCoreKit
 import Observation
 import SwiftUI
 import KosmosAppKit
 
-#if !os(macOS)
-/// Persisted form of a visionOS recent entry. File URLs carry a
-/// bookmark blob so we can re-resolve a fresh security-scoped URL
-/// after relaunch; remote URLs (http(s), galley://, etc.) carry only
-/// the URL — they don't need or support security-scoped bookmarks.
+/// File URLs may resolve to differently-formed paths after
+/// re-resolution (`/private/var` vs `/var`, scoped vs not). Compare
+/// canonical FS paths there; remote URLs have no such concern and
+/// compare by absolute string.
+private extension URL {
+  var key: String {
+    isFileURL ? safe.path : absoluteString
+  }
+}
+
+/// Persisted form of a recent entry. File URLs carry a bookmark blob
+/// so a fresh URL can be re-resolved after relaunch — security-scoped
+/// where the OS requires it (visionOS), a plain re-resolution where it
+/// doesn't (unsandboxed macOS). Remote URLs (http(s), galley://, etc.)
+/// carry only the URL — they don't need or support bookmarks.
 struct RecentDocumentEntry: Codable, Hashable, Sendable {
   let url: URL
   let bookmark: Data?
+
+  init(url: URL, bookmark: Data?) {
+    self.url = url
+    self.bookmark = bookmark
+  }
+
+  init?(url: URL) {
+    if url.isFileURL {
+      // The picker grants security scope on the URL we receive (and on
+      // unsandboxed macOS a plain bookmark works just as well);
+      // bookmarkData captures it so we can re-resolve after relaunch.
+      // If bookmark creation fails, bail rather than persisting a file
+      // URL we won't be able to reopen.
+      guard let data = try? url.bookmarkData() else { return nil }
+      self.init(url: url, bookmark: data)
+    } else {
+      self.init(url: url, bookmark: nil)
+    }
+  }
+
+  var resolved: RecentDocumentEntry? {
+    guard let data = bookmark else { return self }
+    var stale = false
+    guard let resolved = try? URL(
+      resolvingBookmarkData: data,
+      options: [],
+      relativeTo: nil,
+      bookmarkDataIsStale: &stale)
+    else { return nil }
+    guard stale, let updated = try? url.bookmarkData() else { return self }
+    return RecentDocumentEntry(url: resolved, bookmark: updated)
+  }
 }
-#endif
 
 /// Recently-opened-document list surfaced by File > Open Recent (macOS)
 /// and by the welcome screen + More > Open Recent menu (visionOS).
 ///
-/// The two platforms back this very differently:
+/// `Defaults.recentEntries` is the one and only store — this type holds
+/// no copy of its own; `entries`/`urls` read straight through it and
+/// mutations write straight back. The list is owned here rather than by
+/// `NSDocumentController` because SwiftUI's `WindowGroup` installs no
+/// system Open Recent menu — both platforms build that menu from
+/// `urls`. On macOS we additionally mirror the list into
+/// `NSDocumentController` on every change so the Dock's Recent
+/// Documents submenu stays in sync.
 ///
-/// - **macOS** wraps `NSDocumentController.shared.recentDocumentURLs`.
-///   That's the source of truth — the Dock's "Recent Documents"
-///   menu, system-managed dedup + cap, and the on-disk plist are all
-///   handled by AppKit. We just mirror the list and own the
-///   `NSOpenPanel` flow.
-///
-/// - **visionOS** has no equivalent of `NSDocumentController`. File
-///   URLs from the file importer are security-scoped grants that
-///   can't be persisted as plain paths, so we persist a bookmark
-///   alongside the URL and re-resolve at open time. Remote URLs need
-///   no bookmark and round-trip as URL-only entries — both kinds
-///   share one list, ordered most-recent-first.
-///
-/// Constructed once by the app's `@main` and injected via
-/// `.environment()`.
+/// File entries persist a bookmark alongside the URL and re-resolve at
+/// open time; remote entries round-trip as URL-only. Constructed once
+/// by the app's `@main`.
 @MainActor
 @Observable
 final class RecentDocumentsModel {
-  /// URLs ordered most-recent-first. Bound by the menu /
-  /// welcome-screen UI.
-  private(set) var urls: [URL] = []
+  /// URLs ordered most-recent-first, derived from `entries`. Bound by
+  /// the menu / welcome-screen UI.
+  var urls: [URL] { Defaults.shared.recentEntries.map(\.url) }
 
-#if os(macOS)
-  /// Active FTUE open panel, kept weak so we don't extend its
-  /// lifetime past presentation.
-  @ObservationIgnored private weak var activeOpenPanel: NSOpenPanel?
-#else
-  /// Cap matching the macOS system default. visionOS has no
-  /// equivalent of System Settings → Desktop & Dock → Recent items.
+  /// Cap matching the macOS system default for recent items. visionOS
+  /// has no equivalent of System Settings → Desktop & Dock → Recent
+  /// items, so the same constant governs both.
   static let maxItems = 10
 
-  /// Index-aligned with `urls`. Persisted to `Defaults.recentEntries`
-  /// on every mutation.
-  @ObservationIgnored private var entries: [RecentDocumentEntry] = []
-#endif
-
   init() {
-#if os(macOS)
-    self.urls = NSDocumentController.shared.recentDocumentURLs
-#else
-    let stored = Defaults.shared.recentEntries
-    let resolved = Self.resolve(entries: stored)
-    self.entries = resolved
-    self.urls = resolved.map(\.url)
-    if resolved != stored {
-      Defaults.shared.recentEntries = resolved
-    }
-#endif
+    update(Defaults.shared.recentEntries
+      .compactMap { entry in entry.resolved })
+  }
+
+  private func entries(without url: URL) -> [RecentDocumentEntry] {
+    let key = url.key
+    return Defaults.shared.recentEntries
+      .filter { entry in entry.url.key != key }
+  }
+
+  private func entry(with url: URL) -> RecentDocumentEntry? {
+    let key = url.key
+    return Defaults.shared.recentEntries
+      .first { entry in entry.url.key == key }
   }
 
   /// Record a URL as recently opened.
   func record(_ url: URL) {
-    guard !url.isInMainBundle else { return }
-#if os(macOS)
-    NSDocumentController.shared.noteNewRecentDocumentURL(url)
-    urls = NSDocumentController.shared.recentDocumentURLs
-#else
-    let bookmark: Data?
-    if url.isFileURL {
-      // The picker grants security scope on the URL we receive;
-      // bookmarkData captures that grant so we can re-resolve a
-      // fresh scoped URL after relaunch. If bookmark creation fails
-      // (no scope, transient FS error), bail rather than persisting
-      // a file URL we won't be able to reopen.
-      guard let data = try? url.bookmarkData() else { return }
-      bookmark = data
-    } else {
-      bookmark = nil
-    }
-    let entry = RecentDocumentEntry(url: url, bookmark: bookmark)
-    let key = Self.dedupeKey(for: url)
-    var newEntries: [RecentDocumentEntry] = [entry]
-    for existing in entries
-    where Self.dedupeKey(for: existing.url) != key {
-      newEntries.append(existing)
-    }
-    if newEntries.count > Self.maxItems {
-      newEntries = Array(newEntries.prefix(Self.maxItems))
-    }
-    entries = newEntries
-    urls = newEntries.map(\.url)
-    Defaults.shared.recentEntries = newEntries
-#endif
+    guard
+      !url.isInMainBundle,
+      let entry = RecentDocumentEntry(url: url)
+    else { return }
+    update([entry] + entries(without: url))
   }
 
   /// Clear the recents list. Called from File > Open Recent >
   /// Clear Menu (macOS) and the Open Recent submenu footer
   /// (visionOS).
   func clearAll() {
-#if os(macOS)
-    NSDocumentController.shared.clearRecentDocuments(nil)
-    urls = NSDocumentController.shared.recentDocumentURLs
-#else
-    urls = []
-    entries = []
-    Defaults.shared.recentEntries = []
-#endif
+    update([])
   }
 
-#if os(macOS)
+  /// Resolve a recent entry and return a URL the caller can bind to its
+  /// `WindowGroup` slot. For file entries that means re-resolving the
+  /// bookmark (and starting security-scoped access where the OS
+  /// requires it); for remote entries it's the stored URL as-is.
+  /// Returns nil for a dead file entry (bookmark unresolvable) and
+  /// prunes it as a side effect. Refreshes the on-disk bookmark when
+  /// resolution reports stale data, and re-prepends the entry so
+  /// reopening promotes it.
   func resolveRecentURL(_ url: URL) -> URL? {
-    url
-  }
-#else
-  /// Resolve a recent entry and return a URL the caller can bind to
-  /// its `WindowGroup` slot. For file entries that means re-resolving
-  /// the bookmark and starting security-scoped access; for remote
-  /// entries it's the stored URL as-is. Returns nil for a dead file
-  /// entry (bookmark unresolvable) and prunes it as a side effect.
-  ///
-  /// Refreshes the on-disk bookmark when resolution reports stale
-  /// data, and re-prepends the entry so reopening promotes it.
-  func resolveRecentURL(_ url: URL) -> URL? {
-    let key = Self.dedupeKey(for: url)
-    guard let idx = entries.firstIndex(where: {
-      Self.dedupeKey(for: $0.url) == key
-    }) else { return nil }
-    let entry = entries[idx]
-    let resolved: URL
-    let refreshedBookmark: Data?
-    if let data = entry.bookmark {
-      var stale = false
-      let fresh = try? URL(
-        resolvingBookmarkData: data,
-        options: [],
-        relativeTo: nil,
-        bookmarkDataIsStale: &stale)
-      guard let fresh else {
-        entries.remove(at: idx)
-        urls.remove(at: idx)
-        Defaults.shared.recentEntries = entries
-        return nil
-      }
-      _ = fresh.startAccessingSecurityScopedResource()
-      resolved = fresh
-      if stale, let updated = try? fresh.bookmarkData() {
-        refreshedBookmark = updated
-      } else {
-        refreshedBookmark = data
-      }
-    } else {
-      resolved = entry.url
-      refreshedBookmark = nil
+    guard let entry = entry(with: url) else { return nil }
+    guard let entry = entry.resolved else {
+      update(entries(without: url))
+      return nil
     }
-    let promoted = RecentDocumentEntry(
-      url: resolved,
-      bookmark: refreshedBookmark)
-    var newEntries: [RecentDocumentEntry] = [promoted]
-    for (offset, existing) in entries.enumerated() where offset != idx {
-      newEntries.append(existing)
+    if entry.bookmark != nil {
+      _ = entry.url.startAccessingSecurityScopedResource()
     }
-    entries = newEntries
-    urls = newEntries.map(\.url)
-    Defaults.shared.recentEntries = newEntries
-    return resolved
+    update([entry] + entries(without: url))
+    return entry.url
   }
 
   /// Drop one entry by its resolved URL. Surfaced from the
   /// welcome-screen context menu.
   func remove(_ url: URL) {
-    let key = Self.dedupeKey(for: url)
-    guard let idx = entries.firstIndex(where: {
-      Self.dedupeKey(for: $0.url) == key
-    }) else { return }
-    entries.remove(at: idx)
-    urls.remove(at: idx)
-    Defaults.shared.recentEntries = entries
+    update(entries(without: url))
   }
 
-  /// File URLs may resolve to differently-formed paths after
-  /// re-resolution (`/private/var` vs `/var`, scoped vs not). Compare
-  /// canonical FS paths there; remote URLs have no such concern and
-  /// compare by absolute string.
-  private static func dedupeKey(for url: URL) -> String {
-    url.isFileURL ? url.safe.path : url.absoluteString
-  }
-
-  /// Resolve a stored list, dropping unresolvable file entries and
-  /// refreshing stale bookmarks. Remote entries (no bookmark) pass
-  /// through untouched.
-  private static func resolve(
-    entries stored: [RecentDocumentEntry]
-  ) -> [RecentDocumentEntry] {
-    var result: [RecentDocumentEntry] = []
-    for entry in stored {
-      guard let data = entry.bookmark else {
-        result.append(entry)
-        continue
-      }
-      var stale = false
-      let resolved = try? URL(
-        resolvingBookmarkData: data,
-        options: [],
-        relativeTo: nil,
-        bookmarkDataIsStale: &stale)
-      guard let url = resolved else { continue }
-      let bookmark: Data
-      if stale, let updated = try? url.bookmarkData() {
-        bookmark = updated
-      } else {
-        bookmark = data
-      }
-      result.append(.init(url: url, bookmark: bookmark))
+  /// Write the list to its only store and re-sync the system recents.
+  private func update<S>(_ newEntries: S)
+  where S: Collection, S.Element == RecentDocumentEntry
+  {
+    let new = Array(newEntries.prefix(Self.maxItems))
+    guard Defaults.shared.recentEntries != new else { return }
+    Defaults.shared.recentEntries = new
+    /// Rebuild `NSDocumentController`'s recent-documents list (and thus
+    /// the Dock's Recent Documents submenu) from the given entries. No-op
+    /// off macOS. `noteNewRecentDocumentURL` prepends, so we add
+    /// oldest-first to land the most-recent entry at the top.
+#if os(macOS)
+    let controller = NSDocumentController.shared
+    controller.clearRecentDocuments(nil)
+    for url in new.map(\.url).reversed() {
+      controller.noteNewRecentDocumentURL(url)
     }
-    return result
-  }
 #endif
+  }
 }
