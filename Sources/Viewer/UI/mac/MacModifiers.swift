@@ -21,7 +21,6 @@ struct WindowAttachedModifier: ViewModifier {
         // opens via the Open panel + activity URL). Help skips it.
         // Inbound-URL routing lives in `DocumentSceneContent`, not here.
         guard let window else { return }
-        window.alphaValue = 1
         if installNewTabAction {
           NewTabAction.install(on: window)
         }

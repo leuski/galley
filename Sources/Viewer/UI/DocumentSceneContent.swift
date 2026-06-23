@@ -44,6 +44,7 @@ struct DocumentSceneContent: View {
       .onChange(of: sceneID) { _, new in
         self.model = DocumentModel.forScene(id: new)
       }
+      .windowTransparency(model == nil ? 0 : 1)
   }
 
   /// Tokens this window *prefers* — a re-open of the doc it already shows
@@ -78,6 +79,13 @@ struct DocumentSceneContent: View {
       DocumentView(model: model)
     } else {
       WelcomeView()
+        .task {
+          Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard model == nil else { return }
+            AppModel.shared.isOpenFilePresented = true
+          }
+        }
     }
   }
 
