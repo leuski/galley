@@ -448,9 +448,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// `.explicit(.line(_))` intent applied only to the first render of
   /// this bind; absent it, the first render lands at the top.
   /// Subsequent file-watcher reloads preserve current scroll normally.
-  func bind(
-    to target: DocumentTarget
-  ) async {
+  func bind(to target: DocumentTarget) async {
     history = History(url: target.documentURL)
     // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
     // to apply pre-first-paint. `showsTOC` itself stays `true` so

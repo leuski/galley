@@ -94,10 +94,11 @@ struct DocumentSceneContent: View {
     guard let target = GalleyViewerRequestActivity(from: url)?.target
     else { return }
 
+    AppModel.shared.recents.record(target.documentURL)
+
     guard let live = model else {
       // Empty window adopts the document in place (welcome → document).
       model = DocumentModel.open(target: target, id: sceneID)
-      AppModel.shared.recents.record(target.documentURL)
       return
     }
     // Same document → just scroll + focus (dedup).
@@ -115,7 +116,6 @@ struct DocumentSceneContent: View {
     // new-window / new-tab the window declines foreign docs, so SwiftUI
     // spawns a fresh window instead and this line is never reached for
     // them. So: replace in place.
-    AppModel.shared.recents.record(target.documentURL)
     Task { await live.bind(to: target) }
   }
 
