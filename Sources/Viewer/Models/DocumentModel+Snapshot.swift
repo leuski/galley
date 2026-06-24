@@ -117,7 +117,6 @@ extension DocumentModel {
     cache[id] = WeakRef(model)
     cache = cache.filter { $0.value.model != nil }
     model.startTrackingPersistentState(id: id)
-    model.startTrackingRenderInputs()
   }
 
   /// Live-or-restored model for a window. Returns `nil` when the window
@@ -131,6 +130,11 @@ extension DocumentModel {
     let model = DocumentModel(snapshot: snapshot, scroll: nil)
     remember(model, id: id)
     return model
+  }
+
+  static func relocate(_ model: DocumentModel, to sceneID: DocumentSceneID) {
+    cache = cache.filter { $0.value.model !== model }
+    remember(model, id: sceneID)
   }
 
   /// Bind an inbound document to a window, building the model if the

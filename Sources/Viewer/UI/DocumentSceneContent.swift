@@ -41,7 +41,15 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
     // state-restored scene ID arrives late on macOS
       .onChange(of: sceneID) { _, new in
-        guard let newModel = DocumentModel.forScene(id: new) else { return }
+        guard let newModel = DocumentModel.forScene(id: new)
+        else {
+          if let model {
+            DocumentModel.relocate(model, to: new)
+          }
+          return
+        }
+
+        guard newModel !== model else { return }
         self.model = newModel
         // we are restoring the window. If we have a model assigned, it's
         // the wrong model. Evict it and ask the framework to re-open

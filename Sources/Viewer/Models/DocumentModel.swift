@@ -324,6 +324,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
     savedShowsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
+    startTrackingRenderInputs()
     Task { await rebindCurrent(firstScroll: initialScroll ?? .top) }
   }
 
