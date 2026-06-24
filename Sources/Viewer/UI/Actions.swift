@@ -290,11 +290,17 @@ extension Action {
 }
 
 extension Action {
-  static func open() -> Action {
+  static func open(isPresented: Binding<Bool>?) -> Action {
     Action(
       title: "Open…",
       image: "arrow.up.forward",
-      perform: { AppModel.shared.isOpenFilePresented = true },
+      perform: {
+        if isPresented != nil {
+          isPresented?.wrappedValue = true
+        } else {
+          AppModel.shared.isOpenFilePresented = true
+        }
+      },
       shortcut: .init("o", modifiers: [.command]),
       accessibilityID: ViewerA11yID.FileMenu.open
     )
@@ -304,11 +310,17 @@ extension Action {
 struct OpenFileModifier: ViewModifier {
   @Bindable var appModel = AppModel.shared
 
+  let isPresented: Binding<Bool>?
+
+  init(isPresented: Binding<Bool>?) {
+    self.isPresented = isPresented
+  }
+
   func body(content: Content) -> some View {
     content
       .fileDialogCustomizationID("open-file")
       .fileImporter(
-        isPresented: $appModel.isOpenFilePresented,
+        isPresented: isPresented ?? $appModel.isOpenFilePresented,
         allowedContentTypes: MarkdownFileTypes.allTypesAndPlainText,
         allowsMultipleSelection: false
       ) { result in

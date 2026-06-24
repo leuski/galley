@@ -10,8 +10,8 @@ struct FileCommands: Commands {
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
-      Action.open().menuItem()
-        .modifier(OpenFileModifier())
+      Action.open(isPresented: nil).menuItem()
+        .modifier(OpenFileModifier(isPresented: nil))
       Action.openRecentMenu()
     }
 

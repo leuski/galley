@@ -89,6 +89,7 @@ struct DocumentSceneContent: View {
 #endif
     } else {
       WelcomeView()
+#if os(macOS)
         .task {
           Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
@@ -96,6 +97,7 @@ struct DocumentSceneContent: View {
             AppModel.shared.isOpenFilePresented = true
           }
         }
+#endif
     }
   }
 

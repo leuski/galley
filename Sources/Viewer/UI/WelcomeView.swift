@@ -14,6 +14,7 @@ import SwiftUI
 
 struct WelcomeView: View {
   private var recents: RecentDocumentsModel { AppModel.shared.recents }
+  @State private var isOpen: Bool = false
 
   var body: some View {
     HStack(spacing: 40) {
@@ -25,8 +26,8 @@ struct WelcomeView: View {
         Text("Galley")
           .font(.largeTitle.bold())
 
-        Action.open().menuItem()
-          .modifier(OpenFileModifier())
+        Action.open(isPresented: $isOpen).menuItem()
+          .modifier(OpenFileModifier(isPresented: $isOpen))
           .buttonStyle(.borderedProminent)
       }
 

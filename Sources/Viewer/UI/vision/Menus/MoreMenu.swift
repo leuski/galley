@@ -11,10 +11,11 @@ import GalleyCoreKit
 
 struct MoreMenu: View {
   @Bindable var model: DocumentModel
+  @State private var isPresented = false
 
   var body: some View {
     Menu {
-      Action.open().menuItem()
+      Action.open(isPresented: $isPresented).menuItem()
 
       if !AppModel.shared.recents.urls.isEmpty {
         Action.openRecentMenu()
@@ -50,7 +51,7 @@ struct MoreMenu: View {
     } label: {
       Label("More", systemImage: "ellipsis.circle")
     }
-    .modifier(OpenFileModifier())
+    .modifier(OpenFileModifier(isPresented: $isPresented))
     .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
   }
 }
