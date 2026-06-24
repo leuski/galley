@@ -108,14 +108,12 @@ extension DocumentModel {
   /// the model lives exactly as long as its window and is freed when
   /// SwiftUI tears the window down. Empty boxes are swept on lookup.
   private static var cache: [DocumentSceneID: WeakRef] = [:]
-  private(set) static var cacheCounter = 0
 
   private static func cached(_ id: DocumentSceneID) -> DocumentModel? {
     cache[id]?.model
   }
 
   private static func remember(_ model: DocumentModel, id: DocumentSceneID) {
-    cacheCounter += 1
     cache[id] = WeakRef(model)
     cache = cache.filter { $0.value.model != nil }
   }

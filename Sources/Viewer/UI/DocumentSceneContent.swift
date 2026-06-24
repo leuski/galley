@@ -12,9 +12,6 @@
 
 import GalleyCoreKit
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 struct DocumentSceneContent: View {
   let sceneID: DocumentSceneID
