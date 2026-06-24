@@ -23,10 +23,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let page: WebPage
   let zoom: WebPageZoomController
 
-  var isRegular: Bool { id != nil }
-
-  /// Stable per-window identity; the persistence store is keyed by it.
-  let id: DocumentSceneID?
+  let isRegular: Bool
 
   /// Token for the persistence observer (`startTrackingPersistentState`).
   @ObservationIgnored var saveObservation: Cancellable?
@@ -227,11 +224,11 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   convenience init(
     url: URL)
   {
-    self.init(id: nil, history: History(url: url))
+    self.init(isRegular: false, history: History(url: url))
   }
 
   init(
-    id: DocumentSceneID?,
+    isRegular: Bool,
     history: History,
     templatePersistent: String? = nil,
     processorPersistent: String? = nil,
@@ -240,7 +237,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
   ) {
-    self.id = id
+    self.isRegular = isRegular
     self.history = history
     self.templates = SceneTemplateChoice(
       source: AppModel.shared.templates,
@@ -327,10 +324,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
     savedShowsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
-    if isRegular {
-      startTrackingPersistentState()
-      startTrackingRenderInputs()
-    }
     Task { await rebindCurrent(firstScroll: initialScroll ?? .top) }
   }
 

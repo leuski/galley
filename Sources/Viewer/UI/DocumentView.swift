@@ -89,28 +89,13 @@ struct DocumentView: View {
       Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
     .modifier(NoticeModifier(model: model))
-    .modifier(WindowAttachedModifier(
-      installNewTabAction: model.isRegular))
+    .modifier(WindowAttachedModifier())
     .modifier(RenameModifier(model: model))
     .modifier(ExportModifier(model: model))
-    .navigationDocument(model.documentURL, when: model.isRegular)
     .navigationSubtitle(model.page.title)
 #endif
   }
 }
-
-#if os(macOS)
-private extension View {
-  /// Gates `.navigationDocument(_:)` on a condition. The Help window's
-  /// `DocumentView` opts out so AppKit doesn't attach a proxy icon or
-  /// the title-bar document menu (rename / move / version) to what is
-  /// really a read-only resource inside the app bundle.
-  @ViewBuilder
-  func navigationDocument(_ url: URL, when condition: Bool) -> some View {
-    if condition { navigationDocument(url) } else { self }
-  }
-}
-#endif
 
 /// Bottom-overlay banner for `DocumentModel.notice`. Owns no state —
 /// the close button calls `onDismiss` so the model can cancel any

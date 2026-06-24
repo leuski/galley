@@ -11,8 +11,6 @@ import GalleyCoreKit
 import UniformTypeIdentifiers
 
 struct WindowAttachedModifier: ViewModifier {
-  let installNewTabAction: Bool
-
   func body(content: Content) -> some View {
     content
       .windowAccessor { window in
@@ -21,9 +19,7 @@ struct WindowAttachedModifier: ViewModifier {
         // opens via the Open panel + activity URL). Help skips it.
         // Inbound-URL routing lives in `DocumentSceneContent`, not here.
         guard let window else { return }
-        if installNewTabAction {
-          NewTabAction.install(on: window)
-        }
+        NewTabAction.install(on: window)
       }
   }
 }

@@ -116,6 +116,8 @@ extension DocumentModel {
   private static func remember(_ model: DocumentModel, id: DocumentSceneID) {
     cache[id] = WeakRef(model)
     cache = cache.filter { $0.value.model != nil }
+    model.startTrackingPersistentState(id: id)
+    model.startTrackingRenderInputs()
   }
 
   /// Live-or-restored model for a window. Returns `nil` when the window
@@ -126,7 +128,7 @@ extension DocumentModel {
     guard let snapshot = Defaults.shared[snapshot: id] else {
       return nil
     }
-    let model = DocumentModel(snapshot: snapshot, id: id)
+    let model = DocumentModel(snapshot: snapshot, scroll: nil)
     remember(model, id: id)
     return model
   }
@@ -143,7 +145,7 @@ extension DocumentModel {
     let model = DocumentModel(
       snapshot: Defaults.shared[snapshot: target.documentURL]
       ?? Snapshot(url: target.documentURL),
-      id: id)
+      scroll: target.scroll)
     remember(model, id: id)
     return model
   }
@@ -155,14 +157,16 @@ extension DocumentModel {
   }
 
   /// Construct from a restored snapshot.
-  convenience init(snapshot: Snapshot, id: DocumentSceneID) {
+  private convenience init(
+    snapshot: Snapshot, scroll: Scroll?)
+  {
     self.init(
-      id: id,
+      isRegular: true,
       history: snapshot.history,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
       colorSchemePersistent: snapshot.colorSchemePersistent,
-      initialScroll: .location(snapshot.scrollY),
+      initialScroll: scroll ?? .location(snapshot.scrollY),
       initialShowsTOC: snapshot.showsTOC,
       initialZoom: snapshot.pageZoom)
   }
@@ -176,7 +180,7 @@ extension DocumentModel {
   /// `feedback_no_view_mediated_model_mutation`). The tracked set is the
   /// durable fields; any change writes the snapshot to `DocumentStore`
   /// (both the window-keyed and file-keyed halves).
-  func startTrackingPersistentState() {
+  func startTrackingPersistentState(id: DocumentSceneID?) {
     saveObservation = onObservedChange(
       track: { [weak self] in
         guard let self else { return }
@@ -188,13 +192,15 @@ extension DocumentModel {
         _ = self.zoom.zoomScale
         _ = self.renderedTemplateID
       },
-      onChange: { [weak self] in self?.save() })
+      onChange: { [weak self] in self?.save(id: id) })
   }
 
-  private func save() {
-    guard let id else { return }
+  private func save(id: DocumentSceneID?) {
+    guard isRegular else { return }
     let snapshot = self.snapshot
-    Defaults.shared[snapshot: id] = snapshot
+    if let id {
+      Defaults.shared[snapshot: id] = snapshot
+    }
     let url = snapshot.currentURL
     Defaults.shared[snapshot: url] = fileSnapshot(for: url)
   }

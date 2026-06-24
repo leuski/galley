@@ -20,6 +20,8 @@ struct DocumentSceneContent: View {
   /// the store so a restored window shows its document on the first
   /// frame — no async launchTask, no reveal gate.
   @State private var model: DocumentModel?
+  /// this stores the last open target
+  @State private var lastTarget: DocumentTarget?
 
   @Environment(\.openWindow) private var openWindow
 
@@ -39,7 +41,15 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
     // state-restored scene ID arrives late on macOS
       .onChange(of: sceneID) { _, new in
-        self.model = DocumentModel.forScene(id: new)
+        guard let newModel = DocumentModel.forScene(id: new) else { return }
+        self.model = newModel
+        // we are restoring the window. If we have a model assigned, it's
+        // the wrong model. Evict it and ask the framework to re-open
+        // the document.
+        if let lastTarget {
+          self.lastTarget = nil
+          GalleyViewerRequestActivity(target: lastTarget).open()
+        }
       }
       .windowTransparency(model == nil ? 0 : 1)
   }
@@ -74,6 +84,9 @@ struct DocumentSceneContent: View {
   private var documentOrWelcome: some View {
     if let model {
       DocumentView(model: model)
+#if os(macOS)
+        .navigationDocument(model.documentURL)
+#endif
     } else {
       WelcomeView()
         .task {
@@ -94,6 +107,7 @@ struct DocumentSceneContent: View {
     AppModel.shared.recents.record(target.documentURL)
 
     guard let live = model else {
+      lastTarget = target
       // Empty window adopts the document in place (welcome → document).
       model = DocumentModel.open(target: target, id: sceneID)
       return
