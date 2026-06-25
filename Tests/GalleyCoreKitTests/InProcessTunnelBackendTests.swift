@@ -1,10 +1,9 @@
 import Foundation
 import Testing
-import GalleyCoreKit
 import KosmosAppKit
 import KosmosCore
 import KosmosHTTPTunnel
-@testable import GalleyServerKit
+@testable import GalleyCoreKit
 
 private struct FakeRenderer: MarkdownRenderer {
   func render(_ source: String, baseURL: URL) async throws -> String {

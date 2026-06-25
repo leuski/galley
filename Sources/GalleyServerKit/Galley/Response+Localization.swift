@@ -2,81 +2,23 @@ import Foundation
 import GalleyCoreKit
 
 extension Response {
-  static func errorPage(
-    title: String.LocalizationValue,
-    detail: String.LocalizationValue,
-    source: String) -> Response
-  {
-    errorPage(
-      title: String(localized: title, bundle: .galleyServerKit),
-      detail: String(localized: detail, bundle: .galleyServerKit),
-      source: source)
-  }
-
-  @_disfavoredOverload
-  static func errorPage(
-    title: String.LocalizationValue,
-    detail: String,
-    source: String) -> Response
-  {
-    errorPage(
-      title: String(localized: title, bundle: .galleyServerKit),
-      detail: detail,
-      source: source)
-  }
-
-  @_disfavoredOverload
-  private static func errorPage(
-    title: String,
-    detail: String,
-    source: String) -> Response
-  {
-    internalServerError(errorPageTemplate.substituting(substitutions: [
-      "#TITLE#": title.htmlEscaped,
-      "#DETAIL#": detail.htmlEscaped,
-      "#SOURCE#": source.htmlEscaped
-    ]))
-  }
-
-  private final class Helper {}
-
-  private static let errorPageTemplate: String =
-  Bundle.galleyServerKit.requiredString(
-    forResource: "ErrorPage", withExtension: "html")
-}
-
-extension Response {
-  public static func ok(
-    _ message: String.LocalizationValue) -> Response
-  {
-    ok(message, bundle: .galleyServerKit)
-  }
-
-  public static func badRequest(
-    _ message: String.LocalizationValue) -> Response
-  {
-    badRequest(message, bundle: .galleyServerKit)
-  }
-
-  public static func notFound(
-    _ message: String.LocalizationValue) -> Response
-  {
-    notFound(message, bundle: .galleyServerKit)
-  }
-
-  public static func forbidden(
+  static func forbidden(
     _ message: String.LocalizationValue) -> Response
   {
     forbidden(message, bundle: .galleyServerKit)
   }
 
-  public static func unavailable(
+  static func unavailable(
     _ message: String.LocalizationValue) -> Response
   {
     unavailable(message, bundle: .galleyServerKit)
   }
 
-  public static func guarded(
+  /// Host-guard wrapper. The guard runs *before* the transport-neutral
+  /// `PreviewRequestService`, so its failures are HTTP-listener-specific
+  /// (DNS-rebinding / cross-site checks) and stay here rather than in the
+  /// shared `PreviewResponseShaper`.
+  static func guarded(
     request: Request,
     hostURLProvider: @Sendable @escaping () async -> URL?,
     extraAllowedHostsProvider: @Sendable @escaping () async -> Set<String>,

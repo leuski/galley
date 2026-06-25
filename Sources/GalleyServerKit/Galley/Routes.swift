@@ -62,52 +62,34 @@ enum Routes {
   }
 
   /// Map a transport-neutral `PreviewResponse` onto a FlyingFox
-  /// `Response`. SSE wires the `DocumentWatcher` subscription here;
-  /// structured failures become localized error pages. Internal (not
-  /// private) so `InProcessTunnelBackend` builds the *same* `Response`
-  /// and serializes it over the Kosmos tunnel — one source of truth for
-  /// reload-injection, CSP, SSE framing, and error pages.
+  /// `Response`. All response *shaping* — reload-script injection, CSP,
+  /// asset headers, SSE framing, localized error pages — lives in
+  /// `GalleyCoreKit`'s `PreviewResponseShaper`, so this is a thin adapter
+  /// that copies the shaped status/headers/bytes onto FlyingFox and wires
+  /// the `DocumentWatcher` subscription for the SSE stream. The Kosmos
+  /// tunnel's `InProcessTunnelBackend` shapes the *same* `ShapedResponse`
+  /// without FlyingFox, so both carriers emit byte-identical output.
   static func response(
     from preview: PreviewResponse, watcher: DocumentWatcher
   ) -> Response {
-    switch preview {
-    case .html(let html, let documentURL):
-      return .ok(html: html, documentURL: documentURL)
-    case .bytes(let resolved):
-      return .data(
-        resolved.data,
-        mime: resolved.mime,
-        cacheControl: resolved.cache.cacheControl)
-    case .events(let documentURL):
-      return .events { await watcher.subscribe(to: documentURL) }
-    case .plainText(let text):
-      return .ok("\(text)")
-    case .badRequest(let message):
-      return .badRequest("\(message)")
-    case .notFound(let message):
-      return .notFound("\(message)")
-    case .failure(let failure):
-      return errorResponse(failure)
-    }
-  }
-
-  private static func errorResponse(_ failure: PreviewFailure) -> Response {
-    switch failure {
-    case .noProcessor:
-      return .errorPage(
-        title: "No markdown processor configured",
-        detail: """
-            Install a supported processor (e.g. multimarkdown via Homebrew) \
-            and pick it in Settings.
-            """,
-        source: "")
-    case .render(let detail, let source):
-      return .errorPage(title: "Render error", detail: detail, source: source)
-    case .template(let name, let detail, let source):
-      return .errorPage(
-        title: "Template error",
-        detail: "Cannot load template '\(name)': \(detail)",
-        source: source)
+    let shaped = PreviewResponseShaper().shape(preview)
+    switch shaped.body {
+    case .bytes(let data):
+      return Response(
+        status: shaped.status,
+        headerPairs: shaped.headers,
+        body: ResponseBody(byteBuffer: ByteBuffer(bytes: data)))
+    case .eventStream(let documentURL):
+      return Response(
+        status: shaped.status,
+        headerPairs: shaped.headers,
+        body: ResponseBody { writer in
+          try await writer.write(ByteBuffer(bytes: PreviewSSE.connectPrelude))
+          for await _ in await watcher.subscribe(to: documentURL) {
+            try await writer.write(ByteBuffer(bytes: PreviewSSE.reloadFrame))
+          }
+          try await writer.finish(nil)
+        })
     }
   }
 }
