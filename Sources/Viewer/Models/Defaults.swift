@@ -9,7 +9,6 @@ import Foundation
 import GalleyCoreKit
 import SwiftUI
 import OSLog
-import KosmosAppKit
 
 /// App-wide rendering preferences for the Viewer. Renderer selection
 /// (catalog discovery + persisted ID), template store, server config,

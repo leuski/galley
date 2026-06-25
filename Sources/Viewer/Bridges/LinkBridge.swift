@@ -2,7 +2,6 @@ import Foundation
 import GalleyCoreKit
 import WebKit
 import OSLog
-import KosmosAppKit
 
 private let logger = Logger(
   subsystem: bundleIdentifier,

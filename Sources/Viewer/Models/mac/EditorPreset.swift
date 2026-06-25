@@ -1,7 +1,6 @@
 #if os(macOS)
 import AppKit
 import Foundation
-import ALFoundation
 import GalleyCoreKit
 
 /// A built-in editor whose URL scheme + line-jump format we know.

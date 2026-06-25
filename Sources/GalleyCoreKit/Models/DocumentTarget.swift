@@ -1,6 +1,6 @@
 //
 //  DcoumentTarget.swift
-//  KosmosAppKit
+//  GalleyCoreKit
 //
 //  Created by Anton Leuski on 5/31/26.
 //

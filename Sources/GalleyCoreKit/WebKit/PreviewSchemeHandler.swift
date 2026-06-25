@@ -1,8 +1,6 @@
 import Foundation
 import WebKit
 import OSLog
-import ALFoundation
-import KosmosAppKit
 
 /// Custom URL scheme that lets an in-process `WKWebView` resolve the
 /// same template-asset and document-relative URLs the HTTP server

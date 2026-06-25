@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import KosmosAppKit
 import UserNotifications
 
 /// Posts user-facing notifications when a previously-selected

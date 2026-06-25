@@ -6,7 +6,6 @@
 //
 
 import GalleyCoreKit
-import KosmosAppKit
 import SwiftUI
 
 // MARK: - DocumentModel factories

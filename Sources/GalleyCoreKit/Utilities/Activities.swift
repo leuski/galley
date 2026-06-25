@@ -6,7 +6,6 @@
 //
 
 import Foundation
-@_exported import KosmosAppKit
 
 public struct GenerilizedDocumentActivity<Scheme>: URLSerializable,
                                                    Hashable,

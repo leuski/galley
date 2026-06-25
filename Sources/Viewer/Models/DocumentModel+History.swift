@@ -1,5 +1,5 @@
 import Foundation
-import KosmosAppKit
+import GalleyCoreKit
 
 extension DocumentModel {
   struct History: Codable, Hashable, Sendable {

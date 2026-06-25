@@ -1,5 +1,4 @@
 import Foundation
-import KosmosAppKit
 
 public extension URL {
 

@@ -5,7 +5,6 @@
 //  Created by Anton Leuski on 5/29/26.
 //
 
-import KosmosAppKit
 import SwiftUI
 
 public struct SceneChoiceLocalizer<Value>: SceneChoiceValueEnvelopeLocalizer<

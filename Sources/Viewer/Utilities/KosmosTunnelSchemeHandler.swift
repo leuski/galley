@@ -1,5 +1,4 @@
 #if ENABLE_TUNNEL
-import ALFoundation
 import Foundation
 import GalleyCoreKit
 import KosmosHTTPTunnel

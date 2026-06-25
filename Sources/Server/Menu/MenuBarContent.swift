@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import KosmosAppKit
 import GalleyCoreKit
 import GalleyServerKit
 

@@ -1,6 +1,4 @@
 import Foundation
-@_exported import ObservableDefaults
-import KosmosAppKit
 
 /// Shared defaults contract between the Viewer and Server apps.
 /// Both AppModels conform to this protocol. The Viewer backs it with

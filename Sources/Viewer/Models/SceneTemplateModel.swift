@@ -6,7 +6,6 @@
 //
 
 import GalleyCoreKit
-import KosmosAppKit
 import SwiftUI
 
 typealias SceneTemplateChoiceValue = SceneChoiceValueEnvelope<

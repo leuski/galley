@@ -1,6 +1,5 @@
 #if os(macOS)
 import Foundation
-import ALFoundation
 
 /// Renders markdown by piping the source through an external CLI tool.
 /// Used for every BBEdit-style external processor (MultiMarkdown,

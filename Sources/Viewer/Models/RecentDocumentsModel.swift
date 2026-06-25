@@ -1,7 +1,6 @@
 import GalleyCoreKit
 import Observation
 import SwiftUI
-import KosmosAppKit
 
 /// File URLs may resolve to differently-formed paths after
 /// re-resolution (`/private/var` vs `/var`, scoped vs not). Compare

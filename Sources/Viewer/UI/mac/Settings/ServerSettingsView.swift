@@ -1,5 +1,4 @@
 #if os(macOS)
-import KosmosAppKit
 import SwiftUI
 import GalleyCoreKit
 

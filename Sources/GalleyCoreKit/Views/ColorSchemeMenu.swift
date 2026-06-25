@@ -1,5 +1,4 @@
 import SwiftUI
-import KosmosAppKit
 
 public struct ColorSchemeMenu<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,

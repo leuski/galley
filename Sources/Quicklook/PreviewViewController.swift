@@ -3,7 +3,6 @@ import Quartz
 import WebKit
 import GalleyCoreKit
 import OSLog
-import KosmosAppKit
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "QuicklookPreview")

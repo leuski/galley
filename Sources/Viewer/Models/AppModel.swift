@@ -1,6 +1,5 @@
 import Foundation
 import GalleyCoreKit
-import KosmosAppKit
 import SwiftUI
 import OSLog
 import UserNotifications

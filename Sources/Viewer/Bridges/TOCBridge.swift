@@ -2,7 +2,6 @@ import Foundation
 import GalleyCoreKit
 import OSLog
 import WebKit
-import KosmosAppKit
 
 /// Receives two kinds of messages from a user script that walks the
 /// rendered document's `<h1>…<h6>` tree after each load:

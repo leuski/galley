@@ -1,5 +1,4 @@
 import Foundation
-import KosmosAppKit
 
 /// One of the well-known asset routes shared between the live HTTP
 /// server and the in-process URL scheme handler.

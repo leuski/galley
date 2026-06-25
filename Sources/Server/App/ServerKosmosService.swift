@@ -6,7 +6,6 @@ import KosmosHTTPTunnel
 import KosmosTransport
 import Observation
 import OSLog
-import KosmosAppKit
 
 private let log = Logger(
   subsystem: bundleIdentifier, category: "ServerKosmosService")

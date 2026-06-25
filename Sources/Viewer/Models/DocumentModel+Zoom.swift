@@ -5,7 +5,7 @@
 
 import Observation
 import WebKit
-import KosmosAppKit
+import GalleyCoreKit
 
 extension DocumentModel {
   /// Drives WebKit page zoom for one document window. Holds the model

@@ -2,8 +2,6 @@ import Foundation
 import GalleyCoreKit
 import WebKit
 import OSLog
-import ALFoundation
-import KosmosAppKit
 
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible
 /// `WebPage`. The actual asset resolution lives in

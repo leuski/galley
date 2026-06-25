@@ -3,7 +3,6 @@ import SwiftUI
 import GalleyCoreKit
 import GalleyServerKit
 import OSLog
-import KosmosAppKit
 import UserNotifications
 
 private let defaultsLog = Logger(

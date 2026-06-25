@@ -7,7 +7,7 @@
 
 import Foundation
 import Observation
-import KosmosAppKit
+import GalleyCoreKit
 
 struct ColorSchemeChoiceValue: ChoiceValueEnvelopeProtocol<DocumentColorScheme>,
                                SectionedChoiceValue

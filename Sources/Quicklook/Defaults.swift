@@ -1,6 +1,5 @@
 import Foundation
 import GalleyCoreKit
-import KosmosAppKit
 
 /// Quick Look's view onto the shared `net.leuski.galley` defaults
 /// suite. We don't have our own bundle id matching that suite, so

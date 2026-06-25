@@ -4,7 +4,6 @@ import Observation
 import OSLog
 import SwiftUI
 import WebKit
-import KosmosAppKit
 import UserNotifications
 
 /// Per-document state for the native viewer. Owns the WebPage, the

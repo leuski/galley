@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import KosmosAppKit
 
 extension Processor: ChoiceValueProtocol {
   public typealias PersistentID = String

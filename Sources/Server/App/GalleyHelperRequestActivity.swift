@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import KosmosAppKit
 
 /// Pure normalization of inbound URLs from `application(_:open:)` and
 /// the custom `galley://` scheme into the canonical file URL the

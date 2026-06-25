@@ -1,7 +1,6 @@
 import Foundation
 import GalleyCoreKit
 import KosmosHTTPTunnel
-import KosmosAppKit
 
 enum Routes {
   static let assetExtensions: Set<String> = [

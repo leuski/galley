@@ -1,6 +1,5 @@
 import GalleyCoreKit
 import SwiftUI
-import KosmosAppKit
 
 @main
 struct ViewerApp: App {

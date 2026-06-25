@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import KosmosAppKit
 
 public struct TemplateChoiceValue: ChoiceValueEnvelopeProtocol<Template> {
   nonisolated public let value: Value

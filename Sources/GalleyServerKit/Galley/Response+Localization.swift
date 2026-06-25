@@ -1,5 +1,5 @@
 import Foundation
-import KosmosAppKit
+import GalleyCoreKit
 
 extension Response {
   static func errorPage(

@@ -2,7 +2,6 @@ import Foundation
 import Observation
 import OSLog
 import GalleyCoreKit
-import KosmosAppKit
 import KosmosHTTPTunnel
 
 private let log = Logger(

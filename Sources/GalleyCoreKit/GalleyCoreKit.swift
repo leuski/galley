@@ -3,6 +3,8 @@
 // templates, document watching, and helpers that work in any preview
 // context. No HTTP server here — see GalleyServerKit for that.
 import Foundation
+@_exported import ObservableDefaults
+@_exported import KosmosAppKit
 
 private final class Helper: NSObject {}
 

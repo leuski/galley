@@ -1,7 +1,6 @@
 #if os(macOS)
 import SwiftUI
 import GalleyCoreKit
-import ALFoundation
 
 /// Compact status indicator next to the "Run server" toggle. Renders
 /// `ServerStatus` as a colored dot + label pair so the user can tell

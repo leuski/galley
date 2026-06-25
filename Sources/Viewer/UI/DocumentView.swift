@@ -1,6 +1,5 @@
 import GalleyCoreKit
 import SwiftUI
-import KosmosAppKit
 import WebKit
 
 /// The viewer surface for a single document window. Mounted by

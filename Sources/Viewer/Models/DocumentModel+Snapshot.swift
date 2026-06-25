@@ -5,7 +5,6 @@
 
 import Foundation
 import GalleyCoreKit
-import KosmosAppKit
 
 extension DocumentModel {
   /// The single persistent shape for a document window: the nav stack

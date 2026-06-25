@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import KosmosAppKit
 import OSLog
 #if os(macOS)
 import AppKit

@@ -8,7 +8,6 @@
 import Foundation
 import OSLog
 import WebKit
-import KosmosAppKit
 import GalleyCoreKit
 
 extension DocumentModel {

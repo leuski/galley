@@ -7,7 +7,6 @@
 
 import Foundation
 import GalleyCoreKit
-import KosmosAppKit
 import SwiftUI
 
 /// User-controllable color scheme for a rendered document. visionOS

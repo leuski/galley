@@ -2,7 +2,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import GalleyCoreKit
-import KosmosAppKit
 
 struct MarkdownSettingsView: View {
   @Bindable var appModel = AppModel.shared

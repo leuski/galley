@@ -8,7 +8,6 @@
 import GalleyCoreKit
 import SwiftUI
 import WebKit
-import KosmosAppKit
 
 extension DocumentModel {
   func tocColumnVisibility(reduceMotion: Bool)

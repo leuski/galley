@@ -7,7 +7,6 @@
 
 import GalleyCoreKit
 import SwiftUI
-import KosmosAppKit
 
 extension DocumentModel {
   /// Resolve the renderer for the next render. When the per-document

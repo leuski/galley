@@ -2,7 +2,6 @@ import Foundation
 import WebKit
 import OSLog
 import GalleyCoreKit
-import KosmosAppKit
 
 /// Receives `{ "line": <Int> }` messages from the rendered preview and
 /// opens the current document in BBEdit at that line. The bridge has no

@@ -2,7 +2,6 @@ import Foundation
 import WebKit
 import OSLog
 import GalleyCoreKit
-import KosmosAppKit
 
 /// Receives `{ "y": <Double> }` messages from a debounced scroll
 /// listener in the rendered preview, so the owning DocumentModel can
