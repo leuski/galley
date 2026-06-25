@@ -1,7 +1,67 @@
 # Plan: Replace the loopback HTTP server with a Kosmos-based rendering path
 
-Status: proposal / not yet started
+Status: in progress
 Author: design session 2026-06-14
+
+## Progress log
+
+- **2026-06-25 — Plan reviewed against current code.** Still valid; Galley
+  changes since the plan are cleanup/unification only. Kosmos gained
+  per-peer-id addressing + pending-client/future support (helps WS1/WS5).
+- **2026-06-25 — WS2 (Phase 1) done.** `TunnelBackend` protocol +
+  `TunnelResponseEvent` and a provided `URLSessionTunnelBackend` landed in
+  `KosmosHTTPTunnel`; `Responder` now consumes any backend. A
+  `Responder(upstreamBaseProvider:)` convenience init preserves the Galley
+  call site verbatim, so behavior is identical. Tunnel tests green (16
+  existing + 3 new fake-backend tests for bounded/streaming/throw→502).
+  Galley `Viewer` scheme builds clean.
+- **2026-06-25 — WS3 (Phase 2) done.** `PreviewRequestService` +
+  `PreviewResponse`/`PreviewFailure` landed in
+  `GalleyCoreKit/Render/PreviewRequestService.swift` — the single source of
+  truth for `/preview` (render or asset), `/template`, `/events`, `/`,
+  returning transport-neutral responses (uses `ResolvedBytes`/`CachePolicy`
+  from KosmosAppKit; errors are structured so each transport localizes its
+  own page). `Routes.swift` is now a thin FlyingFox adapter that delegates
+  to the service and maps `PreviewResponse → Response` (localized error
+  pages stay in `GalleyServerKit`). Verified: new `PreviewRequestService`
+  suite + the live-socket `ServerPreviewEndToEnd` + `PreviewServerController`
+  + `AVPCSSPathChain` + `TemplateAssetRewriter` all pass; `Viewer` builds
+  clean (no lint warnings). NOTE: the in-process scheme handler
+  (`PreviewScheme.resolve`) is deliberately **not** folded in — it is
+  asset-only (the Mac Viewer renders separately), so unifying it would
+  change Viewer behavior. Left as-is.
+- **2026-06-25 — `serverHTTPPort` → `serverPort` (hard cut).** Renamed in
+  KosmosAppKit `HTTPServerDefaults` (+ `serverEndpointURL`), all three
+  Galley `Defaults` classes (Viewer/Server/Quicklook), the BBEdit
+  Safari/Chrome scripts, and the KosmosAppKit test. `Viewer` builds clean;
+  KosmosAppKit `HTTPServerDefaults` tests pass.
+- **2026-06-25 — WS4 (Phase 3) done.** `InProcessTunnelBackend`
+  (`GalleyServerKit/Galley/InProcessTunnelBackend.swift`) renders via the
+  shared `PreviewRequestService`, maps to the *same* FlyingFox `Response`
+  the HTTP routes build (`Routes.response(from:watcher:)`, now internal),
+  and serializes it into `TunnelResponseEvent`s. To serialize without
+  re-deriving anything, added a generic read-only surface to
+  KosmosHTTPServer (`Response.statusCode` / `.headerPairs` /
+  `drainBody(_:)`) — so reload-script injection, CSP, SSE framing, and
+  localized error pages all come from one place. `ServerKosmosService` now
+  builds `Responder(backend: InProcessTunnelBackend(service:
+  server.previewService, watcher: server.watcher))` instead of the
+  URLSession-to-loopback backend. **The AVP data path no longer touches
+  FlyingFox.** The loopback HTTP listener still runs, now used only by
+  Quick Look / browsers. Verified: new `InProcessTunnelBackend` suite
+  (markdown→HTML with reload script injected; asset bytes) + full `Tests`
+  bundle green (189 tests); `Viewer` builds clean. NOT yet validated
+  against a live Vision Pro — the render path is unit-proven, but
+  real-device AVP rendering + live-reload should be smoke-tested before
+  WS6 deletes the server.
+- **2026-06-25 — incidental fix.** `Tests/ViewerTests/RecentDocumentsModelTests.swift`
+  referenced a removed public `entries` accessor (broken on `main` since the
+  recents-unification refactor; the file never compiled, so the whole `Tests`
+  target couldn't build). Fixed line 49 to read the public
+  `Defaults.shared.recentEntries` store. Suite passes in isolation; under
+  full-bundle parallelism it can flake on the shared `recentEntries` global
+  (pre-existing isolation weakness, now newly exposed). Unrelated to this
+  plan — flagged for a separate fix.
 
 ## 1. Goal
 
@@ -332,10 +392,17 @@ the new path.
 
 ## 10. Open decisions
 
-- **`serverHTTPPort` → `serverKosmosPort`** naming / whether to keep a
-  transitional alias in the shared suite.
+- **RESOLVED — port key.** `serverHTTPPort` → **`serverPort`**, hard cut
+  (no transitional alias). Done 2026-06-25 across KosmosAppKit
+  `HTTPServerDefaults` + all three Galley `Defaults` classes + BBEdit
+  scripts. The persisted key changes name; the Server rewrites it on every
+  state change, so no migration needed.
+- **RESOLVED — GalleyServerKit fate.** After WS6 only ~40 lines survive
+  (the `PreviewFailure → localized HTML error page` rendering) + the two
+  resources — too thin for a target. **Fold** that into GalleyCoreKit
+  (`Render/PreviewErrorPage.swift` + move `ErrorPage.html` and merge its
+  `Localizable.xcstrings`) and **delete the GalleyServerKit target** in
+  WS6. The Server then imports only GalleyCoreKit.
 - Whether the **Mac Viewer** also moves to the tunnel for same-machine
   rendering later, or stays on the in-process scheme handler (current plan:
   stays — it already renders in-process with zero transport).
-- Whether to keep `GalleyServerKit` as a thin shrunk target or fold its
-  remainder into `GalleyCoreKit`.

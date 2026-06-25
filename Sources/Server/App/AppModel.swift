@@ -31,7 +31,7 @@ final class Defaults: GalleyRenderDefaults,
   /// `serverEndpointURL`. 0 means "no listener published" (Server
   /// stopped or failed). Written by this process only; everyone else
   /// reads.
-  @DefaultsKey var serverHTTPPort: UInt16 = 0
+  @DefaultsKey var serverPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 
@@ -187,21 +187,21 @@ final class AppModel {
         switch state {
         case .running(let url):
           let port = (url.port).flatMap { UInt16(exactly: $0) } ?? 0
-          Defaults.shared.serverHTTPPort = port
+          Defaults.shared.serverPort = port
           Defaults.shared.post()
           if !kosmosStarted {
             kosmos.start(httpURL: url)
             kosmosStarted = true
           }
         case .failed:
-          Defaults.shared.serverHTTPPort = 0
+          Defaults.shared.serverPort = 0
           Defaults.shared.post()
           if !kosmosStarted {
             kosmos.start(httpURL: nil)
             kosmosStarted = true
           }
         case .stopped:
-          Defaults.shared.serverHTTPPort = 0
+          Defaults.shared.serverPort = 0
           Defaults.shared.post()
         }
       }

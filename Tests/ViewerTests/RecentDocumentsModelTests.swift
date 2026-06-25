@@ -11,13 +11,21 @@
 //  and restores it in `deinit` so it doesn't leak into the real
 //  recents list or other tests.
 //
+//  `.serialized` is load-bearing: every test mutates the single
+//  process-global `Defaults.shared.recentEntries`, and the
+//  snapshot-in-`init` / restore-after-each pattern races itself when
+//  the suite's tests run in parallel (one test's `init` snapshots the
+//  list another test just populated, then resets it to `[]` mid-flight).
+//  No other suite touches `recentEntries`, so serializing this one is
+//  sufficient to make the key access deterministic.
+//
 
 import Foundation
 import Testing
 @testable import Galley
 
 @MainActor
-@Suite("RecentDocumentsModel")
+@Suite("RecentDocumentsModel", .serialized)
 struct RecentDocumentsModelTests {
   private let saved: [RecentDocumentEntry]
 
@@ -46,7 +54,7 @@ struct RecentDocumentsModelTests {
     recents.record(docA)
     recents.record(docB)
     #expect(recents.urls == [docB, docA])
-    #expect(recents.urls == recents.entries.map(\.url))
+    #expect(recents.urls == Defaults.shared.recentEntries.map(\.url))
   }
 
   @Test("re-recording an existing URL dedupes and promotes it to front")

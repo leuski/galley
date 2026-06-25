@@ -56,7 +56,9 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   init(server: PreviewServerController) {
     self.server = server
     self.httpTunnelResponder = Responder(
-      upstreamBaseProvider: { Defaults.shared.serverEndpointURL })
+      backend: InProcessTunnelBackend(
+        service: server.previewService,
+        watcher: server.watcher))
   }
 
   /// Begin advertising. Idempotent. `httpURL` is the Server's loopback

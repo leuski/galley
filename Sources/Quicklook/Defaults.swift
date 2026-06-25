@@ -9,7 +9,7 @@ import GalleyCoreKit
 /// suite (see `Quicklook.entitlements`), which is enough for the
 /// read.
 ///
-/// We only need `serverHTTPPort` — QL composes the preview URL via
+/// We only need `serverPort` — QL composes the preview URL via
 /// `serverEndpointURL` from `GalleyNetworkDefaults` and falls back
 /// to in-process rendering when the Server isn't running.
 ///
@@ -20,7 +20,7 @@ import GalleyCoreKit
   suiteName: "net.leuski.galley",
   limitToInstance: false)
 final class Defaults: GalleyDefaults, HTTPServerDefaults {
-  @DefaultsKey var serverHTTPPort: UInt16 = 0
+  @DefaultsKey var serverPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 }

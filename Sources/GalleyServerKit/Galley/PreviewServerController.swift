@@ -52,6 +52,16 @@ public final class PreviewServerController {
     self.rendererProvider = rendererProvider
   }
 
+  /// The render config (selected template + renderer providers) as a
+  /// transport-neutral `PreviewRequestService`. Used by the HTTP routes
+  /// and by the Kosmos tunnel's `InProcessTunnelBackend` so both render
+  /// through one path. `watcher` (above) is the SSE source for both.
+  public var previewService: PreviewRequestService {
+    PreviewRequestService(
+      selectedTemplate: selectedTemplateProvider,
+      renderer: rendererProvider)
+  }
+
   /// State + URL forwarders. Reading these inside an observer scope
   /// registers a dependency on the inner controller's `state`, so
   /// SwiftUI views that observe the facade still see invalidations

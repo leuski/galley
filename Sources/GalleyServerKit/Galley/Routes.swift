@@ -3,24 +3,18 @@ import GalleyCoreKit
 import KosmosHTTPTunnel
 
 enum Routes {
-  static let assetExtensions: Set<String> = [
-    "txt", "html", "htm",
-    "css", "js", "json", "map",
-    "svg", "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "tiff", "tif",
-    "woff", "woff2", "ttf", "otf",
-    "mp4", "webm", "mp3", "wav", "ogg",
-    "pdf"
-  ]
-
-  /// Builds the shared `Router` used by both the HTTP and HTTPS
-  /// listeners. `hostURLProvider` returns the URL the request was
-  /// expected to hit — used for DNS-rebinding host-header checks and
-  /// for generating absolute URLs during template rewriting. It is
-  /// invoked at request time because the bound port is unknown until
-  /// the listener is up. `extraAllowedHostsProvider` widens the
-  /// Host-header allowlist beyond the loopback aliases — used by the
-  /// Kosmos bridge to admit the Mac's `.local` hostname when an AVP
-  /// peer is connected. Returning an empty set keeps loopback-only.
+  /// Builds the shared `Router`. `hostURLProvider` returns the URL the
+  /// request was expected to hit — used for DNS-rebinding host-header
+  /// checks. It is invoked at request time because the bound port is
+  /// unknown until the listener is up. `extraAllowedHostsProvider` widens
+  /// the Host-header allowlist beyond the loopback aliases — used by the
+  /// Kosmos bridge to admit the Mac's `.local` hostname when an AVP peer
+  /// is connected. Returning an empty set keeps loopback-only.
+  ///
+  /// The actual request handling (render / asset / template / events) is
+  /// the transport-neutral `PreviewRequestService`; this router is just
+  /// the FlyingFox adapter — host-guarding, origin computation, and
+  /// mapping `PreviewResponse` onto FlyingFox `Response`.
   static func makeRouter(
     hostURLProvider: @Sendable @escaping () async -> URL?,
     extraAllowedHostsProvider: @Sendable @escaping () async -> Set<String>,
@@ -30,188 +24,90 @@ enum Routes {
     watcher: DocumentWatcher
   ) -> Router<BasicRequestContext> {
     let router = Router<BasicRequestContext>()
+    let service = PreviewRequestService(
+      selectedTemplate: selectedTemplateProvider,
+      renderer: rendererProvider)
 
-    router.get("/\(RouteNames.preview)/**") { request, _ -> Response in
+    // Every route runs through the same host-guard + service dispatch.
+    // For the template `origin` we use the host the request actually
+    // arrived on (its `Host` header) — NOT the listener's own URL, which
+    // hardcodes 127.0.0.1 and only works for loopback callers. Otherwise
+    // the rendered HTML's `<base href>` (and any relative asset URLs the
+    // template emits — fonts in CSS, images via `url(...)`) point at
+    // 127.0.0.1 on whoever's viewing, including AVP, where nothing is
+    // listening.
+    @Sendable func handle(_ request: Request) async -> Response {
       await .guarded(
         request: request, hostURLProvider: hostURLProvider,
         extraAllowedHostsProvider: extraAllowedHostsProvider) { request, host in
-          // For the template `origin` we use the host the request
-          // actually arrived on (its `Host` header) — NOT the listener's
-          // own URL, which hardcodes 127.0.0.1 and only works for
-          // loopback callers. Otherwise the rendered HTML's `<base href>`
-          // (and any relative asset URLs the template emits — fonts in
-          // CSS, images via `url(...)`) point at 127.0.0.1 on whoever's
-          // viewing, including AVP, where nothing is listening.
-          await previewOrAssetResponse(
-            request: request,
-            hostURL: request.originURL(origin: origin, fallback: host),
-            selectedTemplate: selectedTemplateProvider(),
-            renderer: rendererProvider())
+          let preview = await service.respond(
+            path: request.uri.path,
+            origin: request.originURL(origin: origin, fallback: host))
+          return response(from: preview, watcher: watcher)
         }
     }
 
-    router.get("/\(RouteNames.template)/**") { request, _ -> Response in
-      await .guarded(
-        request: request, hostURLProvider: hostURLProvider,
-        extraAllowedHostsProvider: extraAllowedHostsProvider) { request, _ in
-          await templateAssetResponse(request: request)
-        }
+    router.get("/\(RouteNames.preview)/**") { request, _ in
+      await handle(request)
     }
-
-    router.get("/\(RouteNames.events)/**") { request, _ -> Response in
-      await .guarded(
-        request: request, hostURLProvider: hostURLProvider,
-        extraAllowedHostsProvider: extraAllowedHostsProvider) { request, _ in
-          eventsResponse(request: request, watcher: watcher)
-        }
+    router.get("/\(RouteNames.template)/**") { request, _ in
+      await handle(request)
     }
-
-    router.get("/") { request, _ -> Response in
-      await .guarded(
-        request: request, hostURLProvider: hostURLProvider,
-        extraAllowedHostsProvider: extraAllowedHostsProvider) { _, _ in
-            .ok("Galley Server is running.")
-        }
+    router.get("/\(RouteNames.events)/**") { request, _ in
+      await handle(request)
     }
+    router.get("/") { request, _ in await handle(request) }
 
     return router
   }
 
-  // MARK: - /preview/<path>
-
-  private static func previewOrAssetResponse(
-    request: Request,
-    hostURL: URL,
-    selectedTemplate: Template,
-    renderer: (any MarkdownRenderer)?
-  ) async -> Response {
-    guard let documentURL = request.decodeFilePath(
-      prefix: "/\(RouteNames.preview)")
-    else {
-      return .badRequest("Invalid path")
+  /// Map a transport-neutral `PreviewResponse` onto a FlyingFox
+  /// `Response`. SSE wires the `DocumentWatcher` subscription here;
+  /// structured failures become localized error pages. Internal (not
+  /// private) so `InProcessTunnelBackend` builds the *same* `Response`
+  /// and serializes it over the Kosmos tunnel — one source of truth for
+  /// reload-injection, CSP, SSE framing, and error pages.
+  static func response(
+    from preview: PreviewResponse, watcher: DocumentWatcher
+  ) -> Response {
+    switch preview {
+    case .html(let html, let documentURL):
+      return .ok(html: html, documentURL: documentURL)
+    case .bytes(let resolved):
+      return .data(
+        resolved.data,
+        mime: resolved.mime,
+        cacheControl: resolved.cache.cacheControl)
+    case .events(let documentURL):
+      return .events { await watcher.subscribe(to: documentURL) }
+    case .plainText(let text):
+      return .ok("\(text)")
+    case .badRequest(let message):
+      return .badRequest("\(message)")
+    case .notFound(let message):
+      return .notFound("\(message)")
+    case .failure(let failure):
+      return errorResponse(failure)
     }
-
-    let ext = documentURL.pathExtension.lowercased()
-    if MarkdownFileTypes.extensions.contains(ext) {
-      guard let renderer else {
-        return .errorPage(
-          title: "No markdown processor configured",
-          detail: """
-              Install a supported processor (e.g. multimarkdown via Homebrew) \
-              and pick it in Settings.
-              """,
-          source: "")
-      }
-      return await renderPreview(
-        documentURL: documentURL,
-        hostURL: hostURL,
-        template: selectedTemplate,
-        renderer: renderer)
-    }
-    if assetExtensions.contains(ext) {
-      return serveFile(at: documentURL)
-    }
-    return .notFound("Unsupported extension: .\(ext)")
   }
 
-  private static func renderPreview(
-    documentURL: URL,
-    hostURL: URL,
-    template: Template,
-    renderer: any MarkdownRenderer
-  ) async -> Response {
-    let source: String
-    do {
-      source = try String(contentsOf: documentURL, encoding: .utf8)
-    } catch {
-      return .notFound(
-        "Cannot read \(documentURL.path): \(error.localizedDescription)")
-    }
-
-    let renderedBody: String
-    do {
-      renderedBody = try await renderer.render(source, baseURL: documentURL)
-    } catch {
+  private static func errorResponse(_ failure: PreviewFailure) -> Response {
+    switch failure {
+    case .noProcessor:
       return .errorPage(
-        title: "Render error",
-        detail: error.localizedDescription,
-        source: source)
-    }
-
-    let composed: ComposedPreview
-    do {
-      composed = try template.composeHTML(
-        documentContent: renderedBody,
-        documentURL: documentURL,
-        origin: hostURL)
-    } catch {
+        title: "No markdown processor configured",
+        detail: """
+            Install a supported processor (e.g. multimarkdown via Homebrew) \
+            and pick it in Settings.
+            """,
+        source: "")
+    case .render(let detail, let source):
+      return .errorPage(title: "Render error", detail: detail, source: source)
+    case .template(let name, let detail, let source):
       return .errorPage(
         title: "Template error",
-        detail: """
-            Cannot load template '\(template.name)': \
-            \(error.localizedDescription)
-            """,
-        source: renderedBody)
-    }
-
-    return .ok(html: composed.html, documentURL: documentURL)
-  }
-
-  /// Serve a file's bytes. `cache` defaults to `.noStore` — correct for a
-  /// document-relative asset (a live-edited sibling of the previewed file);
-  /// the template-asset route passes a bounded `.maxAge` so static template
-  /// files aren't re-fetched on every navigation.
-  private static func serveFile(
-    at url: URL, cache: CachePolicy = .noStore
-  ) -> Response {
-    do {
-      return .data(
-        try Data(contentsOf: url),
-        mime: MIMETypes.mimeType(for: url),
-        cacheControl: cache.cacheControl)
-    } catch {
-      return .notFound(error.localizedDescription)
+        detail: "Cannot load template '\(name)': \(detail)",
+        source: source)
     }
   }
-
-  // MARK: - /template/<id>/<file>
-
-  private static func templateAssetResponse(
-    request: Request
-  ) async -> Response {
-    guard case .templateAsset(let templateID, let file)
-            = PreviewRoute(path: request.uri.path)
-    else {
-      return .badRequest("Invalid template asset path")
-    }
-    guard let template = await TemplateStore.shared
-      .existingTemplate(forID: templateID)
-    else {
-      return .notFound("Template not found: \(templateID)")
-    }
-    guard let assetURL = template.resolveAsset(file: file) else {
-      return .notFound("No such asset in template '\(template.name)': \(file)")
-    }
-    return serveFile(
-      at: assetURL,
-      cache: PreviewRoute.templateAsset(id: templateID, file: file).cachePolicy)
-  }
-
-  // MARK: - /events/<path> (SSE)
-
-  private static func eventsResponse(
-    request: Request,
-    watcher: DocumentWatcher
-  ) -> Response {
-    guard
-      let documentURL = request.decodeFilePath(prefix: "/\(RouteNames.events)"),
-      MarkdownFileTypes.extensions.contains(
-        documentURL.pathExtension.lowercased())
-    else {
-      return .badRequest("Invalid event path")
-    }
-
-    return .events { await watcher.subscribe(to: documentURL) }
-  }
-
 }
