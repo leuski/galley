@@ -212,22 +212,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// when this flips true.
   var isRenameRequested: Bool = false
 
-#if os(visionOS)
-  // The pin holds only while the sidebar is showing OR during the
-  // toggle-off animation. While the TOC is hidden, the pin is nil and
-  // the WebView fills the window (so the user can resize freely);
-  // `liveDetailWidth` tracks the current width via GeometryReader so we
-  // know what to pin to on the next toggle-on. On toggle, we capture
-  // `liveDetailWidth` into `pinnedDetailWidth` BEFORE flipping
-  // `showsTOC` — this fixes the layout target so `.contentSize`
-  // resizability has a definite ideal width and the window grows or
-  // shrinks by exactly the sidebar's width. On toggle-off we delay the
-  // pin release until the animation completes so the window can shrink
-  // back before the WebView starts filling again.
-  var pinnedDetailWidth: CGFloat?
-  var liveDetailWidth: CGFloat = 0
-#endif
-
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 

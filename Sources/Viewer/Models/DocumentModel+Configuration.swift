@@ -39,14 +39,8 @@ extension DocumentModel {
   }
 
   private func willToggleTOC() {
-#if os(visionOS)
-    pinnedDetailWidth = pinnedDetailWidth ?? liveDetailWidth
-#endif
   }
 
   private func didToggleTOC() {
-#if os(visionOS)
-    pinnedDetailWidth = nil
-#endif
   }
 }
