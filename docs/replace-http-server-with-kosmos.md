@@ -1,7 +1,35 @@
 # Plan: Replace the loopback HTTP server with a Kosmos-based rendering path
 
-Status: in progress
+Status: in progress — WS5 (QL-over-Kosmos) ABANDONED; HTTP kept for QL/browsers
 Author: design session 2026-06-14
+
+## Decision update (2026-06-25): QL stays on HTTP; HTTP becomes optional
+
+WS5 (Quick Look as a direct Kosmos client) is **abandoned — it's
+impossible**, confirmed empirically and by Apple. A Quick Look preview
+appex runs in a sandbox that **denies all in-process outbound network**
+(`NWConnection` *and* `URLSession` both → `Operation not permitted` /
+`deny network-outbound`), regardless of `com.apple.security.network.client`.
+The old HTTP QL path works only because `WKWebView` fetches via WebKit's
+**separate** network process, not the appex. See memory
+`quicklook-appex-no-inprocess-network` and Apple Developer Forums threads
+115299 / 701940.
+
+Revised end state:
+- **AVP** — in-process tunnel (WS2+WS4), no FlyingFox in its data path. ✅ done.
+- **Quick Look / browsers** — keep the **HTTP server**; QL loads
+  `http://127.0.0.1:<serverHTTPPort>` in a `WKWebView`, falling back to
+  in-process when `serverHTTPPort` is 0/absent. The HTTP-port default is
+  named `serverHTTPPort` again (the `serverPort` rename is reverted, since
+  the Kosmos-port-for-QL idea is dead).
+- **New goal (replaces WS6 deletion):** make the **HTTP transport an
+  optional server component** rather than deleting it. Blocker to true
+  optionality: `InProcessTunnelBackend` (the AVP path) currently reuses the
+  FlyingFox `Response` (`Routes.response` + `drainBody`), so the AVP tunnel
+  still pulls in FlyingFox. Decoupling it (map `PreviewResponse` →
+  `TunnelResponseEvent` directly, moving reload-injection / CSP / SSE /
+  error-page shaping into a neutral layer shared by both transports) is the
+  real work to make HTTP optional.
 
 ## Progress log
 
@@ -35,6 +63,80 @@ Author: design session 2026-06-14
   Galley `Defaults` classes (Viewer/Server/Quicklook), the BBEdit
   Safari/Chrome scripts, and the KosmosAppKit test. `Viewer` builds clean;
   KosmosAppKit `HTTPServerDefaults` tests pass.
+- **2026-06-25 — WS5 (Phase 5) implemented; functional validation pending.**
+  Quick Look now renders via a **direct loopback Kosmos tunnel** to the
+  Server, falling back to in-process. Pieces:
+  - `GalleyKosmosRole.quicklook` added (so the Server doesn't mistake a
+    preview for Galley.app).
+  - KosmosTransport: `KosmosLink.listeningPort()` (default nil; LoomKosmosLink
+    returns its bound `.tcp` port) + `KosmosClient.listeningPort()`.
+  - Server publishes the **Kosmos** port as `serverPort` from
+    `ServerKosmosService.linkDidStart` (reset to 0 in `stop()`); `AppModel`
+    no longer publishes the HTTP port. `serverPort` is now the Kosmos
+    direct-connect port, not HTTP.
+  - **`PreviewTunnelConnection`** (in `GalleyCoreKit/WebKit/`) encapsulates
+    `makeLoomDirect` + tunnel `Client` wiring + a classic
+    `WKURLSchemeHandler` bridge, exposing a Kosmos-free facade. It lives in
+    GalleyCoreKit (which already links the Kosmos products) so the Quick
+    Look target imports only GalleyCoreKit — **no pbxproj/link changes to
+    the appex** (the naive approach failed at link: QL doesn't link the
+    Kosmos products directly).
+  - QL `PreviewViewController`: try `PreviewTunnelConnection.connect`
+    (2s timeout) → load `kosmos://local/preview/<path>`; on any failure →
+    in-process render (its prior behavior). Graceful fallback means QL
+    always shows something.
+  Builds clean (Viewer); full Tests bundle green (189). **NOT functionally
+  validated** — needs a running Server + `qlmanage -p` against the real
+  `.appex` + an entitled Loom handshake (can't run headless). This run also
+  serves as WS1's end-to-end proof once exercised.
+- **2026-06-25 — WS5 debugging (two fixes after "QL broken, no render").**
+  1. **"No render at all" — fixed.** Regression I introduced: `webView`
+     became an optional built *late* (after the up-to-2s tunnel attempt),
+     so `loadView()` handed Quick Look a throwaway empty WebView while
+     content loaded into a different instance → blank on every path
+     (including the in-process fallback). Fixed by making the controller's
+     view a **stable container** and installing the chosen WebView into it
+     (`install(_:)`) — restores the original single-displayed-view
+     invariant. In-process fallback renders regardless of the Kosmos path.
+  2. **Keychain — confirmed the blocker + added the entitlement.** Loom
+     stores its P256 identity in the Keychain (`SecItemAdd` /
+     `SecItemCopyMatching`). AVP is sandboxed (visionOS) yet works because
+     the **Viewer entitlements grant `keychain-access-groups` =
+     `$(AppIdentifierPrefix)net.leuski.galley`** (Server has it too). QL
+     was sandboxed *without* that group → handshake failed → fell back.
+     Added the same `keychain-access-groups` to `Quicklook.entitlements`.
+     Still needs validation under real signing (ad-hoc `$(AppIdentifierPrefix)`
+     + appex keychain group). Correction to the prior note: this entitlement
+     IS needed — a sandboxed Loom peer requires it (AVP is the proof); it's
+     not a CLI-only artifact.
+- **2026-06-25 — WS1 (Phase 4) capability done; round-trip validation
+  deferred to WS5.** Confirmed **no Loom change needed** — `LoomNode`
+  already exposes `connect(to:using:hello:)`, `startAuthenticatedAdvertising`
+  already returns the bound `[LoomTransportKind: UInt16]`, and
+  `LoomNetworkConfiguration.enableBonjour` already gates discovery. All
+  changes landed in **KosmosTransport**:
+  - `ReconnectingSession` gained a `.peerIdentified(deviceID:metadata:)`
+    event, emitted from the handshake `session.context` right after
+    `.connected` — so a direct dialer learns the peer it didn't discover.
+  - `LoomKosmosLink.Configuration` gained `enableBonjour` +
+    `directEndpoint`; `start()` branches to a no-advertise/no-browse
+    direct-dial path (`startDirectConnect` + `pumpDirect`) that registers
+    the peer on `.peerIdentified` and reuses the existing session/framing/
+    peer-set machinery. `startAdvertising` now captures the bound `.tcp`
+    port, exposed via `listeningPort()` for the Server to publish.
+  - `KosmosClient.makeLoomDirect(host:port:…)` factory (Bonjour off),
+    returning the same `KosmosClient` so the tunnel rides it unchanged.
+  - The discovery/AVP path is untouched (direct mode is a separate
+    branch). `ReconnectingSession` dials `.tcp`, and the `.tcp` listener
+    accepts loopback, so direct connect reuses the proven TCP path.
+  Tested: new direct-connect construction/config suite + all 38
+  KosmosTransport tests pass; full Kosmos package + Galley `Viewer` build
+  clean. **NOT headless-testable:** the real loopback handshake needs
+  Keychain entitlements (documented in `LoomKosmosLinkTests` — SwiftPM CLI
+  hits `keychainWriteFailed(-34018)`), so the two-node round-trip is
+  validated in the entitled Galley Server↔QL path alongside WS5, not in
+  `swift test`. Galley wiring (Server publishes `listeningPort()` →
+  `serverPort`; QL calls `makeLoomDirect`) is WS5.
 - **2026-06-25 — WS4 (Phase 3) done.** `InProcessTunnelBackend`
   (`GalleyServerKit/Galley/InProcessTunnelBackend.swift`) renders via the
   shared `PreviewRequestService`, maps to the *same* FlyingFox `Response`
@@ -156,32 +258,42 @@ and the route table are gone.
 
 ### WS1 — Kosmos: direct peer connection by address/port
 
-Land in the `Kosmos` package (+ a small `Loom` public-API addition).
+Land entirely in the **`Kosmos` package** (KosmosTransport) + Galley wiring.
+**No Loom modification needed** — verified 2026-06-25 that Loom already
+exposes everything: `LoomNode.connect(to: NWEndpoint, using:, hello:, …)`
+is public (raw IPs pass straight through `LoomEndpointResolver`),
+`startAuthenticatedAdvertising(...)` already *returns* the bound
+`[LoomTransportKind: UInt16]` listener ports (today `LoomKosmosLink`
+discards them), and `LoomNetworkConfiguration.enableBonjour` already gates
+discovery/advertising. The work is one layer up, in the `LoomKosmosLink`
+bridge, which is currently 100% Bonjour-discovery-driven.
 
-1. **Loom public connect-by-endpoint.** Promote the existing internal path
-   to public API: `LoomNode.connect(toHost:port:) async throws -> session`,
-   wrapping `LoomEndpointResolver.resolveHostPort` + the internal
-   `attemptConnect(to:)`. Bonjour stays untouched; this is an additive
-   alternative entry point.
-2. **Expose the local direct-transport port.** Add a public accessor so a
-   listening node can read the bound port of its direct listener
-   (`directListenerPorts[.quic]` / `.udp` / `.tcp`) after start, to publish
-   out-of-band. (Today only Bonjour TXT carries it.)
-3. **KosmosTransport direct link.** Add
-   `KosmosClient.makeLoomDirect(host:port:role:product:deviceType:trustProvider:...)`
-   alongside `makeLoomBacked` in `KosmosClientLoomFactory.swift`. It builds
-   a `LoomKosmosLink` with Bonjour disabled (`enableBonjour = false`,
-   advertise off) that dials the fixed endpoint and runs the normal
-   authenticated-session + metadata exchange (role/product), so the peer
-   shows up in the host's peer set exactly like a discovered one.
-4. **Client-only / no-advertise host mode.** Ensure `KosmosServiceHost` can
-   run a client that only dials (QL never advertises). Verify
-   `enabledDirectTransports` / Bonjour-off config supports this.
-5. **Reconnect.** `ReconnectingSession` should target the fixed endpoint on
-   drop rather than waiting for re-discovery, when in direct mode.
+1. **Expose the bound port (Server side).** `LoomKosmosLink.startAdvertising`
+   captures the ports `startAuthenticatedAdvertising` returns (instead of
+   `_ = try await …`) into a stored property, surfaced as a plain `UInt16`
+   (no `LoomTransportKind` leak — pick one transport, e.g. QUIC, as the
+   direct-connect transport). `KosmosServiceHost`/`KosmosService` forward it
+   so Galley can publish it.
+2. **Dial-only mode (Client side).** Add a direct entry to `LoomKosmosLink`:
+   Bonjour off (`enableBonjour = false`), no discovery/advertise, open one
+   outbound session to a fixed `127.0.0.1:<port>` endpoint via `LoomNode`,
+   and register the peer once the handshake `session.context` yields its
+   `deviceID` (the way `acceptInbound` already learns the inbound PeerID) —
+   since direct dial doesn't know the peer's PeerID up front.
+3. **`makeLoomDirect(...)` factory** alongside `makeLoomBacked` in
+   `KosmosClientLoomFactory.swift`. Returns the same `KosmosClient`, so the
+   tunnel `Client`/`Responder` ride it unchanged.
+4. **Direct-client host.** A `KosmosServiceHost`/`KosmosService` mode that
+   dials a fixed endpoint instead of advertising/browsing (QL never
+   advertises).
+5. **Reconnect.** Direct mode re-dials the fixed endpoint on drop rather
+   than waiting for re-discovery.
+
+The one genuinely new bit is the dial-only path in `LoomKosmosLink`; the
+per-peer session machinery (framing, pump, peer-set publishing) is reused.
 
 Tests (in-package, no Galley): two `LoomKosmosLink` nodes over loopback —
-one listening, one dialing `127.0.0.1:<port>` with Bonjour disabled —
+one advertising, one dialing `127.0.0.1:<port>` with Bonjour disabled —
 exchange a round-trip Kosmos message and confirm peer metadata
 (role/product) is present. Confirms direct connect end-to-end without mDNS.
 
@@ -318,7 +430,7 @@ Only after WS4 + WS5 validate.
 
 | Phase | Workstream | Server present? | Risk gate |
 |------|------------|-----------------|-----------|
-| 0 | Spike: loopback QUIC/UDP from sandboxed appex | yes | **gates WS5** |
+| 0 | Spike: loopback QUIC/UDP from sandboxed appex | yes | ✅ **PASS** (gate cleared) |
 | 1 | WS2 tunnel backend abstraction (default = URLSession) | yes | pure refactor |
 | 2 | WS3 `PreviewRequestService`; Mac Viewer/print repointed | yes | no behavior change |
 | 3 | WS4 in-process backend; AVP off FlyingFox | yes (QL/browser only) | validate AVP |
@@ -332,15 +444,21 @@ the new path.
 
 ## 7. Risks, unknowns, and spikes
 
-1. **Loopback QUIC/UDP from a sandboxed `.appex` (phase 0, blocking).**
-   TCP loopback is exempt from local-network privacy; UDP/QUIC loopback to
-   `127.0.0.1` *should* be too, but I have not confirmed it for a sandboxed
-   preview extension. Spike: minimal sandboxed appex dialing a loopback
-   `NWConnection` (QUIC) with `network.client` only, no `NSBonjourServices`
-   — confirm no `-65555`/privacy denial and a completed handshake. If it
-   fails, fall back to: TCP direct transport (`LoomTransportKind.tcp`), or
-   keep QL in-process only (still achieves server removal; QL just loses the
-   uniform-API benefit).
+1. **Loopback QUIC/UDP from a sandboxed `.appex` (phase 0) — RESOLVED: PASS
+   (2026-06-25).** Built an ad-hoc-signed sandboxed `.app` with QL's exact
+   entitlements (`app-sandbox` + `network.client`, `NSAllowsLocalNetworking`,
+   no `NSBonjourServices`) that dials a loopback UDP `NWConnection` to a
+   127.0.0.1 echo listener. Result: `ROUND-TRIP-OK`, no local-network-privacy
+   prompt, no denial. Negative control (same sandbox, *no* `network.client`)
+   was blocked with `Operation not permitted` — proving the sandbox actually
+   engaged, so the pass is real. QUIC rides UDP and the permission gate
+   (sandbox `network.client` + TCC local-network) is transport-agnostic and
+   destination-based (loopback exempt), so QUIC loopback is covered.
+   Independent of QL, plain `NWConnection` UDP loopback round-trips on this
+   macOS 26. Remaining (low-risk) confirmation: a `qlmanage` smoke test of
+   the *actual* `.appex` once WS5 lands — the sandbox/TCC gates are identical
+   between a signed `.app` and `.appex`, so this is verification, not a gate.
+   Fallbacks (TCP direct transport / QL in-process only) are **not needed**.
 2. **Direct-connect handshake latency vs QL's budget.** No Bonjour wait, but
    QUIC + Loom authenticated-session setup is non-zero on the preview hot
    path. Measure; enforce a tight timeout → in-process fallback.
