@@ -118,7 +118,7 @@ final class Defaults: GalleyRenderDefaults,
   /// contract honest and surfaces `serverEndpointURL` for any future
   /// reader. Quicklook reads the same plist through its own
   /// `Defaults` class.
-  var serverPort: UInt16 = 0
+  var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 

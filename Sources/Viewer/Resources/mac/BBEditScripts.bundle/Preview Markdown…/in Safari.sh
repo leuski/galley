@@ -2,7 +2,7 @@
 
 # Open the current BBEdit document in Safari via Galley Server's
 # /preview/ route. The server binds to an OS-assigned port at
-# startup and publishes it under `serverPort` in the
+# startup and publishes it under `serverHTTPPort` in the
 # `net.leuski.galley` defaults suite; this script reads it at run
 # time, so a Galley Server restart with a new port "just works"
 # without reinstalling scripts.
@@ -13,7 +13,7 @@
 # port-file approach, since QL-grade entitlements aren't available
 # for a one-off shell script.
 
-PORT=$(defaults read net.leuski.galley serverPort 2>/dev/null)
+PORT=$(defaults read net.leuski.galley serverHTTPPort 2>/dev/null)
 if ! [ "$PORT" -gt 0 ] 2>/dev/null; then
   osascript -e 'display alert "Galley Server is not running." message "Start Galley Server from its menu-bar icon and try again."'
   exit 1
