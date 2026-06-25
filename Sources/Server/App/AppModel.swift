@@ -23,15 +23,15 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  @DefaultsKey var renderer: String?
-  @DefaultsKey var template: String?
-  @DefaultsKey var serverGalleyHash: String?
+  var renderer: String?
+  var template: String?
+  var serverGalleyHash: String?
   /// OS-assigned port the running Server bound to, published here so
   /// Viewer and Quicklook can compose the loopback URL via
   /// `serverEndpointURL`. 0 means "no listener published" (Server
   /// stopped or failed). Written by this process only; everyone else
   /// reads.
-  @DefaultsKey var serverHTTPPort: UInt16 = 0
+  var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 

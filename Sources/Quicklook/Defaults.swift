@@ -20,7 +20,7 @@ import GalleyCoreKit
   suiteName: "net.leuski.galley",
   limitToInstance: false)
 final class Defaults: GalleyDefaults, HTTPServerDefaults {
-  @DefaultsKey var serverHTTPPort: UInt16 = 0
+  var serverHTTPPort: UInt16 = 0
 
   @MainActor static let shared = Defaults()
 }
