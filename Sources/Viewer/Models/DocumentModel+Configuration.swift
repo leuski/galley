@@ -6,9 +6,6 @@
 //
 
 import GalleyCoreKit
-#if os(visionOS)
-import KosmosHTTPTunnel
-#endif
 import SwiftUI
 import WebKit
 import KosmosAppKit

@@ -1,5 +1,4 @@
 #if os(macOS)
-import AppKit
 import GalleyCoreKit
 import SwiftUI
 

@@ -165,12 +165,6 @@ extension Color {
   }
 }
 
-#if os(macOS)
-import AppKit
-#else
-import UIKit
-#endif
-
 /// macOS-only color machinery for the per-template background cache.
 /// The portable storage layer (`TemplateBackgroundState`, the
 /// `Template.backgroundState` / `setBackgroundColor` extensions, and
@@ -213,7 +207,7 @@ struct RGBColor: Sendable {
   let alpha: CGFloat
 
 #if os(macOS)
-  init?(_ color: NSColor) {
+  init?(_ color: ALColor) {
     guard let resolved = color.usingColorSpace(.sRGB) else {
       return nil
     }
@@ -223,7 +217,7 @@ struct RGBColor: Sendable {
     self.alpha = resolved.alphaComponent
   }
 #else
-  init?(_ color: UIColor) {
+  init?(_ color: ALColor) {
     var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0
     var alpha: CGFloat = 0
     guard color.getRed(
