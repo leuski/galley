@@ -23,7 +23,17 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   let page: WebPage
   let zoom: WebPageZoomController
 
-  let isRegular: Bool
+  var isRegular: Bool {
+    !documentURL.isFileURL ||
+    !documentURL.safe.absoluteString.hasPrefix(
+      Bundle.main.bundleURL.safe.absoluteString)
+  }
+  var canRename: Bool { isRegular && documentURL.isFileURL }
+  var canOpenInEditor: Bool { isRegular && documentURL.isFileURL }
+  var title: String {
+    isRegular ? documentURL.lastPathComponent : String(localized: "Help")
+  }
+  var toolbarID: String { isRegular ? "viewer.main" : "viewer.help" }
 
   /// Token for the persistence observer (`startTrackingPersistentState`).
   @ObservationIgnored var saveObservation: Cancellable?
@@ -224,11 +234,10 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   convenience init(
     url: URL)
   {
-    self.init(isRegular: false, history: History(url: url))
+    self.init(history: History(url: url))
   }
 
   init(
-    isRegular: Bool,
     history: History,
     templatePersistent: String? = nil,
     processorPersistent: String? = nil,
@@ -237,7 +246,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
   ) {
-    self.isRegular = isRegular
     self.history = history
     self.templates = SceneTemplateChoice(
       source: AppModel.shared.templates,
@@ -342,7 +350,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
     editorBridge.onEditorClick = { [weak self] line in
-      Task { await self?.openInEditor(line: line) }
+      self?.openInEditor(line: line)
     }
     backgroundBridge.onColor = { [weak self] color, templateID in
       self?.onBackgroundColor(color, templateID)
@@ -385,7 +393,12 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// not a visionOS concept. On non-macOS this is a no-op so callers
   /// (cmd-click bridge handler, File > Open in Editor menu item)
   /// don't need to platform-guard at the call site.
-  func openInEditor(line: Int? = nil) async {
+  func openInEditor(line: Int? = nil) {
+    guard canOpenInEditor else { return }
+    Task { await _openInEditor(line: line) }
+  }
+
+  private func _openInEditor(line: Int? = nil) async {
 #if os(macOS)
     let url = documentURL
     let resolvedLine: Int?

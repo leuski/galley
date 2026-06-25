@@ -188,9 +188,7 @@ extension Action {
       title: "Rename…",
       image: "pencil",
       perform: { _ in model?.requestRename() },
-      isEnabled: {
-        model?.isRegular == true && model?.documentURL.isFileURL == true
-      },
+      isEnabled: { model?.canRename == true },
       accessibilityID: ViewerA11yID.FileMenu.rename
     )
   }
@@ -199,11 +197,8 @@ extension Action {
     Action(
       title: "Open in Editor",
       image: "arrow.up.forward.app",
-      perform: { _ in
-        guard let model else { return }
-        Task { await model.openInEditor(line: nil) }
-      },
-      isEnabled: { model?.documentURL.isFileURL == true },
+      perform: { _ in model?.openInEditor(line: nil) },
+      isEnabled: { model?.canOpenInEditor == true },
       shortcut: .init("e", modifiers: [.command, .option]),
       accessibilityID: ViewerA11yID.FileMenu.openInEditor
     )

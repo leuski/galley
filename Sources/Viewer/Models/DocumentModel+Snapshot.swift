@@ -39,6 +39,12 @@ extension DocumentModel {
       history.currentURL
     }
 
+    var droppingHistory: Self {
+      var result = self
+      result.history = .init(url: currentURL)
+      return result
+    }
+
     init(url: URL) {
       self.init(history: History(url: url))
     }
@@ -80,15 +86,6 @@ extension DocumentModel {
       rendererPersistent: processors.persistent,
       colorSchemePersistent: colorSchemes.persistent,
       securityScopedBookmark: nil)
-  }
-
-  /// A single-file projection — what gets stored under the file-url key
-  /// so a later fresh window re-seeds this file's view state. The nav
-  /// stack collapses to the one file.
-  func fileSnapshot(for url: URL) -> Snapshot {
-    var projection = snapshot
-    projection.history = History(url: url)
-    return projection
   }
 }
 
@@ -141,7 +138,6 @@ extension DocumentModel {
   /// window was empty (welcome → document, in place) and caching it.
   /// A fresh window seeds its view-state (zoom/scroll/TOC/choices) from
   /// the file store so reopening a known file restores where you were.
-  @discardableResult
   static func open(
     target: DocumentTarget, id: DocumentSceneID) -> DocumentModel
   {
@@ -155,7 +151,7 @@ extension DocumentModel {
   }
 
   /// The singleton Help window's model — a bundled file, never
-  /// persisted (`kind: .help` skips the persistence observer).
+  /// persisted.
   static func help(url: URL) -> DocumentModel {
     DocumentModel(url: url)
   }
@@ -165,7 +161,6 @@ extension DocumentModel {
     snapshot: Snapshot, scroll: Scroll?)
   {
     self.init(
-      isRegular: true,
       history: snapshot.history,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
@@ -200,13 +195,11 @@ extension DocumentModel {
   }
 
   private func save(id: DocumentSceneID?) {
-    guard isRegular else { return }
     let snapshot = self.snapshot
     if let id {
       Defaults.shared[snapshot: id] = snapshot
     }
-    let url = snapshot.currentURL
-    Defaults.shared[snapshot: url] = fileSnapshot(for: url)
+    Defaults.shared[snapshot: snapshot.currentURL] = snapshot.droppingHistory
   }
 
   /// Re-render when a render input changes: the global processor /

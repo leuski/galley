@@ -16,10 +16,7 @@ struct DocumentMainContent: View {
     WebView(model.page)
       .focusedSceneValue(\.documentModel, model)
       .frame(minWidth: webViewMinWidth)
-      .navigationTitle(
-        !model.isRegular
-        ? Text("Help")
-        : Text(model.documentURL.lastPathComponent))
+      .navigationTitle(model.title)
     // The WebView's pre-paint canvas paints system-white during
     // the gap between mount and the first HTML layout — visible
     // as a white flash on tab open / reload regardless of CSS.
@@ -45,7 +42,7 @@ struct DocumentMainContent: View {
           .transition(.move(edge: .bottom).combined(with: .opacity))
         }
       }
-      .toolbar(id: model.isRegular ? "viewer.main" : "viewer.help") {
+      .toolbar(id: model.toolbarID) {
         toolbarContent()
       }
   }
@@ -58,29 +55,26 @@ struct DocumentMainContent: View {
     let placement: ToolbarItemPlacement = .bottomOrnament
 #endif
 
-#if os(macOS)
-#else
+#if !os(macOS)
     Action.toggleTOC(model).toolbarItem(.hidden, placement: placement)
 #endif
 
     Action.navigation(model, placement: placement)
       .defaultCustomization(.hidden)
 
-    //    ToolbarSpacer(.flexible, placement: .automatic)
-    if model.isRegular {
 #if os(macOS)
-      RendererToolbarPicker(docModel: model).toolbarItem
-      TemplateToolbarPicker(docModel: model).toolbarItem
-#else
+    RendererToolbarPicker(docModel: model).toolbarItem
+      .defaultCustomization(.hidden)
+    TemplateToolbarPicker(docModel: model).toolbarItem
+      .defaultCustomization(.hidden)
 #endif
-      Action.reload(model).toolbarItem(.hidden, placement: placement)
-    }
+    Action.reload(model).toolbarItem(.hidden, placement: placement)
+      .defaultCustomization(.hidden)
 
     Action.zoom(model.zoom, placement: placement)
       .defaultCustomization(.hidden)
 
-#if os(macOS)
-#else
+#if !os(macOS)
     Action.find(model.find).toolbarItem(.hidden, placement: placement)
 
     ToolbarItem(id: "share", placement: placement) {
@@ -91,10 +85,7 @@ struct DocumentMainContent: View {
       MoreMenu(model: model)
     }
 #endif
-
-    //    ToolbarSpacer(.fixed, placement: .automatic)
   }
-
 }
 
 #if os(macOS)
