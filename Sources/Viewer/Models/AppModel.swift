@@ -278,8 +278,11 @@ extension ActiveServerAgent {
 
 extension Bundle {
   public var serverBundle: Bundle? {
-    url(forResource: "Galley Server", withExtension: "app")
-      .flatMap { url in Bundle(url: url) }
+    urls(forResourcesWithExtension: "app", subdirectory: nil)?
+      .compactMap { url in Bundle(url: url) }
+      .filter { bundle in
+        bundle.bundleIdentifier == "net.leuski.galley.server" }
+      .first
   }
 }
 #endif

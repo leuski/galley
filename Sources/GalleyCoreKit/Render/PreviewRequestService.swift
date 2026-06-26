@@ -78,7 +78,7 @@ public struct PreviewRequestService: Sendable {
       return events(path: path)
     }
     if path == "/" {
-      return .plainText("Galley Server is running.")
+      return .plainText("Dispatcher is running.")
     }
     return .notFound("Not found: \(path)")
   }

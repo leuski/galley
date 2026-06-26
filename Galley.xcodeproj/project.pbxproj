@@ -18,7 +18,6 @@
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		6273A0762FCA2B9100205507 /* KosmosAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6273A0752FCA2B9100205507 /* KosmosAppKit */; };
 		6273A0802FCA3EFE00205507 /* KosmosHTTPServer in Frameworks */ = {isa = PBXBuildFile; productRef = 6273A07F2FCA3EFE00205507 /* KosmosHTTPServer */; };
-		628053992FBFEC0600A02808 /* Galley Server.app in Resources */ = {isa = PBXBuildFile; fileRef = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */; platformFilters = (macos, ); };
 		6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
 		62A1000300000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000400000000CADD7B01 /* ALFoundation */; };
 		62A127162FC6BDD6002FDFD7 /* MarkdownHTMLKit in Frameworks */ = {isa = PBXBuildFile; productRef = 62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */; };
@@ -559,8 +558,7 @@
 				62D5E0A82FA5BFB000CADD72 /* Compile AppleScripts */,
 				62D5E1042FA5C53400CADD72 /* Embed Frameworks */,
 				62564F432FA857A400FF0F84 /* Embed Foundation Extensions */,
-				62D5E0AA2FA5BFB000CADD72 /* Strip Frameworks from nested Server.app */,
-				62D5E0AB2FA5BFB000CADD72 /* Remove Galley Server.app from build products */,
+				62D5E0AA2FA5BFB000CADD72 /* Move server into the Viewer */,
 			);
 			buildRules = (
 			);
@@ -743,7 +741,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				628053992FBFEC0600A02808 /* Galley Server.app in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -802,7 +799,7 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/Scripts/compile-applescripts.sh\"\n";
 		};
-		62D5E0AA2FA5BFB000CADD72 /* Strip Frameworks from nested Server.app */ = {
+		62D5E0AA2FA5BFB000CADD72 /* Move server into the Viewer */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -812,33 +809,14 @@
 			);
 			inputPaths = (
 			);
-			name = "Strip Frameworks from nested Server.app";
+			name = "Move server into the Viewer";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/Scripts/strip-server-frameworks.sh\"\n";
-		};
-		62D5E0AB2FA5BFB000CADD72 /* Remove Galley Server.app from build products */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Remove Galley Server.app from build products";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/Scripts/remove-server-from-products.sh\"\n";
+			shellScript = "\"${SRCROOT}/Scripts/embed-server-as-galley.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

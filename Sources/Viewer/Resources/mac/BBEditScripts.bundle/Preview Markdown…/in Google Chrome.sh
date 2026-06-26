@@ -15,7 +15,7 @@
 
 PORT=$(defaults read net.leuski.galley serverHTTPPort 2>/dev/null)
 if ! [ "$PORT" -gt 0 ] 2>/dev/null; then
-  osascript -e 'display alert "Galley Server is not running." message "Start Galley Server from its menu-bar icon and try again."'
+  osascript -e 'display alert "Galley does not support preview in the browser."'
   exit 1
 fi
 

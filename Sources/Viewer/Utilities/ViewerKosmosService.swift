@@ -150,7 +150,7 @@ extension ViewerKosmosService {
         "Kosmos link isn’t ready yet. Try again in a moment."
       case .noServer:
         """
-        Galley Server isn’t reachable. Make sure it’s running and \
+        Galley Helper isn’t reachable. Make sure it’s running and \
         that Local Network access is granted to Galley in System \
         Settings → Privacy & Security.
         """

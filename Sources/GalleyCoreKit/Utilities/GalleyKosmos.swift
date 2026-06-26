@@ -29,11 +29,11 @@ public enum GalleyKosmosRole: String, Role {
   public var defaultDeviceName: String {
     switch self {
 #if os(macOS)
-    case .server: Host.current().localizedName ?? "Galley Server"
-    case .macViewer: Host.current().localizedName ?? "Galley"
+    case .server: Host.current().localizedName ?? "Galley"
+    case .macViewer: Host.current().localizedName ?? "Mac"
 #else
-    case .server: "Galley Server"
-    case .macViewer: "Galley"
+    case .server: "Galley"
+    case .macViewer: "Mac"
 #endif
     case .visionViewer: "Apple Vision Pro"
     }
