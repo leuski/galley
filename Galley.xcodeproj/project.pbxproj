@@ -1270,6 +1270,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Viewer/Resources/Info.plist;
+				INFOPLIST_PREPROCESS = YES;
+				INFOPLIST_PREPROCESSOR_DEFINITIONS = "GALLEY_DECLARE_DOC_TYPES=1";
+				"INFOPLIST_PREPROCESSOR_DEFINITIONS[sdk=macosx*]" = "";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1303,6 +1306,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Sources/Viewer/Resources/Info.plist;
+				INFOPLIST_PREPROCESS = YES;
+				INFOPLIST_PREPROCESSOR_DEFINITIONS = "GALLEY_DECLARE_DOC_TYPES=1";
+				"INFOPLIST_PREPROCESSOR_DEFINITIONS[sdk=macosx*]" = "";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
