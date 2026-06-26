@@ -61,14 +61,19 @@ final class AppModel {
   /// is absent or the listener hasn't bound. Drives the menu's
   /// "Open File…" browser action.
   private(set) var httpURL: URL?
-  /// Whether an HTTP listener was discovered at launch.
-  var httpFeatureAvailable: Bool { httpListener != nil }
 
-  init() {
+  static let shared = AppModel()
+
+  private init() {
     Self.logInit(
       bundle: Bundle.main.bundleIdentifier,
       renderer: Defaults.shared.renderer,
       template: Defaults.shared.template)
+
+    SingleProcessInstance.enforceSingleInstance()
+    Task { @MainActor in
+      await ProcessorStore.shared.discover()
+    }
 
     self.previewService = PreviewRequestService(
       selectedTemplate: { @MainActor in
@@ -223,26 +228,6 @@ final class AppModel {
           Defaults.shared.post()
         }
       }
-    }
-  }
-}
-
-/// Boot wrapper that runs async processor discovery before
-/// constructing the real AppModel. The view tree branches on
-/// `model` being non-nil; while loading, a placeholder UI is shown.
-@Observable @MainActor
-final class AppBoot {
-  private(set) var model: AppModel?
-
-  init() {
-    SingleProcessInstance.enforceSingleInstance()
-    // Notification permission is presented as a system sheet on
-    // first run; awaiting it would block boot until the user
-    // responds. Fire it in parallel and let it resolve whenever.
-    Task { await UNUserNotificationCenter.requestAuthorization() }
-    Task { @MainActor in
-      await ProcessorStore.shared.discover()
-      self.model = AppModel()
     }
   }
 }

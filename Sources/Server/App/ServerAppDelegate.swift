@@ -23,8 +23,6 @@ private let log = Logger(
 /// `ServerKosmosService` whenever a file shows up.
 @MainActor
 final class ServerAppDelegate: NSObject, NSApplicationDelegate {
-  weak var boot: AppBoot?
-
   func application(_ application: NSApplication, open urls: [URL]) {
     // URLs arrive in two shapes: real `file://` URLs from
     // LaunchServices when the Server is the document-type handler,
@@ -51,7 +49,7 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
       application(_:open:) received=\(urls.count, privacy: .public) \
       resolved=\(targets.count, privacy: .public)
       """)
-    let kosmos = boot?.model?.kosmos
+    let kosmos = AppModel.shared.kosmos
     Task {
       for target in targets {
         await ServerKosmosService.dispatch(target, with: kosmos)

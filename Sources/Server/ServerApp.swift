@@ -9,21 +9,31 @@ import SwiftUI
 
 @main
 struct ServerApp: App {
-  @State private var boot = AppBoot()
   @NSApplicationDelegateAdaptor private var appDelegate: ServerAppDelegate
 
+  init() {
+    _ = AppModel.shared
+  }
+
   var body: some Scene {
+#if DEBUG
     MenuBarExtra {
-      if let model = boot.model {
-        MenuBarContent(model: model)
-          .onAppear { appDelegate.boot = boot }
-      } else {
-        Text("Starting…")
-          .onAppear { appDelegate.boot = boot }
+      Button("Quit Galley Server") {
+        NSApplication.shared.terminate(nil)
       }
+      .accessibilityIdentifier("quit")
     } label: {
       Image("MenuBarIcon")
     }
     .menuBarExtraStyle(.menu)
+#else
+    // Release: faceless. `LSUIElement` (Info.plist) plus a dormant
+    // `Settings` scene means no Dock icon and no menu-bar item — the
+    // bridge runs headless, and LaunchServices cold-launches it on
+    // demand for dot-bridge:// / Services / App Intent triggers.
+    Settings {
+      EmptyView()
+    }
+#endif
   }
 }
