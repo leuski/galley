@@ -18,15 +18,11 @@ enum Routes {
   static func makeRouter(
     hostURLProvider: @Sendable @escaping () async -> URL?,
     extraAllowedHostsProvider: @Sendable @escaping () async -> Set<String>,
-    selectedTemplateProvider: @Sendable @escaping () async -> Template,
-    rendererProvider: @Sendable @escaping () async -> (any MarkdownRenderer)?,
+    service: PreviewRequestService,
     origin: String,
     watcher: DocumentWatcher
   ) -> Router<BasicRequestContext> {
     let router = Router<BasicRequestContext>()
-    let service = PreviewRequestService(
-      selectedTemplate: selectedTemplateProvider,
-      renderer: rendererProvider)
 
     // Every route runs through the same host-guard + service dispatch.
     // For the template `origin` we use the host the request actually

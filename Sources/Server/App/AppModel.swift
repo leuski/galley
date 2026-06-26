@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import GalleyCoreKit
-import GalleyServerKit
 import OSLog
 import UserNotifications
 
@@ -45,8 +44,29 @@ final class AppModel {
 
   let templates: TemplateChoice
   let processors: ProcessorChoice
-  @ObservationIgnored let server: PreviewServerController
+
+  /// File watcher feeding the SSE live-reload of **both** the optional
+  /// HTTP listener and the Kosmos tunnel responder — one watch, shared.
+  @ObservationIgnored let watcher = DocumentWatcher()
+  /// Request-time render config (selected template + renderer), read by
+  /// both the optional HTTP listener and the tunnel responder.
+  @ObservationIgnored let previewService: PreviewRequestService
+  /// The optional loopback HTTP preview server (`GalleyServerKit`),
+  /// resolved at runtime. `nil` → no HTTP listener; Quick Look renders
+  /// in-process. Nothing here imports `GalleyServerKit`.
+  @ObservationIgnored let httpListener: (any PreviewHTTPListener)?
   @ObservationIgnored let kosmos: ServerKosmosService
+
+  /// Mirrors the HTTP listener's state for the menu bar. Stays
+  /// `.stopped` when the feature is absent (see `httpFeatureAvailable`).
+  private(set) var httpState: PreviewHTTPListenerState = .stopped
+  /// Loopback base URL once the listener binds; `nil` when the feature
+  /// is absent or the listener hasn't bound. Drives the menu's
+  /// "Open File…" browser action.
+  private(set) var httpURL: URL?
+  /// Whether an HTTP listener was discovered at launch.
+  var httpFeatureAvailable: Bool { httpListener != nil }
+
   @ObservationIgnored private var persistenceTokens: [Cancellable] = []
 
   init() {
@@ -66,14 +86,19 @@ final class AppModel {
         Self.notify(.processor, name)
       }
 
-    self.server = PreviewServerController(
-      selectedTemplateProvider: { [weak templates] in
+    self.previewService = PreviewRequestService(
+      selectedTemplate: { [weak templates] in
         await templates?.selected.value ?? .default
       },
-      rendererProvider: { [weak processors] in
+      renderer: { [weak processors] in
         await processors?.selected.value.renderer
       })
-    self.kosmos = ServerKosmosService(server: self.server)
+    self.kosmos = ServerKosmosService(
+      service: self.previewService, watcher: self.watcher)
+    // The HTTP server is an optional component: present → Quick Look /
+    // browsers fetch over loopback; absent → Quick Look renders
+    // in-process. Resolved by ObjC-runtime name, so no import here.
+    self.httpListener = discoverPreviewHTTPListener()
 
     // Bidirectional sync with the shared `net.leuski.galley.shared`
     // suite. Outbound: menu-bar picks here surface in the Viewer
@@ -167,26 +192,38 @@ final class AppModel {
   }
 
   private func startServer() {
-    server.start()
-    // One observer covers two responsibilities, since `stateChanges`
+    // The Kosmos tunnel renders in-process, so the mesh must come up
+    // whether or not the optional HTTP listener exists. With no
+    // listener, start Kosmos now (no URL to advertise) and leave
+    // `serverHTTPPort` at 0 — Quick Look then renders in-process.
+    guard let http = httpListener else {
+      kosmos.start(httpURL: nil)
+      return
+    }
+
+    http.start(
+      service: previewService, watcher: watcher,
+      host: GalleyConstants.defaultHost)
+
+    // One observer covers three responsibilities, since `stateChanges`
     // is single-consumer:
     //
-    // 1. Publish the bound port to the shared `net.leuski.galley`
-    //    defaults on every transition. Quicklook and any future
-    //    same-machine reader compose the loopback URL through
-    //    `Defaults.shared.serverEndpointURL`. 0 means "no listener".
-    //
-    // 2. Start Kosmos exactly once, on the first `.running` /
-    //    `.failed`. The loopback URL rides in the peer's metadata so
-    //    Mac Viewer can show it without a second port-discovery
-    //    channel. `.failed` still starts Kosmos so peers see
-    //    liveness, just without a URL.
-    Task { [server, kosmos] in
+    // 1. Mirror the state into `httpState` / `httpURL` for the menu bar.
+    // 2. Publish the bound port to the shared `net.leuski.galley`
+    //    defaults on every transition. Quicklook composes the loopback
+    //    URL through `Defaults.shared.serverEndpointURL`; 0 = no listener.
+    // 3. Start Kosmos exactly once, on the first `.running` / `.failed`,
+    //    advertising the loopback URL so Mac Viewer's pill can show the
+    //    port. `.failed` still starts Kosmos so peers see liveness.
+    Task { [weak self, kosmos] in
       var kosmosStarted = false
-      for await state in server.stateChanges {
+      for await state in http.stateChanges {
+        guard let self else { return }
+        self.httpState = state
         switch state {
         case .running(let url):
           let port = (url.port).flatMap { UInt16(exactly: $0) } ?? 0
+          self.httpURL = url
           Defaults.shared.serverHTTPPort = port
           Defaults.shared.post()
           if !kosmosStarted {
@@ -194,6 +231,7 @@ final class AppModel {
             kosmosStarted = true
           }
         case .failed:
+          self.httpURL = nil
           Defaults.shared.serverHTTPPort = 0
           Defaults.shared.post()
           if !kosmosStarted {
@@ -201,6 +239,7 @@ final class AppModel {
             kosmosStarted = true
           }
         case .stopped:
+          self.httpURL = nil
           Defaults.shared.serverHTTPPort = 0
           Defaults.shared.post()
         }

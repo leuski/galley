@@ -35,10 +35,13 @@ struct ServerPreviewEndToEndTests {
   private func startReadyController(
     renderer: any MarkdownRenderer = SwiftMarkdownRenderer()
   ) async -> (PreviewServerController, URL)? {
-    let controller = PreviewServerController(
-      selectedTemplateProvider: { Template.default },
-      rendererProvider: { renderer })
-    controller.start()
+    let controller = PreviewServerController()
+    controller.start(
+      service: PreviewRequestService(
+        selectedTemplate: { Template.default },
+        renderer: { renderer }),
+      watcher: DocumentWatcher(),
+      host: "127.0.0.1")
 
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
     while ContinuousClock.now < deadline {

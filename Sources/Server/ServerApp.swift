@@ -15,9 +15,7 @@ struct ServerApp: App {
   var body: some Scene {
     MenuBarExtra {
       if let model = boot.model {
-        MenuBarContent(
-          model: model,
-          server: model.server)
+        MenuBarContent(model: model)
           .onAppear { appDelegate.boot = boot }
       } else {
         Text("Starting…")

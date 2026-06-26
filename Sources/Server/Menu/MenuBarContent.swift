@@ -1,11 +1,9 @@
 import SwiftUI
 import AppKit
 import GalleyCoreKit
-import GalleyServerKit
 
 struct MenuBarContent: View {
   @Bindable var model: AppModel
-  let server: PreviewServerController
 
   var body: some View {
     Group {
@@ -23,6 +21,7 @@ struct MenuBarContent: View {
 
       Button("Open File…") { openFile() }
         .accessibilityIdentifier(ServerA11yID.MenuBar.openFile)
+        .disabled(model.httpURL == nil)
 
       Divider()
 
@@ -36,16 +35,22 @@ struct MenuBarContent: View {
   @ViewBuilder
   private var statusItem: some View {
     Group {
-      switch server.state {
-      case .running(let url):
-        Text("Listening on \(url.hostAndPort)")
-          .accessibilityLabel("Server status: listening on \(url.hostAndPort)")
-      case .stopped:
-        Text("Server stopped")
-          .accessibilityLabel("Server status: stopped")
-      case .failed(let message):
-        Text("Server error: \(message)")
-          .accessibilityLabel("Server status: error, \(message)")
+      if !model.httpFeatureAvailable {
+        Text("HTTP preview off — Quick Look renders in-process")
+          .accessibilityLabel("Server status: HTTP preview unavailable")
+      } else {
+        switch model.httpState {
+        case .running(let url):
+          Text("Listening on \(url.hostAndPort)")
+            .accessibilityLabel(
+              "Server status: listening on \(url.hostAndPort)")
+        case .stopped:
+          Text("Server stopped")
+            .accessibilityLabel("Server status: stopped")
+        case .failed(let message):
+          Text("Server error: \(message)")
+            .accessibilityLabel("Server status: error, \(message)")
+        }
       }
     }
     .accessibilityIdentifier(ServerA11yID.MenuBar.statusItem)
@@ -75,7 +80,7 @@ struct MenuBarContent: View {
     guard
       panel.runModal() == .OK,
       let url = panel.url,
-      let base = server.serverURL
+      let base = model.httpURL
     else { return }
 
     NSWorkspace.shared.open(base.appendingPreview(url))

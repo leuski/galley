@@ -1,6 +1,5 @@
 import Foundation
 import GalleyCoreKit
-import GalleyServerKit
 import KosmosCore
 import KosmosHTTPTunnel
 import KosmosTransport
@@ -41,24 +40,21 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   var isAVPReachable: Bool { host.reachablePeer(deviceType: .vision) != nil }
 
   @ObservationIgnored private let host = ServiceHost(role: .server)
-  @ObservationIgnored private let server: PreviewServerController
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
-  /// peers and streams responses chunkwise from the local HTTP
-  /// listener over Kosmos.
+  /// peers and renders each in-process via `InProcessTunnelBackend` —
+  /// no loopback HTTP listener involved, so the tunnel works with or
+  /// without the optional HTTP server.
   @ObservationIgnored private let httpTunnelResponder: Responder
 
   /// Server's loopback HTTP base URL, captured at `start(httpURL:)`
   /// time and read inside `makeLink()` to populate advertise-time
-  /// metadata. `nil` if the listener hadn't bound by `start()`.
+  /// metadata. `nil` if no HTTP listener is present / hadn't bound.
   @ObservationIgnored private var advertisedHTTPURL: URL?
 
-  init(server: PreviewServerController) {
-    self.server = server
+  init(service: PreviewRequestService, watcher: DocumentWatcher) {
     self.httpTunnelResponder = Responder(
-      backend: InProcessTunnelBackend(
-        service: server.previewService,
-        watcher: server.watcher))
+      backend: InProcessTunnelBackend(service: service, watcher: watcher))
   }
 
   /// Begin advertising. Idempotent. `httpURL` is the Server's loopback

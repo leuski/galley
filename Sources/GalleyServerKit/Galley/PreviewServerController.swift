@@ -7,83 +7,55 @@ import KosmosHTTPTunnel
 private let log = Logger(
   subsystem: bundleIdentifier, category: "PreviewServer")
 
-/// Galley-specific facade over the generic `HTTPServerController`.
-/// Owns the Galley wiring — the selected-template and renderer
-/// provider closures, the shared `DocumentWatcher` that the SSE route
-/// subscribes against — and delegates the lifecycle (state machine,
+/// Galley-specific facade over the generic `HTTPServerController`,
+/// adopting GalleyCoreKit's `PreviewHTTPListener` so the Server can drive
+/// it without importing this framework. It carries no render config of
+/// its own: `start(service:watcher:host:)` receives the
+/// `PreviewRequestService` + `DocumentWatcher` from the Server (the same
+/// instances that feed the Kosmos tunnel), builds the router via
+/// `Routes.makeRouter(...)`, and delegates the lifecycle (state machine,
 /// bound-URL publication, start/stop) to the generic controller.
 ///
-/// The public surface is preserved from the pre-refactor type so that
-/// `Sources/Server/App/AppModel.swift` and the existing
-/// `PreviewServerControllerTests` see no change: same `State` cases,
-/// same `state` / `serverURL` / `stateChanges` / `watcher` properties,
-/// same `start()` / `stop()` methods. Inside, `start()` constructs the
-/// router via `Routes.makeRouter(...)` and hands the lifecycle to
-/// `HTTPServerController`.
-///
-/// Loopback-only by design. Same-machine consumers (Mac Viewer,
-/// Quicklook, browsers, BBEdit) reach the listener via `127.0.0.1`.
-/// AVP doesn't dial the HTTP listener directly — it tunnels each
-/// request over Kosmos through `Responder`, which proxies to this
-/// loopback endpoint on AVP's behalf. No HTTPS, no cert provisioning,
-/// no AWDL ingress concerns.
+/// Loopback-only by design. Same-machine consumers (Quick Look,
+/// browsers, BBEdit) reach the listener via `127.0.0.1`. AVP doesn't dial
+/// it — it tunnels each request over Kosmos and renders in-process. No
+/// HTTPS, no cert provisioning.
 @Observable
 @MainActor
-public final class PreviewServerController {
-  /// Re-exported so call sites continue to write
-  /// `PreviewServerController.State.running(...)` unchanged.
-  public typealias State = HTTPServerState
-
+public final class PreviewServerController: PreviewHTTPListener {
   @ObservationIgnored
   private let http = HTTPServerController()
 
-  @ObservationIgnored public let watcher = DocumentWatcher()
-
-  @ObservationIgnored private let selectedTemplateProvider: @Sendable ()
-    async -> Template
-  @ObservationIgnored private let rendererProvider: @Sendable ()
-    async -> (any MarkdownRenderer)?
-
-  public init(
-    selectedTemplateProvider: @escaping @Sendable () async -> Template,
-    rendererProvider: @escaping @Sendable () async -> (any MarkdownRenderer)?
-  ) {
-    self.selectedTemplateProvider = selectedTemplateProvider
-    self.rendererProvider = rendererProvider
-  }
-
-  /// The render config (selected template + renderer providers) as a
-  /// transport-neutral `PreviewRequestService`. Used by the HTTP routes
-  /// and by the Kosmos tunnel's `InProcessTunnelBackend` so both render
-  /// through one path. `watcher` (above) is the SSE source for both.
-  public var previewService: PreviewRequestService {
-    PreviewRequestService(
-      selectedTemplate: selectedTemplateProvider,
-      renderer: rendererProvider)
-  }
+  public init() {}
 
   /// State + URL forwarders. Reading these inside an observer scope
   /// registers a dependency on the inner controller's `state`, so
   /// SwiftUI views that observe the facade still see invalidations
   /// when the listener transitions.
-  public var state: State { http.state }
-  public var serverURL: URL? { http.serverURL }
-  public var stateChanges: AsyncStream<State> { http.stateChanges }
+  public var state: PreviewHTTPListenerState { http.state.asListenerState }
+  public var stateChanges: AsyncStream<PreviewHTTPListenerState> {
+    let upstream = http.stateChanges
+    return AsyncStream { continuation in
+      let task = Task {
+        for await state in upstream {
+          continuation.yield(state.asListenerState)
+        }
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
 
   /// Starts the loopback HTTP listener. AVP traffic doesn't reach the
-  /// listener directly — `Responder` proxies Kosmos
-  /// `ProxyHTTPRequest` messages through the same endpoint.
-  public func start() {
-    let templateProvider = selectedTemplateProvider
-    let renderProvider = rendererProvider
-    let watcher = self.watcher
-
-    http.start(bindHost: GalleyConstants.defaultHost) { boundURL in
+  /// listener directly — it tunnels over Kosmos and renders in-process.
+  public func start(
+    service: PreviewRequestService, watcher: DocumentWatcher, host: String
+  ) {
+    http.start(bindHost: host) { boundURL in
       Routes.makeRouter(
         hostURLProvider: boundURL,
         extraAllowedHostsProvider: { [] },
-        selectedTemplateProvider: templateProvider,
-        rendererProvider: renderProvider,
+        service: service,
         origin: TunnelHeaders.origin,
         watcher: watcher)
     }
@@ -91,5 +63,27 @@ public final class PreviewServerController {
 
   public func stop() {
     http.stop()
+  }
+}
+
+extension HTTPServerState {
+  /// Project the generic server state onto the public listener contract.
+  var asListenerState: PreviewHTTPListenerState {
+    switch self {
+    case .stopped: .stopped
+    case .running(let url): .running(url)
+    case .failed(let message): .failed(message)
+    }
+  }
+}
+
+/// ObjC-discoverable factory the Server resolves by name
+/// (`NSClassFromString`) so it can use the HTTP listener without a
+/// compile-time dependency on this framework.
+@objc(GalleyPreviewHTTPListenerFactory)
+public final class GalleyPreviewHTTPListenerFactory: NSObject,
+  PreviewHTTPListenerFactory {
+  @MainActor public static func makeListener() -> AnyObject {
+    PreviewServerController()
   }
 }
