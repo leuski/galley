@@ -19,7 +19,7 @@ struct TemplateAssetRewriter {
   let templatePrefix: String
   let absolutePrefix: String
 
-  init(id: String, origin: URL) {
+  init(id: Template.ID, origin: URL) {
     self.templatePrefix = origin.galleyTemplate(id: id)
       .absoluteString.appendingSlash
     self.absolutePrefix = origin.galleyPreview

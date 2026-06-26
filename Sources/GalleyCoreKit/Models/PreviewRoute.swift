@@ -11,7 +11,7 @@ import Foundation
 /// route table).
 public enum PreviewRoute: Sendable, Equatable {
   /// `/template/<id>/<file>` — a file bundled with the named template.
-  case templateAsset(id: String, file: String)
+  case templateAsset(id: Template.ID, file: String)
   /// `/preview/<absolute-path>` — a file referenced relative to the
   /// previewed document, expressed as an absolute filesystem path.
   case documentAsset(absolutePath: String)
@@ -53,7 +53,7 @@ public enum PreviewRoute: Sendable, Equatable {
     let rawFile = String(tail[tail.index(after: slash)...])
     let id = rawID.removingPercentEncoding ?? rawID
     let file = rawFile.removingPercentEncoding ?? rawFile
-    return .templateAsset(id: id, file: file)
+    return .templateAsset(id: Template.ID(rawValue: id), file: file)
   }
 
   private static func parsePreview(path: String) -> Self? {

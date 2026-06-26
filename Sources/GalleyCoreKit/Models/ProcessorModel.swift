@@ -6,8 +6,8 @@
 import SwiftUI
 
 extension Processor: ChoiceValueProtocol {
-  public typealias PersistentID = String
-  public var persistentID: String { id }
+  public typealias PersistentID = ID
+  public var persistentID: ID { id }
 }
 
 public struct ProcessorChoiceValue: ChoiceValueEnvelopeProtocol<Processor> {

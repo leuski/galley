@@ -10,6 +10,7 @@
 
 import Foundation
 import Testing
+import GalleyCoreKit
 @testable import Galley
 
 @MainActor
@@ -109,9 +110,9 @@ struct DocumentSnapshotTests {
       scrollY: 120.5,
       showsTOC: true,
       pageZoom: 1.25,
-      templatePersistent: "tmpl",
-      rendererPersistent: "rend",
-      colorSchemePersistent: "dark",
+      templatePersistent: .init(id: .init(rawValue: "aaa"), name: "template"),
+      rendererPersistent: .init(id: .init(rawValue: "bbb"), name: "processor"),
+      colorSchemePersistent: .init(id: .dark, name: "schema"),
       securityScopedBookmark: Data([0x01, 0x02]))
 
     let data = try JSONEncoder().encode(original)

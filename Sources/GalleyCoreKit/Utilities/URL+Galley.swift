@@ -73,8 +73,8 @@ extension URL {
     return galleyPreview.appending(path: path)
   }
 
-  public func galleyTemplate(id: String) -> URL {
-    appending(path: RouteNames.template).appending(path: id)
+  public func galleyTemplate(id: GalleyCoreKit.Template.ID) -> URL {
+    appending(path: RouteNames.template).appending(path: id.rawValue)
   }
 
   /// `<self>/preview` — the route prefix for previewed documents.

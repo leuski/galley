@@ -24,16 +24,16 @@ struct TemplateResolutionTests {
   func resolvesKnownID() throws {
     let (store, tmp) = try seededStore(name: "MyTheme")
     defer { try? tmp.remove() }
-    let resolved = store.existingTemplate(forID: "0.MyTheme")
+    let resolved = store.existingTemplate(forID: .init(rawValue: "0.MyTheme"))
       ?? .bundledDefault
-    #expect(resolved.id == "0.MyTheme")
+    #expect(resolved.id.rawValue == "0.MyTheme")
   }
 
   @Test("an unknown stored id falls back to the bundled default")
   func fallsBackOnUnknownID() throws {
     let (store, tmp) = try seededStore(name: "MyTheme")
     defer { try? tmp.remove() }
-    let resolved = store.existingTemplate(forID: "9.Missing")
+    let resolved = store.existingTemplate(forID: .init(rawValue: "9.Missing"))
       ?? .bundledDefault
     #expect(resolved.id == Template.bundledDefault.id)
   }

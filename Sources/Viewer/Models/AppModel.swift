@@ -223,25 +223,25 @@ final class AppModel {
   }
 
   private static func logInit(
-    bundle: String?, renderer: String?, template: String?
+    bundle: String?, renderer: Any?, template: Any?
   ) {
     let pid = ProcessInfo.processInfo.processIdentifier
     defaultsLog.notice("""
       Viewer AppModel init pid=\(pid) \
       bundle=\(bundle ?? "?", privacy: .public) \
-      renderer=\(renderer ?? "nil", privacy: .public) \
-      template=\(template ?? "nil", privacy: .public)
+      renderer=\(String(describing: renderer), privacy: .public) \
+      template=\(String(describing: template), privacy: .public)
       """)
   }
 
   private static func logDidChange(
-    renderer: String?, template: String?
+    renderer: Any?, template: Any?
   ) {
     let pid = ProcessInfo.processInfo.processIdentifier
     defaultsLog.debug("""
       Viewer didChange pid=\(pid) \
-      renderer=\(renderer ?? "nil", privacy: .public) \
-      template=\(template ?? "nil", privacy: .public)
+      renderer=\(String(describing: renderer), privacy: .public) \
+      template=\(String(describing: template), privacy: .public)
       """)
   }
 

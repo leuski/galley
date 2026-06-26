@@ -41,7 +41,7 @@ struct TemplateStoreObservationTests {
     store.reload()
 
     #expect(store.templates.count == 1)
-    #expect(store.templates.contains(where: { $0.id == "0.MyTheme" }))
+    #expect(store.templates.contains(where: { $0.id.rawValue == "0.MyTheme" }))
   }
 
   @Test("reload() drops a deleted folder template")
@@ -70,7 +70,7 @@ struct TemplateStoreObservationTests {
     try writeFolderTemplate(at: userSim, name: "Default")
     let store = TemplateStore(directoryURLs: [bundleSim, userSim])
 
-    let ids = store.templates.map(\.id).sorted()
+    let ids = store.templates.map(\.id).sorted().map(\.rawValue)
     #expect(ids == ["0.Default", "1.Default"])
   }
 

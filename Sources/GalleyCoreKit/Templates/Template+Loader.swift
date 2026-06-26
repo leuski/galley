@@ -39,7 +39,7 @@ extension Template {
         if html.itemExists {
           let name = entryURL.lastPathComponent
           self.init(
-            id: "\(sourceIndex).\(name)",
+            id: ID(sourceIndex: sourceIndex, name: name),
             name: nameResource ?? Self.runtimeName(for: name),
             directoryURL: resolved,
             htmlURL: html,
@@ -56,7 +56,7 @@ extension Template {
 
     let name = entryURL.fileName
     self.init(
-      id: "\(sourceIndex).\(name)",
+      id: ID(sourceIndex: sourceIndex, name: name),
       name: nameResource ?? Self.runtimeName(for: name),
       directoryURL: resolved.parent,
       htmlURL: resolved,

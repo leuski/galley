@@ -79,7 +79,7 @@ public final class TemplateStore {
     startWatching()
   }
 
-  public func existingTemplate(forID id: String?) -> Template? {
+  public func existingTemplate(forID id: Template.ID?) -> Template? {
     guard let id else { return nil }
     return templates.first { $0.id == id }
   }

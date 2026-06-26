@@ -33,8 +33,8 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  var renderer: String?
-  var template: String?
+  var renderer: Processor.PersistentRepresentation?
+  var template: Template.PersistentRepresentation?
   var enablePerDocumentOverrides: Bool = false
   var openBehavior: OpenBehavior = .newWindow
   /// Per-window persisted state, keyed by `DocumentSceneID.description`.
@@ -102,7 +102,7 @@ final class Defaults: GalleyRenderDefaults,
   /// `AppModel` writes back via `bindPersistent`. Stored on both
   /// platforms so the shared plist round-trips cleanly; only visionOS
   /// surfaces the setting in UI.
-  var colorScheme: String?
+  var colorScheme: DocumentColorScheme.PersistentRepresentation?
 
   /// Hash of the Galley.app bundle the Server saw at its launch.
   /// Published by the Server (via the shared `net.leuski.galley`

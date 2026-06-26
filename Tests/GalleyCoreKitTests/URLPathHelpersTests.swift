@@ -29,14 +29,15 @@ struct URLPathHelpersTests {
   @Test("galleyTemplate yields /template/<id>")
   func templateBase() {
     #expect(
-      base.galleyTemplate(id: "myth").absoluteString
+      base.galleyTemplate(id: .init(rawValue: "myth")).absoluteString
         == "http://127.0.0.1:8089/template/myth")
   }
 
   @Test("galleyTemplate with file encodes id and file with spaces")
   func templateWithFile() {
     #expect(
-      base.galleyTemplate(id: "My Theme").appending(path: "css/main.css")
+      base.galleyTemplate(id: .init(rawValue: "My Theme"))
+        .appending(path: "css/main.css")
         .absoluteString
         == "http://127.0.0.1:8089/template/My%20Theme/css/main.css")
   }

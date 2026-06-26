@@ -106,7 +106,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   /// resolve against the same template.
   @MainActor
   private static func resolvedTemplate() -> Template {
-    TemplateStore.shared.existingTemplate(forID: Defaults.shared.template)
+    TemplateStore.shared.existingTemplate(forID: Defaults.shared.template?.id)
       ?? .bundledDefault
   }
 }

@@ -7,14 +7,32 @@ import Observation
 public struct Processor: Sendable, Identifiable,
                          CustomLocalizedStringResourceConvertible
 {
-  public let id: String
+  public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+      lhs.rawValue < rhs.rawValue
+    }
+
+    public let rawValue: String
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+    public init(from decoder: any Decoder) throws {
+      self.rawValue = try decoder.singleValueContainer().decode(String.self)
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(rawValue)
+    }
+  }
+
+  public let id: ID
   public let name: LocalizedStringResource
   public let installHint: String?
   public let renderer: (any MarkdownRenderer)?
   public var localizedStringResource: LocalizedStringResource { name }
 
   public init(
-    id: String,
+    id: ID,
     name: LocalizedStringResource,
     installHint: String?,
     renderer: (any MarkdownRenderer)?
@@ -33,7 +51,7 @@ public struct Processor: Sendable, Identifiable,
   /// list is non-empty before async discovery completes — keeps
   /// `ProcessorChoice.selected` non-optional.
   public static let builtIn = Processor(
-    id: "swift-markdown",
+    id: ID(rawValue: "swift-markdown"),
     name: LocalizedStringResource("Built-in", bundle: .galleyCoreKit),
     installHint: nil,
     renderer: SwiftMarkdownRenderer())
@@ -153,7 +171,7 @@ public final class ProcessorStore {
     for spec in specs {
       let renderer = await spec.discover()
       entries.append(Processor(
-        id: spec.id,
+        id: Processor.ID(rawValue: spec.id),
         name: LocalizedStringResource(String.LocalizationValue("\(spec.name)")),
         installHint: spec.installHint,
         renderer: renderer))

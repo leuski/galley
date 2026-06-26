@@ -34,7 +34,7 @@ final class BackgroundColorBridge: JavaScriptBridge {
   /// `templateID` the page identified itself with (`nil` when the
   /// page predates the meta-injection or the meta was stripped by a
   /// user template).
-  var onColor: ((Color?, String?) -> Void)?
+  var onColor: ((Color?, Template.ID?) -> Void)?
 
   func handle(message: WKScriptMessage, error: any Error) {
     Self.handle(message: message, error: error)
@@ -45,7 +45,9 @@ final class BackgroundColorBridge: JavaScriptBridge {
     // `color == nil` is an explicit JS `null` — both `html` and `body`
     // were transparent — so the host falls back to the system default.
     // A present-but-unparseable color also resolves to `nil` here.
-    onColor?(msg.color.flatMap(Self.parseCSSColor), msg.templateID)
+    onColor?(
+      msg.color.flatMap(Self.parseCSSColor),
+      msg.templateID.map(Template.ID.init(rawValue:)))
   }
 
   struct Value: Decodable {

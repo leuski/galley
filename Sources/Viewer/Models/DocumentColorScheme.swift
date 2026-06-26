@@ -28,7 +28,7 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
   case light
   case dark
 
-  var id: String { rawValue }
+  var id: DocumentColorScheme { self }
 
   /// User-facing name. Strings live in the per-target catalog so each
   /// shipped locale can translate independently.
@@ -50,6 +50,6 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
 }
 
 extension DocumentColorScheme: ChoiceValueProtocol {
-  typealias PersistentID = String
-  var persistentID: String { rawValue }
+  typealias PersistentID = ID
+  var persistentID: ID { id }
 }

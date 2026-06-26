@@ -51,8 +51,8 @@ struct GalleyActionTests {
 
   @Test("Settings tab value is case-insensitive")
   func settingsTabCaseInsensitive() {
-    let url = URL(string: "galley-settings://?tab=SERVER")!
-    #expect(OpenSettingsActivity(from: url) == .init(.server))
+    let url = URL(string: "galley-settings://?tab=GENERAL")!
+    #expect(OpenSettingsActivity(from: url) == .init(.general))
   }
 
   @Test("Unknown settings tab is dropped")
@@ -238,8 +238,8 @@ struct GalleyActionTests {
 
   @Test("Settings with extra unrelated params still returns the tab")
   func settingsTabWithExtras() {
-    let url = URL(string: "galley-settings://?foo=bar&tab=server&x=y")!
-    #expect(OpenSettingsActivity(from: url) == .init(.server))
+    let url = URL(string: "galley-settings://?foo=bar&tab=general&x=y")!
+    #expect(OpenSettingsActivity(from: url) == .init(.general))
   }
 
   // MARK: - Unparseable cases

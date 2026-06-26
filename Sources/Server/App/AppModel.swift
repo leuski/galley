@@ -22,8 +22,8 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  var renderer: String?
-  var template: String?
+  var renderer: Processor.PersistentRepresentation?
+  var template: Template.PersistentRepresentation?
   var serverGalleyHash: String?
   /// OS-assigned port the running Server bound to, published here so
   /// Viewer and Quicklook can compose the loopback URL via
@@ -169,25 +169,25 @@ final class AppModel {
   }
 
   private static func logInit(
-    bundle: String?, renderer: String?, template: String?
+    bundle: String?, renderer: Any?, template: Any?
   ) {
     let pid = ProcessInfo.processInfo.processIdentifier
     defaultsLog.notice("""
       Server AppModel init pid=\(pid) \
       bundle=\(bundle ?? "?", privacy: .public) \
-      renderer=\(renderer ?? "nil", privacy: .public) \
-      template=\(template ?? "nil", privacy: .public)
+      renderer=\(String(describing: renderer), privacy: .public) \
+      template=\(String(describing: template), privacy: .public)
       """)
   }
 
   private static func logDidChange(
-    renderer: String?, template: String?
+    renderer: Any?, template: Any?
   ) {
     let pid = ProcessInfo.processInfo.processIdentifier
     defaultsLog.debug("""
       Server didChange pid=\(pid) \
-      renderer=\(renderer ?? "nil", privacy: .public) \
-      template=\(template ?? "nil", privacy: .public)
+      renderer=\(String(describing: renderer), privacy: .public) \
+      template=\(String(describing: template), privacy: .public)
       """)
   }
 

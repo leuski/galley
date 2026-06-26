@@ -18,8 +18,8 @@ extension GalleyDefaults {
 }
 
 public protocol GalleyRenderDefaults: GalleyDefaults {
-  var renderer: String? { get set }
-  var template: String? { get set }
+  var renderer: Processor.PersistentRepresentation? { get set }
+  var template: Template.PersistentRepresentation? { get set }
 }
 
 public let bundleIdentifier = Bundle.main.bundleIdentifier

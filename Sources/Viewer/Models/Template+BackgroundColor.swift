@@ -118,7 +118,8 @@ extension Template {
   /// template's own color, the global last-seen fallback, and the
   /// system window bg.
   @MainActor var backgroundState: TemplateBackgroundState {
-    Defaults.shared.templateBackgroundColors[persistentID] ?? .unresolved
+    Defaults.shared
+      .templateBackgroundColors[persistentID.rawValue] ?? .unresolved
   }
 
   /// Persist the bridge's latest report against this template's id.
@@ -131,7 +132,7 @@ extension Template {
     let value: TemplateBackgroundState = .resolved(
       color ?? .userSystemWindowBackground)
     Defaults.shared.lastTemplateBackgroundColor = value
-    Defaults.shared.templateBackgroundColors[persistentID] = value
+    Defaults.shared.templateBackgroundColors[persistentID.rawValue] = value
   }
 }
 

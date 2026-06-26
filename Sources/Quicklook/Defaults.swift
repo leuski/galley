@@ -21,9 +21,10 @@ import GalleyCoreKit
 @ObservableDefaults(
   suiteName: "net.leuski.galley",
   limitToInstance: false)
-final class Defaults: GalleyDefaults, HTTPServerDefaults {
+final class Defaults: GalleyDefaults, HTTPServerDefaults, GalleyRenderDefaults {
   var serverHTTPPort: UInt16 = 0
-  var template: String?
+  var renderer: Processor.PersistentRepresentation?
+  var template: Template.PersistentRepresentation?
 
   @MainActor static let shared = Defaults()
 }

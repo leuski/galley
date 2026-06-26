@@ -140,7 +140,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   ///
   /// Observed — SwiftUI re-evaluates the chrome's container
   /// background, scheme, and overlay color the moment this flips.
-  private(set) var renderedTemplateID: String?
+  private(set) var renderedTemplateID: Template.ID?
 
   /// Visited documents in chronological order; `currentIndex` points
   /// at the one currently rendered. Navigation actions move
@@ -222,9 +222,9 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
   init(
     history: History,
-    templatePersistent: String? = nil,
-    processorPersistent: String? = nil,
-    colorSchemePersistent: String? = nil,
+    templatePersistent: Template.PersistentRepresentation? = nil,
+    processorPersistent: Processor.PersistentRepresentation? = nil,
+    colorSchemePersistent: DocumentColorScheme.PersistentRepresentation? = nil,
     initialScroll: Scroll? = nil,
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
@@ -340,7 +340,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     }
   }
 
-  private func onBackgroundColor(_ color: Color?, _ templateID: String?) {
+  private func onBackgroundColor(_ color: Color?, _ templateID: Template.ID?) {
     // Bridge fires post-layout regardless of whether the page
     // declared an opaque bg, so any fire = "WebView has painted"
     // and we can drop DocumentView's anti-flash overlay.

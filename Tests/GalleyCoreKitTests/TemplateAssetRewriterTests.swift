@@ -10,7 +10,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("Relative <link href> is routed through /template/<id>/")
   func relativeLink() {
-    let rewriter = TemplateAssetRewriter(id: "myth", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "myth"), origin: origin)
     let html = #"<link rel="stylesheet" href="style.css">"#
     let out = rewriter.rewriteAssets(in: html)
     #expect(out.contains(
@@ -19,7 +20,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("Absolute filesystem href is routed through /preview")
   func absoluteHref() {
-    let rewriter = TemplateAssetRewriter(id: "myth", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "myth"), origin: origin)
     let html = #"<img src="/Users/foo/pic.png">"#
     let out = rewriter.rewriteAssets(in: html)
     #expect(out.contains(
@@ -28,7 +30,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("BBEdit placeholder #BASE# is left untouched")
   func bbeditPlaceholder() {
-    let rewriter = TemplateAssetRewriter(id: "myth", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "myth"), origin: origin)
     let html = ##"<base href="#BASE#">"##
     let out = rewriter.rewriteAssets(in: html)
     #expect(out == html)
@@ -36,7 +39,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("Absolute URL with scheme is left untouched")
   func absoluteScheme() {
-    let rewriter = TemplateAssetRewriter(id: "myth", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "myth"), origin: origin)
     let html = #"<script src="https://cdn.example.com/lib.js"></script>"#
     let out = rewriter.rewriteAssets(in: html)
     #expect(out == html)
@@ -44,7 +48,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("CSS url(...) inside <style> is rewritten")
   func cssUrl() {
-    let rewriter = TemplateAssetRewriter(id: "myth", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "myth"), origin: origin)
     let html = "<style>body { background: url(bg.png); }</style>"
     let out = rewriter.rewriteAssets(in: html)
     #expect(out.contains(
@@ -53,7 +58,8 @@ struct TemplateAssetRewriterTests {
 
   @Test("Template id with space gets percent-encoded in prefix")
   func encodedTemplateID() {
-    let rewriter = TemplateAssetRewriter(id: "My Theme", origin: origin)
+    let rewriter = TemplateAssetRewriter(
+      id: .init(rawValue: "My Theme"), origin: origin)
     let html = #"<link href="style.css">"#
     let out = rewriter.rewriteAssets(in: html)
     #expect(out.contains(

@@ -11,7 +11,28 @@ import Foundation
 public struct Template: Sendable, Identifiable,
                         CustomLocalizedStringResourceConvertible
 {
-  public let id: String
+  public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+      lhs.rawValue < rhs.rawValue
+    }
+
+    public let rawValue: String
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+    public init(sourceIndex: Int, name: String) {
+      self.init(rawValue: "\(sourceIndex).\(name)")
+    }
+    public init(from decoder: any Decoder) throws {
+      self.rawValue = try decoder.singleValueContainer().decode(String.self)
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(rawValue)
+    }
+  }
+
+  public let id: ID
   /// User-visible label. Bundled templates get a literal
   /// `LocalizedStringResource` so Xcode's catalog extraction picks the
   /// label up; user templates wrap their filename in a runtime
@@ -31,7 +52,7 @@ public struct Template: Sendable, Identifiable,
   public let sourceIndex: Int
 
   public init(
-    id: String,
+    id: ID,
     name: LocalizedStringResource,
     directoryURL: URL,
     htmlURL: URL,
@@ -87,8 +108,8 @@ public extension Template {
 }
 
 extension Template: ChoiceValueProtocol {
-  public typealias PersistentID = String
-  public var persistentID: String { id }
+  public typealias PersistentID = Template.ID
+  public var persistentID: PersistentID { id }
 }
 
 /// Result of composing a preview page. Pairs the final HTML with the
@@ -155,7 +176,8 @@ public extension Template {
   /// for the JS reader to find via `document.querySelector`.
   private func injectingTemplateIDMeta(into html: String) -> String {
     let meta = """
-      <meta name="galley-template-id" content="\(id.htmlAttributeEscaped)">
+      <meta name="galley-template-id" \
+      content="\(id.rawValue.htmlAttributeEscaped)">
       """
     if let range = html.range(
       of: "</head>", options: [.caseInsensitive]) {

@@ -24,11 +24,11 @@ extension DocumentModel {
     /// Page zoom factor.
     var pageZoom: Double = 1.0
     /// Per-window template override (`Template.persistentID`).
-    var templatePersistent: String?
+    var templatePersistent: Template.PersistentRepresentation?
     /// Per-window renderer override (`Processor.persistentID`).
-    var rendererPersistent: String?
+    var rendererPersistent: Processor.PersistentRepresentation?
     /// Per-window color-scheme override (visionOS).
-    var colorSchemePersistent: String?
+    var colorSchemePersistent: DocumentColorScheme.PersistentRepresentation?
     /// visionOS: lets a fresh window re-resolve a sandboxed file URL.
     var securityScopedBookmark: Data?
 
@@ -53,9 +53,10 @@ extension DocumentModel {
       scrollY: Double = 0,
       showsTOC: Bool = false,
       pageZoom: Double = 1.0,
-      templatePersistent: String? = nil,
-      rendererPersistent: String? = nil,
-      colorSchemePersistent: String? = nil,
+      templatePersistent: Template.PersistentRepresentation? = nil,
+      rendererPersistent: Processor.PersistentRepresentation? = nil,
+      colorSchemePersistent: DocumentColorScheme
+        .PersistentRepresentation? = nil,
       securityScopedBookmark: Data? = nil
     ) {
       self.history = history
