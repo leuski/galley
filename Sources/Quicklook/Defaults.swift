@@ -9,9 +9,11 @@ import GalleyCoreKit
 /// suite (see `Quicklook.entitlements`), which is enough for the
 /// read.
 ///
-/// We only need `serverHTTPPort` — QL composes the preview URL via
-/// `serverEndpointURL` from `GalleyNetworkDefaults` and falls back
-/// to in-process rendering when the Server isn't running.
+/// QL reads two keys: `serverHTTPPort` (composing the preview URL via
+/// `serverEndpointURL`, falling back to in-process rendering when the
+/// Server isn't running) and `template` (the user's selected template
+/// id, so the in-process fallback honors it instead of always using the
+/// bundled default).
 ///
 /// The `@ObservableDefaults` macro requires a string literal for
 /// `suiteName`, so we can't route through `GalleyConstants.suiteName`
@@ -21,6 +23,7 @@ import GalleyCoreKit
   limitToInstance: false)
 final class Defaults: GalleyDefaults, HTTPServerDefaults {
   var serverHTTPPort: UInt16 = 0
+  var template: String?
 
   @MainActor static let shared = Defaults()
 }

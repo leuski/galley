@@ -11,10 +11,13 @@ private let log = Logger(
 ///
 /// Tries the running Markdown Preview Server first so the user's
 /// chosen processor and template are honored. Falls back to an
-/// in-process render with the built-in Swift renderer and bundled
-/// template when the server is unreachable (typical when the menu-bar
-/// app isn't running). The fallback uses the same recipe as the
-/// server (`template.rewriteAssets` + `PlaceholderContext.substitute`)
+/// in-process render with the built-in Swift renderer when the server
+/// is unreachable (typical when the menu-bar app isn't running). The
+/// fallback still honors the user's **selected template** (read from
+/// the shared defaults via `Defaults.shared.template`), resolving it
+/// through `TemplateStore` and dropping to the bundled default only
+/// when the stored template can't be found. It uses the same recipe as
+/// the server (`template.rewriteAssets` + `PlaceholderContext.substitute`)
 /// against `PreviewScheme.originURL`, with `ClassicPreviewSchemeHandler`
 /// resolving asset URLs back to the filesystem.
 final class PreviewViewController: NSViewController, QLPreviewingController {
@@ -25,7 +28,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   /// fully wired up. `loadView()` would otherwise run too late.
   private lazy var webView: WKWebView = {
     let configuration = WKWebViewConfiguration()
-    let handler = ClassicPreviewSchemeHandler { .bundledDefault }
+    let handler = ClassicPreviewSchemeHandler {
+      PreviewViewController.resolvedTemplate()
+    }
     configuration.setURLSchemeHandler(
       handler, forURLScheme: PreviewScheme.name)
     let web = WKWebView(frame: .zero, configuration: configuration)
@@ -87,11 +92,22 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   private func renderInProcess(file: URL) async throws -> ComposedPreview {
     let source = try String(contentsOf: file, encoding: .utf8)
     let body = try await SwiftMarkdownRenderer().render(source, baseURL: file)
-    let template: Template = .bundledDefault
-    return try template.composeHTML(
+    return try Self.resolvedTemplate().composeHTML(
       documentContent: body,
       documentURL: file,
       origin: PreviewScheme.originURL)
+  }
+
+  /// The user's selected template, read from the shared defaults and
+  /// resolved through `TemplateStore`. Falls back to the bundled default
+  /// when nothing is stored or the stored template can't be found (e.g.
+  /// a user template the sandbox can't reach). Shared by the render
+  /// recipe and the scheme handler so `/template/<id>/…` asset URLs
+  /// resolve against the same template.
+  @MainActor
+  private static func resolvedTemplate() -> Template {
+    TemplateStore.shared.existingTemplate(forID: Defaults.shared.template)
+      ?? .bundledDefault
   }
 }
 
