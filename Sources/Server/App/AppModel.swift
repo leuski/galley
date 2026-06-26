@@ -42,9 +42,6 @@ final class AppModel {
 
   // MARK: - In-memory state
 
-  let templates: TemplateChoice
-  let processors: ProcessorChoice
-
   /// File watcher feeding the SSE live-reload of **both** the optional
   /// HTTP listener and the Kosmos tunnel responder — one watch, shared.
   @ObservationIgnored let watcher = DocumentWatcher()
@@ -67,32 +64,23 @@ final class AppModel {
   /// Whether an HTTP listener was discovered at launch.
   var httpFeatureAvailable: Bool { httpListener != nil }
 
-  @ObservationIgnored private var persistenceTokens: [Cancellable] = []
-
   init() {
     Self.logInit(
       bundle: Bundle.main.bundleIdentifier,
       renderer: Defaults.shared.renderer,
       template: Defaults.shared.template)
-    self.templates = TemplateChoice(
-      source: TemplateStore.shared,
-      persistent: Defaults.shared.template) { name in
-        Self.notify(.template, name)
-      }
-
-    self.processors = ProcessorChoice(
-      source: ProcessorStore.shared,
-      persistent: Defaults.shared.renderer) { name in
-        Self.notify(.processor, name)
-      }
 
     self.previewService = PreviewRequestService(
-      selectedTemplate: { [weak templates] in
-        await templates?.selected.value ?? .default
+      selectedTemplate: { @MainActor in
+        TemplateStore.shared
+          .existingTemplate(forID: Defaults.shared.template?.id) ?? .default
       },
-      renderer: { [weak processors] in
-        await processors?.selected.value.renderer
+      renderer: { @MainActor in
+        (ProcessorStore.shared.processors.first { processor in
+          processor.id == Defaults.shared.renderer?.id
+        } ?? .builtIn).renderer
       })
+
     self.kosmos = ServerKosmosService(
       service: self.previewService, watcher: self.watcher)
     // The HTTP server is an optional component: present → Quick Look /
@@ -109,15 +97,6 @@ final class AppModel {
     // process-local; the Darwin-notification bridge is what makes
     // cross-process change observation actually work.
     Defaults.shared.startListening()
-
-    persistenceTokens = bindPersistent(
-      templates,
-      label: "Server.template",
-      property: \Defaults.template)
-    + bindPersistent(
-      processors,
-      label: "Server.processor",
-      property: \Defaults.renderer)
 
     NotificationCenter.default.addObserver(
       forName: UserDefaults.didChangeNotification,

@@ -11,11 +11,6 @@ struct MenuBarContent: View {
 
       Divider()
 
-      TemplateMenu(model: model.templates)
-      ProcessorMenu(model: model.processors)
-
-      Divider()
-
       Button("Open Galley") { openGalley() }
         .accessibilityIdentifier(ServerA11yID.MenuBar.openGalley)
 
