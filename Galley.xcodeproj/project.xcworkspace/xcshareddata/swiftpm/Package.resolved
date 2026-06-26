@@ -1,15 +1,6 @@
 {
-  "originHash" : "d8ea240d341386b0c7f993828f476215d118c9cffd01c0c555a30803757d1f7e",
+  "originHash" : "7fd2739a3e44aab83ad6c4c1beda6bcefc1429c4d92267cf460b434aef747cae",
   "pins" : [
-    {
-      "identity" : "flyingfox",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swhitty/FlyingFox.git",
-      "state" : {
-        "revision" : "de38230104cf63ef4843cb569ba11c13f8165685",
-        "version" : "0.26.2"
-      }
-    },
     {
       "identity" : "observabledefaults",
       "kind" : "remoteSourceControl",
@@ -35,15 +26,6 @@
       "state" : {
         "revision" : "924936d0427cb25a61169739a7660230bffa6ea6",
         "version" : "0.8.0"
-      }
-    },
-    {
-      "identity" : "swift-http-types",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-http-types.git",
-      "state" : {
-        "revision" : "db774a277f60063a32d854f2980299caf06da041",
-        "version" : "1.6.0"
       }
     },
     {

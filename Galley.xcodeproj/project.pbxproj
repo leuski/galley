@@ -10,31 +10,24 @@
 		620A41EF2FD7D955003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41EE2FD7D955003676A2 /* Kosmos */; };
 		620A41F02FD7D955003676A2 /* Kosmos in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 620A41EE2FD7D955003676A2 /* Kosmos */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		620A41F22FD7D97C003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41F12FD7D97C003676A2 /* Kosmos */; };
-		620A41F62FD7D9A3003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41F52FD7D9A3003676A2 /* Kosmos */; };
 		620A41FC2FD7D9D7003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41FB2FD7D9D7003676A2 /* Kosmos */; };
 		620A42002FD7D9EE003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41FF2FD7D9EE003676A2 /* Kosmos */; };
 		62564F322FA857A400FF0F84 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62564F312FA857A400FF0F84 /* Quartz.framework */; };
 		62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 62564F302FA857A400FF0F84 /* Quicklook.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		6273A0762FCA2B9100205507 /* KosmosAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6273A0752FCA2B9100205507 /* KosmosAppKit */; };
-		6273A0802FCA3EFE00205507 /* KosmosHTTPServer in Frameworks */ = {isa = PBXBuildFile; productRef = 6273A07F2FCA3EFE00205507 /* KosmosHTTPServer */; };
 		6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000200000000CADD7B01 /* ALFoundation */; };
-		62A1000300000000CADD7B01 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A1000400000000CADD7B01 /* ALFoundation */; };
 		62A127162FC6BDD6002FDFD7 /* MarkdownHTMLKit in Frameworks */ = {isa = PBXBuildFile; productRef = 62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */; };
 		62A7C37E2FC0FC9F00902074 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62A7C37D2FC0FC9F00902074 /* ALFoundation */; };
 		62CC3C6E2FA7BA440018F091 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62CC3C6F2FA7BA440018F091 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
-		62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; };
 		62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		62D5E4B32FA5DAEC00CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B22FA5DAEC00CADD72 /* ALFoundation */; };
-		62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62D5E4B62FA5DB9200CADD72 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62D5E4B52FA5DB9200CADD72 /* ALFoundation */; };
 		62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
 		62FA000300000000CADD7300 /* ObservableDefaults in Frameworks */ = {isa = PBXBuildFile; productRef = 62FA000200000000CADD7300 /* ObservableDefaults */; };
 		62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
-		62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */; platformFilters = (macos, ); };
 		62FE000300000000CADD7201 /* ALFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 62FE000400000000CADD7201 /* ALFoundation */; };
 /* End PBXBuildFile section */
 
@@ -67,20 +60,6 @@
 			remoteGlobalIDString = 62D5CA182FA048F000CADD72;
 			remoteInfo = Viewer;
 		};
-		62D5E4A82FA5DA1F00CADD72 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 62D5E4322FA5D93700CADD72;
-			remoteInfo = GalleyCoreKit;
-		};
-		62D5E4AE2FA5DA2A00CADD72 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 62D5E4432FA5D95400CADD72;
-			remoteInfo = GalleyServerKit;
-		};
 		62D5E4DD2FA5E08800CADD72 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
@@ -95,20 +74,17 @@
 			remoteGlobalIDString = 626E8D4E2F9DD1C700BD51F9;
 			remoteInfo = Server;
 		};
+		62EB9F282FEEEC8100545769 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 626E8D472F9DD1C700BD51F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 62D5E4322FA5D93700CADD72;
+			remoteInfo = GalleyCoreKit;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		620A41F32FD7D97C003676A2 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		620A41F72FD7D9A3003676A2 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
@@ -167,7 +143,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */,
-				62D5E44B2FA5D95400CADD72 /* GalleyServerKit.framework in Embed Frameworks */,
 				620A41F02FD7D955003676A2 /* Kosmos in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -185,7 +160,6 @@
 		62CC3C5F2FA7B8F90018F091 /* UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D5CA192FA048F000CADD72 /* Galley.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Galley.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GalleyCoreKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GalleyServerKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -281,11 +255,6 @@
 			path = Viewer;
 			sourceTree = "<group>";
 		};
-		62D5E4562FA5D99A00CADD72 /* GalleyServerKit */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = GalleyServerKit;
-			sourceTree = "<group>";
-		};
 		62D5E4802FA5D9AB00CADD72 /* GalleyCoreKit */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = GalleyCoreKit;
@@ -316,7 +285,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				6281285E2FC4134E0059DDFF /* ALFoundation in Frameworks */,
-				62D5E4B02FA5DA3300CADD72 /* GalleyServerKit.framework in Frameworks */,
 				620A41F22FD7D97C003676A2 /* Kosmos in Frameworks */,
 				62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */,
 			);
@@ -327,7 +295,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */,
-				62FE000200000000CADD7201 /* GalleyServerKit.framework in Frameworks */,
 				620A42002FD7D9EE003676A2 /* Kosmos in Frameworks */,
 				62FE000300000000CADD7201 /* ALFoundation in Frameworks */,
 			);
@@ -364,17 +331,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		62D5E4412FA5D95400CADD72 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				62D5E4B42FA5DB4D00CADD72 /* GalleyCoreKit.framework in Frameworks */,
-				6273A0802FCA3EFE00205507 /* KosmosHTTPServer in Frameworks */,
-				620A41F62FD7D9A3003676A2 /* Kosmos in Frameworks */,
-				62A1000300000000CADD7B01 /* ALFoundation in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -399,7 +355,6 @@
 				626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */,
 				62D5CA192FA048F000CADD72 /* Galley.app */,
 				62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */,
-				62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */,
 				62CC3C5F2FA7B8F90018F091 /* UITests.xctest */,
 				62564F302FA857A400FF0F84 /* Quicklook.appex */,
 			);
@@ -418,7 +373,6 @@
 			isa = PBXGroup;
 			children = (
 				62D5E4802FA5D9AB00CADD72 /* GalleyCoreKit */,
-				62D5E4562FA5D99A00CADD72 /* GalleyServerKit */,
 				62564F332FA857A400FF0F84 /* Quicklook */,
 				62D5D5292FA1673B00CADD72 /* Server */,
 				62D5D5432FA1674A00CADD72 /* Viewer */,
@@ -439,13 +393,6 @@
 
 /* Begin PBXHeadersBuildPhase section */
 		62D5E42E2FA5D93700CADD72 /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		62D5E43F2FA5D95400CADD72 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -490,7 +437,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */,
+				62EB9F292FEEEC8100545769 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				62D5D5292FA1673B00CADD72 /* Server */,
@@ -619,34 +566,6 @@
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
 			productType = "com.apple.product-type.framework";
 		};
-		62D5E4432FA5D95400CADD72 /* GalleyServerKit */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 62D5E44C2FA5D95400CADD72 /* Build configuration list for PBXNativeTarget "GalleyServerKit" */;
-			buildPhases = (
-				62D5E43F2FA5D95400CADD72 /* Headers */,
-				62D5E4402FA5D95400CADD72 /* Sources */,
-				62D5E4412FA5D95400CADD72 /* Frameworks */,
-				62D5E4422FA5D95400CADD72 /* Resources */,
-				620A41F72FD7D9A3003676A2 /* Embed Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				62D5E4A92FA5DA1F00CADD72 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				62D5E4562FA5D99A00CADD72 /* GalleyServerKit */,
-			);
-			name = GalleyServerKit;
-			packageProductDependencies = (
-				62A1000400000000CADD7B01 /* ALFoundation */,
-				6273A07F2FCA3EFE00205507 /* KosmosHTTPServer */,
-				620A41F52FD7D9A3003676A2 /* Kosmos */,
-			);
-			productName = GalleyServerKit;
-			productReference = 62D5E4442FA5D95400CADD72 /* GalleyServerKit.framework */;
-			productType = "com.apple.product-type.framework";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -677,9 +596,6 @@
 					62D5E4322FA5D93700CADD72 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
-					62D5E4432FA5D95400CADD72 = {
-						CreatedOnToolsVersion = 26.4.1;
-					};
 				};
 			};
 			buildConfigurationList = 626E8D4A2F9DD1C700BD51F9 /* Build configuration list for PBXProject "Galley" */;
@@ -698,7 +614,6 @@
 				629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */,
 				62A127142FC6BDD6002FDFD7 /* XCLocalSwiftPackageReference "../MarkdownHTMLKit" */,
 				6273A0742FCA2B9100205507 /* XCLocalSwiftPackageReference "../KosmosAppKit" */,
-				6273A07E2FCA3EFE00205507 /* XCLocalSwiftPackageReference "../KosmosHTTPServer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 626E8D502F9DD1C700BD51F9 /* Products */;
@@ -706,7 +621,6 @@
 			projectRoot = "";
 			targets = (
 				62D5E4322FA5D93700CADD72 /* GalleyCoreKit */,
-				62D5E4432FA5D95400CADD72 /* GalleyServerKit */,
 				626E8D4E2F9DD1C700BD51F9 /* Server */,
 				62564F2F2FA857A400FF0F84 /* Quicklook */,
 				62D5CA182FA048F000CADD72 /* Viewer */,
@@ -753,13 +667,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		62D5E4312FA5D93700CADD72 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		62D5E4422FA5D95400CADD72 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -871,13 +778,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		62D5E4402FA5D95400CADD72 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -916,16 +816,6 @@
 			isa = PBXTargetDependency;
 			productRef = 62D5E4A22FA5DA0600CADD72 /* ALFoundation */;
 		};
-		62D5E4A92FA5DA1F00CADD72 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
-			targetProxy = 62D5E4A82FA5DA1F00CADD72 /* PBXContainerItemProxy */;
-		};
-		62D5E4AF2FA5DA2A00CADD72 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 62D5E4432FA5D95400CADD72 /* GalleyServerKit */;
-			targetProxy = 62D5E4AE2FA5DA2A00CADD72 /* PBXContainerItemProxy */;
-		};
 		62D5E4DE2FA5E08800CADD72 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 62D5CA182FA048F000CADD72 /* Viewer */;
@@ -938,6 +828,11 @@
 			);
 			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
 			targetProxy = 62D5E7682FA5E20100CADD72 /* PBXContainerItemProxy */;
+		};
+		62EB9F292FEEEC8100545769 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 62D5E4322FA5D93700CADD72 /* GalleyCoreKit */;
+			targetProxy = 62EB9F282FEEEC8100545769 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1384,66 +1279,6 @@
 			};
 			name = Release;
 		};
-		62D5E44D2FA5D95400CADD72 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				ENABLE_MODULE_VERIFIER = YES;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyServerKit;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_INSTALL_MODULE = YES;
-				SWIFT_INSTALL_OBJC_HEADER = NO;
-				VERSIONING_SYSTEM = "apple-generic";
-				VERSION_INFO_PREFIX = "";
-			};
-			name = Debug;
-		};
-		62D5E44E2FA5D95400CADD72 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				ENABLE_MODULE_VERIFIER = YES;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = net.leuski.GalleyServerKit;
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_INSTALL_MODULE = YES;
-				SWIFT_INSTALL_OBJC_HEADER = NO;
-				VERSIONING_SYSTEM = "apple-generic";
-				VERSION_INFO_PREFIX = "";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1510,25 +1345,12 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		62D5E44C2FA5D95400CADD72 /* Build configuration list for PBXNativeTarget "GalleyServerKit" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				62D5E44D2FA5D95400CADD72 /* Debug */,
-				62D5E44E2FA5D95400CADD72 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		6273A0742FCA2B9100205507 /* XCLocalSwiftPackageReference "../KosmosAppKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../KosmosAppKit;
-		};
-		6273A07E2FCA3EFE00205507 /* XCLocalSwiftPackageReference "../KosmosHTTPServer" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../KosmosHTTPServer;
 		};
 		629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -1570,11 +1392,6 @@
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
 			productName = Kosmos;
 		};
-		620A41F52FD7D9A3003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
 		620A41F92FD7D9CA003676A2 /* Kosmos */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
@@ -1594,21 +1411,12 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = KosmosAppKit;
 		};
-		6273A07F2FCA3EFE00205507 /* KosmosHTTPServer */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = KosmosHTTPServer;
-		};
 		62913B9F2FBC39AE00088C1F /* ObservableDefaults */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62FA000100000000CADD7300 /* XCRemoteSwiftPackageReference "ObservableDefaults" */;
 			productName = ObservableDefaults;
 		};
 		62A1000200000000CADD7B01 /* ALFoundation */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
-			productName = ALFoundation;
-		};
-		62A1000400000000CADD7B01 /* ALFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 62D5E1112FA5CB0800CADD72 /* XCRemoteSwiftPackageReference "swift-core-kit" */;
 			productName = ALFoundation;

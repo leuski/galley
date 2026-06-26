@@ -13,17 +13,17 @@ struct PreviewHTTPListenerTests {
       className: "NoSuchPreviewHTTPListenerFactory") == nil)
   }
 
-  @MainActor
-  @Test("discovery resolves the GalleyServerKit factory when loaded")
-  func discoveryPresent() {
-    // The unified test bundle links GalleyServerKit, so the @objc
-    // factory is registered: discovery must find it, construct a
-    // listener via the ObjC-runtime seam, and hand back a usable,
-    // initially-stopped PreviewHTTPListener.
-    let listener = discoverPreviewHTTPListener()
-    #expect(listener != nil)
-    #expect(listener?.state == .stopped)
-  }
+//  @MainActor
+//  @Test("discovery resolves the GalleyServerKit factory when loaded")
+//  func discoveryPresent() {
+//    // The unified test bundle links GalleyServerKit, so the @objc
+//    // factory is registered: discovery must find it, construct a
+//    // listener via the ObjC-runtime seam, and hand back a usable,
+//    // initially-stopped PreviewHTTPListener.
+//    let listener = discoverPreviewHTTPListener()
+//    #expect(listener != nil)
+//    #expect(listener?.state == .stopped)
+//  }
 
   @Test("listener state is value-equatable")
   func stateEquatable() {
