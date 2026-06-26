@@ -87,37 +87,20 @@ placeholder via state restoration / `OpenWindowAction` from somewhere
 that's guaranteed to fire pre-window. Worth confirming this is a
 SwiftUI bug vs. a missing handler before patching.
 
-## Test-mode launch arguments
+## Test-mode launch
 
-Both apps parse `LaunchArguments.fromProcess()` at startup. None of
-these flags are passed in production launches.
+UITests seed a document by firing a `galley://<path>` URL via
+`/usr/bin/open` (`AppLauncher.openViaURLScheme`) — the same routing-aware
+scheme Finder and BBEdit use — rather than via launch-argument injection.
+The test-mode marker is passed through `launchEnvironment`
+(`GALLEY_UI_TEST_MODE`), not a `--`-prefixed argument, because AppKit's
+`NSUserDefaults` parser eats `--` tokens and pollutes the defaults domain.
+Test mode also passes `-ApplePersistenceIgnoreState YES` to skip the
+post-crash "Reopen?" alert.
 
-```
---ui-test-mode             Master switch. Implies --reset-state unless
-                           --no-reset-state is also passed.
---reset-state              Wipe UserDefaults + Application Support before
-                           start. Implied by --ui-test-mode.
---no-reset-state           Escape hatch when --ui-test-mode is on but the
-                           test wants to preload state into a scratch dir.
---scratch-dir <path>       Override Application Support root. Lets every
-                           test run get a fresh, ephemeral persistence
-                           tree without touching the user's prefs.
---seed-file <path>         Pre-enqueue a file path into the launch buffer
-                           so the first window comes up bound to it
-                           without going through LaunchServices.
---mock-editor <template>   Replace EditorChoice with a script that logs
-                           cmd-click invocations to a file. The template
-                           supports {path} and {line} placeholders.
---fixed-port <n>           Force a specific server port (Server app).
-```
-
-The parser lives in `Sources/GalleyCoreKit/Routing/LaunchArguments.swift`
-and is unit-tested in `Tests/GalleyCoreKitTests/Routing/LaunchArgumentsTests.swift`.
-
-Currently the only behavior wired up is `seedFile` (queued into the
-delegate's `LaunchURLBuffer` at init) and `uiTestMode` (suppresses
-recent-doc hydration). Wire up the rest as the test layers above
-demand them — the parser is already there.
+(The old `LaunchArguments` parser — `--ui-test-mode` / `--seed-file` /
+`--scratch-dir` / `--fixed-port` etc. — was removed once it was no longer
+wired into app launch.)
 
 ## Accessibility identifiers
 
