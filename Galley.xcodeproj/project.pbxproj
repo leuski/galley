@@ -230,6 +230,13 @@
 			);
 			target = 626E8D5B2F9DD1C800BD51F9 /* Tests */;
 		};
+		62EB9AA12FEEE6FA00545769 /* Exceptions for "Viewer" folder in "Server" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/AppIcon.icon,
+			);
+			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -268,6 +275,7 @@
 		62D5D5432FA1674A00CADD72 /* Viewer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				62EB9AA12FEEE6FA00545769 /* Exceptions for "Viewer" folder in "Server" target */,
 				62B8BEAD2FB96756004FB681 /* Exceptions for "Viewer" folder in "Viewer" target */,
 			);
 			path = Viewer;
