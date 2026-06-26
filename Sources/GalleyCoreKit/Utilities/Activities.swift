@@ -63,7 +63,6 @@ public typealias GalleyViewerRequestActivity = GenerilizedDocumentActivity<
 public enum SettingsTab: String, Sendable, CaseIterable {
   case general
   case markdown
-  case server
 }
 
 public struct OpenSettingsScheme: SchemeProtocol {

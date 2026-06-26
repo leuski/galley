@@ -102,17 +102,6 @@ extension ViewerKosmosService {
     host.presentPeer(role: .server, onHost: localHostUUID)
   }
 
-  /// Drives the Server-status pill.
-  var isServerPeerConnected: Bool { serverPeer != nil }
-
-  /// HTTP base URL the Server published in its peer metadata at
-  /// advertise time. `nil` until the Server peer appears with a URL
-  /// in metadata. Drives the port number shown in `.running` pill text.
-  var serverPeerHTTPURL: URL? {
-    guard let id = serverPeer, let info = host.peers[id] else { return nil }
-    return info.metadata[.httpURL]
-  }
-
   /// Drives the "Show on Vision Pro" menu enabledness. Same resume-
   /// gated reachability the Server uses for dispatch, so the menu is
   /// enabled exactly when a route would actually land on AVP (rather

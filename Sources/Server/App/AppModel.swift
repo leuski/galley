@@ -197,7 +197,7 @@ final class AppModel {
     // listener, start Kosmos now (no URL to advertise) and leave
     // `serverHTTPPort` at 0 — Quick Look then renders in-process.
     guard let http = httpListener else {
-      kosmos.start(httpURL: nil)
+      kosmos.start()
       return
     }
 
@@ -227,7 +227,7 @@ final class AppModel {
           Defaults.shared.serverHTTPPort = port
           Defaults.shared.post()
           if !kosmosStarted {
-            kosmos.start(httpURL: url)
+            kosmos.start()
             kosmosStarted = true
           }
         case .failed:
@@ -235,7 +235,7 @@ final class AppModel {
           Defaults.shared.serverHTTPPort = 0
           Defaults.shared.post()
           if !kosmosStarted {
-            kosmos.start(httpURL: nil)
+            kosmos.start()
             kosmosStarted = true
           }
         case .stopped:

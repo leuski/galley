@@ -20,13 +20,6 @@ struct MacSettingsView: View {
           Label("Markdown", systemImage: "doc.text")
         }
         .tag(SettingsTab.markdown)
-
-      ServerSettingsView()
-        .settingsPane()
-        .tabItem {
-          Label("Server", systemImage: "server.rack")
-        }
-        .tag(SettingsTab.server)
     }
     .frame(width: 620, height: 320)
     // The Settings scene claims `galley-settings://` via

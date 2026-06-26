@@ -45,43 +45,32 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   /// peers and renders each in-process via `InProcessTunnelBackend` —
   /// no loopback HTTP listener involved, so the tunnel works with or
   /// without the optional HTTP server.
-  @ObservationIgnored private let httpTunnelResponder: Responder
-
-  /// Server's loopback HTTP base URL, captured at `start(httpURL:)`
-  /// time and read inside `makeLink()` to populate advertise-time
-  /// metadata. `nil` if no HTTP listener is present / hadn't bound.
-  @ObservationIgnored private var advertisedHTTPURL: URL?
+  @ObservationIgnored private let tunnelResponder: Responder
 
   init(service: PreviewRequestService, watcher: DocumentWatcher) {
-    self.httpTunnelResponder = Responder(
+    self.tunnelResponder = Responder(
       backend: InProcessTunnelBackend(service: service, watcher: watcher))
   }
 
-  /// Begin advertising. Idempotent. `httpURL` is the Server's loopback
-  /// HTTP base URL once the listener has bound; it's published in the
-  /// peer's Kosmos metadata so the Mac Viewer's pill can read the port
-  /// for display without a side-channel file lookup. `nil` means the
-  /// HTTP listener never came up — peers can still discover liveness
-  /// but won't see a URL.
-  func start(httpURL: URL?) {
-    advertisedHTTPURL = httpURL
+  /// Begin advertising. Idempotent.
+  func start() {
     host.start(service: self)
   }
 
   func stop() {
-    httpTunnelResponder.stop()
+    tunnelResponder.stop()
     Task { await host.stop() }
   }
 
   // MARK: - KosmosService
 
   func makeLink() async -> KosmosClient {
-    await host.makeLink(extraMetadata: [.httpURL => advertisedHTTPURL])
+    await host.makeLink()
   }
 
   func configure(host: ServiceHost, client: KosmosClient) async {
     await registerHandlers(host: host)
-    httpTunnelResponder.install(on: host, client: client)
+    tunnelResponder.install(on: host, client: client)
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {

@@ -22,13 +22,6 @@ struct MenuBarContent: View {
       Button("Open File…") { openFile() }
         .accessibilityIdentifier(ServerA11yID.MenuBar.openFile)
         .disabled(model.httpURL == nil)
-
-      Divider()
-
-      Button("Settings…") {
-        OpenSettingsActivity(.server).open()
-      }
-      .accessibilityIdentifier(ServerA11yID.MenuBar.settings)
     }
   }
 
