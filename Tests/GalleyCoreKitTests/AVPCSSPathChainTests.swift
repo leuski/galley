@@ -10,7 +10,7 @@
 //
 //    KosmosTunnelSchemeTests          → URL construction
 //    HTTPTunnelAVPClientTests         → URL → ProxyHTTPRequest (AVP)
-//    HTTPTunnelURLBuilderTests        → ProxyHTTPRequest → URLRequest (Mac)
+//    KosmosKit URLBuilderTests        → ProxyHTTPRequest → URLRequest (Mac)
 //    TemplateOriginURLTests           → X-Kosmos-Origin → base href
 //    RoutePathDecodingTests           → /preview/<encoded> → file URL
 //
@@ -43,27 +43,29 @@ struct AVPCSSPathChainTests {
     #expect(tunnelURL.absoluteString
       == "kosmos://local/preview/Users/x/Documents/Read%20Me.md")
 
-    // Layer 2: simulated AVP scheme handler — wire `urlPath` is
-    // `URLComponents.percentEncodedPath` verbatim.
-    let components = try #require(URLComponents(
-      url: tunnelURL, resolvingAgainstBaseURL: false))
-    let wireURLPath = components.percentEncodedPath
-    #expect(wireURLPath == "/preview/Users/x/Documents/Read%20Me.md")
+    // Layer 2: AVP scheme handler folds the URL into a `ProxyHTTPRequest`.
+    // The path travels *decoded* (`URLComponents.path`); percent-encoding
+    // is the responder's concern, not the wire's.
+    let proxy = try #require(makeProxy(forURL: tunnelURL))
+    #expect(proxy.path == "/preview/Users/x/Documents/Read Me.md")
 
-    // Layer 3: Mac splices `urlPath` onto the loopback base.
+    // Layer 3: Mac re-encodes the decoded path onto the loopback base.
     let base = URL(string: "http://127.0.0.1:54775")!
-    let proxy = ProxyHTTPRequest(
-      method: "GET",
-      urlPath: wireURLPath,
-      headers: [
-        TunnelHeaders.origin: TunnelScheme.originURL.absoluteString
-      ])
-    let urlRequest = try #require(
-      URLBuilder.buildURLRequest(base: base, request: proxy))
+    let urlRequest = try #require(proxy.urlRequest(base: base))
     #expect(urlRequest.url?.absoluteString
       == "http://127.0.0.1:54775/preview/Users/x/Documents/Read%20Me.md")
     #expect(urlRequest.value(forHTTPHeaderField: "X-Kosmos-Origin")
       == "kosmos://local")
+  }
+
+  /// Fold a synthesized tunnel URL into a `ProxyHTTPRequest`, stamping the
+  /// origin header the AVP scheme handler attaches.
+  private func makeProxy(forURL url: URL) -> ProxyHTTPRequest? {
+    var urlRequest = URLRequest(url: url)
+    urlRequest.setValue(
+      TunnelScheme.originURL.absoluteString,
+      forHTTPHeaderField: TunnelHeaders.origin)
+    return ProxyHTTPRequest(requestID: UUID(), request: urlRequest, url: url)
   }
 
   /// A CSS sub-resource fetch is the same chain, just with a
@@ -76,20 +78,11 @@ struct AVPCSSPathChainTests {
     let tunnelURL = URL(
       string: "kosmos://local/template/galley.default/style%20one.css")!
 
-    let components = try #require(URLComponents(
-      url: tunnelURL, resolvingAgainstBaseURL: false))
-    let wireURLPath = components.percentEncodedPath
-    #expect(wireURLPath == "/template/galley.default/style%20one.css")
+    let proxy = try #require(makeProxy(forURL: tunnelURL))
+    #expect(proxy.path == "/template/galley.default/style one.css")
 
     let base = URL(string: "http://127.0.0.1:54775")!
-    let proxy = ProxyHTTPRequest(
-      method: "GET",
-      urlPath: wireURLPath,
-      headers: [
-        TunnelHeaders.origin: TunnelScheme.originURL.absoluteString
-      ])
-    let urlRequest = try #require(
-      URLBuilder.buildURLRequest(base: base, request: proxy))
+    let urlRequest = try #require(proxy.urlRequest(base: base))
     #expect(urlRequest.url?.absoluteString
       == "http://127.0.0.1:54775/template/galley.default/style%20one.css")
   }

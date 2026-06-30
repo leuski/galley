@@ -77,9 +77,9 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
       GalleyViewerRequestActivity(target: message.target).open()
     }
 
-    // Receiver-side tunnel wiring (`ProxyHTTPResponseHead` /
-    // `ProxyHTTPResponseChunk` → the in-flight request) is shared in
-    // `KosmosHTTPTunnel`.
+    // Receiver-side tunnel wiring (response frames → the in-flight
+    // request) is shared in `KosmosHTTPTunnel`; the wire framing is its
+    // concern, not ours.
     tunnel.install(on: host, pendingClient: client)
     tunnel.attachTunnelIf(serverPresent: host.presentPeer(role: .server) != nil)
 #endif

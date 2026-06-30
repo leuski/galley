@@ -23,15 +23,27 @@ struct InProcessTunnelBackendTests {
     return url
   }
 
+  /// Build the request exactly as the AVP scheme handler would: a
+  /// `kosmos://local` URL carrying `path`, folded into a `ProxyHTTPRequest`
+  /// via the public initializer (which decodes the path into `.path`).
+  private func proxyRequest(path: String) throws -> ProxyHTTPRequest {
+    var components = URLComponents()
+    components.scheme = "kosmos"
+    components.host = "local"
+    components.path = path
+    let url = try #require(components.url)
+    var urlRequest = URLRequest(url: url)
+    urlRequest.setValue(
+      "kosmos://local", forHTTPHeaderField: TunnelHeaders.origin)
+    return try #require(
+      ProxyHTTPRequest(requestID: UUID(), request: urlRequest, url: url))
+  }
+
   @MainActor
   private func run(
     _ backend: InProcessTunnelBackend, path: String
   ) async throws -> (status: Int?, headers: [String: String], body: Data) {
-    let request = ProxyHTTPRequest(
-      method: "GET",
-      urlPath: path,
-      headers: [TunnelHeaders.origin: "kosmos://local"],
-      body: Data())
+    let request = try proxyRequest(path: path)
     var status: Int?
     var headers: [String: String] = [:]
     var body = Data()
