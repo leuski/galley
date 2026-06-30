@@ -33,7 +33,9 @@ public enum PreviewRoute: Sendable, Equatable {
   }
 
   /// Parse a URL path (`url.path` for the scheme handler,
-  /// `request.path` for the HTTP server). Percent-decoded.
+  /// `request.path` for the HTTP server). Both inputs are already
+  /// percent-decoded (`URL.path` / `URLComponents.path`), so the parser
+  /// does not decode again.
   public init?(path: String) {
     if let route = Self.parseTemplate(path: path) {
       self = route
@@ -49,19 +51,17 @@ public enum PreviewRoute: Sendable, Equatable {
     guard path.hasPrefix(prefix) else { return nil }
     let tail = path.dropFirst(prefix.count)
     guard let slash = tail.firstIndex(of: "/") else { return nil }
-    let rawID = String(tail[..<slash])
-    let rawFile = String(tail[tail.index(after: slash)...])
-    let id = rawID.removingPercentEncoding ?? rawID
-    let file = rawFile.removingPercentEncoding ?? rawFile
+    let id = String(tail[..<slash])
+    let file = String(tail[tail.index(after: slash)...])
     return .templateAsset(id: Template.ID(rawValue: id), file: file)
   }
 
   private static func parsePreview(path: String) -> Self? {
     let prefix = "/\(RouteNames.preview)"
-    guard path.hasPrefix(prefix) else { return nil }
-    var tail = String(path.dropFirst(prefix.count))
-    if !tail.hasPrefix("/") { tail = "/" + tail }
-    let decoded = tail.removingPercentEncoding ?? tail
-    return .documentAsset(absolutePath: decoded)
+    // Match the full `/preview/` segment so the name can't collide with the
+    // prefix of a longer route; strip the bare prefix so the tail keeps its
+    // leading slash and reads as an absolute filesystem path.
+    guard path.hasPrefix(prefix + "/") else { return nil }
+    return .documentAsset(absolutePath: String(path.dropFirst(prefix.count)))
   }
 }

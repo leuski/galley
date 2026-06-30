@@ -34,9 +34,10 @@ public final class InProcessTunnelBackend: TunnelBackend {
     return AsyncThrowingStream { continuation in
       let work = Task { @MainActor in
         do {
-          // `urlPath` is percent-encoded path + optional query; the
-          // service dispatches on the path and decodes internally.
-          let path = String(request.urlPath.prefix { $0 != "?" })
+          let path = request.path
+          // `request.path` is the already-decoded URL path; the service
+          // dispatches on it directly. Query lives in `request.queryItems`,
+          // which the preview/template/events routes don't consult.
           let preview = await service.respond(
             path: path, origin: Self.origin(from: request))
           let shaped = shaper.shape(preview)

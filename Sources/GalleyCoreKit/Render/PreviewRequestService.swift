@@ -68,13 +68,16 @@ public struct PreviewRequestService: Sendable {
   /// HTML's `<base href>` should use — the requester's own host, so
   /// sub-resource fetches come back to the same transport.
   public func respond(path: String, origin: URL) async -> PreviewResponse {
-    if path.hasPrefix("/\(RouteNames.preview)") {
+    // Tail-bearing routes match on the full `/<name>/` segment so a route
+    // name can never collide with the prefix of a longer one; leaf routes
+    // (the `/` index) match exactly.
+    if path.hasPrefix("/\(RouteNames.preview)/") {
       return await previewOrAsset(path: path, origin: origin)
     }
     if path.hasPrefix("/\(RouteNames.template)/") {
       return await templateAsset(path: path)
     }
-    if path.hasPrefix("/\(RouteNames.events)") {
+    if path.hasPrefix("/\(RouteNames.events)/") {
       return events(path: path)
     }
     if path == "/" {
@@ -88,7 +91,7 @@ public struct PreviewRequestService: Sendable {
   private func previewOrAsset(
     path: String, origin: URL
   ) async -> PreviewResponse {
-    guard let documentURL = Self.decodeAbsolutePath(
+    guard let documentURL = Self.absolutePath(
       path, prefix: "/\(RouteNames.preview)")
     else {
       return .badRequest("Invalid path")
@@ -162,8 +165,8 @@ public struct PreviewRequestService: Sendable {
   // MARK: - /template/<id>/<file>
 
   private func templateAsset(path: String) async -> PreviewResponse {
-    let route = PreviewRoute(path: path)
-    guard case .templateAsset(let templateID, let file) = route else {
+    guard let route = PreviewRoute(path: path),
+          case .templateAsset(let templateID, let file) = route else {
       return .badRequest("Invalid template asset path")
     }
     guard let template = await TemplateStore.shared
@@ -177,14 +180,14 @@ public struct PreviewRequestService: Sendable {
     }
     return serveFile(
       at: assetURL,
-      cache: PreviewRoute.templateAsset(id: templateID, file: file).cachePolicy)
+      cache: route.cachePolicy)
   }
 
   // MARK: - /events/<path> (SSE)
 
   private func events(path: String) -> PreviewResponse {
     guard
-      let documentURL = Self.decodeAbsolutePath(
+      let documentURL = Self.absolutePath(
         path, prefix: "/\(RouteNames.events)"),
       MarkdownFileTypes.extensions.contains(
         documentURL.pathExtension.lowercased())
@@ -196,14 +199,15 @@ public struct PreviewRequestService: Sendable {
 
   // MARK: - Helpers
 
-  /// Decode the absolute filesystem path tail of a route (the same shape
+  /// The absolute filesystem path tail of a route (the same shape
   /// `URL.appendingPreview(_:)` produces and `PreviewRoute` parses for
-  /// `/preview`). Percent-decoded, leading slash ensured.
-  static func decodeAbsolutePath(_ path: String, prefix: String) -> URL? {
+  /// `/preview`). `prefix` is the bare route name (`/preview`, `/events`)
+  /// without a trailing slash, so the stripped tail keeps its leading
+  /// slash. The incoming `path` is already percent-decoded
+  /// (`ProxyHTTPRequest.path` is `URLComponents.path`), so no decoding
+  /// happens here either.
+  static func absolutePath(_ path: String, prefix: String) -> URL? {
     guard path.hasPrefix(prefix) else { return nil }
-    var tail = String(path.dropFirst(prefix.count))
-    if !tail.hasPrefix("/") { tail = "/" + tail }
-    let decoded = tail.removingPercentEncoding ?? tail
-    return URL(fileURLWithPath: decoded)
+    return URL(fileURLWithPath: String(path.dropFirst(prefix.count)))
   }
 }
