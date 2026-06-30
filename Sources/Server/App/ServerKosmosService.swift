@@ -101,14 +101,8 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
         """)
       return false
     }
-    guard let destination = TunnelScheme.originURL.galleyPreviewURL(
-      forFile: target.documentURL.safe.path)
-    else {
-      log.notice("""
-        Failed \(target.documentURL.safe, privacy: .public)
-        """)
-      return false
-    }
+    let destination = TunnelScheme.originURL
+      .appending(.documentAsset(target.documentURL))
     let target = DocumentTarget(url: destination, scrollLine: target.scrollLine)
     let message = RouteToTunnelClient(target: target)
     host.publish(message) { peers.contains($0) }

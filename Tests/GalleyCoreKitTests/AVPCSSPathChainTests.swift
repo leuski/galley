@@ -38,8 +38,8 @@ struct AVPCSSPathChainTests {
     let documentPath = "/Users/x/Documents/Read Me.md"
 
     // Layer 1: AVP synthesizes the navigation URL.
-    let tunnelURL = try #require(
-      TunnelScheme.originURL.galleyPreviewURL(forFile: documentPath))
+    let tunnelURL = TunnelScheme.originURL.appending(
+      .documentAsset(URL(fileURLWithPath: documentPath)))
     #expect(tunnelURL.absoluteString
       == "kosmos://local/preview/Users/x/Documents/Read%20Me.md")
 

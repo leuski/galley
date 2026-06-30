@@ -48,7 +48,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
   func preparePreviewOfFile(at url: URL) async throws {
     if let endpoint = Defaults.shared.serverEndpointURL {
       do {
-        try await loadFromServer(endpoint.appendingPreview(url))
+        try await loadFromServer(endpoint.appending(.documentAsset(url)))
         return
       } catch {
         // Fall through to in-process render.

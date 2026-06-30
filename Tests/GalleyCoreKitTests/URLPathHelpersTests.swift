@@ -8,37 +8,30 @@ internal import ALFoundation
 struct URLPathHelpersTests {
   private let base: URL = "http://127.0.0.1:8089"
 
-  @Test("galleyPreview yields /preview")
-  func previewBase() {
+  @Test("documentAsset encodes the absolute path under /preview")
+  func documentAsset() {
     #expect(
-      base.galleyPreview.absoluteString
-        == "http://127.0.0.1:8089/preview")
+      base.appending(.documentAsset(
+        URL(fileURLWithPath: "/Users/foo/My Notes/test.md")))
+        .absoluteString
+        == "http://127.0.0.1:8089/preview/Users/foo/My%20Notes/test.md")
   }
 
-  @Test("appendingPreview with absolute document path encodes spaces")
-  func previewWithDocument() {
+  @Test("templateAsset encodes id and file under /template")
+  func templateAsset() {
     #expect(
-      base
-        .appendingPreview(
-          URL(fileURLWithPath: "/Users/foo/My Notes/test.md")
-        ).absoluteString
-        == "http://127.0.0.1:8089/preview/Users/foo/My%20Notes/test.md"
-)
-  }
-
-  @Test("galleyTemplate yields /template/<id>")
-  func templateBase() {
-    #expect(
-      base.galleyTemplate(id: .init(rawValue: "myth")).absoluteString
-        == "http://127.0.0.1:8089/template/myth")
-  }
-
-  @Test("galleyTemplate with file encodes id and file with spaces")
-  func templateWithFile() {
-    #expect(
-      base.galleyTemplate(id: .init(rawValue: "My Theme"))
-        .appending(path: "css/main.css")
+      base.appending(.templateAsset(
+        id: .init(rawValue: "My Theme"), file: "css/main.css"))
         .absoluteString
         == "http://127.0.0.1:8089/template/My%20Theme/css/main.css")
+  }
+
+  @Test("events encodes the absolute path under /events")
+  func eventsAsset() {
+    #expect(
+      base.appending(.events(
+        URL(fileURLWithPath: "/Users/foo/doc.md")))
+        .absoluteString
+        == "http://127.0.0.1:8089/events/Users/foo/doc.md")
   }
 }

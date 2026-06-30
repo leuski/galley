@@ -56,30 +56,3 @@ public extension URL {
     !! "GalleyCoreKit bundle missing Templates.bundle wrapper"
   }()
 }
-
-extension URL {
-  public var galleyPreview: URL {
-    appending(path: RouteNames.preview)
-  }
-
-  /// Construct a tunnel URL for a document or asset at a POSIX path.
-  /// `path` must begin with `/`. Returns nil only on malformed input.
-  ///
-  /// `URL.appending(path:)` percent-encodes its argument, so the
-  /// input is the raw filesystem path — never `percentEncodedForPath`,
-  /// or `%` itself ends up as `%25` on the wire.
-  public func galleyPreviewURL(forFile path: String) -> URL? {
-    guard path.hasPrefix("/") else { return nil }
-    return galleyPreview.appending(path: path)
-  }
-
-  public func galleyTemplate(id: GalleyCoreKit.Template.ID) -> URL {
-    appending(path: RouteNames.template).appending(path: id.rawValue)
-  }
-
-  /// `<self>/preview` — the route prefix for previewed documents.
-  /// Pass `documentPath` to point at a specific document.
-  public func appendingPreview(_ documentURL: URL) -> URL {
-    galleyPreview.appending(path: documentURL.safe.path)
-  }
-}

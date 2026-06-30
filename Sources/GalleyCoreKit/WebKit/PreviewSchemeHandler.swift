@@ -52,8 +52,12 @@ public enum PreviewScheme {
             let assetURL = template.resolveAsset(file: file)
       else { throw URLError(.fileDoesNotExist) }
       return assetURL
-    case .documentAsset(let absolutePath):
-      return URL(fileURLWithPath: absolutePath)
+    case .documentAsset(let url):
+      return url
+    case .events:
+      // Live-reload (SSE) is an HTTP / Kosmos-tunnel concern; the in-process
+      // scheme handler serves only static asset bytes.
+      throw URLError(.unsupportedURL)
     }
   }
 }

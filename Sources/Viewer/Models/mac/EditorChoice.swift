@@ -143,9 +143,7 @@ func substituteEditorTemplate(
     "{url}": fileURL.absoluteString
       .addingPercentEncoding(withAllowedCharacters: allowed)
     ?? fileURL.absoluteString,
-    "{path}": fileURL.path
-      .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-    ?? fileURL.path,
+    "{path}": fileURL.path.percentEncodedForPath,
     "{line}": line.map(String.init) ?? ""
   ])
 }

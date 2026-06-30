@@ -157,7 +157,7 @@ public extension Template {
     let substituted = context.substitute(into: processed)
     return ComposedPreview(
       html: injectingTemplateIDMeta(into: substituted),
-      baseURL: origin.appendingPreview(documentURL))
+      baseURL: origin.appending(.documentAsset(documentURL)))
   }
 
   /// Inserts `<meta name="galley-template-id" content="...">` just

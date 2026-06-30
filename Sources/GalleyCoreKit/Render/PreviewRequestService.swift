@@ -71,31 +71,33 @@ public struct PreviewRequestService: Sendable {
     // Tail-bearing routes match on the full `/<name>/` segment so a route
     // name can never collide with the prefix of a longer one; leaf routes
     // (the `/` index) match exactly.
-    if path.hasPrefix("/\(RouteNames.preview)/") {
-      return await previewOrAsset(path: path, origin: origin)
+    return if let route = PreviewRoute(path: path) {
+      switch route {
+      case .templateAsset(id: let id, file: let file):
+        await templateAsset(
+          templateID: id,
+          file: file,
+          cachePolicy: route.cachePolicy
+        )
+      case .documentAsset(let url):
+        await previewOrAsset(
+          url: url, origin: origin,
+          cachePolicy: route.cachePolicy)
+      case .events(let url):
+        events(url: url)
+      }
+    } else if path == "/" {
+      .plainText("Dispatcher is running.")
+    } else {
+      .notFound("Not found: \(path)")
     }
-    if path.hasPrefix("/\(RouteNames.template)/") {
-      return await templateAsset(path: path)
-    }
-    if path.hasPrefix("/\(RouteNames.events)/") {
-      return events(path: path)
-    }
-    if path == "/" {
-      return .plainText("Dispatcher is running.")
-    }
-    return .notFound("Not found: \(path)")
   }
 
   // MARK: - /preview/<path>
 
   private func previewOrAsset(
-    path: String, origin: URL
+    url documentURL: URL, origin: URL, cachePolicy: CachePolicy
   ) async -> PreviewResponse {
-    guard let documentURL = Self.absolutePath(
-      path, prefix: "/\(RouteNames.preview)")
-    else {
-      return .badRequest("Invalid path")
-    }
     let ext = documentURL.pathExtension.lowercased()
     if MarkdownFileTypes.extensions.contains(ext) {
       guard let renderer = await renderer() else {
@@ -108,7 +110,7 @@ public struct PreviewRequestService: Sendable {
         renderer: renderer)
     }
     if Self.assetExtensions.contains(ext) {
-      return serveFile(at: documentURL, cache: .noStore)
+      return serveFile(at: documentURL, cache: cachePolicy)
     }
     return .notFound("Unsupported extension: .\(ext)")
   }
@@ -164,11 +166,12 @@ public struct PreviewRequestService: Sendable {
 
   // MARK: - /template/<id>/<file>
 
-  private func templateAsset(path: String) async -> PreviewResponse {
-    guard let route = PreviewRoute(path: path),
-          case .templateAsset(let templateID, let file) = route else {
-      return .badRequest("Invalid template asset path")
-    }
+  private func templateAsset(
+    templateID: Template.ID,
+    file: String,
+    cachePolicy: CachePolicy) async
+  -> PreviewResponse
+  {
     guard let template = await TemplateStore.shared
       .existingTemplate(forID: templateID)
     else {
@@ -178,36 +181,17 @@ public struct PreviewRequestService: Sendable {
       return .notFound(
         "No such asset in template '\(template.name)': \(file)")
     }
-    return serveFile(
-      at: assetURL,
-      cache: route.cachePolicy)
+    return serveFile(at: assetURL, cache: cachePolicy)
   }
 
   // MARK: - /events/<path> (SSE)
 
-  private func events(path: String) -> PreviewResponse {
-    guard
-      let documentURL = Self.absolutePath(
-        path, prefix: "/\(RouteNames.events)"),
-      MarkdownFileTypes.extensions.contains(
+  private func events(url documentURL: URL) -> PreviewResponse {
+    guard MarkdownFileTypes.extensions.contains(
         documentURL.pathExtension.lowercased())
     else {
       return .badRequest("Invalid event path")
     }
     return .events(documentURL: documentURL)
-  }
-
-  // MARK: - Helpers
-
-  /// The absolute filesystem path tail of a route (the same shape
-  /// `URL.appendingPreview(_:)` produces and `PreviewRoute` parses for
-  /// `/preview`). `prefix` is the bare route name (`/preview`, `/events`)
-  /// without a trailing slash, so the stripped tail keeps its leading
-  /// slash. The incoming `path` is already percent-decoded
-  /// (`ProxyHTTPRequest.path` is `URLComponents.path`), so no decoding
-  /// happens here either.
-  static func absolutePath(_ path: String, prefix: String) -> URL? {
-    guard path.hasPrefix(prefix) else { return nil }
-    return URL(fileURLWithPath: String(path.dropFirst(prefix.count)))
   }
 }

@@ -16,14 +16,12 @@ import Foundation
 /// because all of them produce HTML that goes through the same render
 /// pipeline and must reference assets via the same routes.
 struct TemplateAssetRewriter {
-  let templatePrefix: String
-  let absolutePrefix: String
+  let templateID: Template.ID
+  let origin: URL
 
   init(id: Template.ID, origin: URL) {
-    self.templatePrefix = origin.galleyTemplate(id: id)
-      .absoluteString.appendingSlash
-    self.absolutePrefix = origin.galleyPreview
-      .absoluteString
+    self.templateID = id
+    self.origin = origin
   }
 
   func rewriteAssets(in html: String) -> String {
@@ -84,13 +82,13 @@ struct TemplateAssetRewriter {
       return value
     }
 
-    if value.hasPrefix("/") {
+    return origin.appending(
+      value.hasPrefix("/")
       // BBEdit convention: literal absolute filesystem paths. Route through
       // /preview.
-      return absolutePrefix + value.percentEncodedForPath
-    }
-
-    // Template-relative path. Encode the value to handle spaces, etc.
-    return templatePrefix + value.percentEncodedForPath
+      ? .documentAsset(URL(fileURLWithPath: value))
+      // Template-relative path. Encode the value to handle spaces, etc.
+      : .templateAsset(id: templateID, file: value))
+    .absoluteString
   }
 }

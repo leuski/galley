@@ -90,14 +90,13 @@ public struct PreviewResponseShaper: Sendable {
   static func injectReloadScript(
     into html: String, documentURL: URL, nonce: String
   ) -> String {
-    let encodedPath = documentURL.path
-      .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-      ?? documentURL.path
+    let encodedPath = documentURL.path.percentEncodedForPath
+    let events = PreviewRoute.Name.events.rawValue
     let script = """
         <script nonce="\(nonce)">
         (function() {
           try {
-            var src = new EventSource('/events\(encodedPath)');
+            var src = new EventSource('/\(events)\(encodedPath)');
             src.addEventListener('reload', function() { location.reload(); });
           } catch (e) { console.warn('livereload disabled:', e); }
         })();
