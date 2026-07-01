@@ -36,6 +36,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
 
   /// Token for the render-inputs observer (`startTrackingRenderInputs`).
   @ObservationIgnored var reloadObservation: Cancellable?
+  @ObservationIgnored var lastRequest: DocumentTarget?
 
   /// True once this window holds a document (blank windows have no model).
   var hasDocument: Bool { !history.isEmpty }

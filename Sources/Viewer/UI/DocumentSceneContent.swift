@@ -20,8 +20,6 @@ struct DocumentSceneContent: View {
   /// the store so a restored window shows its document on the first
   /// frame — no async launchTask, no reveal gate.
   @State private var model: DocumentModel?
-  /// this stores the last open target
-  @State private var lastTarget: DocumentTarget?
 
   @Environment(\.openWindow) private var openWindow
 
@@ -51,13 +49,13 @@ struct DocumentSceneContent: View {
         }
 
         guard newModel !== model else { return }
+        let lastRequest = model.lastRequest
         self.model = newModel
         // we are restoring the window. If we have a model assigned, it's
         // the wrong model. Evict it and ask the framework to re-open
         // the document.
-        if let lastTarget {
-          self.lastTarget = nil
-          GalleyViewerRequestActivity(target: lastTarget).open()
+        if let lastRequest {
+          GalleyViewerRequestActivity(target: lastRequest).open()
         }
       }
       .windowTransparency(model == nil ? 0 : 1)
