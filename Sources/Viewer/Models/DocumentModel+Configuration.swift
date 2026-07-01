@@ -14,7 +14,9 @@ extension DocumentModel {
   -> Binding<NavigationSplitViewVisibility>
   {
     Binding(
-      get: { [weak self] in self?.showsTOC == true ? .all : .detailOnly },
+      get: { [weak self] in
+        self?.mustShowTOC == true || self?.showsTOC == true ? .all : .detailOnly
+      },
       set: { [weak self] newValue in
         self?.setShowsTOC(newValue != .detailOnly, reduceMotion: reduceMotion)
       }

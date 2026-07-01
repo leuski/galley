@@ -39,21 +39,7 @@ struct DocumentView: View {
     } detail: {
       DocumentMainContent(model: model)
 #if os(macOS)
-      // Collapse the TOC sidebar just before the very first paint
-      // of this split view if the user wanted it closed. `showsTOC`
-      // starts `true` so NavigationSplitView is born with a sidebar
-      // and AppKit wires the column as `.behavior = .sidebar` (so
-      // it extends up under the tab bar). `savedShowsTOC` holds the
-      // user's actual preference; we apply it inside `viewWillDraw`
-      // — same runloop turn as the first paint, so the visible
-      // state never includes the open-sidebar frame. One-shot via
-      // the `savedShowsTOC` flag flip.
-        .willPresent {
-          if !model.savedShowsTOC {
-            model.savedShowsTOC = true
-            model.showsTOC = false
-          }
-        }
+        .willPresent { model.mustShowTOC = false }
 #endif
     }
     .navigationSplitViewStyle(.balanced)

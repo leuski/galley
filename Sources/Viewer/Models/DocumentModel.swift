@@ -158,26 +158,17 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// in-window link navigation so a child doc inherits the parent's
   /// pick. Cold opens / Replace-current rebinds reset this from the
   /// destination URL's file snapshot instead.
-  ///
-  /// Starts `true` so `NavigationSplitView` is born with a visible
-  /// sidebar — AppKit only wires `NSSplitViewItem.behavior = .sidebar`
-  /// when the column is visible at first paint, otherwise a later
-  /// toggle puts sidebar content below the tab bar instead of
-  /// extending up under it. `BeforeFirstDrawAccessor` collapses it
-  /// pre-paint when `savedShowsTOC` says the user wanted it closed.
+  var showsTOC: Bool = false
+
+  /// One-shot guard for the pre-first-draw sidebar collapse. `true`
+  /// means "mount with sidebar open". If sidebar is closed on mount,
+  /// the sidebar list top offset will be wrong.
 #if os(macOS)
-  var showsTOC: Bool = true
+  var mustShowTOC: Bool = true
 #else
   // we are handling sidebar differently on other platforms
-  var showsTOC: Bool = false
+  var mustShowTOC: Bool = false
 #endif
-  /// One-shot guard for the pre-first-draw sidebar collapse. `false`
-  /// means "the user wanted TOC closed for this bind — collapse on
-  /// the next `viewWillDraw`." `true` means "leave the sidebar
-  /// alone" (either the user wants it open, or we've already
-  /// applied the collapse). Set by `finishBind` from the bind's
-  /// `initialShowsTOC` and consumed by `BeforeFirstDrawAccessor`.
-  @ObservationIgnored var savedShowsTOC: Bool = true
 
   /// The in-flight TOC scroll, if any. `scrollToHeading` cancels it
   /// before starting a new one, so a later row tap preempts the
@@ -313,7 +304,7 @@ final class DocumentModel: NavigationModel, ReloadableModel {
     wireBridges()
 
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
-    savedShowsTOC = initialShowsTOC
+    showsTOC = initialShowsTOC
     zoom.setZoom(initialZoom)
     startTrackingRenderInputs()
     Task { await rebindCurrent(firstScroll: initialScroll ?? .top) }
@@ -440,12 +431,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   /// Subsequent file-watcher reloads preserve current scroll normally.
   func bind(to target: DocumentTarget) async {
     history = History(url: target.documentURL)
-    // Stash the desired sidebar state for `BeforeFirstDrawAccessor`
-    // to apply pre-first-paint. `showsTOC` itself stays `true` so
-    // NavigationSplitView is born with the sidebar visible and
-    // AppKit wires `NSSplitViewItem.behavior = .sidebar` — without
-    // that, a later toggle puts sidebar content below the tab bar.
-    savedShowsTOC = false
     await rebindCurrent(firstScroll: target.scroll ?? .top)
   }
 
