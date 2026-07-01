@@ -18,7 +18,7 @@ extension DocumentModel {
     /// Back/forward stack in visit order.
     var history: History
     /// Resting scroll position of the current page.
-    var scrollY: Double = 0
+    var scroll: Scroll = .top
     /// TOC sidebar visibility.
     var showsTOC: Bool = false
     /// Page zoom factor.
@@ -50,7 +50,7 @@ extension DocumentModel {
 
     init(
       history: History,
-      scrollY: Double = 0,
+      scroll: Scroll = .top,
       showsTOC: Bool = false,
       pageZoom: Double = 1.0,
       templatePersistent: Template.PersistentRepresentation? = nil,
@@ -60,7 +60,7 @@ extension DocumentModel {
       securityScopedBookmark: Data? = nil
     ) {
       self.history = history
-      self.scrollY = scrollY
+      self.scroll = scroll
       self.showsTOC = showsTOC
       self.pageZoom = pageZoom
       self.templatePersistent = templatePersistent
@@ -79,7 +79,7 @@ extension DocumentModel {
   var snapshot: Snapshot {
     Snapshot(
       history: history,
-      scrollY: currentScrollY,
+      scroll: .location(currentScrollY),
       showsTOC: showsTOC,
       pageZoom: zoom.zoomScale,
       templatePersistent: templates.persistent,
@@ -91,65 +91,7 @@ extension DocumentModel {
 
 // MARK: - Per-scene instance cache + factories
 
-extension DocumentModel {
-  private final class WeakRef {
-    weak var model: DocumentModel?
-    init(_ model: DocumentModel) { self.model = model }
-  }
-
-  /// SwiftUI re-creates a window's content view on every parent/scene
-  /// body pass, and `@State`'s initial value is evaluated eagerly each
-  /// time — so a bare `DocumentModel(...)` there would be built and
-  /// discarded repeatedly (a `WebPage` + bridges + render each time).
-  /// Dedup by window id; the strong owner is the scene's `@State`, so
-  /// the model lives exactly as long as its window and is freed when
-  /// SwiftUI tears the window down. Empty boxes are swept on lookup.
-  private static var cache: [DocumentSceneID: WeakRef] = [:]
-
-  private static func cached(_ id: DocumentSceneID) -> DocumentModel? {
-    cache[id]?.model
-  }
-
-  private static func remember(_ model: DocumentModel, id: DocumentSceneID) {
-    cache[id] = WeakRef(model)
-    cache = cache.filter { $0.value.model != nil }
-    model.startTrackingPersistentState(id: id)
-  }
-
-  /// Live-or-restored model for a window. Returns `nil` when the window
-  /// has no stored document (the welcome state). Synchronous — safe to
-  /// call from a `@State` initial value.
-  static func forScene(id: DocumentSceneID) -> DocumentModel? {
-    if let existing = cached(id) { return existing }
-    guard let snapshot = Defaults.shared[snapshot: id] else {
-      return nil
-    }
-    let model = DocumentModel(snapshot: snapshot, scroll: nil)
-    remember(model, id: id)
-    return model
-  }
-
-  static func relocate(_ model: DocumentModel, to sceneID: DocumentSceneID) {
-    cache = cache.filter { $0.value.model !== model }
-    remember(model, id: sceneID)
-  }
-
-  /// Bind an inbound document to a window, building the model if the
-  /// window was empty (welcome → document, in place) and caching it.
-  /// A fresh window seeds its view-state (zoom/scroll/TOC/choices) from
-  /// the file store so reopening a known file restores where you were.
-  static func open(
-    target: DocumentTarget, id: DocumentSceneID) -> DocumentModel
-  {
-    if let existing = cached(id) { return existing }
-    let model = DocumentModel(
-      snapshot: Defaults.shared[snapshot: target.documentURL]
-      ?? Snapshot(url: target.documentURL),
-      scroll: target.scroll)
-    remember(model, id: id)
-    return model
-  }
-
+extension DocumentModel: Persistent {
   /// The singleton Help window's model — a bundled file, never
   /// persisted.
   static func help(url: URL) -> DocumentModel {
@@ -157,15 +99,15 @@ extension DocumentModel {
   }
 
   /// Construct from a restored snapshot.
-  private convenience init(
-    snapshot: Snapshot, scroll: Scroll?)
+  convenience init(
+    snapshot: Snapshot)
   {
     self.init(
       history: snapshot.history,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
       colorSchemePersistent: snapshot.colorSchemePersistent,
-      initialScroll: scroll ?? .location(snapshot.scrollY),
+      initialScroll: snapshot.scroll,
       initialShowsTOC: snapshot.showsTOC,
       initialZoom: snapshot.pageZoom)
   }
@@ -179,27 +121,14 @@ extension DocumentModel {
   /// `feedback_no_view_mediated_model_mutation`). The tracked set is the
   /// durable fields; any change writes the snapshot to `DocumentStore`
   /// (both the window-keyed and file-keyed halves).
-  func startTrackingPersistentState(id: DocumentSceneID?) {
-    saveObservation = onObservedChange(
-      track: { [weak self] in
-        guard let self else { return }
-        _ = self.history
-        _ = self.showsTOC
-        _ = self.templates.persistent
-        _ = self.processors.persistent
-        _ = self.colorSchemes.persistent
-        _ = self.zoom.zoomScale
-        _ = self.renderedTemplateID
-      },
-      onChange: { [weak self] in self?.save(id: id) })
-  }
-
-  private func save(id: DocumentSceneID?) {
-    let snapshot = self.snapshot
-    if let id {
-      Defaults.shared[snapshot: id] = snapshot
-    }
-    Defaults.shared[snapshot: snapshot.currentURL] = snapshot.droppingHistory
+  func trackPersistentState() {
+    _ = self.history
+    _ = self.showsTOC
+    _ = self.templates.persistent
+    _ = self.processors.persistent
+    _ = self.colorSchemes.persistent
+    _ = self.zoom.zoomScale
+    _ = self.renderedTemplateID
   }
 
   /// Re-render when a render input changes: the global processor /

@@ -7,8 +7,8 @@ import WebKit
 /// restored snapshot or an inbound URL) — so this view always has a
 /// concrete document and a hydrated `AppModel` to work with.
 struct DocumentView: View {
-  /// The window's document model — built and cached by `DocumentSceneContent`
-  /// (`DocumentModel.forScene` / `.open`), already populated and
+  /// The window's document model — built and cached by
+  /// `WindowModelManager` (`forScene` / `open`), already populated and
   /// rendering. The view never constructs it, never owns persistence,
   /// and never observes it to mutate another model.
   @Bindable var model: DocumentModel

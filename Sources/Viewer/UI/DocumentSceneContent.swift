@@ -27,7 +27,8 @@ struct DocumentSceneContent: View {
 
   init(sceneID: DocumentSceneID) {
     self.sceneID = sceneID
-    _model = State(initialValue: DocumentModel.forScene(id: sceneID))
+    _model = State(
+      initialValue: WindowModelManager.shared.forScene(id: sceneID))
   }
 
   var body: some View {
@@ -41,10 +42,10 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
     // state-restored scene ID arrives late on macOS
       .onChange(of: sceneID) { _, new in
-        guard let newModel = DocumentModel.forScene(id: new)
+        guard let newModel = WindowModelManager.shared.forScene(id: new)
         else {
           if let model {
-            DocumentModel.relocate(model, to: new)
+            WindowModelManager.shared.relocate(model, to: new)
           }
           return
         }
@@ -119,7 +120,7 @@ struct DocumentSceneContent: View {
     guard let live = model else {
       lastTarget = target
       // Empty window adopts the document in place (welcome → document).
-      model = DocumentModel.open(target: target, id: sceneID)
+      model = WindowModelManager.shared.open(target: target, id: sceneID)
       return
     }
     // Same document → just scroll + focus (dedup).

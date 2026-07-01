@@ -107,7 +107,7 @@ struct DocumentSnapshotTests {
     let url = URL(fileURLWithPath: "/tmp/doc.md")
     let original = DocumentModel.Snapshot(
       history: .init(url: url),
-      scrollY: 120.5,
+      scroll: .location(120.5),
       showsTOC: true,
       pageZoom: 1.25,
       templatePersistent: .init(id: .init(rawValue: "aaa"), name: "template"),
@@ -119,5 +119,19 @@ struct DocumentSnapshotTests {
     let decoded = try JSONDecoder().decode(
       DocumentModel.Snapshot.self, from: data)
     #expect(decoded == original)
+  }
+
+  @Test("Snapshot round-trips a line-target scroll")
+  func snapshotCodingLineScroll() throws {
+    let url = URL(fileURLWithPath: "/tmp/doc.md")
+    let original = DocumentModel.Snapshot(
+      history: .init(url: url),
+      scroll: .line(42))
+
+    let data = try JSONEncoder().encode(original)
+    let decoded = try JSONDecoder().decode(
+      DocumentModel.Snapshot.self, from: data)
+    #expect(decoded == original)
+    #expect(decoded.scroll == .line(42))
   }
 }

@@ -34,9 +34,6 @@ final class DocumentModel: NavigationModel, ReloadableModel {
   }
   var toolbarID: String { isRegular ? "viewer.main" : "viewer.help" }
 
-  /// Token for the persistence observer (`startTrackingPersistentState`).
-  @ObservationIgnored var saveObservation: Cancellable?
-
   /// Token for the render-inputs observer (`startTrackingRenderInputs`).
   @ObservationIgnored var reloadObservation: Cancellable?
 
