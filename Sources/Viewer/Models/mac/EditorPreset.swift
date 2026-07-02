@@ -19,15 +19,57 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
 
   var id: String { rawValue }
 
-  var displayName: String {
+  // MARK: - Installed application
+
+  /// Bundle identifiers of the editor's `.app`, most-preferred first.
+  /// Used to resolve the installed application URL — and from it the
+  /// icon and availability — via `NSWorkspace`. Sublime Text ships a
+  /// different identifier per major version, so it lists several
+  /// candidates and the first that resolves wins.
+  var bundleIdentifiers: [String] {
     switch self {
-    case .bbedit:   "BBEdit"
-    case .textmate: "TextMate"
-    case .vscode:   "Visual Studio Code"
-    case .sublime:  "Sublime Text"
-    case .zed:      "Zed"
-    case .xcode:    "Xcode"
+    case .bbedit:   ["com.barebones.bbedit"]
+    case .textmate: ["com.macromates.TextMate"]
+    case .vscode:   ["com.microsoft.VSCode"]
+    case .sublime:
+      ["com.sublimetext.4", "com.sublimetext.3", "com.sublimetext.2"]
+    case .zed:      ["dev.zed.Zed"]
+    case .xcode:    ["com.apple.dt.Xcode"]
     }
+  }
+
+  /// URL of the installed `.app`, or nil if none of the known bundle
+  /// identifiers resolves. Returns the first candidate LaunchServices
+  /// can locate. `NSWorkspace`/`Bundle`/`FileManager` are thread-safe,
+  /// so this stays nonisolated and can feed the nonisolated
+  /// `ChoiceValue.name`.
+  var applicationURL: URL? {
+    bundleIdentifiers
+      .lazy
+      .compactMap { id in
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+      }
+      .first
+  }
+
+  /// True when the editor's application is installed. Drives whether
+  /// the settings picker offers this preset at all.
+  var isInstalled: Bool { applicationURL != nil }
+
+  /// The application's own name, for the picker row: the bundle's
+  /// display name (or bundle name), then the Finder display name
+  /// (with the `.app` extension stripped). There is no hardcoded
+  /// per-editor label — the name always comes from the installed app.
+  /// The `rawValue` fallback only surfaces for a persisted selection
+  /// whose app has since been uninstalled (normally filtered out of
+  /// the picker), so it never shows in normal use.
+  ///
+  /// `Bundle(identifier:)` can't be used here: it resolves only bundles
+  /// already loaded into this process, not an arbitrary installed app,
+  /// so we build the bundle from the resolved application URL instead.
+  var localizedName: String {
+    guard let url = applicationURL else { return rawValue }
+    return url.displayName
   }
 
   /// How this editor accepts a "open file at line" request. URL-template
@@ -47,19 +89,19 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   var invocation: InvocationStyle {
     switch self {
     case .bbedit:
-      .urlTemplate("x-bbedit://open?url={url}&line={line}")
+        .urlTemplate("x-bbedit://open?url={url}&line={line}")
     case .textmate:
-      .urlTemplate("txmt://open?url={url}&line={line}")
+        .urlTemplate("txmt://open?url={url}&line={line}")
     case .vscode:
-      .urlTemplate("vscode://file{path}:{line}")
+        .urlTemplate("vscode://file{path}:{line}")
     case .sublime:
-      .urlTemplate("subl://open?url={url}&line={line}")
+        .urlTemplate("subl://open?url={url}&line={line}")
     case .zed:
-      .urlTemplate("zed://file{path}:{line}")
+        .urlTemplate("zed://file{path}:{line}")
     case .xcode:
-      .command(
-        executable: "/usr/bin/xed",
-        args: ["--line", "{line}", "{path}"])
+        .command(
+          executable: "/usr/bin/xed",
+          args: ["--line", "{line}", "{path}"])
     }
   }
 
@@ -108,13 +150,13 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   /// walked-up version safe to hand to the picker.
   var defaultScriptDestination: URL? {
     switch self {
-    // `~/Library/Application Support/BBEdit/Scripts` — BBEdit's user
-    // scripts directory.
+      // `~/Library/Application Support/BBEdit/Scripts` — BBEdit's user
+      // scripts directory.
     case .bbedit:
       URL.applicationSupportDirectory/"BBEdit"/"Scripts"
-    // `~/Library/Scripts/Applications/Xcode` — macOS Script Menu
-    // per-application directory. Scripts placed here surface in the
-    // system Script Menu only when Xcode is frontmost.
+      // `~/Library/Scripts/Applications/Xcode` — macOS Script Menu
+      // per-application directory. Scripts placed here surface in the
+      // system Script Menu only when Xcode is frontmost.
     case .xcode:
       URL.homeDirectory/"Library"/"Scripts"/"Applications"/"Xcode"
     case .textmate, .vscode, .sublime, .zed:
@@ -181,9 +223,9 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
   /// the install is a plain copy — no port-placeholder rewriting.
   func installScripts(to destination: URL) throws {
     guard let bundleName = scriptBundleName,
-      let source = Bundle.main.url(
-        forResource: bundleName, withExtension: "bundle"),
-      source.itemExists else {
+          let source = Bundle.main.url(
+            forResource: bundleName, withExtension: "bundle"),
+          source.itemExists else {
       throw ScriptInstallError.sourceMissing
     }
 
@@ -236,8 +278,8 @@ enum EditorPreset: String, Codable, CaseIterable, Identifiable,
       // `UserDefaults(suiteName:)` skips a `Process` round-trip.
       UserDefaults(suiteName: "com.apple.scriptmenu")?
         .set(true, forKey: "ScriptMenuEnabled")
-      NSWorkspace.shared.open(URL(filePath:
-        "/System/Library/CoreServices/Script Menu.app"))
+      NSWorkspace.shared.open(URL(
+        filePath: "/System/Library/CoreServices/Script Menu.app"))
     case .bbedit, .textmate, .vscode, .sublime, .zed:
       break
     }

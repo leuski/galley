@@ -44,24 +44,35 @@ final class EditorChoice: ChoiceModel {
 
     /// User-visible label. Translatable phrases ("Custom URL
     /// Scheme…", "Other Application…") use the literal init so Xcode
-    /// extracts them; product / brand names ("BBEdit", "TextMate")
-    /// and picked-app filenames go through a runtime
-    /// `LocalizationValue` so they stay out of the catalog and
-    /// resolve to themselves at lookup time.
+    /// extracts them; the preset's application name and picked-app
+    /// filenames go through a runtime `LocalizationValue` so they stay
+    /// out of the catalog and resolve to themselves at lookup time. A
+    /// preset's name is the installed app's own name — there is no
+    /// hardcoded per-editor label.
     var name: LocalizedStringResource {
       switch self {
       case .preset(let preset):
-        return LocalizedStringResource(
-          String.LocalizationValue("\(preset.displayName)"))
+        LocalizedStringResource(
+          String.LocalizationValue(preset.localizedName))
       case .customURL:
-        return "Custom URL Scheme…"
+          "Custom URL Scheme…"
       case .appBundle(let url):
-        if let url {
-          let basename = url.deletingPathExtension().lastPathComponent
-          return LocalizedStringResource(
-            String.LocalizationValue("\(basename)"))
-        }
-        return "Other Application…"
+        url.map { url in
+          LocalizedStringResource(
+            String.LocalizationValue(url.displayName))
+        } ?? "Other Application…"
+      }
+    }
+
+    /// Application URL whose icon represents this row, or nil for rows
+    /// without an app (the "Custom URL Scheme…" row and the empty
+    /// "Other Application…" row). The view builds the SwiftUI image
+    /// from this URL — the model stays free of `NSImage`.
+    var iconApplicationURL: URL? {
+      switch self {
+      case .preset(let preset): return preset.applicationURL
+      case .appBundle(let url): return url
+      case .customURL:          return nil
       }
     }
 
@@ -103,12 +114,17 @@ final class EditorChoice: ChoiceModel {
   }
 
   init() {
-    var initial: [Element] = EditorPreset.allCases.map { .preset($0) }
+    let loaded = Defaults.shared.editor
+    // Offer only editors whose application is installed. A persisted
+    // preset whose app is missing is kept so the picker still shows
+    // the user's prior selection rather than silently dropping it.
+    var initial: [Element] = EditorPreset.allCases
+      .filter { $0.isInstalled || Element.preset($0).kind == loaded.kind }
+      .map { .preset($0) }
     initial.append(.customURL(
       template: EditorPreset.bbedit.urlTemplate ?? ""))
     initial.append(.appBundle(nil))
 
-    let loaded = Defaults.shared.editor
     if let index = initial.firstIndex(where: { $0.kind == loaded.kind }) {
       initial[index] = loaded
     }
