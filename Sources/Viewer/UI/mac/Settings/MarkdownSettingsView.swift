@@ -69,7 +69,7 @@ struct MarkdownSettingsView: View {
             model: appModel.editors,
             onRequestAppPicker: { showAppPicker = true })
         } label: {
-          Text(appModel.editors.selected.name)
+          EditorChoiceElement(model: appModel.editors.selected)
         }
         .fixedSize()
       } label: {
@@ -300,6 +300,24 @@ private struct InstallScriptsPickerModifier: ViewModifier {
   }
 }
 
+struct EditorChoiceElement: View {
+  let model: EditorChoice.Element
+
+  var body: some View {
+    if let image = model.iconApplicationURL?.icon {
+      Label {
+        Text(model.name)
+      } icon: {
+        image
+          .resizable()
+          .frame(width: 16, height: 16)
+      }
+    } else {
+      Text(model.name)
+    }
+  }
+}
+
 /// Menu rows for the editor picker. Sectioned by kind so presets
 /// sit above customURL/appBundle.
 ///
@@ -309,6 +327,9 @@ private struct InstallScriptsPickerModifier: ViewModifier {
 /// present its `.fileImporter` so the user can pick an app first.
 /// The model never receives `.appBundle(nil)` — it only sees
 /// `.appBundle(picked)` after a successful pick.
+/// Renders an application's Finder icon at menu-row size. Keeping the
+/// `NSWorkspace.icon(forFile:)` lookup and `Image(nsImage:)` bridge
+/// inside a view means the model layer never handles an `NSImage`.
 struct EditorMenuCore: View {
   let model: EditorChoice
   let onRequestAppPicker: () -> Void
@@ -325,7 +346,7 @@ struct EditorMenuCore: View {
       }
     ], id: \.kind) { value in
       Toggle(isOn: binding(for: value)) {
-        Text(value.name)
+        EditorChoiceElement(model: value)
       }
     }
   }
