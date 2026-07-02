@@ -78,11 +78,10 @@ struct MarkdownSettingsView: View {
       .modifier(InstallScriptsPickerModifier(
         isPresented: $showScriptPicker,
         errorMessage: $scriptInstallError,
-        defaultDestination: selectedScriptingPreset?
-          .scriptPickerDefaultDirectory
-          ?? URL.applicationSupportDirectory,
-        customizationID: selectedScriptingPreset?
-          .scriptPickerCustomizationID ?? "is-default",
+        defaultDestination: appModel.editors.selected
+          .editor.scriptPickerDefaultDirectory,
+        customizationID: appModel.editors.selected
+          .editor.scriptPickerCustomizationID,
         onCompletion: handlePickedScriptDestination))
       detailFields
         .modifier(AppBundlePickerModifier(
@@ -96,52 +95,41 @@ struct MarkdownSettingsView: View {
   ) {
     guard case .success(let urls) = result, let url = urls.first
     else { return }
-    appModel.editors.selected = .appBundle(url)
+    Defaults.shared.editorOtherApplication = url
+    appModel.editors.selected = .otherApplication
   }
 
   private func handlePickedScriptDestination(
     _ result: Result<[URL], any Error>
   ) {
-    guard case .success(let urls) = result, let destination = urls.first,
-      let preset = selectedScriptingPreset
+    guard case .success(let urls) = result, let destination = urls.first
     else { return }
     do {
-      try preset.installScripts(to: destination)
-      preset.presentInstalledScripts(at: destination)
+      let editor = appModel.editors.selected.editor
+      guard editor.scriptBundleName != nil else { return }
+      try editor.installScripts(to: destination)
+      editor.presentInstalledScripts(at: destination)
     } catch {
       scriptInstallError = error.localizedDescription
     }
   }
 
-  /// Currently-selected preset if the user is on a preset row that
-  /// ships scripts, otherwise nil. Drives the "Install scripts…"
-  /// affordance and its picker.
-  private var selectedScriptingPreset: EditorPreset? {
-    if case .preset(let preset) = appModel.editors.selected,
-       preset.hasScriptKit {
-      return preset
-    }
-    return nil
-  }
-
   @ViewBuilder
   private var detailFields: some View {
     switch appModel.editors.selected {
-    case .preset(let preset) where preset.hasScriptKit:
+    case let value where value.editor.scriptBundleName != nil:
       HStack {
         Spacer()
         Button("Install scripts…") { showScriptPicker = true }
           .padding(.top, 4)
       }
-    case .preset:
-      EmptyView()
 
-    case .customURL:
+    case .customURLScheme:
       VStack(alignment: .leading, spacing: 4) {
         HStack {
           Text("URL template")
           Spacer()
-          TextField("URL template", text: customURLBinding)
+          TextField("URL template", text: $defaults.editorCustomURL)
             .textFieldStyle(.roundedBorder)
             .font(.system(.body, design: .monospaced))
             .labelsHidden()
@@ -150,7 +138,7 @@ struct MarkdownSettingsView: View {
           .subtitle()
       }
 
-    case .appBundle:
+    case .otherApplication:
       VStack(alignment: .leading, spacing: 4) {
         HStack {
           Text(
@@ -161,6 +149,8 @@ struct MarkdownSettingsView: View {
           Button("Choose Application…") { showAppPicker = true }
         }
       }
+    default:
+      EmptyView()
     }
   }
 
@@ -207,25 +197,6 @@ struct MarkdownSettingsView: View {
       Re-run shell-based discovery — useful after installing a new processor.
       """)
   }
-
-  /// Reads/writes the customURL template via `selected`. The setter
-  /// flows through `EditorChoice.selected.set` which rewrites the
-  /// matching slot in `values`, so each keystroke updates both the
-  /// active selection and the in-memory customURL slot.
-  private var customURLBinding: Binding<String> {
-    Binding(
-      get: {
-        if case .customURL(let template) = appModel.editors.selected {
-          return template
-        }
-        return ""
-      },
-      set: { newValue in
-        appModel.editors.selected = .customURL(template: newValue)
-      }
-    )
-  }
-
 }
 
 /// Wraps the app-bundle `.fileImporter` and its `.fileDialog*`
@@ -304,7 +275,7 @@ struct EditorChoiceElement: View {
   let model: EditorChoice.Element
 
   var body: some View {
-    if let image = model.iconApplicationURL?.icon {
+    if let image = model.editor.url?.icon {
       Label {
         Text(model.name)
       } icon: {
@@ -336,29 +307,27 @@ struct EditorMenuCore: View {
 
   var body: some View {
     let values = model.values
-    DividedSections(sections: [
-      values.filter { if case .preset = $0 { return true }; return false },
-      values.filter {
-        switch $0 {
-        case .customURL, .appBundle: return true
-        case .preset:                return false
-        }
+      .reduce(into: [:]) { result, value in
+        result[value.section, default: []].append(value)
       }
-    ], id: \.kind) { value in
+      .sorted { $0.key < $1.key }
+      .map { $0.value }
+    DividedSections(sections: values, id: \.self) { value in
       Toggle(isOn: binding(for: value)) {
         EditorChoiceElement(model: value)
       }
+      .disabled(!value.isAvailable)
     }
   }
 
   private func binding(for value: EditorChoice.Element) -> Binding<Bool> {
     Binding(
-      get: { model.selected.kind == value.kind },
+      get: { model.selected.persistentID == value.persistentID },
       set: { newValue in
         guard newValue else { return }
-        if case .appBundle = value {
-          if let url = model.appBundleURL {
-            model.selected = .appBundle(url)
+        if value == .otherApplication {
+          if nil != Defaults.shared.editorOtherApplication {
+            model.selected = .otherApplication
           } else {
             onRequestAppPicker()
           }

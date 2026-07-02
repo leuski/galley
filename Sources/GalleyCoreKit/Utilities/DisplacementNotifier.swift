@@ -14,6 +14,7 @@ extension UNUserNotificationCenter {
   public enum Kind: Sendable {
     case processor
     case template
+    case editor
 
     /// Localized notification title for the case, exposed as
     /// `LocalizedStringResource` for symmetry with the rest of the
@@ -28,6 +29,8 @@ extension UNUserNotificationCenter {
         "Markdown processor unavailable", bundle: .galleyCoreKit)
       case .template: LocalizedStringResource(
         "Template unavailable", bundle: .galleyCoreKit)
+      case .editor: LocalizedStringResource(
+        "Editor unavailable", bundle: .galleyCoreKit)
       }
     }
   }

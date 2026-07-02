@@ -74,7 +74,11 @@ final class AppModel {
       NSWindow.allowsAutomaticWindowTabbing = Defaults
         .shared.openBehavior == .newTab
     })
-    self.editors = EditorChoice()
+    self.editors = EditorChoice(
+      source: EditorStore.shared,
+      persistent: Defaults.shared.editor) { name in
+        Self.notify(.editor, name)
+      }
     /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
     /// activity URL. The "+" only exists when windows are already tabbed
     /// (new-tab behavior → `syncWindowTabbing` left the toggle on), so the

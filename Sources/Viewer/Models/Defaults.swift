@@ -82,7 +82,13 @@ final class Defaults: GalleyRenderDefaults,
   var readingWordsPerMinute: Int = 200
 
 #if os(macOS)
-  var editor: EditorChoice.Element = .preset(.bbedit)
+  var editor: Editor.PersistentRepresentation?
+  private var editorOtherApplicationPath: String?
+  var editorOtherApplication: URL? {
+    get { editorOtherApplicationPath.flatMap { URL(string: $0) } }
+    set { editorOtherApplicationPath = newValue?.absoluteString }
+  }
+  var editorCustomURL = "x-bbedit://open?url={url}&line={line}"
 #endif
 
   /// Persisted Open Recent entries — the single source of truth for

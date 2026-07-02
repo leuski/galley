@@ -379,11 +379,8 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     } else {
       resolvedLine = await topmostVisibleSourceLine()
     }
-    await openFileInEditor(
-      AppModel.shared.editors.selected,
-      fileURL: url,
-      line: resolvedLine,
-      logger: logger)
+    await AppModel.shared.editors.selected.editor.openFileInEditor(
+      url, line: resolvedLine)
 #else
     _ = line
 #endif
