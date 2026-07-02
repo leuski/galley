@@ -42,7 +42,7 @@ final class Defaults: GalleyRenderDefaults,
   /// `WindowGroup` value (the id), and the window rehydrates its
   /// document from this map. Replaces the old `@SceneStorage("history")`
   /// slot (broken on visionOS). See docs/rebuild-document-windowing.md.
-  private var windowSnapshots: [String: DocumentModel.Snapshot] = [:]
+  private var windowSnapshots: [String: WindowModel.Snapshot] = [:]
   /// Per-file persisted state, keyed by `fileKey(_:)`. The
   /// url-keyed half of document store: a fresh window opening a known
   /// file re-seeds its zoom/scroll/TOC/choices from here. Same
@@ -126,7 +126,7 @@ final class Defaults: GalleyRenderDefaults,
     suiteName: GalleyConstants.suiteName)
   @Ignore var accessTimes = Set<String>()
 
-  subscript (snapshot key: DocumentSceneID) -> DocumentModel.Snapshot? {
+  subscript (snapshot key: DocumentSceneID) -> WindowModel.Snapshot? {
     get {
       let key = key.description
       accessTimes.insert(key)

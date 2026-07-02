@@ -16,7 +16,7 @@ import UserNotifications
 /// URLs; toolbar buttons drive `goBack`, `goForward`, and `reload`.
 @Observable
 @MainActor
-final class DocumentModel: NavigationModel, ReloadableModel {
+final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   var canReload: Bool { true }
 
   let page: WebPage

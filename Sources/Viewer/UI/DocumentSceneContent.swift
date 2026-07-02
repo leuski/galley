@@ -19,7 +19,7 @@ struct DocumentSceneContent: View {
   /// `nil` == welcome (no document). Built synchronously in `init` from
   /// the store so a restored window shows its document on the first
   /// frame — no async launchTask, no reveal gate.
-  @State private var model: DocumentModel?
+  @State private var model: WindowModel?
 
   @Environment(\.openWindow) private var openWindow
 
@@ -31,9 +31,10 @@ struct DocumentSceneContent: View {
 
   var body: some View {
     documentOrWelcome
-      // Window selection IS the open-behavior decision (directive 8):
-      // SwiftUI routes the URL — we don't re-dispatch. See
-      // `preferringTokens` / `allowingTokens`.
+      // One window-level routing decision — SwiftUI picks the window, we
+      // don't re-dispatch. Tokens come from the active tab (Dot-style);
+      // a welcome window falls back to the bare scheme so a freshly
+      // spawned window attracts the document fired at it.
       .handlesExternalEvents(
         preferring: preferringTokens,
         allowing: allowingTokens)
@@ -49,51 +50,37 @@ struct DocumentSceneContent: View {
         }
 
         guard newModel !== model else { return }
-        let lastRequest = model.lastRequest
+        let oldRequests = model?.tabs
+          .compactMap { tab in tab.lastRequest } ?? []
         self.model = newModel
-        // we are restoring the window. If we have a model assigned, it's
-        // the wrong model. Evict it and ask the framework to re-open
-        // the document.
-        if let lastRequest {
-          GalleyViewerRequestActivity(target: lastRequest).open()
+        for request in oldRequests {
+          // we are restoring the window. If we have a model assigned, it's
+          // the wrong model. Evict it and ask the framework to re-open
+          // the document.
+          GalleyViewerRequestActivity(target: request).open()
         }
       }
       .windowTransparency(model == nil ? 0 : 1)
   }
 
-  /// Tokens this window *prefers* — a re-open of the doc it already shows
-  /// routes back here (dedup). A blank window prefers the bare scheme so
-  /// a freshly-spawned window attracts the document fired at it.
-  private var preferringTokens: Set<String> {
-    model?.documentURL.galleyPreferringTokens
-      ?? [GalleyViewerRequestActivity.schemeExternalToken]
-  }
-
-  /// Tokens this window *accepts*, which is what makes SwiftUI choose
-  /// where a URL lands — i.e. open-behavior expressed declaratively:
-  ///   - empty window → anything (it's the adopt/bootstrap target);
-  ///   - `.replaceCurrent` → anything (a foreign doc replaces in place);
-  ///   - `.newWindow` / `.newTab` → only its *own* doc, so same-doc
-  ///     re-opens still dedup here while a foreign doc is declined and
-  ///     SwiftUI spawns a fresh window (born-as-tab per
-  ///     `syncWindowTabbing`).
-  private var allowingTokens: Set<String> {
-    guard let model else { return DocumentScene.events }
-    switch Defaults.shared.openBehavior {
-    case .replaceCurrent:
-      return DocumentScene.events
-    case .newWindow, .newTab:
-      return model.documentURL.galleyPreferringTokens
-    }
-  }
-
   @ViewBuilder
   private var documentOrWelcome: some View {
     if let model {
-      DocumentView(model: model)
+      ZStack {
+        ForEach(model.tabs) { tab in
+          DocumentView(model: tab)
+          // Keep every tab mounted and switch by visibility only, so a
+          // tab switch never tears down / reloads a WebView (Dot's
+          // VisionBrowserContentView pattern). On macOS there is always
+          // exactly one tab, so this is a no-op there.
+            .opacity(tab === model.activeTab ? 1 : 0)
+            .allowsHitTesting(tab === model.activeTab)
+            .accessibilityHidden(tab !== model.activeTab)
 #if os(macOS)
-        .navigationDocument(model.documentURL)
+            .navigationDocument(tab.documentURL)
 #endif
+        }
+      }
     } else {
       WelcomeView()
 #if os(macOS)
@@ -108,35 +95,95 @@ struct DocumentSceneContent: View {
     }
   }
 
+  /// Dedup tokens for *every* open tab — a re-open of any tab's document
+  /// (not just the active one) routes back to this window, where
+  /// `handleOpenURL` activates the matching tab.
+  private func openTabTokens(_ model: WindowModel) -> Set<String> {
+    model.tabs.reduce(into: Set<String>()) { tokens, tab in
+      tokens.formUnion(tab.documentURL.galleyPreferringTokens)
+    }
+  }
+
+  /// Tokens this window *prefers* — a re-open of any open tab's doc routes
+  /// back here (dedup). A welcome window prefers the bare scheme so a
+  /// freshly spawned window attracts the document fired at it.
+  private var preferringTokens: Set<String> {
+    guard let model else {
+      return [GalleyViewerRequestActivity.schemeExternalToken]
+    }
+    return openTabTokens(model)
+  }
+
+  /// Tokens this window *accepts*, which is what makes SwiftUI choose
+  /// where a URL lands — open-behavior expressed declaratively. In every
+  /// case the union of open-tab tokens is accepted so a re-open of any
+  /// tab dedups here; foreign docs are additionally accepted only when
+  /// the behavior keeps them in this window:
+  ///   - welcome window → anything (the adopt/bootstrap target);
+  ///   - `.replaceCurrent` → anything (a foreign doc replaces in place);
+  ///   - `.newTab` → **visionOS** anything (adopt as an in-window tab);
+  ///     **macOS** dedup-only, so a foreign doc is declined and SwiftUI
+  ///     spawns a fresh window born-as-tab via the OS tabbing group;
+  ///   - `.newWindow` → dedup-only, so a foreign doc spawns a new window.
+  private var allowingTokens: Set<String> {
+    guard let model else { return DocumentScene.events }
+    switch Defaults.shared.openBehavior {
+    case .replaceCurrent:
+      return DocumentScene.events
+    case .newTab:
+#if os(visionOS)
+      return DocumentScene.events
+#else
+      return openTabTokens(model)
+#endif
+    case .newWindow:
+      return openTabTokens(model)
+    }
+  }
+
   /// Apply an inbound document URL SwiftUI routed to this window.
   private func handleOpenURL(_ url: URL) {
     guard let target = GalleyViewerRequestActivity(from: url)?.target
     else { return }
-
     AppModel.shared.recents.record(target.documentURL)
 
-    guard let live = model else {
-      lastTarget = target
-      // Empty window adopts the document in place (welcome → document).
+    // Welcome window adopts the document in place (welcome → document).
+    guard let model else {
       model = WindowModelManager.shared.open(target: target, id: sceneID)
       return
     }
-    // Same document → just scroll + focus (dedup).
-    if live.documentURL.standardizedFileURL
-      == target.documentURL.standardizedFileURL
-    {
+
+    // Already open in some tab of this window → activate that tab, scroll,
+    // focus (dedup across *all* tabs, not just the active one).
+    if let existing = model.tabs.first(where: {
+      $0.documentURL.standardizedFileURL
+        == target.documentURL.standardizedFileURL
+    }) {
+      model.activate(tab: existing)
       if let scroll = target.scroll {
-        Task { await live.scroll(to: scroll) }
+        Task { await existing.scroll(to: scroll) }
       }
       focusWindow()
       return
     }
-    // A live window only receives a *foreign* document when its
-    // `allowingTokens` accepted it — i.e. under `.replaceCurrent`. Under
-    // new-window / new-tab the window declines foreign docs, so SwiftUI
-    // spawns a fresh window instead and this line is never reached for
-    // them. So: replace in place.
-    Task { await live.bind(to: target) }
+
+    // A foreign document reached this window because `allowingTokens`
+    // accepted it. On visionOS under `.newTab` that means "add an
+    // in-window tab"; every other accept path (`.replaceCurrent`, and
+    // the macOS OS-tab route — which declines foreign docs so a new
+    // window spawns instead and never lands here) replaces the active
+    // tab in place.
+#if os(visionOS)
+    if case .newTab = Defaults.shared.openBehavior {
+      model.addTab(WindowModelManager.shared.makeTab(for: target))
+      return
+    }
+#endif
+    if Defaults.shared.openBehavior == .replaceCurrent {
+      Task { await model.activeTab.bind(to: target) }
+      return
+    }
+    GalleyViewerRequestActivity(target: target).open()
   }
 
   private func focusWindow() {

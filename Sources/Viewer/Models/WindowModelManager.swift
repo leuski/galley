@@ -8,7 +8,7 @@
 import GalleyCoreKit
 
 final class WindowModelManager: PersistentModelManager<
-DocumentSceneID, DocumentModel>
+DocumentSceneID, WindowModel>
 {
   static let shared = WindowModelManager()
 
@@ -18,14 +18,16 @@ DocumentSceneID, DocumentModel>
       setter: { id, value in
         Defaults.shared[snapshot: id] = value
         guard let value else { return }
-        Defaults.shared[snapshot: value.currentURL] = value.droppingHistory
+        value.tabs.forEach { tab in
+          Defaults.shared[snapshot: tab.currentURL] = tab.droppingHistory
+        }
       }))
   }
 
   /// Live-or-restored model for a window. Returns `nil` when the window
   /// has no stored document (the welcome state). Synchronous — safe to
   /// call from a `@State` initial value.
-  func forScene(id: DocumentSceneID) -> DocumentModel? {
+  func forScene(id: DocumentSceneID) -> WindowModel? {
     get(for: id)
   }
 
@@ -34,14 +36,26 @@ DocumentSceneID, DocumentModel>
   /// A fresh window seeds its view-state (zoom/scroll/TOC/choices) from
   /// the file store so reopening a known file restores where you were.
   func open(
-    target: DocumentTarget, id: DocumentSceneID) -> DocumentModel
+    target: DocumentTarget, id: DocumentSceneID) -> WindowModel
   {
     if let existing = existing(for: id) { return existing }
+    return remember(WindowModel(makeTab(for: target)), for: id)
+  }
+
+  /// Build a document tab seeded from the file store (so reopening a
+  /// known file restores its zoom/scroll/TOC/choices) and stamped with
+  /// the originating request. Shared by the welcome→document adopt path
+  /// (`open`) and the visionOS new-tab path (`WindowModel.addTab`).
+  func makeTab(for target: DocumentTarget) -> DocumentModel {
     var snapshot = Defaults.shared[snapshot: target.documentURL]
     ?? DocumentModel.Snapshot(url: target.documentURL)
     if let scroll = target.scroll {
       snapshot.scroll = scroll
     }
-    return remember(DocumentModel(snapshot: snapshot), for: id)
+    let documentModel = DocumentModel(snapshot: snapshot)
+    documentModel.lastRequest = target
+    return documentModel
   }
 }
+
+typealias WindowModel = AbstractWindowModel<DocumentModel>

@@ -316,12 +316,17 @@ struct OpenFileModifier: ViewModifier {
       .fileImporter(
         isPresented: isPresented ?? $appModel.isOpenFilePresented,
         allowedContentTypes: MarkdownFileTypes.allTypesAndPlainText,
-        allowsMultipleSelection: false
+        allowsMultipleSelection: true
       ) { result in
-        guard case .success(let urls) = result, let url = urls.first
+        guard case .success(let urls) = result
         else { return }
-        _ = url.startAccessingSecurityScopedResource()
-        GalleyViewerRequestActivity(url: url).open()
+        Task {
+          for url in urls {
+            _ = url.startAccessingSecurityScopedResource()
+            GalleyViewerRequestActivity(url: url).open()
+            try? await Task.sleep(nanoseconds: 100_000_000)
+          }
+        }
       }
   }
 }

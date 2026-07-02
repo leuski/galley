@@ -150,6 +150,43 @@ struct EditorPresetTests {
     #expect(result == "x://open?line=")
     #expect(!result.contains("{line}"))
   }
+
+  /// Every preset must declare at least one non-empty, reverse-DNS
+  /// bundle identifier — that string is what resolves the installed
+  /// app URL (and thus its icon + availability) via `NSWorkspace`.
+  /// An empty or malformed list would silently mark the editor as
+  /// never-installed.
+  @Test("Every preset declares a plausible bundle identifier",
+        arguments: EditorPreset.allCases)
+  func everyPresetHasBundleIdentifiers(preset: EditorPreset) {
+    let identifiers = preset.bundleIdentifiers
+    #expect(!identifiers.isEmpty, "\(preset) has no bundle identifiers")
+    for identifier in identifiers {
+      #expect(!identifier.isEmpty, "\(preset) has an empty identifier")
+      #expect(identifier.contains("."), "\(preset) → \(identifier)")
+    }
+  }
+
+  @Test("Known presets map to their canonical bundle identifiers")
+  func canonicalBundleIdentifiers() {
+    #expect(EditorPreset.bbedit.bundleIdentifiers.first
+      == "com.barebones.bbedit")
+    #expect(EditorPreset.vscode.bundleIdentifiers.first
+      == "com.microsoft.VSCode")
+    #expect(EditorPreset.xcode.bundleIdentifiers.first
+      == "com.apple.dt.Xcode")
+  }
+
+  /// `localizedName` comes from the installed app's bundle, falling
+  /// back to the `rawValue` when the app isn't installed — so it is
+  /// never empty (an empty menu row would be a silent regression).
+  /// The localized value itself is environment-dependent, so we only
+  /// pin the non-empty invariant here.
+  @Test("Every preset resolves a non-empty menu title",
+        arguments: EditorPreset.allCases)
+  func everyPresetHasLocalizedName(preset: EditorPreset) {
+    #expect(!preset.localizedName.isEmpty)
+  }
 }
 
 #endif
