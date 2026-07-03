@@ -52,64 +52,59 @@ enum ScriptInstallError: LocalizedError {
 }
 
 @MainActor
-protocol EditorProtocol {
-  nonisolated var persistentID: String { get }
-  var url: URL? { get }
-  var invocation: InvocationStyle { get }
-  var name: LocalizedStringResource { get }
-  var scriptBundleName: String? { get }
-  var defaultScriptDestination: URL? { get }
-  var postInstall: (@MainActor () -> Void)? { get }
-  var section: Int { get }
-}
-
-enum Editor: ChoiceValue, SectionedChoiceValue
+struct Editor: ChoiceValue, SectionedChoiceValue
 {
-  case preset(Preset)
-  case customURLScheme
-  case otherApplication
+  static let customURLScheme = Editor(
+    section: 1,
+    persistentID: "customURLScheme",
+    url: nil,
+    invocation: .urlTemplate(
+      Defaults.shared.editorCustomURL),
+    name: "Custom URL Scheme"
+  )
 
-  nonisolated var persistentID: String { editor.persistentID }
-  var name: LocalizedStringResource { editor.name }
-  var section: Int { editor.section }
-
-  nonisolated var editor: EditorProtocol {
-    switch self {
-    case .preset(let preset): preset
-    case .customURLScheme: CustomURLScheme.shared
-    case .otherApplication: OtherApplication.shared
-    }
-  }
-
-  struct CustomURLScheme: EditorProtocol {
-    nonisolated static let shared = Self()
-    nonisolated var persistentID: String { "customURLScheme" }
-    var invocation: InvocationStyle { .urlTemplate(
-      Defaults.shared.editorCustomURL) }
-    var name: LocalizedStringResource { "Custom URL Scheme" }
-  }
-
-  struct OtherApplication: EditorProtocol {
-    nonisolated static let shared = Self()
-    nonisolated var persistentID: String { "otherApplication" }
-    var invocation: InvocationStyle { .open }
-    var name: LocalizedStringResource { Defaults.shared
+  static let otherApplication = Editor(
+    section: 1,
+    persistentID: "otherApplication",
+    url: Defaults.shared.editorOtherApplication,
+    invocation: .open,
+    name: Defaults.shared
         .editorOtherApplication.map { url in
           LocalizedStringResource(
             String.LocalizationValue(url.displayName))
-        } ?? "Other Application…" }
-    var url: URL? { Defaults.shared.editorOtherApplication }
-  }
+        } ?? "Other Application…"
+  )
 
-  struct Preset: EditorProtocol {
-    var section: Int { 0 }
-    nonisolated let persistentID: String
-    let url: URL?
-    let invocation: InvocationStyle
-    let name: LocalizedStringResource
-    let scriptBundleName: String?
-    let defaultScriptDestination: URL?
-    let postInstall: (@MainActor () -> Void)?
+  let section: Int
+  nonisolated let persistentID: String
+  private let _url: () -> URL?
+  var url: URL? { _url() }
+  private let _invocation: () -> InvocationStyle
+  var invocation: InvocationStyle { _invocation() }
+  private let _name: () -> LocalizedStringResource
+  var name: LocalizedStringResource { _name() }
+  let scriptBundleName: String?
+  let defaultScriptDestination: URL?
+  let postInstall: (@MainActor () -> Void)?
+
+  init(
+    section: Int,
+    persistentID: String,
+    url: @escaping @autoclosure () -> URL?,
+    invocation: @escaping @autoclosure () -> InvocationStyle,
+    name: @escaping @autoclosure () -> LocalizedStringResource,
+    scriptBundleName: String? = nil,
+    defaultScriptDestination: URL? = nil,
+    postInstall: (@MainActor () -> Void)? = nil
+  ) {
+    self.section = section
+    self.persistentID = persistentID
+    self._url = url
+    self._invocation = invocation
+    self._name = name
+    self.scriptBundleName = scriptBundleName
+    self.defaultScriptDestination = defaultScriptDestination
+    self.postInstall = postInstall
   }
 
   init?(
@@ -125,7 +120,8 @@ enum Editor: ChoiceValue, SectionedChoiceValue
     else {
       return nil
     }
-    self = .preset(Preset(
+    self.init(
+      section: 0,
       persistentID: id,
       url: url,
       invocation: invocation,
@@ -134,16 +130,8 @@ enum Editor: ChoiceValue, SectionedChoiceValue
       scriptBundleName: scriptBundleName,
       defaultScriptDestination: defaultScriptDestination,
       postInstall: postInstall
-    ))
+    )
   }
-}
-
-extension EditorProtocol {
-  var section: Int { 1 }
-  var url: URL? { nil }
-  var scriptBundleName: String? { nil }
-  var defaultScriptDestination: URL? { nil }
-  var postInstall: (@MainActor () -> Void)? { nil }
 
   /// Walks up `defaultScriptDestination` until it finds a directory
   /// that exists on disk. `NSOpenPanel` and SwiftUI's

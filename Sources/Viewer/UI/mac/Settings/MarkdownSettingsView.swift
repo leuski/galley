@@ -79,9 +79,9 @@ struct MarkdownSettingsView: View {
         isPresented: $showScriptPicker,
         errorMessage: $scriptInstallError,
         defaultDestination: appModel.editors.selected
-          .editor.scriptPickerDefaultDirectory,
+          .scriptPickerDefaultDirectory,
         customizationID: appModel.editors.selected
-          .editor.scriptPickerCustomizationID,
+          .scriptPickerCustomizationID,
         onCompletion: handlePickedScriptDestination))
       detailFields
         .modifier(AppBundlePickerModifier(
@@ -105,7 +105,7 @@ struct MarkdownSettingsView: View {
     guard case .success(let urls) = result, let destination = urls.first
     else { return }
     do {
-      let editor = appModel.editors.selected.editor
+      let editor = appModel.editors.selected
       guard editor.scriptBundleName != nil else { return }
       try editor.installScripts(to: destination)
       editor.presentInstalledScripts(at: destination)
@@ -117,7 +117,7 @@ struct MarkdownSettingsView: View {
   @ViewBuilder
   private var detailFields: some View {
     switch appModel.editors.selected {
-    case let value where value.editor.scriptBundleName != nil:
+    case let value where value.scriptBundleName != nil:
       HStack {
         Spacer()
         Button("Install scripts…") { showScriptPicker = true }
@@ -275,7 +275,7 @@ struct EditorChoiceElement: View {
   let model: EditorChoice.Element
 
   var body: some View {
-    if let image = model.editor.url?.icon {
+    if let image = model.url?.icon {
       Label {
         Text(model.name)
       } icon: {
