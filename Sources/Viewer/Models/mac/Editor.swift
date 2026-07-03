@@ -254,17 +254,43 @@ private func openURL(url: URL?, fileURL: URL, line: Int?) async
   }
 }
 
-private func openURL(template: String, fileURL: URL, line: Int?)
-{
+/// Substitutes the `{url}`, `{path}`, `{line}` placeholders in a
+/// URL-scheme editor template. `{url}` is `absoluteString` re-encoded
+/// for a query slot (so it survives as a query parameter), `{path}`
+/// is the raw path percent-encoded for a path slot, and `{line}`
+/// substitutes to the empty string when the caller passes nil.
+/// Shared by the live open path and the unit tests.
+func substituteEditorTemplate(
+  _ template: String, fileURL: URL, line: Int?
+) -> String {
   let allowed = CharacterSet.urlQueryAllowed
     .subtracting(CharacterSet(charactersIn: "&=+?#"))
-  let urlString = template.substituting(substitutions: [
+  return template.substituting(substitutions: [
     "{url}": fileURL.absoluteString
       .addingPercentEncoding(withAllowedCharacters: allowed)
     ?? fileURL.absoluteString,
     "{path}": fileURL.path.percentEncodedForPath,
     "{line}": line.map(String.init) ?? ""
   ])
+}
+
+/// Substitutes `{path}` and `{line}` in a single command argument
+/// with no URL encoding. `{line}` falls back to `"1"` when the caller
+/// passes nil so `--line {line}` always sees a valid integer. Shared
+/// by the live open path and the unit tests.
+func substituteCommandArg(
+  _ arg: String, fileURL: URL, line: Int?
+) -> String {
+  arg.substituting(substitutions: [
+    "{path}": fileURL.path,
+    "{line}": line.map(String.init) ?? "1"
+  ])
+}
+
+private func openURL(template: String, fileURL: URL, line: Int?)
+{
+  let urlString = substituteEditorTemplate(
+    template, fileURL: fileURL, line: line)
   guard let url = URL(string: urlString) else {
     logger.error("""
           Editor URL is not a valid URL: \(urlString, privacy: .public)
@@ -282,10 +308,9 @@ private func runEditorCommand(
   executable: String, args: [String],
   fileURL: URL, line: Int?
 ) async {
-  let args = args.map { arg in arg.substituting(substitutions: [
-    "{path}": fileURL.path,
-    "{line}": line.map(String.init) ?? "1"
-  ])}
+  let args = args.map { arg in
+    substituteCommandArg(arg, fileURL: fileURL, line: line)
+  }
 
   let executableURL = URL(filePath: executable)
   guard executableURL.isExecutable else {

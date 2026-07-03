@@ -4,8 +4,8 @@
 //  Galley
 //
 //  Logic tests for the Viewer app. Uses `@testable import Galley` so
-//  internal types (`EditorPreset`, etc.) are reachable from here.
-//  Pure-routing tests for the kit live in
+//  internal types (`Editor`, `EditorStore`, etc.) are reachable from
+//  here. Pure-routing tests for the kit live in
 //  `Tests/GalleyCoreKitTests/Routing/`.
 //
 //  Note: WelcomeView's recents list (inline Picker driving
@@ -50,29 +50,47 @@ func galleyModuleLoads() {
 // seam to assert against; the menu/toolbar rendering path is exercised by the
 // UITests.
 
-// MARK: - EditorPreset / substituteEditorTemplate
+// MARK: - substituteEditorTemplate / substituteCommandArg
 
-@Suite("EditorPreset")
-struct EditorPresetTests {
-  /// Every preset's URL template must produce a parseable URL after
-  /// substitution — otherwise cmd-click silently fails.
-  @Test("Every preset produces a parseable URL with line",
-        arguments: EditorPreset.urlTemplatePresets)
-  func everyPresetParsesWithLine(preset: EditorPreset) {
-    let url = URL(fileURLWithPath: "/tmp/note.md")
+/// The substitution rules that back URL-scheme and command-style
+/// editor opens. These are the "cmd-click silently fails" bug class:
+/// a template that produces an unparseable URL, an unencoded space,
+/// or a leftover placeholder means the open never reaches the editor.
+/// The rules live in `Editor.swift` and are shared by the live open
+/// path (`openURL(template:…)` / `runEditorCommand`) and these tests.
+@Suite("Editor substitution")
+struct EditorSubstitutionTests {
+  private static let note = URL(fileURLWithPath: "/tmp/note.md")
+  private static let spaced =
+    URL(fileURLWithPath: "/tmp/foo bar/baz.md")
+
+  /// A representative `{url}`-style template (BBEdit/TextMate/Sublime
+  /// shape) and a `{path}`-style template (VSCode/Zed shape). Covers
+  /// both percent-encoding paths without coupling to the live roster,
+  /// which only lists apps installed on the test machine.
+  static let urlTemplates = [
+    "x-bbedit://open?url={url}&line={line}",
+    "txmt://open?url={url}&line={line}",
+    "subl://open?url={url}&line={line}",
+    "vscode://file{path}:{line}",
+    "zed://file{path}:{line}"
+  ]
+
+  @Test("Every template produces a parseable URL with line",
+        arguments: urlTemplates)
+  func templateParsesWithLine(template: String) {
     let result = substituteEditorTemplate(
-      preset.urlTemplate ?? "", fileURL: url, line: 42)
-    #expect(URL(string: result) != nil, "\(preset) → \(result)")
-    #expect(result.contains("42"), "\(preset) line missing: \(result)")
+      template, fileURL: Self.note, line: 42)
+    #expect(URL(string: result) != nil, "\(template) → \(result)")
+    #expect(result.contains("42"), "line missing: \(result)")
   }
 
-  @Test("Every preset still parses when line is nil",
-        arguments: EditorPreset.urlTemplatePresets)
-  func everyPresetParsesWithoutLine(preset: EditorPreset) {
-    let url = URL(fileURLWithPath: "/tmp/note.md")
+  @Test("Every template still parses when line is nil",
+        arguments: urlTemplates)
+  func templateParsesWithoutLine(template: String) {
     let result = substituteEditorTemplate(
-      preset.urlTemplate ?? "", fileURL: url, line: nil)
-    #expect(URL(string: result) != nil, "\(preset) → \(result)")
+      template, fileURL: Self.note, line: nil)
+    #expect(URL(string: result) != nil, "\(template) → \(result)")
   }
 
   /// Paths with spaces must percent-encode in the resulting URL.
@@ -85,58 +103,29 @@ struct EditorPresetTests {
   ///              encoding is correct for URLs embedded as a query
   ///              parameter — the receiver decodes once for the
   ///              query and once for the URL.
-  @Test("Spaces in path produce a parseable URL for every preset",
-        arguments: EditorPreset.urlTemplatePresets)
-  func spacesArePercentEncoded(preset: EditorPreset) {
-    let url = URL(fileURLWithPath: "/tmp/foo bar/baz.md")
+  @Test("Spaces in path produce a parseable URL for every template",
+        arguments: urlTemplates)
+  func spacesArePercentEncoded(template: String) {
     let result = substituteEditorTemplate(
-      preset.urlTemplate ?? "", fileURL: url, line: 1)
-    #expect(URL(string: result) != nil, "\(preset) → \(result)")
+      template, fileURL: Self.spaced, line: 1)
+    #expect(URL(string: result) != nil, "\(template) → \(result)")
     // The space MUST be encoded somehow — a literal space here means
     // the URL fails to parse on macOS 26 (older macOS versions were
     // lenient and accepted unencoded spaces, masking the bug).
-    #expect(!result.contains("foo bar"), "\(preset) → \(result)")
+    #expect(!result.contains("foo bar"), "\(template) → \(result)")
     // Either single (%20) or double (%2520) encoding is acceptable
     // depending on placeholder; both decode back to a real space at
     // the receiving editor.
     #expect(
       result.contains("foo%20bar") || result.contains("foo%2520bar"),
-      "\(preset) → \(result)")
-  }
-
-  /// Command-style presets (Xcode's `xed`) substitute `{path}` and
-  /// `{line}` raw — no URL encoding — and `{line}` falls back to `"1"`
-  /// so `--line {line}` always sees a valid integer.
-  @Test("Every command preset substitutes path and line",
-        arguments: EditorPreset.commandPresets)
-  func everyCommandPresetSubstitutes(preset: EditorPreset) {
-    guard case .command(_, let args) = preset.invocation else {
-      Issue.record("\(preset) is not command-style")
-      return
-    }
-    let url = URL(fileURLWithPath: "/tmp/foo bar/baz.md")
-    let resolved = args.map {
-      substituteCommandArg($0, fileURL: url, line: 42)
-    }
-    #expect(resolved.contains("/tmp/foo bar/baz.md"))
-    #expect(resolved.contains("42"))
-    #expect(!resolved.contains("{path}"))
-    #expect(!resolved.contains("{line}"))
-  }
-
-  @Test("Command preset {line} defaults to 1 when caller passes nil")
-  func commandLineDefault() {
-    let url = URL(fileURLWithPath: "/tmp/note.md")
-    #expect(
-      substituteCommandArg("{line}", fileURL: url, line: nil) == "1")
+      "\(template) → \(result)")
   }
 
   @Test("Custom URL template substitutes all three placeholders")
   func customTemplateSubstitution() {
-    let url = URL(fileURLWithPath: "/tmp/note.md")
     let template = "myeditor:url={url}|path={path}|line={line}"
     let result = substituteEditorTemplate(
-      template, fileURL: url, line: 7)
+      template, fileURL: Self.note, line: 7)
     #expect(result.contains("url=file:///tmp/note.md"))
     #expect(result.contains("path=/tmp/note.md"))
     #expect(result.contains("line=7"))
@@ -144,48 +133,109 @@ struct EditorPresetTests {
 
   @Test("Empty line substitutes to empty string, not the literal")
   func emptyLine() {
-    let url = URL(fileURLWithPath: "/tmp/note.md")
     let result = substituteEditorTemplate(
-      "x://open?line={line}", fileURL: url, line: nil)
+      "x://open?line={line}", fileURL: Self.note, line: nil)
     #expect(result == "x://open?line=")
     #expect(!result.contains("{line}"))
   }
 
-  /// Every preset must declare at least one non-empty, reverse-DNS
-  /// bundle identifier — that string is what resolves the installed
-  /// app URL (and thus its icon + availability) via `NSWorkspace`.
-  /// An empty or malformed list would silently mark the editor as
-  /// never-installed.
-  @Test("Every preset declares a plausible bundle identifier",
-        arguments: EditorPreset.allCases)
-  func everyPresetHasBundleIdentifiers(preset: EditorPreset) {
-    let identifiers = preset.bundleIdentifiers
-    #expect(!identifiers.isEmpty, "\(preset) has no bundle identifiers")
-    for identifier in identifiers {
-      #expect(!identifier.isEmpty, "\(preset) has an empty identifier")
-      #expect(identifier.contains("."), "\(preset) → \(identifier)")
+  /// Command-style editors (Xcode's `xed`) substitute `{path}` and
+  /// `{line}` raw — no URL encoding — and `{line}` falls back to `"1"`
+  /// so `--line {line}` always sees a valid integer.
+  @Test("Command args substitute path and line raw")
+  func commandArgsSubstitute() {
+    let args = ["--line", "{line}", "{path}"]
+    let resolved = args.map {
+      substituteCommandArg($0, fileURL: Self.spaced, line: 42)
+    }
+    #expect(resolved.contains("/tmp/foo bar/baz.md"))
+    #expect(resolved.contains("42"))
+    #expect(!resolved.contains("{path}"))
+    #expect(!resolved.contains("{line}"))
+  }
+
+  @Test("Command {line} defaults to 1 when caller passes nil")
+  func commandLineDefault() {
+    #expect(
+      substituteCommandArg("{line}", fileURL: Self.note, line: nil)
+        == "1")
+  }
+}
+
+// MARK: - EditorStore roster
+
+/// `EditorStore.editors` is the live picker roster: the built-in
+/// editors whose app LaunchServices can resolve on this machine, plus
+/// the two always-present static rows (Custom URL Scheme, Other
+/// Application…). The per-editor invariants below guard the picker and
+/// the persistence layer (`RestorableChoiceValue` keys off
+/// `persistentID`, the menu row shows `name`).
+@Suite("EditorStore roster")
+@MainActor
+struct EditorStoreTests {
+  @Test("Roster always includes the two static editors")
+  func rosterHasStaticEditors() {
+    let ids = EditorStore.shared.editors.map(\.persistentID)
+    #expect(ids.contains(Editor.customURLScheme.persistentID))
+    #expect(ids.contains(Editor.otherApplication.persistentID))
+  }
+
+  /// Every roster entry must carry a non-empty `persistentID` — it is
+  /// the key the choice layer persists and restores by. A blank id
+  /// would collide across editors and corrupt the saved selection.
+  @Test("Every editor has a non-empty persistent id")
+  func everyEditorHasPersistentID() {
+    for editor in EditorStore.shared.editors {
+      #expect(!editor.persistentID.isEmpty)
     }
   }
 
-  @Test("Known presets map to their canonical bundle identifiers")
-  func canonicalBundleIdentifiers() {
-    #expect(EditorPreset.bbedit.bundleIdentifiers.first
-      == "com.barebones.bbedit")
-    #expect(EditorPreset.vscode.bundleIdentifiers.first
-      == "com.microsoft.VSCode")
-    #expect(EditorPreset.xcode.bundleIdentifiers.first
-      == "com.apple.dt.Xcode")
+  /// The menu row shows `name`; an empty title would be a silent
+  /// regression. The value itself is environment-dependent (built-in
+  /// editors resolve the installed app's display name), so we only
+  /// pin the non-empty invariant.
+  @Test("Every editor resolves a non-empty menu title")
+  func everyEditorHasName() {
+    for editor in EditorStore.shared.editors {
+      #expect(!String(localized: editor.name).isEmpty)
+    }
   }
 
-  /// `localizedName` comes from the installed app's bundle, falling
-  /// back to the `rawValue` when the app isn't installed — so it is
-  /// never empty (an empty menu row would be a silent regression).
-  /// The localized value itself is environment-dependent, so we only
-  /// pin the non-empty invariant here.
-  @Test("Every preset resolves a non-empty menu title",
-        arguments: EditorPreset.allCases)
-  func everyPresetHasLocalizedName(preset: EditorPreset) {
-    #expect(!preset.localizedName.isEmpty)
+  /// A resolved built-in editor's `persistentID` is its bundle
+  /// identifier (reverse-DNS). The two static editors use plain
+  /// slugs, so they are exempt. Guards against a malformed id that
+  /// would fail to resolve the app URL, icon, and availability.
+  @Test("Resolved built-in editors key off a reverse-DNS bundle id")
+  func builtInEditorsUseBundleIDs() {
+    let staticIDs: Set = [
+      Editor.customURLScheme.persistentID,
+      Editor.otherApplication.persistentID
+    ]
+    for editor in EditorStore.shared.editors
+    where !staticIDs.contains(editor.persistentID) {
+      #expect(
+        editor.persistentID.contains("."),
+        "\(editor.persistentID) is not a bundle id")
+    }
+  }
+
+  /// Every URL-template editor currently in the roster must produce a
+  /// parseable URL — this is the roster-level companion to the
+  /// substitution-rule tests above, catching a bad template string on
+  /// any editor installed on the test machine.
+  @Test("Every URL-template roster editor produces a parseable URL")
+  func rosterTemplatesParse() {
+    let url = URL(fileURLWithPath: "/tmp/note.md")
+    for editor in EditorStore.shared.editors {
+      guard case .urlTemplate(let template) = editor.invocation,
+            !template.isEmpty
+      else { continue }
+      let result = substituteEditorTemplate(
+        template, fileURL: url, line: 42)
+      #expect(
+        URL(string: result) != nil,
+        "\(editor.persistentID) → \(result)")
+    }
   }
 }
 

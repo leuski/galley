@@ -118,18 +118,16 @@ final class AppModel {
     // outbound write fires the cross-process signal.
     Defaults.shared.startListening()
 
-    persistenceTokens += bindPersistent(
-      templates,
-      label: "Viewer.template",
-      property: \Defaults.template)
-    + bindPersistent(
-      processors,
-      label: "Viewer.processor",
-      property: \Defaults.renderer)
-    + bindPersistent(
-      colorSchemes,
-      label: "Viewer.colorScheme",
-      property: \Defaults.colorScheme)
+    persistenceTokens = persistenceTokens
+    + Property(templates, \.persistent, label: "Viewer.template")
+      .bind(
+        toAndFrom: Defaults.shared.property(\.template), checkSettled: true)
+    + Property(processors, \.persistent, label: "Viewer.processor")
+      .bind(
+        toAndFrom: Defaults.shared.property(\.renderer), checkSettled: true)
+    + Property(colorSchemes, \.persistent, label: "Viewer.colorScheme")
+      .bind(
+        toAndFrom: Defaults.shared.property(\.colorScheme), checkSettled: true)
 
     Self.logDefaultsDidChange()
 
