@@ -568,7 +568,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
         let renderer = resolvedRenderer()
         let template = resolvedTemplate()
         let composed: ComposedPreview
-
         do {
           let source = try await Self.readSource(at: url)
           let body = try await renderer.render(source, baseURL: url)

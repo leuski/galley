@@ -74,7 +74,7 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
   func configure(host: ServiceHost, client: KosmosClient) async {
 #if ENABLE_TUNNEL
     host.subscribe(RouteToTunnelClient.self) { _, message in
-      GalleyViewerRequestActivity(target: message.target).open()
+      GalleyViewerRequestActivity.open(message.target)
     }
 
     // Receiver-side tunnel wiring (response frames → the in-flight

@@ -31,10 +31,10 @@ struct DocumentSceneContent: View {
 
   var body: some View {
     documentOrWelcome
-      // One window-level routing decision — SwiftUI picks the window, we
-      // don't re-dispatch. Tokens come from the active tab (Dot-style);
-      // a welcome window falls back to the bare scheme so a freshly
-      // spawned window attracts the document fired at it.
+    // One window-level routing decision — SwiftUI picks the window, we
+    // don't re-dispatch. Tokens come from the active tab (Dot-style);
+    // a welcome window falls back to the bare scheme so a freshly
+    // spawned window attracts the document fired at it.
       .handlesExternalEvents(
         preferring: preferringTokens,
         allowing: allowingTokens)
@@ -53,12 +53,10 @@ struct DocumentSceneContent: View {
         let oldRequests = model?.tabs
           .compactMap { tab in tab.lastRequest } ?? []
         self.model = newModel
-        for request in oldRequests {
-          // we are restoring the window. If we have a model assigned, it's
-          // the wrong model. Evict it and ask the framework to re-open
-          // the document.
-          GalleyViewerRequestActivity(target: request).open()
-        }
+        // we are restoring the window. If we have a model assigned, it's
+        // the wrong model. Evict it and ask the framework to re-open
+        // the document.
+        GalleyViewerRequestActivity.open(oldRequests)
       }
       .windowTransparency(model == nil ? 0 : 1)
   }
@@ -157,7 +155,7 @@ struct DocumentSceneContent: View {
     // focus (dedup across *all* tabs, not just the active one).
     if let existing = model.tabs.first(where: {
       $0.documentURL.standardizedFileURL
-        == target.documentURL.standardizedFileURL
+      == target.documentURL.standardizedFileURL
     }) {
       model.activate(tab: existing)
       if let scroll = target.scroll {
@@ -183,7 +181,18 @@ struct DocumentSceneContent: View {
       Task { await model.activeTab.bind(to: target) }
       return
     }
-    GalleyViewerRequestActivity(target: target).open()
+
+    // now we are in the territory that should not have happened --
+    // Swiftui fired multiple openurls into the same scene.
+
+    // find an empty tab
+    if let existing = model.tabs.first(where: { !$0.hasDocument }) {
+      Task { await existing.bind(to: target) }
+      return
+    }
+
+    // re-open it again
+    GalleyViewerRequestActivity.open(target)
   }
 
   private func focusWindow() {

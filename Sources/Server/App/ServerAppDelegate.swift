@@ -49,11 +49,6 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
       application(_:open:) received=\(urls.count, privacy: .public) \
       resolved=\(targets.count, privacy: .public)
       """)
-    let kosmos = AppModel.shared.kosmos
-    Task {
-      for target in targets {
-        await ServerKosmosService.dispatch(target, with: kosmos)
-      }
-    }
+    AppModel.shared.kosmos.dispatch(targets)
   }
 }

@@ -109,35 +109,33 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     return true
   }
 
-  @MainActor
   @discardableResult
-  public static func dispatch(
-    _ target: DocumentTarget,
-    with kosmos: ServerKosmosService?) async -> Bool
+  private func dispatch(_ target: DocumentTarget) async -> Bool
   {
-    if kosmos?.dispatchToClient(target, deviceType: .vision) == true {
+    guard !dispatchToClient(target, deviceType: .vision) else {
       return true
     }
     log.notice("""
       dispatch → local Viewer (no AVP): \
       \(target, privacy: .public)
       """)
-    if kosmos?.dispatchToClient(target, deviceType: .mac) == true {
+    guard !dispatchToClient(target, deviceType: .mac) else {
       return true
     }
     log.notice("""
       dispatch → local Viewer (no tunnel): \
       \(target, privacy: .public)
       """)
-    openInLocalViewer(target)
+    GalleyViewerRequestActivity.open(target)
     return false
   }
 
-  /// Surface a request in the Mac Viewer via its forced-local `dot://`
-  /// URL — `.entry` navigates to the entry, `.search` opens search
-  /// pre-populated. LaunchServices launches the Viewer if it isn't up.
-  static func openInLocalViewer(_ request: DocumentTarget) {
-    GalleyViewerRequestActivity(target: request).open()
+  public func dispatch(_ targets: [DocumentTarget]) {
+    Task {
+      for target in targets {
+        await self.dispatch(target)
+      }
+    }
   }
 
   // MARK: - Subscription wiring

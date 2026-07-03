@@ -19,6 +19,12 @@ extension DocumentModel {
   /// convention in practice.
   static func readSource(at url: URL) async throws -> String {
     if url.isFileURL {
+      let didStart = url.startAccessingSecurityScopedResource()
+      defer {
+        if didStart {
+          url.stopAccessingSecurityScopedResource()
+        }
+      }
       return try String(contentsOf: url, encoding: .utf8)
     }
     let (data, response) = try await URLSession.shared.data(from: url)
