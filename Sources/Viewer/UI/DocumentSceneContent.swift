@@ -56,7 +56,9 @@ struct DocumentSceneContent: View {
         // we are restoring the window. If we have a model assigned, it's
         // the wrong model. Evict it and ask the framework to re-open
         // the document.
-        GalleyViewerRequestActivity.open(oldRequests)
+        oldRequests.forEach { request in
+          GalleyViewerRequestActivity(target: request).open()
+        }
       }
       .windowTransparency(model == nil ? 0 : 1)
   }
@@ -192,7 +194,7 @@ struct DocumentSceneContent: View {
     }
 
     // re-open it again
-    GalleyViewerRequestActivity.open(target)
+    GalleyViewerRequestActivity(target: target).open()
   }
 
   private func focusWindow() {

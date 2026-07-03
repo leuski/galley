@@ -126,7 +126,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
       dispatch → local Viewer (no tunnel): \
       \(target, privacy: .public)
       """)
-    GalleyViewerRequestActivity.open(target)
+    GalleyViewerRequestActivity(target: target).open()
     return false
   }
 

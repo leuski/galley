@@ -41,27 +41,6 @@ where Scheme: SchemeProtocol
   public var url: URL? {
     target.url(scheme: Self.scheme)
   }
-
-  public static func open(_ urls: [URL]) {
-    urls.forEach(open)
-  }
-
-  public static func open(_ targets: [DocumentTarget]) {
-    targets.forEach(open)
-  }
-
-  public static func open(_ url: URL) {
-    open(DocumentTarget(url: url))
-  }
-
-  public static func open(_ target: DocumentTarget) {
-    // pace the open() dispatch. Allow the UI to update between
-    // individual invocations, otherwise SwiftUI will send all urls
-    // into the same scene.
-    pacedExecutor.yield {
-      Self(target: target).open()
-    }
-  }
 }
 
 public struct GalleyScheme: SchemeProtocol {

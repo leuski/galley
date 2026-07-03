@@ -110,7 +110,7 @@ extension Action {
       }(),
       perform: { _ in
         guard let fresh = recents.resolveRecentURL(url) else { return }
-        GalleyViewerRequestActivity.open(fresh)
+        GalleyViewerRequestActivity(url: fresh).open()
       },
       accessibilityID:
         "\(ViewerA11yID.FileMenu.openRecentItem).\(url.lastPathComponent)"
@@ -320,7 +320,9 @@ struct OpenFileModifier: ViewModifier {
       ) { result in
         guard case .success(let urls) = result
         else { return }
-        GalleyViewerRequestActivity.open(urls)
+        urls.forEach { url in
+          GalleyViewerRequestActivity(url: url).open()
+        }
       }
   }
 }
