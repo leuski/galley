@@ -42,25 +42,7 @@ final class AppModel {
 
   // MARK: - In-memory state
 
-  /// File watcher feeding the SSE live-reload of **both** the optional
-  /// HTTP listener and the Kosmos tunnel responder — one watch, shared.
-  @ObservationIgnored let watcher = DocumentWatcher()
-  /// Request-time render config (selected template + renderer), read by
-  /// both the optional HTTP listener and the tunnel responder.
-  @ObservationIgnored let previewService: PreviewRequestService
-  /// The optional loopback HTTP preview server (`GalleyServerKit`),
-  /// resolved at runtime. `nil` → no HTTP listener; Quick Look renders
-  /// in-process. Nothing here imports `GalleyServerKit`.
-  @ObservationIgnored let httpListener: (any PreviewHTTPListener)?
   @ObservationIgnored let kosmos: ServerKosmosService
-
-  /// Mirrors the HTTP listener's state for the menu bar. Stays
-  /// `.stopped` when the feature is absent (see `httpFeatureAvailable`).
-  private(set) var httpState: PreviewHTTPListenerState = .stopped
-  /// Loopback base URL once the listener binds; `nil` when the feature
-  /// is absent or the listener hasn't bound. Drives the menu's
-  /// "Open File…" browser action.
-  private(set) var httpURL: URL?
 
   static let shared = AppModel()
 
@@ -75,23 +57,20 @@ final class AppModel {
       await ProcessorStore.shared.discover()
     }
 
-    self.previewService = PreviewRequestService(
+    let previewService = PreviewRequestService(
       selectedTemplate: { @MainActor in
-        TemplateStore.shared
-          .existingTemplate(forID: Defaults.shared.template?.id) ?? .default
+        TemplateStore.shared.anyTemplate(forID: Defaults.shared.template?.id)
       },
       renderer: { @MainActor in
-        (ProcessorStore.shared.processors.first { processor in
-          processor.id == Defaults.shared.renderer?.id
-        } ?? .builtIn).renderer
+        ProcessorStore.shared
+          .anyProcessor(forID: Defaults.shared.renderer?.id).renderer
       })
 
+    /// File watcher feeding the SSE live-reload of **both** the optional
+    /// HTTP listener and the Kosmos tunnel responder — one watch, shared.
+    let watcher = DocumentWatcher()
     self.kosmos = ServerKosmosService(
-      service: self.previewService, watcher: self.watcher)
-    // The HTTP server is an optional component: present → Quick Look /
-    // browsers fetch over loopback; absent → Quick Look renders
-    // in-process. Resolved by ObjC-runtime name, so no import here.
-    self.httpListener = discoverPreviewHTTPListener()
+      service: previewService, watcher: watcher)
 
     // Bidirectional sync with the shared `net.leuski.galley.shared`
     // suite. Outbound: menu-bar picks here surface in the Viewer
@@ -115,7 +94,7 @@ final class AppModel {
       }
     }
 
-    startServer()
+    startServer(service: previewService, watcher: watcher)
     publishGalleyAppHash()
   }
 
@@ -175,18 +154,24 @@ final class AppModel {
       """)
   }
 
-  private func startServer() {
+  private func startServer(
+    service: PreviewRequestService, watcher: DocumentWatcher)
+  {
+    // The HTTP server is an optional component: present → Quick Look /
+    // browsers fetch over loopback; absent → Quick Look renders
+    // in-process. Resolved by ObjC-runtime name, so no import here.
+
     // The Kosmos tunnel renders in-process, so the mesh must come up
     // whether or not the optional HTTP listener exists. With no
     // listener, start Kosmos now (no URL to advertise) and leave
     // `serverHTTPPort` at 0 — Quick Look then renders in-process.
-    guard let http = httpListener else {
+    guard let http = discoverPreviewHTTPListener() else {
       kosmos.start()
       return
     }
 
     http.start(
-      service: previewService, watcher: watcher,
+      service: service, watcher: watcher,
       host: GalleyConstants.defaultHost)
 
     // One observer covers three responsibilities, since `stateChanges`
@@ -202,12 +187,10 @@ final class AppModel {
     Task { [weak self, kosmos] in
       var kosmosStarted = false
       for await state in http.stateChanges {
-        guard let self else { return }
-        self.httpState = state
+        guard self != nil else { return }
         switch state {
         case .running(let url):
           let port = (url.port).flatMap { UInt16(exactly: $0) } ?? 0
-          self.httpURL = url
           Defaults.shared.serverHTTPPort = port
           Defaults.shared.post()
           if !kosmosStarted {
@@ -215,7 +198,6 @@ final class AppModel {
             kosmosStarted = true
           }
         case .failed:
-          self.httpURL = nil
           Defaults.shared.serverHTTPPort = 0
           Defaults.shared.post()
           if !kosmosStarted {
@@ -223,7 +205,6 @@ final class AppModel {
             kosmosStarted = true
           }
         case .stopped:
-          self.httpURL = nil
           Defaults.shared.serverHTTPPort = 0
           Defaults.shared.post()
         }

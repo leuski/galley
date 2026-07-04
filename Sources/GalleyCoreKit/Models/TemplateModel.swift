@@ -36,7 +36,7 @@ extension TemplateChoiceValue: RestorableChoiceValue {
 
 extension TemplateStore: ChoiceModelSource<Template> {
   public var values: [Template] { templates }
-  public var defaultValue: Template { .default }
+  public var defaultValue: Template { .bundledDefault }
 }
 
 public typealias TemplateChoice = ConcreteChoiceModel<

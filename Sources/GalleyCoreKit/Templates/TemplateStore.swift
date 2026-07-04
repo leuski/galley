@@ -84,6 +84,10 @@ public final class TemplateStore {
     return templates.first { $0.id == id }
   }
 
+  public func anyTemplate(forID id: Template.ID?) -> Template {
+    existingTemplate(forID: id) ?? .bundledDefault
+  }
+
   public func revealFolder() {
     #if os(macOS)
     NSWorkspace.shared.activateFileViewerSelecting([userDirectoryURL])

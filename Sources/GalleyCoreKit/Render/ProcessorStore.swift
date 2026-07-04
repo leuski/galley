@@ -82,6 +82,14 @@ public final class ProcessorStore {
     Task { await discover() }
   }
 
+  public func existingProcessor(forID id: Processor.ID?) -> Processor? {
+    processors.first(where: { $0.id == id })
+  }
+
+  public func anyProcessor(forID id: Processor.ID?) -> Processor {
+    existingProcessor(forID: id) ?? .builtIn
+  }
+
   // MARK: - Catalog
 
   private struct Spec: Sendable {

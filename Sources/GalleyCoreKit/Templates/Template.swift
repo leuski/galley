@@ -100,11 +100,6 @@ public extension Template {
     }
     return template
   }()
-
-  /// Convenience used by callers that previously wrote `.default`.
-  /// Resolves to `bundledDefault` so the static fallback still works
-  /// without depending on `TemplateStore`.
-  static var `default`: Template { .bundledDefault }
 }
 
 extension Template: ChoiceValueProtocol {
