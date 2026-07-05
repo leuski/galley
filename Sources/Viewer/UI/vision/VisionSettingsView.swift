@@ -14,6 +14,7 @@ import SwiftUI
 struct VisionSettingsView: View {
   @Bindable private var defaults = Defaults.shared
   private let subtitleSpacing: CGFloat = 16
+  @Environment(AppModel.self) var appModel
 
   var body: some View {
     Form {
@@ -67,7 +68,7 @@ struct VisionSettingsView: View {
 
       VStack(alignment: .leading, spacing: subtitleSpacing) {
         LabeledContent {
-          MyPicker(model: AppModel.shared.colorSchemes)
+          MyPicker(model: appModel.colorSchemes)
         } label: {
           Text("Color scheme")
         }
@@ -114,7 +115,7 @@ struct VisionSettingsView: View {
   private var markdownSection: some View {
     Section("Markdown") {
       LabeledContent {
-        MyPicker(model: AppModel.shared.templates)
+        MyPicker(model: appModel.templates)
       } label: {
         Text("Template")
       }

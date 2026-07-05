@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct ColorSchemeMenu<Model>: View
+public struct ColorSchemeMenuContent<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,
       Model.Element: SectionedChoiceValue
 {

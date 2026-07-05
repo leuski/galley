@@ -13,14 +13,17 @@ import SwiftUI
 /// selection directly.
 struct FormatCommands: Commands {
   @FocusedValue(\.documentModel) private var documentModel
+  let appModel: AppModel
 
   var body: some Commands {
     CommandMenu("Format") {
       // Subscribe to per-window selections so this body re-evaluates
       // and the system menu rebuilds when an override flips. NSMenu
       // doesn't pick up internal Toggle invalidations on its own.
-      templateMenu(documentModel: documentModel)
-      processorMenu(documentModel: documentModel)
+      TemplateMenu(documentModel: documentModel)
+        .environment(appModel)
+      ProcessorMenu(documentModel: documentModel)
+        .environment(appModel)
     }
   }
 }

@@ -21,6 +21,7 @@ struct DocumentSceneContent: View {
   /// frame — no async launchTask, no reveal gate.
   @State private var model: WindowModel?
 
+  @Environment(AppModel.self) var appModel
   @Environment(\.openWindow) private var openWindow
 
   init(sceneID: DocumentSceneID) {
@@ -88,7 +89,7 @@ struct DocumentSceneContent: View {
           Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             guard model == nil else { return }
-            AppModel.shared.isOpenFilePresented = true
+            appModel.isOpenFilePresented = true
           }
         }
 #endif
@@ -145,7 +146,7 @@ struct DocumentSceneContent: View {
   private func handleOpenURL(_ url: URL) {
     guard let target = GalleyViewerRequestActivity(from: url)?.target
     else { return }
-    AppModel.shared.recents.record(target.documentURL)
+    appModel.recents.record(target.documentURL)
 
     // Welcome window adopts the document in place (welcome → document).
     guard let model else {

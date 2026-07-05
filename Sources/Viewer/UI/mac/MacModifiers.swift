@@ -26,6 +26,7 @@ struct WindowAttachedModifier: ViewModifier {
 
 struct ExportModifier: ViewModifier {
   @Bindable var model: DocumentModel
+  let appModel: AppModel
 
   /// Non-nil while the SwiftUI "Couldn't export PDF" alert is up.
   /// Set by the export flow on failure; cleared when the alert is
@@ -54,7 +55,7 @@ struct ExportModifier: ViewModifier {
       }
       .fileExporter(
         isPresented: $model.isExportingPDF,
-        item: model.pdfExport,
+        item: model.pdfExport(appModel: appModel),
         contentTypes: [.pdf],
         defaultFilename: model.documentURL
           .deletingPathExtension().lastPathComponent
@@ -81,7 +82,8 @@ struct RenameModifier: ViewModifier {
   /// `body`). Lives on the view because it has no meaning outside
   /// the alert's lifetime.
   @State private var renameInput = ""
-  private var recents: RecentDocumentsModel { AppModel.shared.recents }
+  let appModel: AppModel
+  private var recents: RecentDocumentsModel { appModel.recents }
 
   func body(content: Content) -> some View {
     content

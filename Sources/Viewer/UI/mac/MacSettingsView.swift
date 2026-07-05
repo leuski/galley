@@ -3,9 +3,10 @@ import GalleyCoreKit
 import SwiftUI
 
 struct MacSettingsView: View {
-  @Bindable var appModel = AppModel.shared
+  @Environment(AppModel.self) var appModel
 
   var body: some View {
+    @Bindable var appModel = self.appModel
     TabView(selection: $appModel.selectedSettingsTab) {
       GeneralSettingsView()
         .settingsPane()
@@ -14,7 +15,7 @@ struct MacSettingsView: View {
         }
         .tag(SettingsTab.general)
 
-      MarkdownSettingsView(appModel: appModel)
+      MarkdownSettingsView()
         .settingsPane()
         .tabItem {
           Label("Markdown", systemImage: "doc.text")
@@ -49,9 +50,5 @@ extension View {
   func settingsPane() -> some View {
     modifier(SettingsPaneModifier())
   }
-}
-
-#Preview {
-  MacSettingsView()
 }
 #endif

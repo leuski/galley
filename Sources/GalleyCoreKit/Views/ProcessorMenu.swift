@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct ProcessorMenu<Model>: View
+public struct ProcessorMenuContent<Model>: View
 where Model: ChoiceModel & AnyObject & Observable,
       Model.Element: SectionedChoiceValue
 {

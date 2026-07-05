@@ -5,24 +5,24 @@ import SwiftUI
 struct ViewerApp: App {
   @Environment(\.openWindow) var openWindow
   @Environment(\.scenePhase) var scenePhase
-
-  init() {
-    // Touching the singleton here builds it (and runs `warmCache`) at app
-    // launch, before any scene body — it *is* the boot point now.
-    _ = AppModel.shared
-  }
+  @State var appModel = AppModel.shared
 
   var body: some Scene {
     DocumentScene()
+      .environment(appModel)
 #if os(visionOS)
-      .onChange(of: scenePhase, handlePhaseChange(openWindow))
+      .onChange(of: scenePhase, handlePhaseChange(
+        openWindow, appModel: appModel))
 #endif
 
     HelpScene()
+      .environment(appModel)
 #if os(visionOS)
-      .onChange(of: scenePhase, handlePhaseChange(openWindow))
+      .onChange(of: scenePhase, handlePhaseChange(
+        openWindow, appModel: appModel))
 #endif
 
     SettingsScene()
+      .environment(appModel)
   }
 }

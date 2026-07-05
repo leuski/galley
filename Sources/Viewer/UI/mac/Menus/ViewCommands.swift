@@ -33,10 +33,11 @@ struct ViewCommands: Commands {
 
 struct WindowCommands: Commands {
   @FocusedValue(\.documentModel) private var model
+  let appModel: AppModel
 
   var body: some Commands {
     CommandGroup(before: .windowArrangement) {
-      Action.showOnVisionPro(model).menuItem()
+      Action.showOnVisionPro(model, appModel: appModel).menuItem()
     }
   }
 }

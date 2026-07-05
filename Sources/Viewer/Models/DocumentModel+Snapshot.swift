@@ -136,12 +136,12 @@ extension DocumentModel {
   /// window's own per-window choice overrides. Explicit model wiring —
   /// replaces the old `ChangeHandlers` `.onChange(of: appModel.…)` that
   /// had the view observe the app model to drive this model's reload.
-  func startTrackingRenderInputs() {
+  func startTrackingRenderInputs(appModel: AppModel) {
     reloadObservation = onObservedChange(
-      track: { [weak self] in
-        guard let self else { return }
-        _ = AppModel.shared.processors.selected
-        _ = AppModel.shared.templates.selected
+      track: { [weak self, weak appModel] in
+        guard let self, let appModel else { return }
+        _ = appModel.processors.selected
+        _ = appModel.templates.selected
         _ = Defaults.shared.enablePerDocumentOverrides
         _ = self.templates.persistent
         _ = self.processors.persistent

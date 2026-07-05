@@ -26,12 +26,12 @@ extension DocumentModel {
   /// modal on the same window would clash. Both `showsPrintPanel`
   /// and `showsProgressPanel` are off, so the modal is invisible —
   /// just a run-loop attachment point for `runModal(for:)`.
-  func exportPDF() async throws -> URL {
+  func exportPDF(appModel: AppModel) async throws -> URL {
     let destination = URL.temporaryDirectory / "\(UUID().uuidString).pdf"
     let host = Self.makeOffscreenHostWindow()
     try await runPrintOperation(
       jobTitle: documentURL.lastPathComponent,
-      on: host
+      on: host, appModel: appModel
     ) { operation, _ in
       let info = operation.printInfo
       info.jobDisposition = .save
@@ -48,11 +48,11 @@ extension DocumentModel {
   /// _does_ expose `printOperation(with:)`, unlike SwiftUI's
   /// `WebPage`) and runs the panel as a sheet on `window`. The
   /// panel's "PDF ▾" submenu produces a paginated PDF for free.
-  func runPrintPanel(on window: NSWindow?) async {
+  func runPrintPanel(on window: NSWindow?, appModel: AppModel) async {
     do {
       try await runPrintOperation(
         jobTitle: documentURL.lastPathComponent,
-        on: window
+        on: window, appModel: appModel
       ) { operation, _ in
         operation.showsPrintPanel = true
         operation.showsProgressPanel = true
@@ -99,10 +99,12 @@ extension DocumentModel {
   private func runPrintOperation(
     jobTitle: String,
     on window: NSWindow?,
+    appModel: AppModel,
     configure: (NSPrintOperation, NSPrintInfo) -> Void
   ) async throws {
-    let template = resolvedTemplate()
-    let composed = try await buildComposedPreview(template: template)
+    let template = resolvedTemplate(appModel: appModel)
+    let composed = try await buildComposedPreview(
+      template: template, appModel: appModel)
 
     // Fresh print info per operation — `runModal` tucks per-op
     // state into the dict (jobDisposition, savingURL) and we don't

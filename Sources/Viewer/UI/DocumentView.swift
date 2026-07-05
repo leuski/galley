@@ -12,6 +12,7 @@ struct DocumentView: View {
   /// rendering. The view never constructs it, never owns persistence,
   /// and never observes it to mutate another model.
   @Bindable var model: DocumentModel
+  @Environment(AppModel.self) var appModel
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -51,13 +52,13 @@ struct DocumentView: View {
     // `prefers-color-scheme` media queries on the new template pick
     // the user's preferred variant — not whichever variant was
     // current under the previous template's bg-luminance scheme.
-    .preferredColorScheme(model.resolvedColorScheme)
+    .preferredColorScheme(model.resolvedColorScheme(appModel: appModel))
     // `model.pageBackgroundColor` already resolves through the
     // template state → last-seen → system-bg fallback chain, so
     // it's always a real color; no second `??` needed here.
     .background(
       Defaults.shared.tintWindowWithPageBackground
-      ? model.pageBackgroundColor : defaultBackground)
+      ? model.pageBackgroundColor(appModel: appModel) : defaultBackground)
 #if os(macOS)
     // Paint the page's own background color into the window's
     // container background so the translucent toolbar / sidebar
@@ -72,11 +73,14 @@ struct DocumentView: View {
       for: .windowToolbar)
     .containerBackground(
       Defaults.shared.tintWindowWithPageBackground
-      ? model.pageBackgroundColor : .userSystemWindowBackground, for: .window)
+      ? model.pageBackgroundColor(appModel: appModel)
+      : .userSystemWindowBackground,
+      for: .window
+    )
     .modifier(NoticeModifier(model: model))
     .modifier(WindowAttachedModifier())
-    .modifier(RenameModifier(model: model))
-    .modifier(ExportModifier(model: model))
+    .modifier(RenameModifier(model: model, appModel: appModel))
+    .modifier(ExportModifier(model: model, appModel: appModel))
     .navigationSubtitle(model.page.title)
 #endif
   }

@@ -18,6 +18,8 @@ struct DocumentScene: Scene {
   static let events = Set([
     "file:", GalleyViewerRequestActivity.schemeExternalToken])
 
+  @Environment(AppModel.self) var appModel
+
   var body: some Scene {
     // Optional value (no `defaultValue:`). The `defaultValue:` variant
     // force-unwraps the restored binding, which TRAPS when SwiftUI
@@ -45,12 +47,12 @@ struct DocumentScene: Scene {
   @CommandsBuilder
   var commands: some Commands {
     SettingsCommands()
-    FileCommands()
+    FileCommands(appModel: appModel)
     EditCommands()
     ToolbarCommands()
     ViewCommands()
-    FormatCommands()
-    WindowCommands()
+    FormatCommands(appModel: appModel)
+    WindowCommands(appModel: appModel)
     HelpCommands()
   }
 #endif

@@ -59,7 +59,7 @@ struct InProcessTunnelBackendTests {
   private func makeBackend() -> InProcessTunnelBackend {
     InProcessTunnelBackend(
       service: PreviewRequestService(
-        selectedTemplate: { .default },
+        selectedTemplate: { .bundledDefault },
         renderer: { FakeRenderer() }),
       watcher: DocumentWatcher())
   }

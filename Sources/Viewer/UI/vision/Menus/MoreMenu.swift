@@ -12,13 +12,14 @@ import GalleyCoreKit
 struct MoreMenu: View {
   @Bindable var model: DocumentModel
   @State private var isPresented = false
+  @Environment(AppModel.self) var appModel
 
   var body: some View {
     Menu {
-      Action.open(isPresented: $isPresented).menuItem()
+      Action.open(isPresented: $isPresented, appModel: appModel).menuItem()
 
-      if !AppModel.shared.recents.urls.isEmpty {
-        Action.openRecentMenu()
+      if !appModel.recents.urls.isEmpty {
+        Action.openRecentMenu(appModel: appModel)
       }
 
       Divider()
@@ -27,20 +28,20 @@ struct MoreMenu: View {
 
       Divider()
 
-      templateMenu(documentModel: model)
+      TemplateMenu(documentModel: model)
         .disabled(!model.documentURL.isFileURL)
         .help(
           model.documentURL.isFileURL
           ? ""
           : "Rendered on Mac — change template in Galley on your Mac.")
-      colorSchemeMenu(documentModel: model)
+      ColorSchemeMenu(documentModel: model)
         .disabled(!model.documentURL.isFileURL)
         .help(
           model.documentURL.isFileURL
           ? ""
           : "Rendered on Mac — change color scheme on your Mac.")
-      if AppModel.shared.processors.values.count > 1 {
-        processorMenu(documentModel: model)
+      if appModel.processors.values.count > 1 {
+        ProcessorMenu(documentModel: model)
       }
 
       Divider()

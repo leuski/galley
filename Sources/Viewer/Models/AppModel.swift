@@ -83,11 +83,6 @@ final class AppModel {
     /// activity URL. The "+" only exists when windows are already tabbed
     /// (new-tab behavior → `syncWindowTabbing` left the toggle on), so the
     /// picks are born-as-tab.
-    NewTabAction.handler = { _ in
-      Task { @MainActor in
-        AppModel.shared.isOpenFilePresented = true
-      }
-    }
 #endif
 
     self.templates = TemplateChoice(
@@ -152,6 +147,13 @@ final class AppModel {
       await ProcessorStore.shared.discover()
     }
     kosmos.start()
+#if os(macOS)
+    NewTabAction.handler = { [weak self] _ in
+      Task { @MainActor in
+        self?.isOpenFilePresented = true
+      }
+    }
+#endif
   }
 
   static func logDefaultsDidChange() {

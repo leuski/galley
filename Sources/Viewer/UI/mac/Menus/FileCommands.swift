@@ -7,12 +7,13 @@ import SwiftUI
 /// so we build it ourselves from `RecentDocumentsModel.urls`.
 struct FileCommands: Commands {
   @FocusedValue(\.documentModel) private var model
+  let appModel: AppModel
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
-      Action.open(isPresented: nil).menuItem()
-        .modifier(OpenFileModifier(isPresented: nil))
-      Action.openRecentMenu()
+      Action.open(isPresented: nil, appModel: appModel).menuItem()
+        .modifier(OpenFileModifier(isPresented: nil, appModel: appModel))
+      Action.openRecentMenu(appModel: appModel)
     }
 
     // Replace the `.saveItem` slot — which is otherwise empty for us —
@@ -30,7 +31,7 @@ struct FileCommands: Commands {
 
     CommandGroup(after: .saveItem) {
       Action.rename(model).menuItem()
-      Action.openInEditor(model).menuItem()
+      Action.openInEditor(model, appModel: appModel).menuItem()
 
       Divider()
 
@@ -39,7 +40,7 @@ struct FileCommands: Commands {
 
     CommandGroup(replacing: .printItem) {
       Action.pageSetup(model).menuItem()
-      Action.print(model).menuItem()
+      Action.print(model, appModel: appModel).menuItem()
     }
   }
 }

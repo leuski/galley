@@ -20,12 +20,12 @@ extension DocumentModel {
   /// `Transferable` representation of this document's exportable PDF.
   /// The render closure runs only when the user actually shares /
   /// exports — until then no PDF is generated.
-  var pdfExport: PDFExport {
+  func pdfExport(appModel: AppModel) -> PDFExport {
     PDFExport(
       suggestedName: documentURL.deletingPathExtension().lastPathComponent
     ) { [weak self] in
       guard let self else { throw CocoaError(.featureUnsupported) }
-      return try await self.exportPDF()
+      return try await self.exportPDF(appModel: appModel)
     }
   }
 
@@ -34,10 +34,10 @@ extension DocumentModel {
   /// live-zoom style. PDF renders at 100% regardless of on-screen
   /// zoom.
   func buildComposedPreview(
-    template: Template
+    template: Template, appModel: AppModel
   ) async throws -> ComposedPreview {
     let url = documentURL
-    let renderer = resolvedRenderer()
+    let renderer = resolvedRenderer(appModel: appModel)
     let source = try String(contentsOf: url, encoding: .utf8)
     let body = try await renderer.render(source, baseURL: url)
     return try template.composeHTML(

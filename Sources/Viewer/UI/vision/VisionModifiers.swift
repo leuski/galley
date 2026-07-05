@@ -11,7 +11,8 @@ import GalleyCoreKit
 
 @MainActor
 func handlePhaseChange(
-  _ openWindow: OpenWindowAction) -> ((ScenePhase, ScenePhase) -> Void)
+  _ openWindow: OpenWindowAction, appModel: AppModel)
+-> ((ScenePhase, ScenePhase) -> Void)
 {
   { _, newPhase in
     // App-level (aggregate) phase. Drives Kosmos suspend/resume,
@@ -19,14 +20,14 @@ func handlePhaseChange(
     // whole app is on its way out — otherwise per-scene
     // `.background` transitions during app backgrounding would
     // each look like a fresh dismissal and try to spawn empties.
-    AppModel.shared.didChangePhase(scenePhase: newPhase) {
+    appModel.didChangePhase(scenePhase: newPhase) {
       openWindow(id: DocumentScene.id)
     }
     switch newPhase {
     case .active, .inactive:
-      AppModel.shared.kosmos.publishResume()
+      appModel.kosmos.publishResume()
     case .background:
-      AppModel.shared.kosmos.publishSuspend()
+      appModel.kosmos.publishSuspend()
     @unknown default:
       break
     }

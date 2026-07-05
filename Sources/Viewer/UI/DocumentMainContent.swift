@@ -11,6 +11,7 @@ import WebKit
 
 struct DocumentMainContent: View {
   @Bindable var model: DocumentModel
+  @Environment(AppModel.self) var appModel
 
   var body: some View {
     WebView(model.page)
@@ -25,7 +26,7 @@ struct DocumentMainContent: View {
     // flips true via the BackgroundColorBridge post-layout fire.
       .overlay {
         if !model.isPageRendered {
-          model.pageBackgroundColor.allowsHitTesting(false)
+          model.pageBackgroundColor(appModel: appModel).allowsHitTesting(false)
         }
       }
       .safeAreaInset(edge: .top, spacing: 0) {
@@ -100,11 +101,10 @@ struct DocumentMainContent: View {
 private let toolbarMenuIconScale: CGFloat = 1.0
 
 private struct RendererToolbarPicker: View {
-  @Bindable var appModel = AppModel.shared
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    processorMenu(documentModel: docModel)
+    ProcessorMenu(documentModel: docModel)
       .scaleEffect(toolbarMenuIconScale, anchor: .center)
       .help("Markdown processor")
   }
@@ -118,11 +118,10 @@ private struct RendererToolbarPicker: View {
 }
 
 private struct TemplateToolbarPicker: View {
-  @Bindable var appModel = AppModel.shared
   @Bindable var docModel: DocumentModel
 
   var body: some View {
-    templateMenu(documentModel: docModel)
+    TemplateMenu(documentModel: docModel)
       .scaleEffect(toolbarMenuIconScale, anchor: .center)
       .help("Template")
   }

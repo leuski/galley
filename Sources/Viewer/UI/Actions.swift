@@ -192,11 +192,13 @@ extension Action {
     )
   }
 
-  static func openInEditor(_ model: DocumentModel?) -> Action {
+  static func openInEditor(
+    _ model: DocumentModel?, appModel: AppModel) -> Action
+  {
     Action(
       title: "Open in Editor",
       image: "arrow.up.forward.app",
-      perform: { _ in model?.openInEditor(line: nil) },
+      perform: { _ in model?.openInEditor(line: nil, appModel: appModel) },
       isEnabled: { model?.canOpenInEditor == true },
       shortcut: .init("e", modifiers: [.command, .option]),
       accessibilityID: ViewerA11yID.FileMenu.openInEditor
@@ -225,14 +227,14 @@ extension Action {
     )
   }
 
-  static func print(_ model: DocumentModel?) -> Action {
+  static func print(_ model: DocumentModel?, appModel: AppModel) -> Action {
     Action(
       title: "Print…",
       image: "printer",
       perform: { _ in
         guard let model else { return }
         let window = NSApp.keyWindow
-        Task { await model.runPrintPanel(on: window) }
+        Task { await model.runPrintPanel(on: window, appModel: appModel) }
       },
       isEnabled: { model != nil },
       shortcut: .init("p", modifiers: .command),
@@ -240,21 +242,22 @@ extension Action {
     )
   }
 
-  static func showOnVisionPro(_ model: DocumentModel?) -> Action
+  static func showOnVisionPro(
+    _ model: DocumentModel?, appModel: AppModel) -> Action
   {
     Action(
       title: { "Show on Vision Pro" },
       help: {
-        AppModel.shared.kosmos.isAVPReachable
+        appModel.kosmos.isAVPReachable
         ? "Open this document on the connected Vision Pro."
         : "No Vision Pro is currently paired with the bridge."
       },
       image: "visionpro",
       perform: { _ in
-        model?.showOnVisionPro(kosmos: AppModel.shared.kosmos)
+        model?.showOnVisionPro(kosmos: appModel.kosmos)
       },
       isEnabled: {
-        AppModel.shared.kosmos.isAVPReachable
+        appModel.kosmos.isAVPReachable
         && model?.documentURL.isFileURL == true
       },
       shortcut: .init("3", modifiers: [.command, .control]),
@@ -267,8 +270,8 @@ extension Action {
 extension Action {
 
   @ViewBuilder
-  static func openRecentMenu() -> some View {
-    @Bindable var recents = AppModel.shared.recents
+  static func openRecentMenu(appModel: AppModel) -> some View {
+    @Bindable var recents = appModel.recents
     Menu("Open Recent", systemImage: "clock") {
       if !recents.urls.isEmpty {
         ForEach(recents.urls, id: \.self) { url in
@@ -284,7 +287,7 @@ extension Action {
 }
 
 extension Action {
-  static func open(isPresented: Binding<Bool>?) -> Action {
+  static func open(isPresented: Binding<Bool>?, appModel: AppModel) -> Action {
     Action(
       title: "Open…",
       image: "arrow.up.forward",
@@ -292,7 +295,7 @@ extension Action {
         if isPresented != nil {
           isPresented?.wrappedValue = true
         } else {
-          AppModel.shared.isOpenFilePresented = true
+          appModel.isOpenFilePresented = true
         }
       },
       shortcut: .init("o", modifiers: [.command]),
@@ -302,16 +305,12 @@ extension Action {
 }
 
 struct OpenFileModifier: ViewModifier {
-  @Bindable var appModel = AppModel.shared
-
   let isPresented: Binding<Bool>?
-
-  init(isPresented: Binding<Bool>?) {
-    self.isPresented = isPresented
-  }
+  let appModel: AppModel
 
   func body(content: Content) -> some View {
-    content
+    @Bindable var appModel = self.appModel
+    return content
       .fileDialogCustomizationID("open-file")
       .fileImporter(
         isPresented: isPresented ?? $appModel.isOpenFilePresented,

@@ -13,7 +13,8 @@ import GalleyCoreKit
 import SwiftUI
 
 struct WelcomeView: View {
-  private var recents: RecentDocumentsModel { AppModel.shared.recents }
+  @Environment(AppModel.self) var appModel
+  private var recents: RecentDocumentsModel { appModel.recents }
   @State private var isOpen: Bool = false
 
   var body: some View {
@@ -26,8 +27,8 @@ struct WelcomeView: View {
         Text("Galley")
           .font(.largeTitle.bold())
 
-        Action.open(isPresented: $isOpen).menuItem()
-          .modifier(OpenFileModifier(isPresented: $isOpen))
+        Action.open(isPresented: $isOpen, appModel: appModel).menuItem()
+          .modifier(OpenFileModifier(isPresented: $isOpen, appModel: appModel))
           .buttonStyle(.borderedProminent)
       }
 

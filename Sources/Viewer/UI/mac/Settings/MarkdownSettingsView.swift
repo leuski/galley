@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 import GalleyCoreKit
 
 struct MarkdownSettingsView: View {
-  @Bindable var appModel = AppModel.shared
+  @Environment(AppModel.self) var appModel
   @Bindable var defaults = Defaults.shared
 
   /// Drives the SwiftUI `.fileImporter` for the "Other Application…"
@@ -340,6 +340,7 @@ struct EditorMenuCore: View {
 }
 
 #Preview {
-  MarkdownSettingsView(appModel: AppModel())
+  MarkdownSettingsView()
+    .environment(AppModel())
 }
 #endif

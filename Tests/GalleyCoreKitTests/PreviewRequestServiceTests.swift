@@ -15,7 +15,7 @@ struct PreviewRequestServiceTests {
     renderer: (any MarkdownRenderer)? = FakeRenderer(body: "<p>BODY</p>")
   ) -> PreviewRequestService {
     PreviewRequestService(
-      selectedTemplate: { .default },
+      selectedTemplate: { .bundledDefault },
       renderer: { renderer })
   }
 
