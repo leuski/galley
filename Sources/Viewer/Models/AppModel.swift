@@ -51,6 +51,9 @@ final class AppModel {
     .schemeHandler
 #endif
 
+  @ObservationIgnored
+  lazy var windowModelManager = WindowModelManager(appModel: self)
+
   /// The app's single boot point (replaces the old `AppBoot`). Builds
   /// synchronously: choices decode from the shared defaults suite now,
   /// and processor discovery runs *after* in a background task — the
