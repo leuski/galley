@@ -206,12 +206,14 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     subsystem: bundleIdentifier, category: "DocumentModel")
 
   convenience init(
+    appModel: AppModel,
     url: URL)
   {
-    self.init(history: History(url: url))
+    self.init(appModel: appModel, history: History(url: url))
   }
 
   init(
+    appModel: AppModel,
     history: History,
     templatePersistent: Template.PersistentRepresentation? = nil,
     processorPersistent: Processor.PersistentRepresentation? = nil,
@@ -220,7 +222,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
   ) {
-    let appModel = AppModel.shared
     self.appModel = appModel
     self.history = history
     self.templates = SceneTemplateChoice(

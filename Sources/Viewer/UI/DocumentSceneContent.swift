@@ -27,7 +27,7 @@ struct DocumentSceneContent: View {
   init(sceneID: DocumentSceneID) {
     self.sceneID = sceneID
     _model = State(
-      initialValue: WindowModelManager.shared.forScene(id: sceneID))
+      initialValue: appModel.windowModelManager.forScene(id: sceneID))
   }
 
   var body: some View {
@@ -42,10 +42,10 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
     // state-restored scene ID arrives late on macOS
       .onChange(of: sceneID) { _, new in
-        guard let newModel = WindowModelManager.shared.forScene(id: new)
+        guard let newModel = appModel.windowModelManager.forScene(id: new)
         else {
           if let model {
-            WindowModelManager.shared.relocate(model, to: new)
+            appModel.windowModelManager.relocate(model, to: new)
           }
           return
         }
@@ -150,7 +150,7 @@ struct DocumentSceneContent: View {
 
     // Welcome window adopts the document in place (welcome → document).
     guard let model else {
-      model = WindowModelManager.shared.open(target: target, id: sceneID)
+      model = appModel.windowModelManager.open(target: target, id: sceneID)
       return
     }
 

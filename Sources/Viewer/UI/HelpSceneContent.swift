@@ -9,6 +9,7 @@ import SwiftUI
 /// `.help` mode (which bypasses dedup, recents, and the tab "+").
 struct HelpSceneContent: View {
   @State private var model: DocumentModel?
+  @Environment(AppModel.self) var appModel
 
   var body: some View {
     Group {
@@ -23,7 +24,7 @@ struct HelpSceneContent: View {
     }
     .onOpenURL { url in
       guard let help = OpenHelpActivity(from: url) else { return }
-      model = DocumentModel.help(url: help.documentURL)
+      model = DocumentModel.help(appModel: appModel, url: help.documentURL)
     }
   }
 }

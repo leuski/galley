@@ -91,18 +91,40 @@ extension DocumentModel {
 
 // MARK: - Per-scene instance cache + factories
 
-extension DocumentModel: Persistent {
+extension CodingUserInfoKey {
+  static let appModel = Self(rawValue: "appModel") !! "cannot happen"
+}
+
+extension DocumentModel: @MainActor Persistent {
   /// The singleton Help window's model — a bundled file, never
   /// persisted.
-  static func help(url: URL) -> DocumentModel {
-    DocumentModel(url: url)
+  static func help(appModel: AppModel, url: URL) -> DocumentModel {
+    DocumentModel(appModel: appModel, url: url)
+  }
+
+  func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(snapshot)
   }
 
   /// Construct from a restored snapshot.
-  convenience init(
-    snapshot: Snapshot)
+  convenience init(from decoder: Decoder) throws
+  {
+    let container = try decoder.singleValueContainer()
+    let snapshot = try container.decode(Snapshot.self)
+    guard let appModel = decoder.userInfo[.appModel] as? AppModel else {
+      throw DecodingError.dataCorrupted(.init(
+        codingPath: decoder.codingPath,
+        debugDescription: "missing appModel"))
+    }
+    self.init(appModel: appModel, snapshot: snapshot)
+  }
+
+  /// Construct from a restored snapshot.
+  convenience init(appModel: AppModel, snapshot: Snapshot)
   {
     self.init(
+      appModel: appModel,
       history: snapshot.history,
       templatePersistent: snapshot.templatePersistent,
       processorPersistent: snapshot.rendererPersistent,
