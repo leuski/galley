@@ -33,8 +33,8 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  var renderer: Processor.PersistentRepresentation?
-  var template: Template.PersistentRepresentation?
+  var renderer: ProcessorChoice.PersistentSelectionRepresentation?
+  var template: TemplateChoice.PersistentSelectionRepresentation?
   var enablePerDocumentOverrides: Bool = false
   var openBehavior: OpenBehavior = .newWindow
   /// Per-window persisted state, keyed by `DocumentSceneID.description`.
@@ -82,7 +82,7 @@ final class Defaults: GalleyRenderDefaults,
   var readingWordsPerMinute: Int = 200
 
 #if os(macOS)
-  var editor: Editor.PersistentRepresentation?
+  var editor: EditorPolicy.PersistentSelectionRepresentation?
   private var editorOtherApplicationPath: String?
   var editorOtherApplication: URL? {
     get { editorOtherApplicationPath.flatMap { URL(string: $0) } }
@@ -108,7 +108,7 @@ final class Defaults: GalleyRenderDefaults,
   /// `AppModel` writes back via `bindPersistent`. Stored on both
   /// platforms so the shared plist round-trips cleanly; only visionOS
   /// surfaces the setting in UI.
-  var colorScheme: DocumentColorScheme.PersistentRepresentation?
+  var colorScheme: ColorSchemeChoice.PersistentSelectionRepresentation?
 
   /// Hash of the Galley.app bundle the Server saw at its launch.
   /// Published by the Server (via the shared `net.leuski.galley`

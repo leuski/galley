@@ -14,7 +14,7 @@ extension DocumentModel {
   ///
   /// Every field after `history`/`currentIndex` defaults to "unset" so a
   /// blank window (welcome) round-trips as an empty snapshot.
-  struct Snapshot: Codable, Hashable, Sendable {
+  struct Snapshot: Codable {
     /// Back/forward stack in visit order.
     var history: History
     /// Resting scroll position of the current page.
@@ -24,11 +24,14 @@ extension DocumentModel {
     /// Page zoom factor.
     var pageZoom: Double = 1.0
     /// Per-window template override (`Template.persistentID`).
-    var templatePersistent: Template.PersistentRepresentation?
+    var templatePersistent: SceneTemplateChoice
+      .PersistentSelectionRepresentation?
     /// Per-window renderer override (`Processor.persistentID`).
-    var rendererPersistent: Processor.PersistentRepresentation?
+    var rendererPersistent: SceneProcessorChoice
+      .PersistentSelectionRepresentation?
     /// Per-window color-scheme override (visionOS).
-    var colorSchemePersistent: DocumentColorScheme.PersistentRepresentation?
+    var colorSchemePersistent: SceneColorSchemeChoice
+      .PersistentSelectionRepresentation?
     /// visionOS: lets a fresh window re-resolve a sandboxed file URL.
     var securityScopedBookmark: Data?
 
@@ -53,10 +56,12 @@ extension DocumentModel {
       scroll: Scroll = .top,
       showsTOC: Bool = false,
       pageZoom: Double = 1.0,
-      templatePersistent: Template.PersistentRepresentation? = nil,
-      rendererPersistent: Processor.PersistentRepresentation? = nil,
-      colorSchemePersistent: DocumentColorScheme
-        .PersistentRepresentation? = nil,
+      templatePersistent: SceneTemplateChoice
+        .PersistentSelectionRepresentation? = nil,
+      rendererPersistent: SceneProcessorChoice
+        .PersistentSelectionRepresentation? = nil,
+      colorSchemePersistent: SceneColorSchemeChoice
+        .PersistentSelectionRepresentation? = nil,
       securityScopedBookmark: Data? = nil
     ) {
       self.history = history
@@ -82,9 +87,9 @@ extension DocumentModel {
       scroll: .location(currentScrollY),
       showsTOC: showsTOC,
       pageZoom: zoom.zoomScale,
-      templatePersistent: templates.persistent,
-      rendererPersistent: processors.persistent,
-      colorSchemePersistent: colorSchemes.persistent,
+      templatePersistent: templates.selectionRepresentation,
+      rendererPersistent: processors.selectionRepresentation,
+      colorSchemePersistent: colorSchemes.selectionRepresentation,
       securityScopedBookmark: nil)
   }
 }
@@ -146,9 +151,9 @@ extension DocumentModel {
   func trackPersistentState() {
     _ = self.history
     _ = self.showsTOC
-    _ = self.templates.persistent
-    _ = self.processors.persistent
-    _ = self.colorSchemes.persistent
+    _ = self.templates.selectionRepresentation
+    _ = self.processors.selectionRepresentation
+    _ = self.colorSchemes.selectionRepresentation
     _ = self.zoom.zoomScale
     _ = self.renderedTemplateID
   }
@@ -165,9 +170,9 @@ extension DocumentModel {
         _ = appModel.processors.selected
         _ = appModel.templates.selected
         _ = Defaults.shared.enablePerDocumentOverrides
-        _ = self.templates.persistent
-        _ = self.processors.persistent
-        _ = self.colorSchemes.persistent
+        _ = self.templates.selected
+        _ = self.processors.selected
+        _ = self.colorSchemes.selected
       },
       onChange: { [weak self] in
         Task { await self?.reload() }

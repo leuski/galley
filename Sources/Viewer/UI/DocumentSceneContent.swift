@@ -24,7 +24,7 @@ struct DocumentSceneContent: View {
   @Environment(AppModel.self) var appModel
   @Environment(\.openWindow) private var openWindow
 
-  init(sceneID: DocumentSceneID) {
+  init(sceneID: DocumentSceneID, appModel: AppModel) {
     self.sceneID = sceneID
     _model = State(
       initialValue: appModel.windowModelManager.forScene(id: sceneID))
@@ -176,7 +176,7 @@ struct DocumentSceneContent: View {
     // tab in place.
 #if os(visionOS)
     if case .newTab = Defaults.shared.openBehavior {
-      model.addTab(WindowModelManager.shared.makeTab(for: target))
+      model.addTab(appModel.windowModelManager.makeTab(for: target))
       return
     }
 #endif

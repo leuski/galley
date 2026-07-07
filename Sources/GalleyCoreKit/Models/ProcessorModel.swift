@@ -5,34 +5,42 @@
 
 import SwiftUI
 
-extension Processor: ChoiceValueProtocol {
-  public typealias PersistentID = ID
-  public var persistentID: ID { id }
-}
+public struct ProcessorPolicy: SelectablePolicy<Processor> {
+  public typealias PersistentSelectionRepresentation = NamedPair<Processor.ID>
+  public typealias Selection = Processor
 
-public struct ProcessorChoiceValue: ChoiceValueEnvelopeProtocol<Processor> {
-  nonisolated public let value: Value
-
-  public init(_ value: Value) {
-    self.value = value
+  private let store: ProcessorStore
+  public var elements: [Processor] { store.processors }
+  public var defaultSelection: Processor { .builtIn }
+  public var isReady: Bool { store.isReady }
+  public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
+    store.existingProcessor(forID: value.id)
+  }
+  public func encode(_ value: Selection) -> PersistentSelectionRepresentation {
+    .init(id: value.id, name: String(localized: value.name))
+  }
+  public func contains(_ value: Selection) -> Bool {
+    store.existingProcessor(forID: value.id) != nil
+  }
+  public init(_ store: ProcessorStore = .shared) {
+    self.store = store
   }
 }
 
-extension ProcessorChoiceValue: SectionedChoiceValue {
-  public var isAvailable: Bool { value.isAvailable }
-  public var section: Int {
-    value.isBuiltIn ? 0 : 1
+public typealias ProcessorChoice = SelectableModel<ProcessorPolicy>
+
+extension ProcessorChoice {
+  public convenience init(
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: ProcessorPolicy(),
+      initialSelection: initialSelection,
+      notifier: notifier)
   }
 }
 
-extension ProcessorChoiceValue: RestorableChoiceValue {
-  public typealias Source = ProcessorStore
+extension Processor: SectionedChoiceValue {
+  public var section: Int { isBuiltIn ? 0 : 1 }
 }
-
-extension ProcessorStore: ChoiceModelSource<Processor> {
-  public var values: [Processor] { processors }
-  public var defaultValue: Processor { .builtIn }
-}
-
-public typealias ProcessorChoice = ConcreteChoiceModel<
-  ProcessorChoiceValue, ProcessorStore>

@@ -143,15 +143,18 @@ struct VisionSettingsView: View {
   }
 }
 
-struct MyPicker<Choice>: View
-where Choice: ChoiceModel & Observable & AnyObject,
-      Choice.Element: SectionedChoiceValue
+struct MyPicker<Model>: View
+where Model: Selectable & Observable,
+      Model.Selection == Model.Element,
+      Model.Element: SectionedChoiceValue & Identifiable
 {
-  @Bindable var model: Choice
+  @Bindable var model: Model
 
   var body: some View {
-    Picker("", selection: $model.selected) {
-      MenuCore(model: model)
+    Menu {
+      SelectableMenuCore(model: model)
+    } label: {
+      Text(model.selected.name)
     }
     .labelsHidden()
   }

@@ -8,7 +8,18 @@
 import GalleyCoreKit
 import SwiftUI
 
-typealias SceneColorSchemeChoiceValue = SceneChoiceValueEnvelope<
-  ColorSchemeChoice, SceneChoiceLocalizer<ColorSchemeChoice.Element>>
-typealias SceneColorSchemeChoice = SceneChoice<
-  ColorSchemeChoice, SceneChoiceLocalizer<ColorSchemeChoice.Element>>
+typealias SceneColorSchemeChoice = SelectableModel<SceneSelectablePolicy<
+  ColorSchemePolicy>>
+
+extension SceneColorSchemeChoice {
+  convenience init(
+    source: ColorSchemeChoice,
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: .init(source),
+      initialSelection: initialSelection,
+      notifier: notifier)
+  }
+}

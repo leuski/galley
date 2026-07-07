@@ -7,37 +7,41 @@
 
 import Foundation
 
-public struct TemplateChoiceValue: ChoiceValueEnvelopeProtocol<Template> {
-  nonisolated public let value: Value
+public struct TemplatePolicy: SelectablePolicy<Template> {
+  public typealias PersistentSelectionRepresentation = NamedPair<Template.ID>
+  public typealias Selection = Template
 
-  public init(_ value: Value) {
-    self.value = value
+  private let store: TemplateStore
+  public var elements: [Template] { store.templates }
+  public var defaultSelection: Template { .bundledDefault }
+  public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
+    store.existingTemplate(forID: value.id)
   }
-
-  /// Override the envelope's default `name` (which would wrap the
-  /// inner value's `description` as a runtime `LocalizationValue`,
-  /// losing catalog extraction) and forward to `Template.name` so
-  /// the bundled "Default" lands in the catalog and user-defined
-  /// templates stay out of it.
-  public var name: LocalizedStringResource { value.name }
+  public func encode(_ value: Selection) -> PersistentSelectionRepresentation {
+    .init(id: value.id, name: String(localized: value.name))
+  }
+  public func contains(_ value: Selection) -> Bool {
+    store.existingTemplate(forID: value.id) != nil
+  }
+  public init(_ store: TemplateStore = .shared) {
+    self.store = store
+  }
 }
 
-extension TemplateChoiceValue: SectionedChoiceValue {
-  /// Section by source index — bundled templates and user templates
-  /// render in distinct menu groups. Production has 0 = bundle and
-  /// 1 = user; future sources (e.g. team-shared dirs) get their own
-  /// sections automatically.
-  public var section: Int { value.sourceIndex }
+public typealias TemplateChoice = SelectableModel<TemplatePolicy>
+
+extension TemplateChoice {
+  public convenience init(
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: TemplatePolicy(),
+      initialSelection: initialSelection,
+      notifier: notifier)
+  }
 }
 
-extension TemplateChoiceValue: RestorableChoiceValue {
-  public typealias Source = TemplateStore
+extension Template: SectionedChoiceValue {
+  public var section: Int { sourceIndex }
 }
-
-extension TemplateStore: ChoiceModelSource<Template> {
-  public var values: [Template] { templates }
-  public var defaultValue: Template { .bundledDefault }
-}
-
-public typealias TemplateChoice = ConcreteChoiceModel<
-  TemplateChoiceValue, TemplateStore>

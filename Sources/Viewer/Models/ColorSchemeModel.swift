@@ -6,40 +6,39 @@
 //
 
 import Foundation
-import Observation
 import GalleyCoreKit
+import SwiftUI
 
-struct ColorSchemeChoiceValue: ChoiceValueEnvelopeProtocol<DocumentColorScheme>,
-                               SectionedChoiceValue
-{
-  nonisolated let value: Value
+struct ColorSchemePolicy: SelectablePolicy<DocumentColorScheme> {
+  typealias PersistentSelectionRepresentation = NamedPair<Element>
+  typealias Selection = Element
 
-  init(_ value: Value) {
-    self.value = value
+  var elements: [Element] { DocumentColorScheme.allCases }
+  var defaultSelection: Selection { .light }
+  func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
+    value.id
   }
-
-  /// Forward to the inner enum's localized name (Light / Dark) so
-  /// catalog extraction picks them up — same pattern as
-  /// `TemplateChoiceValue.name`.
-  var name: LocalizedStringResource { value.localizedStringResource }
+  func encode(_ value: Selection) -> PersistentSelectionRepresentation {
+    .init(id: value.id, name: String(localized: value.name))
+  }
+  func contains(_ value: Selection) -> Bool {
+    true
+  }
 }
 
-extension ColorSchemeChoiceValue: RestorableChoiceValue {
-  typealias Source = ColorSchemeStore
+typealias ColorSchemeChoice = SelectableModel<ColorSchemePolicy>
+
+extension ColorSchemeChoice {
+  convenience init(
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: ColorSchemePolicy(),
+      initialSelection: initialSelection,
+      notifier: notifier)
+  }
 }
 
-/// Catalog of color-scheme options. Static — `DocumentColorScheme` is
-/// a fixed two-case enum — but expressed through the same
-/// `ChoiceModelSource` shape as `TemplateStore` / `ProcessorStore` so
-/// the rest of the choice infrastructure (Scene envelopes,
-/// `bindPersistent`) drops in unchanged.
-@Observable @MainActor
-final class ColorSchemeStore: ChoiceModelSource {
-  static let shared = ColorSchemeStore()
-
-  let values: [DocumentColorScheme] = DocumentColorScheme.allCases
-  let defaultValue: DocumentColorScheme = .light
+extension DocumentColorScheme: SectionedChoiceValue {
 }
-
-typealias ColorSchemeChoice = ConcreteChoiceModel<
-  ColorSchemeChoiceValue, ColorSchemeStore>

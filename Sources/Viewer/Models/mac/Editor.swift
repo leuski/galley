@@ -51,12 +51,26 @@ enum ScriptInstallError: LocalizedError {
   }
 }
 
+private let customURLSchemeID = "customURLScheme"
+private let otherApplicationID = "otherApplication"
+
 @MainActor
-struct Editor: ChoiceValue, SectionedChoiceValue
+struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
 {
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    switch (lhs.id, rhs.id) {
+    case (customURLSchemeID, customURLSchemeID):
+      lhs.invocation == rhs.invocation
+    case (otherApplicationID, otherApplicationID):
+      lhs.url == rhs.url
+    default:
+      lhs.id == rhs.id
+    }
+  }
+
   static let customURLScheme = Editor(
     section: 1,
-    persistentID: "customURLScheme",
+    id: customURLSchemeID,
     url: nil,
     invocation: .urlTemplate(
       Defaults.shared.editorCustomURL),
@@ -65,18 +79,18 @@ struct Editor: ChoiceValue, SectionedChoiceValue
 
   static let otherApplication = Editor(
     section: 1,
-    persistentID: "otherApplication",
+    id: otherApplicationID,
     url: Defaults.shared.editorOtherApplication,
     invocation: .open,
     name: Defaults.shared
-        .editorOtherApplication.map { url in
-          LocalizedStringResource(
-            String.LocalizationValue(url.displayName))
-        } ?? "Other Application…"
+      .editorOtherApplication.map { url in
+        LocalizedStringResource(
+          String.LocalizationValue(url.displayName))
+      } ?? "Other Application…"
   )
 
   let section: Int
-  nonisolated let persistentID: String
+  nonisolated let id: String
   private let _url: () -> URL?
   var url: URL? { _url() }
   private let _invocation: () -> InvocationStyle
@@ -89,7 +103,7 @@ struct Editor: ChoiceValue, SectionedChoiceValue
 
   init(
     section: Int,
-    persistentID: String,
+    id: String,
     url: @escaping @autoclosure () -> URL?,
     invocation: @escaping @autoclosure () -> InvocationStyle,
     name: @escaping @autoclosure () -> LocalizedStringResource,
@@ -98,7 +112,7 @@ struct Editor: ChoiceValue, SectionedChoiceValue
     postInstall: (@MainActor () -> Void)? = nil
   ) {
     self.section = section
-    self.persistentID = persistentID
+    self.id = id
     self._url = url
     self._invocation = invocation
     self._name = name
@@ -122,7 +136,7 @@ struct Editor: ChoiceValue, SectionedChoiceValue
     }
     self.init(
       section: 0,
-      persistentID: id,
+      id: id,
       url: url,
       invocation: invocation,
       name: LocalizedStringResource(
@@ -158,7 +172,7 @@ struct Editor: ChoiceValue, SectionedChoiceValue
   /// for BBEdit would replace Xcode's remembered default and vice
   /// versa.
   var scriptPickerCustomizationID: String {
-    "is-\(persistentID)"
+    "is-\(id)"
   }
 
   /// Copies this editor's bundled scripts folder into `destination`.
@@ -393,48 +407,40 @@ final class EditorStore {
   }()
 }
 
-extension Editor: RestorableChoiceValue {
-  func isResident(in source: EditorStore) -> Bool {
-    source.editors.contains { $0.persistentID == persistentID }
+struct EditorPolicy: @MainActor SelectablePolicy<Editor> {
+  typealias PersistentSelectionRepresentation = NamedPair<Editor.ID>
+  typealias Selection = Editor
+
+  private let store: EditorStore
+  var elements: [Element] { store.editors }
+  var defaultSelection: Selection {
+    store.editors.first ?? .customURLScheme }
+  func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
+    store.editors.first { $0.id == value.id }
   }
-
-  static func decode(
-    _ persistent: PersistentRepresentation,
-    from source: EditorStore) throws -> Editor
-  {
-    guard let value = source.editors.first(
-      where: { $0.persistentID == persistent.id })
-    else {
-      throw AnyChoiceValueDecodingError.missingValue(persistent.name)
-    }
-    return value
+  func encode(_ value: Selection) -> PersistentSelectionRepresentation {
+    .init(id: value.id, name: String(localized: value.name))
   }
-
-  static func values(from source: EditorStore) -> [Editor] {
-    source.editors.map { $0 }
+  func contains(_ value: Selection) -> Bool {
+    store.editors.first { $0.id == value.id } != nil
   }
-
-  static func defaultElement(from source: EditorStore) -> Editor {
-    source.editors.first ?? .customURLScheme
-  }
-
-  typealias Source = EditorStore
-
-  func persist() -> NamedValue<String>? {
-    NamedValue(
-      id: persistentID,
-      name: String(localized: name))
-  }
-
-  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.persistentID == rhs.persistentID
-  }
-
-  nonisolated func hash(into hasher: inout Hasher) {
-    hasher.combine(persistentID)
+  init(_ store: EditorStore = .shared) {
+    self.store = store
   }
 }
 
-typealias EditorChoice = Choice<Editor>
+typealias EditorChoice = SelectableModel<EditorPolicy>
+
+extension EditorChoice {
+  convenience init(
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: EditorPolicy(),
+      initialSelection: initialSelection,
+      notifier: notifier)
+  }
+}
 
 #endif

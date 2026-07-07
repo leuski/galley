@@ -22,8 +22,8 @@ final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults
 {
-  var renderer: Processor.PersistentRepresentation?
-  var template: Template.PersistentRepresentation?
+  var renderer: ProcessorChoice.PersistentSelectionRepresentation?
+  var template: TemplateChoice.PersistentSelectionRepresentation?
   var serverGalleyHash: String?
   /// OS-assigned port the running Server bound to, published here so
   /// Viewer and Quicklook can compose the loopback URL via

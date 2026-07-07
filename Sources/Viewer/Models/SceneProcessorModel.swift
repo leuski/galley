@@ -6,7 +6,18 @@
 import GalleyCoreKit
 import SwiftUI
 
-typealias SceneProcessorChoiceValue = SceneChoiceValueEnvelope<
-  ProcessorChoice, SceneChoiceLocalizer<ProcessorChoice.Element>>
-typealias SceneProcessorChoice = SceneChoice<
-  ProcessorChoice, SceneChoiceLocalizer<ProcessorChoice.Element>>
+typealias SceneProcessorChoice = SelectableModel<SceneSelectablePolicy<
+  ProcessorPolicy>>
+
+extension SceneProcessorChoice {
+  public convenience init(
+    source: ProcessorChoice,
+    initialSelection: PersistentSelectionRepresentation? = nil,
+    notifier: Notifier? = nil)
+  {
+    self.init(
+      source: .init(source),
+      initialSelection: initialSelection,
+      notifier: notifier)
+  }
+}

@@ -175,9 +175,9 @@ struct EditorSubstitutionTests {
 struct EditorStoreTests {
   @Test("Roster always includes the two static editors")
   func rosterHasStaticEditors() {
-    let ids = EditorStore.shared.editors.map(\.persistentID)
-    #expect(ids.contains(Editor.customURLScheme.persistentID))
-    #expect(ids.contains(Editor.otherApplication.persistentID))
+    let ids = EditorStore.shared.editors.map(\.id)
+    #expect(ids.contains(Editor.customURLScheme.id))
+    #expect(ids.contains(Editor.otherApplication.id))
   }
 
   /// Every roster entry must carry a non-empty `persistentID` — it is
@@ -186,7 +186,7 @@ struct EditorStoreTests {
   @Test("Every editor has a non-empty persistent id")
   func everyEditorHasPersistentID() {
     for editor in EditorStore.shared.editors {
-      #expect(!editor.persistentID.isEmpty)
+      #expect(!editor.id.isEmpty)
     }
   }
 
@@ -208,14 +208,14 @@ struct EditorStoreTests {
   @Test("Resolved built-in editors key off a reverse-DNS bundle id")
   func builtInEditorsUseBundleIDs() {
     let staticIDs: Set = [
-      Editor.customURLScheme.persistentID,
-      Editor.otherApplication.persistentID
+      Editor.customURLScheme.id,
+      Editor.otherApplication.id
     ]
     for editor in EditorStore.shared.editors
-    where !staticIDs.contains(editor.persistentID) {
+    where !staticIDs.contains(editor.id) {
       #expect(
-        editor.persistentID.contains("."),
-        "\(editor.persistentID) is not a bundle id")
+        editor.id.contains("."),
+        "\(editor.id) is not a bundle id")
     }
   }
 
@@ -234,7 +234,7 @@ struct EditorStoreTests {
         template, fileURL: url, line: 42)
       #expect(
         URL(string: result) != nil,
-        "\(editor.persistentID) → \(result)")
+        "\(editor.id) → \(result)")
     }
   }
 }

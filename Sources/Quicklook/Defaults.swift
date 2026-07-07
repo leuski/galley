@@ -23,8 +23,8 @@ import GalleyCoreKit
   limitToInstance: false)
 final class Defaults: GalleyDefaults, HTTPServerDefaults, GalleyRenderDefaults {
   var serverHTTPPort: UInt16 = 0
-  var renderer: Processor.PersistentRepresentation?
-  var template: Template.PersistentRepresentation?
+  var renderer: ProcessorChoice.PersistentSelectionRepresentation?
+  var template: TemplateChoice.PersistentSelectionRepresentation?
 
   @MainActor static let shared = Defaults()
 }

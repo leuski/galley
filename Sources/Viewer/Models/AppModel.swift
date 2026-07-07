@@ -78,8 +78,7 @@ final class AppModel {
         .shared.openBehavior == .newTab
     })
     self.editors = EditorChoice(
-      source: EditorStore.shared,
-      persistent: Defaults.shared.editor) { name in
+      initialSelection: Defaults.shared.editor) { name in
         Self.notify(.editor, name)
       }
     /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
@@ -89,14 +88,12 @@ final class AppModel {
 #endif
 
     self.templates = TemplateChoice(
-      source: TemplateStore.shared,
-      persistent: Defaults.shared.template) { name in
+      initialSelection: Defaults.shared.template) { name in
         Self.notify(.template, name)
       }
 
     self.processors = ProcessorChoice(
-      source: ProcessorStore.shared,
-      persistent: Defaults.shared.renderer) { name in
+      initialSelection: Defaults.shared.renderer) { name in
         Self.notify(.processor, name)
       }
 
@@ -104,8 +101,7 @@ final class AppModel {
     // displacement notifier is a no-op — the catalog can't lose a
     // case at runtime the way templates or processors can.
     self.colorSchemes = ColorSchemeChoice(
-      source: ColorSchemeStore.shared,
-      persistent: Defaults.shared.colorScheme)
+      initialSelection: Defaults.shared.colorScheme)
 
     // Darwin-notification bridge: `UserDefaults.didChangeNotification`
     // is process-local, so the Server (a near-idle menu-bar app) never
@@ -117,13 +113,14 @@ final class AppModel {
     Defaults.shared.startListening()
 
     persistenceTokens = persistenceTokens
-    + Property(templates, \.persistent, label: "Viewer.template")
+    + Property(templates, \.selectionRepresentation, label: "Viewer.template")
       .bind(
         toAndFrom: Defaults.shared.property(\.template), checkSettled: true)
-    + Property(processors, \.persistent, label: "Viewer.processor")
+    + Property(processors, \.selectionRepresentation, label: "Viewer.processor")
       .bind(
         toAndFrom: Defaults.shared.property(\.renderer), checkSettled: true)
-    + Property(colorSchemes, \.persistent, label: "Viewer.colorScheme")
+    + Property(
+      colorSchemes, \.selectionRepresentation, label: "Viewer.colorScheme")
       .bind(
         toAndFrom: Defaults.shared.property(\.colorScheme), checkSettled: true)
 
@@ -183,7 +180,7 @@ final class AppModel {
     if let templates, Defaults.shared.enablePerDocumentOverrides {
       return templates.selected.value
     }
-    return self.templates.selected.value
+    return self.templates.selected
   }
 
   public func urlSchemeHandler(

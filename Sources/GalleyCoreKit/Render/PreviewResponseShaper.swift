@@ -157,9 +157,8 @@ public struct PreviewResponseShaper: Sendable {
       source = renderSource
     case .template(let name, let templateDetail, let templateSource):
       title = Self.localized("Template error")
-      detail = String(
-        format: Self.localized("Cannot load template '%@': %@"),
-        name, templateDetail)
+      detail = Self.localized(
+        "Cannot load template '\(name)': \(templateDetail)")
       source = templateSource
     }
     let html = Self.errorPageTemplate.substituting(substitutions: [

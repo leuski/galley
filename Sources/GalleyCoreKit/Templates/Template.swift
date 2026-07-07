@@ -9,7 +9,8 @@ import Foundation
 /// (a user template named "Default" coexists with the bundled "Default"
 /// because their source indices differ).
 public struct Template: Sendable, Identifiable,
-                        CustomLocalizedStringResourceConvertible
+                        CustomLocalizedStringResourceConvertible,
+                        Equatable
 {
   public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
     public static func < (lhs: Self, rhs: Self) -> Bool {
@@ -30,6 +31,10 @@ public struct Template: Sendable, Identifiable,
       var container = encoder.singleValueContainer()
       try container.encode(rawValue)
     }
+  }
+
+  public static func == (lhs: Template, rhs: Template) -> Bool {
+    lhs.id == rhs.id
   }
 
   public let id: ID
@@ -100,11 +105,6 @@ public extension Template {
     }
     return template
   }()
-}
-
-extension Template: ChoiceValueProtocol {
-  public typealias PersistentID = Template.ID
-  public var persistentID: PersistentID { id }
 }
 
 /// Result of composing a preview page. Pairs the final HTML with the

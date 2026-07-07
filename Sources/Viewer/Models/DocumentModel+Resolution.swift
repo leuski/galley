@@ -20,7 +20,7 @@ extension DocumentModel {
       return renderer
     }
 
-    return appModel.processors.selected.value.renderer
+    return appModel.processors.selected.renderer
     ?? SwiftMarkdownRenderer()
   }
 
@@ -42,7 +42,7 @@ extension DocumentModel {
     if Defaults.shared.enablePerDocumentOverrides {
       return colorSchemes.selected.value.colorScheme
     }
-    return appModel.colorSchemes.selected.value.colorScheme
+    return appModel.colorSchemes.selected.colorScheme
 #endif
   }
 
@@ -55,7 +55,7 @@ extension DocumentModel {
   /// (template uninstalled mid-session).
   func renderedTemplate(appModel: AppModel) -> Template {
     if let id = renderedTemplateID,
-       let template = appModel.templates.findValue(forID: id)
+       let template = TemplateStore.shared.existingTemplate(forID: id)
     {
       return template
     }

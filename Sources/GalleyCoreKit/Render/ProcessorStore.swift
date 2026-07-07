@@ -5,7 +5,8 @@ import Observation
 /// when the underlying tool is not installed; the row is still shown so
 /// the user can see what is available and how to install it.
 public struct Processor: Sendable, Identifiable,
-                         CustomLocalizedStringResourceConvertible
+                         CustomLocalizedStringResourceConvertible,
+                         Equatable
 {
   public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
     public static func < (lhs: Self, rhs: Self) -> Bool {
@@ -23,6 +24,10 @@ public struct Processor: Sendable, Identifiable,
       var container = encoder.singleValueContainer()
       try container.encode(rawValue)
     }
+  }
+
+  public static func == (lhs: Processor, rhs: Processor) -> Bool {
+    lhs.id == rhs.id
   }
 
   public let id: ID
@@ -76,6 +81,7 @@ public final class ProcessorStore {
 
   public func discover() async {
     self.processors = await Self.discoverAll()
+    self.isReady = true
   }
 
   public func rediscover() {
@@ -89,6 +95,8 @@ public final class ProcessorStore {
   public func anyProcessor(forID id: Processor.ID?) -> Processor {
     existingProcessor(forID: id) ?? .builtIn
   }
+
+  private(set) var isReady: Bool = false
 
   // MARK: - Catalog
 

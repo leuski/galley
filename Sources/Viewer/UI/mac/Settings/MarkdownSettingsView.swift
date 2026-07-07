@@ -157,7 +157,7 @@ struct MarkdownSettingsView: View {
   @ViewBuilder
   private var templatePicker: some View {
     Menu {
-      MenuCore(model: appModel.templates)
+      SelectableMenuCore(model: appModel.templates)
     } label: {
       Text(appModel.templates.selected.name)
     }
@@ -166,7 +166,7 @@ struct MarkdownSettingsView: View {
   @ViewBuilder
   private var processorPicker: some View {
     Menu {
-      MenuCore(model: appModel.processors)
+      SelectableMenuCore(model: appModel.processors)
     } label: {
       Text(appModel.processors.selected.name)
     }
@@ -306,13 +306,13 @@ struct EditorMenuCore: View {
   let onRequestAppPicker: () -> Void
 
   var body: some View {
-    let values = model.values
+    let values = model.elements
       .reduce(into: [:]) { result, value in
         result[value.section, default: []].append(value)
       }
       .sorted { $0.key < $1.key }
       .map { $0.value }
-    DividedSections(sections: values, id: \.self) { value in
+    DividedSections(sections: values, id: \.id) { value in
       Toggle(isOn: binding(for: value)) {
         EditorChoiceElement(model: value)
       }
@@ -322,7 +322,7 @@ struct EditorMenuCore: View {
 
   private func binding(for value: EditorChoice.Element) -> Binding<Bool> {
     Binding(
-      get: { model.selected.persistentID == value.persistentID },
+      get: { model.selected.id == value.id },
       set: { newValue in
         guard newValue else { return }
         if value == .otherApplication {

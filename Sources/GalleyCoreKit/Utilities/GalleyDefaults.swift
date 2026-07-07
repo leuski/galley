@@ -18,8 +18,9 @@ extension GalleyDefaults {
 }
 
 public protocol GalleyRenderDefaults: GalleyDefaults {
-  var renderer: Processor.PersistentRepresentation? { get set }
-  var template: Template.PersistentRepresentation? { get set }
+  var renderer: ProcessorChoice.PersistentSelectionRepresentation? { get set }
+  var template: TemplateChoice.PersistentSelectionRepresentation?
+  { get set }
 }
 
 public let bundleIdentifier = Bundle.main.bundleIdentifier

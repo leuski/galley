@@ -58,7 +58,7 @@ DocumentSceneID, WindowModel>
   /// known file restores its zoom/scroll/TOC/choices) and stamped with
   /// the originating request. Shared by the welcome→document adopt path
   /// (`open`) and the visionOS new-tab path (`WindowModel.addTab`).
-  private func makeTab(for target: DocumentTarget) -> DocumentModel {
+  func makeTab(for target: DocumentTarget) -> DocumentModel {
     var snapshot = Defaults.shared[snapshot: target.documentURL]
     ?? DocumentModel.Snapshot(url: target.documentURL)
     if let scroll = target.scroll {

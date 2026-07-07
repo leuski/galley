@@ -1,8 +1,9 @@
 import SwiftUI
 
 public struct ProcessorMenuContent<Model>: View
-where Model: ChoiceModel & AnyObject & Observable,
-      Model.Element: SectionedChoiceValue
+where Model: Selectable,
+      Model.Element == Model.Selection,
+      Model.Element: SectionedChoiceValue & Identifiable
 {
   let title: LocalizedStringResource
   let model: Model
@@ -17,7 +18,7 @@ where Model: ChoiceModel & AnyObject & Observable,
 
   public var body: some View {
     Menu(title, systemImage: "wand.and.stars") {
-      MenuCore(model: model)
+      SelectableMenuCore(model: model)
       Divider()
       Button(
         LocalizedStringResource(

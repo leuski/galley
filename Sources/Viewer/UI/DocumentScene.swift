@@ -29,7 +29,7 @@ struct DocumentScene: Scene {
     // any of our code runs. With the optional variant an undecodable
     // value is simply `nil`, and `DocumentSceneContent` mints a fresh id.
     WindowGroup(id: Self.id, for: DocumentSceneID.self) { $sceneID in
-      DocumentSceneContent(sceneID: sceneID)
+      DocumentSceneContent(sceneID: sceneID, appModel: appModel)
     } defaultValue: {
       DocumentSceneID.next()
     }

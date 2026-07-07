@@ -215,9 +215,12 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   init(
     appModel: AppModel,
     history: History,
-    templatePersistent: Template.PersistentRepresentation? = nil,
-    processorPersistent: Processor.PersistentRepresentation? = nil,
-    colorSchemePersistent: DocumentColorScheme.PersistentRepresentation? = nil,
+    templatePersistent: SceneTemplateChoice
+      .PersistentSelectionRepresentation? = nil,
+    processorPersistent: SceneProcessorChoice
+      .PersistentSelectionRepresentation? = nil,
+    colorSchemePersistent: SceneColorSchemeChoice
+      .PersistentSelectionRepresentation? = nil,
     initialScroll: Scroll? = nil,
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
@@ -226,13 +229,13 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     self.history = history
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
-      persistent: templatePersistent
+      initialSelection: templatePersistent
     ) { name in
       UNUserNotificationCenter.post(kind: .template, displaced: name)
     }
     self.processors = SceneProcessorChoice(
       source: appModel.processors,
-      persistent: processorPersistent
+      initialSelection: processorPersistent
     ) { name in
       UNUserNotificationCenter.post(kind: .processor, displaced: name)
     }
@@ -240,7 +243,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // as `AppModel.colorSchemes`.
     self.colorSchemes = SceneColorSchemeChoice(
       source: appModel.colorSchemes,
-      persistent: colorSchemePersistent
+      initialSelection: colorSchemePersistent
     ) { _ in }
 
     var configuration = WebPage.Configuration()
@@ -350,9 +353,9 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // mid-render — extremely rare), fall back to the selected
     // template; better a slightly-stale write than no write.
     let painted = templateID.flatMap {
-      appModel.templates.findValue(forID: $0)
+      TemplateStore.shared.existingTemplate(forID: $0)
     } ?? resolvedTemplate(appModel: appModel)
-    renderedTemplateID = painted.persistentID
+    renderedTemplateID = painted.id
     // Always persist — `color: nil` records a sentinel so a
     // template that *used to* paint a bg but no longer does (CSS
     // edited) overwrites its stale hex entry. Every other
@@ -452,7 +455,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // `prefers-color-scheme` queries inside the new template would
     // resolve under whatever scheme the previous template's
     // bg-luminance forced — and pick the wrong variant.
-    let nextTemplateID = resolvedTemplate(appModel: appModel).persistentID
+    let nextTemplateID = resolvedTemplate(appModel: appModel).id
     if nextTemplateID != renderedTemplateID {
       isRenderingNewTemplate = true
     }

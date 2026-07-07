@@ -40,7 +40,7 @@ struct MoreMenu: View {
           model.documentURL.isFileURL
           ? ""
           : "Rendered on Mac — change color scheme on your Mac.")
-      if appModel.processors.values.count > 1 {
+      if appModel.processors.elements.count > 1 {
         ProcessorMenu(documentModel: model)
       }
 
@@ -52,7 +52,7 @@ struct MoreMenu: View {
     } label: {
       Label("More", systemImage: "ellipsis.circle")
     }
-    .modifier(OpenFileModifier(isPresented: $isPresented))
+    .modifier(OpenFileModifier(isPresented: $isPresented, appModel: appModel))
     .accessibilityIdentifier(ViewerA11yID.Toolbar.more)
   }
 }
