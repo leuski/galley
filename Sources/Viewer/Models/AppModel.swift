@@ -78,6 +78,7 @@ final class AppModel {
         .shared.openBehavior == .newTab
     })
     self.editors = EditorChoice(
+      source: .shared,
       initialSelection: Defaults.shared.editor) { name in
         Self.notify(.editor, name)
       }

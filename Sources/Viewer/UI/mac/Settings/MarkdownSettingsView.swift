@@ -96,7 +96,7 @@ struct MarkdownSettingsView: View {
     guard case .success(let urls) = result, let url = urls.first
     else { return }
     Defaults.shared.editorOtherApplication = url
-    appModel.editors.selected = .otherApplication
+    appModel.editors.selected = EditorStore.shared.otherApplication
   }
 
   private func handlePickedScriptDestination(
@@ -124,7 +124,7 @@ struct MarkdownSettingsView: View {
           .padding(.top, 4)
       }
 
-    case .customURLScheme:
+    case EditorStore.shared.customURLScheme:
       VStack(alignment: .leading, spacing: 4) {
         HStack {
           Text("URL template")
@@ -138,7 +138,7 @@ struct MarkdownSettingsView: View {
           .subtitle()
       }
 
-    case .otherApplication:
+    case EditorStore.shared.otherApplication:
       VStack(alignment: .leading, spacing: 4) {
         HStack {
           Text(
@@ -325,9 +325,9 @@ struct EditorMenuCore: View {
       get: { model.selected.id == value.id },
       set: { newValue in
         guard newValue else { return }
-        if value == .otherApplication {
+        if value == EditorStore.shared.otherApplication {
           if nil != Defaults.shared.editorOtherApplication {
-            model.selected = .otherApplication
+            model.selected = EditorStore.shared.otherApplication
           } else {
             onRequestAppPicker()
           }

@@ -31,7 +31,8 @@ import OSLog
 @ObservableDefaults(limitToInstance: false)
 final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
-                      BroadcastedDefaults
+                      BroadcastedDefaults,
+                      GalleyEditorDefaults
 {
   var renderer: ProcessorChoice.PersistentSelectionRepresentation?
   var template: TemplateChoice.PersistentSelectionRepresentation?
@@ -83,12 +84,8 @@ final class Defaults: GalleyRenderDefaults,
 
 #if os(macOS)
   var editor: EditorPolicy.PersistentSelectionRepresentation?
-  private var editorOtherApplicationPath: String?
-  var editorOtherApplication: URL? {
-    get { editorOtherApplicationPath.flatMap { URL(string: $0) } }
-    set { editorOtherApplicationPath = newValue?.absoluteString }
-  }
-  var editorCustomURL = "x-bbedit://open?url={url}&line={line}"
+  var editorOtherApplicationPath: String?
+  var editorCustomURL = InvocationStyle.defaultCustomURL
 #endif
 
   /// Persisted Open Recent entries — the single source of truth for

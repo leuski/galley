@@ -8,7 +8,6 @@
 #if os(macOS)
 import AppKit
 import Foundation
-import GalleyCoreKit
 import OSLog
 
 private let logger = Logger(
@@ -23,7 +22,9 @@ private func bundleURL(_ bundleIdentifiers: [String]) -> URL? {
     .first
 }
 
-enum InvocationStyle: Sendable, Hashable {
+public enum InvocationStyle: Sendable, Hashable {
+  public static let defaultCustomURL = "x-bbedit://open?url={url}&line={line}"
+
   /// `{url}`, `{path}`, `{line}` placeholders, percent-encoded for
   /// their position in the URL.
   case urlTemplate(String)
@@ -55,9 +56,9 @@ private let customURLSchemeID = "customURLScheme"
 private let otherApplicationID = "otherApplication"
 
 @MainActor
-struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
+public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
 {
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     switch (lhs.id, rhs.id) {
     case (customURLSchemeID, customURLSchemeID):
       lhs.invocation == rhs.invocation
@@ -68,38 +69,45 @@ struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
     }
   }
 
-  static let customURLScheme = Editor(
-    section: 1,
-    id: customURLSchemeID,
-    url: nil,
-    invocation: .urlTemplate(
-      Defaults.shared.editorCustomURL),
-    name: "Custom URL Scheme"
-  )
+  public static func customURLScheme<D>(_ defaults: D) -> Editor
+  where D: GalleyEditorDefaults
+  {
+    Editor(
+      section: 1,
+      id: customURLSchemeID,
+      url: nil,
+      invocation: .urlTemplate(defaults.editorCustomURL),
+      name: "Custom URL Scheme"
+    )
+  }
 
-  static let otherApplication = Editor(
-    section: 1,
-    id: otherApplicationID,
-    url: Defaults.shared.editorOtherApplication,
-    invocation: .open,
-    name: Defaults.shared
-      .editorOtherApplication.map { url in
-        LocalizedStringResource(
-          String.LocalizationValue(url.displayName))
-      } ?? "Other Application…"
-  )
+  public static func otherApplication<D>(_ defaults: D) -> Editor
+  where D: GalleyEditorDefaults
+  {
+    Editor(
+      section: 1,
+      id: otherApplicationID,
+      url: defaults.editorOtherApplication,
+      invocation: .open,
+      name: defaults
+        .editorOtherApplication.map { url in
+          LocalizedStringResource(
+            String.LocalizationValue(url.displayName))
+        } ?? "Other Application…"
+    )
+  }
 
-  let section: Int
-  nonisolated let id: String
+  public let section: Int
+  public nonisolated let id: String
   private let _url: () -> URL?
-  var url: URL? { _url() }
+  public var url: URL? { _url() }
   private let _invocation: () -> InvocationStyle
-  var invocation: InvocationStyle { _invocation() }
+  public var invocation: InvocationStyle { _invocation() }
   private let _name: () -> LocalizedStringResource
-  var name: LocalizedStringResource { _name() }
-  let scriptBundleName: String?
-  let defaultScriptDestination: URL?
-  let postInstall: (@MainActor () -> Void)?
+  public var name: LocalizedStringResource { _name() }
+  public let scriptBundleName: String?
+  public let defaultScriptDestination: URL?
+  public let postInstall: (@MainActor () -> Void)?
 
   init(
     section: Int,
@@ -154,7 +162,7 @@ struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
   /// instead of landing on the deepest ancestor that does exist.
   /// Falls back to `applicationSupportDirectory` for editors without
   /// a kit so callers always get a usable URL.
-  var scriptPickerDefaultDirectory: URL {
+  public var scriptPickerDefaultDirectory: URL {
     guard let destination = defaultScriptDestination else {
       return URL.applicationSupportDirectory
     }
@@ -171,7 +179,7 @@ struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
   /// last-used destination separately. Without it, picking a folder
   /// for BBEdit would replace Xcode's remembered default and vice
   /// versa.
-  var scriptPickerCustomizationID: String {
+  public var scriptPickerCustomizationID: String {
     "is-\(id)"
   }
 
@@ -183,7 +191,7 @@ struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
   /// Shell scripts in the bundle resolve the server endpoint at run
   /// time via `defaults read net.leuski.galley serverHTTPPort`, so
   /// the install is a plain copy — no port-placeholder rewriting.
-  func installScripts(to destination: URL) throws {
+  public func installScripts(to destination: URL) throws {
     guard let bundleName = scriptBundleName,
           let source = Bundle.main.url(
             forResource: bundleName, withExtension: "bundle"),
@@ -230,12 +238,12 @@ struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
   /// install — both the defaults write and the Script Menu launch
   /// are idempotent.
   @MainActor
-  func presentInstalledScripts(at destination: URL) {
+  public func presentInstalledScripts(at destination: URL) {
     NSWorkspace.shared.activateFileViewerSelecting([destination])
     postInstall?()
   }
 
-  func openFileInEditor(_ fileURL: URL, line: Int? = nil) async {
+  public func openFileInEditor(_ fileURL: URL, line: Int? = nil) async {
     switch invocation {
     case .urlTemplate(let template):
       openURL(template: template, fileURL: fileURL, line: line)
@@ -358,89 +366,94 @@ private func runEditorCommand(
 
 @Observable
 @MainActor
-final class EditorStore {
-  static let shared = EditorStore()
+public final class EditorStore {
+  public let editors: [Editor]
+  public let customURLScheme: Editor
+  public let otherApplication: Editor
+  public let defaultEditor: Editor
 
-  var editors = {
-    [
-      Editor(
-        bundleIdentifiers: ["com.barebones.bbedit"],
-        invocation: .urlTemplate("x-bbedit://open?url={url}&line={line}"),
-        scriptBundleName: "BBEditScripts",
-        defaultScriptDestination: URL
-          .applicationSupportDirectory/"BBEdit"/"Scripts"),
-      Editor(
-        bundleIdentifiers: ["com.macromates.TextMate"],
-        invocation: .urlTemplate("txmt://open?url={url}&line={line}")),
-      Editor(
-        bundleIdentifiers: ["com.microsoft.VSCode"],
-        invocation: .urlTemplate("vscode://file{path}:{line}")),
-      Editor(
-        bundleIdentifiers: ["com.sublimetext.4",
-                            "com.sublimetext.3",
-                            "com.sublimetext.2"],
-        invocation: .urlTemplate("subl://open?url={url}&line={line}")),
-      Editor(
-        bundleIdentifiers: ["dev.zed.Zed"],
-        invocation: .urlTemplate("zed://file{path}:{line}")),
-      Editor(
-        bundleIdentifiers: ["com.apple.dt.Xcode"],
-        invocation: .command(
-          executable: "/usr/bin/xed",
-          args: ["--line", "{line}", "{path}"]),
-        scriptBundleName: "XCodeScripts",
-        defaultScriptDestination: URL
-          .homeDirectory/"Library"/"Scripts"/"Applications"/"Xcode",
-        postInstall: {
-          // System Script Menu surfaces user scripts only when it's
-          // enabled. Same as `defaults write com.apple.scriptmenu
-          // ScriptMenuEnabled -bool true` — writing through
-          // `UserDefaults(suiteName:)` skips a `Process` round-trip.
-          UserDefaults(suiteName: "com.apple.scriptmenu")?
-            .set(true, forKey: "ScriptMenuEnabled")
-          NSWorkspace.shared.open(URL(
-            filePath: "/System/Library/CoreServices/Script Menu.app"))
-        }),
-      .customURLScheme,
-      .otherApplication
-    ].compactMap { $0 }
-  }()
+  public init<D>(_ defaults: D)
+  where D: GalleyEditorDefaults
+  {
+    self.otherApplication = .otherApplication(defaults)
+    self.customURLScheme = .customURLScheme(defaults)
+    self.defaultEditor = customURLScheme
+    self.editors = [
+        Editor(
+          bundleIdentifiers: ["com.barebones.bbedit"],
+          invocation: .urlTemplate("x-bbedit://open?url={url}&line={line}"),
+          scriptBundleName: "BBEditScripts",
+          defaultScriptDestination: URL
+            .applicationSupportDirectory/"BBEdit"/"Scripts"),
+        Editor(
+          bundleIdentifiers: ["com.macromates.TextMate"],
+          invocation: .urlTemplate("txmt://open?url={url}&line={line}")),
+        Editor(
+          bundleIdentifiers: ["com.microsoft.VSCode"],
+          invocation: .urlTemplate("vscode://file{path}:{line}")),
+        Editor(
+          bundleIdentifiers: ["com.sublimetext.4",
+                              "com.sublimetext.3",
+                              "com.sublimetext.2"],
+          invocation: .urlTemplate("subl://open?url={url}&line={line}")),
+        Editor(
+          bundleIdentifiers: ["dev.zed.Zed"],
+          invocation: .urlTemplate("zed://file{path}:{line}")),
+        Editor(
+          bundleIdentifiers: ["com.apple.dt.Xcode"],
+          invocation: .command(
+            executable: "/usr/bin/xed",
+            args: ["--line", "{line}", "{path}"]),
+          scriptBundleName: "XCodeScripts",
+          defaultScriptDestination: URL
+            .homeDirectory/"Library"/"Scripts"/"Applications"/"Xcode",
+          postInstall: {
+            // System Script Menu surfaces user scripts only when it's
+            // enabled. Same as `defaults write com.apple.scriptmenu
+            // ScriptMenuEnabled -bool true` — writing through
+            // `UserDefaults(suiteName:)` skips a `Process` round-trip.
+            UserDefaults(suiteName: "com.apple.scriptmenu")?
+              .set(true, forKey: "ScriptMenuEnabled")
+            NSWorkspace.shared.open(URL(
+              filePath: "/System/Library/CoreServices/Script Menu.app"))
+          }),
+        defaultEditor,
+        otherApplication
+      ].compactMap { $0 }
+  }
+
+  public func anyEditor(forID id: Editor.ID?) -> Editor {
+    editors.first { $0.id == id } ?? defaultEditor
+  }
 }
 
-struct EditorPolicy: @MainActor SelectablePolicy<Editor> {
-  typealias PersistentSelectionRepresentation = NamedPair<Editor.ID>
-  typealias Selection = Editor
+public struct EditorPolicy: @MainActor SelectablePolicy<Editor> {
+  public typealias PersistentSelectionRepresentation = NamedPair<Editor.ID>
+  public typealias Selection = Editor
 
   private let store: EditorStore
-  var elements: [Element] { store.editors }
-  var defaultSelection: Selection {
-    store.editors.first ?? .customURLScheme }
-  func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
+  public var elements: [Element] { store.editors }
+  public var defaultSelection: Selection {
+    store.editors.first ?? store.defaultEditor }
+  public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
     store.editors.first { $0.id == value.id }
   }
-  func encode(_ value: Selection) -> PersistentSelectionRepresentation {
+  public func encode(_ value: Selection) -> PersistentSelectionRepresentation {
     .init(id: value.id, name: String(localized: value.name))
   }
-  func contains(_ value: Selection) -> Bool {
+  public func contains(_ value: Selection) -> Bool {
     store.editors.first { $0.id == value.id } != nil
   }
-  init(_ store: EditorStore = .shared) {
+  public init(_ store: EditorStore) {
     self.store = store
   }
-}
-
-typealias EditorChoice = SelectableModel<EditorPolicy>
-
-extension EditorChoice {
-  convenience init(
-    initialSelection: PersistentSelectionRepresentation? = nil,
-    notifier: Notifier? = nil)
+  public init<D>(_ defaults: D)
+  where D: GalleyEditorDefaults
   {
-    self.init(
-      source: EditorPolicy(),
-      initialSelection: initialSelection,
-      notifier: notifier)
+    self.init(EditorStore(defaults))
   }
 }
+
+public typealias EditorChoice = SelectableModel<EditorPolicy>
 
 #endif

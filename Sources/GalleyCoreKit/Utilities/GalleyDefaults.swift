@@ -23,6 +23,19 @@ public protocol GalleyRenderDefaults: GalleyDefaults {
   { get set }
 }
 
+public protocol GalleyEditorDefaults: GalleyDefaults {
+  var editor: EditorPolicy.PersistentSelectionRepresentation? { get set }
+  var editorOtherApplicationPath: String? { get set }
+  var editorCustomURL: String { get set }
+}
+
+extension GalleyEditorDefaults {
+  public var editorOtherApplication: URL? {
+    get { editorOtherApplicationPath.flatMap { URL(string: $0) } }
+    set { editorOtherApplicationPath = newValue?.absoluteString }
+  }
+}
+
 public let bundleIdentifier = Bundle.main.bundleIdentifier
 ?? GalleyConstants.suiteName
 

@@ -20,10 +20,16 @@ private let defaultsLog = Logger(
   limitToInstance: false)
 final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
-                      BroadcastedDefaults
+                      BroadcastedDefaults,
+                      GalleyEditorDefaults
 {
   var renderer: ProcessorChoice.PersistentSelectionRepresentation?
   var template: TemplateChoice.PersistentSelectionRepresentation?
+#if os(macOS)
+  var editor: EditorPolicy.PersistentSelectionRepresentation?
+  var editorOtherApplicationPath: String?
+  var editorCustomURL = InvocationStyle.defaultCustomURL
+#endif
   var serverGalleyHash: String?
   /// OS-assigned port the running Server bound to, published here so
   /// Viewer and Quicklook can compose the loopback URL via
@@ -36,6 +42,12 @@ final class Defaults: GalleyRenderDefaults,
 
   let broadcaster = DefaultsBroadcast(suiteName: GalleyConstants.suiteName)
 }
+
+#if os(macOS)
+extension EditorStore {
+  static let shared = EditorStore(Defaults.shared)
+}
+#endif
 
 @MainActor @Observable
 final class AppModel {
