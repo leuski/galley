@@ -96,6 +96,7 @@ public final class TemplateStore {
 
   public func reload() {
     func dirContents(at dir: URL) -> [URL] {
+      let dir = dir.safe
       do {
         return try dir.contentsOfDirectory(
           includingPropertiesForKeys: [.isDirectoryKey],
@@ -106,7 +107,7 @@ public final class TemplateStore {
         return []
       } catch {
         log.error("""
-          Templates dir \(dir.safe.path, privacy: .private) unreadable: \
+          Templates dir \(dir.path, privacy: .private) unreadable: \
           \(error.localizedDescription, privacy: .public)
           """)
         return []
