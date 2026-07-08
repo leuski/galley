@@ -198,7 +198,7 @@ extension Action {
     Action(
       title: "Open in Editor",
       image: "arrow.up.forward.app",
-      perform: { _ in model?.openInEditor(line: nil, appModel: appModel) },
+      perform: { _ in model?.openInEditor(line: nil) },
       isEnabled: { model?.canOpenInEditor == true },
       shortcut: .init("e", modifiers: [.command, .option]),
       accessibilityID: ViewerA11yID.FileMenu.openInEditor
@@ -227,14 +227,14 @@ extension Action {
     )
   }
 
-  static func print(_ model: DocumentModel?, appModel: AppModel) -> Action {
+  static func print(_ model: DocumentModel?) -> Action {
     Action(
       title: "Print…",
       image: "printer",
       perform: { _ in
         guard let model else { return }
         let window = NSApp.keyWindow
-        Task { await model.runPrintPanel(on: window, appModel: appModel) }
+        Task { await model.runPrintPanel(on: window) }
       },
       isEnabled: { model != nil },
       shortcut: .init("p", modifiers: .command),

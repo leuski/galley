@@ -29,10 +29,10 @@ extension DocumentModel {
   /// same reason — and additionally honors `@page` CSS margins,
   /// which `UIPrintPageRenderer` does not. That's a quality
   /// difference but not a correctness one for our use case.
-  func exportPDF(appModel: AppModel) async throws -> URL {
-    let template = resolvedTemplate(appModel: appModel)
+  func exportPDF() async throws -> URL {
+    let template = resolvedTemplate()
     let composed = try await buildComposedPreview(
-      template: template, appModel: appModel)
+      template: template)
 
     // US Letter @ 72 dpi with half-inch margins. Matches the macOS
     // print pipeline's default `NSPrintInfo` paper / margins so the

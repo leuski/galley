@@ -23,18 +23,32 @@ public protocol GalleyRenderDefaults: GalleyDefaults {
   { get set }
 }
 
+extension GalleyRenderDefaults {
+  @MainActor public var resolvedTemplate: Template {
+    TemplateStore.shared.anyTemplate(forID: template?.id)
+  }
+  @MainActor public var resolvedRenderer: any MarkdownRenderer {
+    ProcessorStore.shared.anyProcessor(forID: renderer?.id).renderer
+    ?? SwiftMarkdownRenderer()
+  }
+}
+
 public protocol GalleyEditorDefaults: GalleyDefaults {
+#if os(macOS)
   var editor: EditorPolicy.PersistentSelectionRepresentation? { get set }
   var editorOtherApplicationPath: String? { get set }
   var editorCustomURL: String { get set }
+#endif
 }
 
+#if os(macOS)
 extension GalleyEditorDefaults {
   public var editorOtherApplication: URL? {
     get { editorOtherApplicationPath.flatMap { URL(string: $0) } }
     set { editorOtherApplicationPath = newValue?.absoluteString }
   }
 }
+#endif
 
 public let bundleIdentifier = Bundle.main.bundleIdentifier
 ?? GalleyConstants.suiteName

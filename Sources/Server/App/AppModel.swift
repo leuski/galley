@@ -47,6 +47,11 @@ final class Defaults: GalleyRenderDefaults,
 extension EditorStore {
   static let shared = EditorStore(Defaults.shared)
 }
+extension GalleyEditorDefaults {
+  @MainActor public var resolvedEditor: Editor {
+    EditorStore.shared.anyEditor(forID: editor?.id)
+  }
+}
 #endif
 
 @MainActor @Observable

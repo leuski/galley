@@ -52,13 +52,13 @@ struct DocumentView: View {
     // `prefers-color-scheme` media queries on the new template pick
     // the user's preferred variant — not whichever variant was
     // current under the previous template's bg-luminance scheme.
-    .preferredColorScheme(model.resolvedColorScheme(appModel: appModel))
+    .preferredColorScheme(model.resolvedColorScheme())
     // `model.pageBackgroundColor` already resolves through the
     // template state → last-seen → system-bg fallback chain, so
     // it's always a real color; no second `??` needed here.
     .background(
       Defaults.shared.tintWindowWithPageBackground
-      ? model.pageBackgroundColor(appModel: appModel) : defaultBackground)
+      ? model.pageBackgroundColor() : defaultBackground)
 #if os(macOS)
     // Paint the page's own background color into the window's
     // container background so the translucent toolbar / sidebar
@@ -73,7 +73,7 @@ struct DocumentView: View {
       for: .windowToolbar)
     .containerBackground(
       Defaults.shared.tintWindowWithPageBackground
-      ? model.pageBackgroundColor(appModel: appModel)
+      ? model.pageBackgroundColor()
       : .userSystemWindowBackground,
       for: .window
     )

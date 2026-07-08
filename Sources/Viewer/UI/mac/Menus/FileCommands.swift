@@ -40,7 +40,7 @@ struct FileCommands: Commands {
 
     CommandGroup(replacing: .printItem) {
       Action.pageSetup(model).menuItem()
-      Action.print(model, appModel: appModel).menuItem()
+      Action.print(model).menuItem()
     }
   }
 }

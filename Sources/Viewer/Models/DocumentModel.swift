@@ -63,8 +63,8 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// then flash back when the bridge corrects the cache after the
   /// outgoing page's last (stale) post — the "sepia then dark then
   /// sepia" flicker that motivated this refactor.
-  func pageBackgroundColor(appModel: AppModel) -> Color {
-    renderedTemplate(appModel: appModel).backgroundState.color
+  func pageBackgroundColor() -> Color {
+    renderedTemplate().backgroundState.color
   }
 
   /// Per-window template / processor choices. Reference types so
@@ -200,8 +200,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// when this flips true.
   var isRenameRequested: Bool = false
 
-  private weak var appModel: AppModel?
-
   let logger = Logger(
     subsystem: bundleIdentifier, category: "DocumentModel")
 
@@ -225,7 +223,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     initialShowsTOC: Bool = false,
     initialZoom: Double = 1
   ) {
-    self.appModel = appModel
     self.history = history
     self.templates = SceneTemplateChoice(
       source: appModel.templates,
@@ -307,7 +304,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     self.zoom = zoom
     zoom.model = self
 
-    wireBridges(appModel: appModel)
+    wireBridges()
 
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
     showsTOC = initialShowsTOC
@@ -320,7 +317,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// `init` so the constructor stays under SwiftLint's body-length
   /// budget; called once, immediately after `self` is fully
   /// initialized.
-  private func wireBridges(appModel: AppModel) {
+  private func wireBridges() {
     // Browser-style navigation: clicking a markdown link in the
     // rendered preview pushes onto our history and rebinds this same
     // model rather than opening a new document window.
@@ -329,18 +326,17 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     }
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
-    editorBridge.onEditorClick = { [weak self, weak appModel] line in
-      self?.openInEditor(line: line, appModel: appModel)
+    editorBridge.onEditorClick = { [weak self] line in
+      self?.openInEditor(line: line)
     }
-    backgroundBridge.onColor = { [weak self, weak appModel] color, templateID in
-      self?.onBackgroundColor(color, templateID, appModel: appModel)
+    backgroundBridge.onColor = { [weak self] color, templateID in
+      self?.onBackgroundColor(color, templateID)
     }
   }
 
   private func onBackgroundColor(
-    _ color: Color?, _ templateID: Template.ID?, appModel: AppModel?)
+    _ color: Color?, _ templateID: Template.ID?)
   {
-    guard let appModel else { return }
     // Bridge fires post-layout regardless of whether the page
     // declared an opaque bg, so any fire = "WebView has painted"
     // and we can drop DocumentView's anti-flash overlay.
@@ -354,7 +350,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // template; better a slightly-stale write than no write.
     let painted = templateID.flatMap {
       TemplateStore.shared.existingTemplate(forID: $0)
-    } ?? resolvedTemplate(appModel: appModel)
+    } ?? resolvedTemplate()
     renderedTemplateID = painted.id
     // Always persist — `color: nil` records a sentinel so a
     // template that *used to* paint a bg but no longer does (CSS
@@ -376,12 +372,12 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// not a visionOS concept. On non-macOS this is a no-op so callers
   /// (cmd-click bridge handler, File > Open in Editor menu item)
   /// don't need to platform-guard at the call site.
-  func openInEditor(line: Int? = nil, appModel: AppModel?) {
+  func openInEditor(line: Int? = nil) {
     guard canOpenInEditor else { return }
-    Task { await _openInEditor(line: line, appModel: appModel) }
+    Task { await _openInEditor(line: line) }
   }
 
-  private func _openInEditor(line: Int? = nil, appModel: AppModel?) async {
+  private func _openInEditor(line: Int? = nil) async {
 #if os(macOS)
     let url = documentURL
     let resolvedLine: Int?
@@ -390,7 +386,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     } else {
       resolvedLine = await topmostVisibleSourceLine()
     }
-    await appModel?.editors.selected.openFileInEditor(
+    await Defaults.shared.resolvedEditor.openFileInEditor(
       url, line: resolvedLine)
 #else
     _ = line
@@ -441,7 +437,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   }
 
   func reload() async {
-    guard let appModel else { return }
     // `pageBackgroundColor` is computed off `renderedTemplate()
     // .backgroundState`, so the chrome stays at the *current* painted
     // template's color through the entire render — no optimistic
@@ -455,7 +450,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // `prefers-color-scheme` queries inside the new template would
     // resolve under whatever scheme the previous template's
     // bg-luminance forced — and pick the wrong variant.
-    let nextTemplateID = resolvedTemplate(appModel: appModel).id
+    let nextTemplateID = resolvedTemplate().id
     if nextTemplateID != renderedTemplateID {
       isRenderingNewTemplate = true
     }
@@ -560,7 +555,6 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   }
 
   private func renderCurrent(scroll targetScroll: Scroll) async {
-    guard let appModel else { return }
     // Drop any prior render-bound notice — it described the previous
     // bind and would otherwise sit behind the incoming render until
     // the next failure overwrote it. Leaves an in-flight ephemeral
@@ -578,8 +572,8 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // the template, owns livereload (via SSE), and is the renderer.
     do {
       if url.isFileURL {
-        let renderer = resolvedRenderer(appModel: appModel)
-        let template = resolvedTemplate(appModel: appModel)
+        let renderer = resolvedRenderer()
+        let template = resolvedTemplate()
         let composed: ComposedPreview
         do {
           let source = try await Self.readSource(at: url)

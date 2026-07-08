@@ -55,7 +55,7 @@ struct ExportModifier: ViewModifier {
       }
       .fileExporter(
         isPresented: $model.isExportingPDF,
-        item: model.pdfExport(appModel: appModel),
+        item: model.pdfExport(),
         contentTypes: [.pdf],
         defaultFilename: model.documentURL
           .deletingPathExtension().lastPathComponent

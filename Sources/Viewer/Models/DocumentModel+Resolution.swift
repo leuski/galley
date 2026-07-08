@@ -13,36 +13,35 @@ extension DocumentModel {
   /// override flag is on, the window-local choice wins (falling back
   /// to the global selection if its pick is unavailable). Otherwise
   /// always use the global selection.
-  func resolvedRenderer(appModel: AppModel) -> any MarkdownRenderer {
+  func resolvedRenderer() -> any MarkdownRenderer {
     if Defaults.shared.enablePerDocumentOverrides == true,
        let renderer = processors.selected.value.renderer
     {
       return renderer
     }
 
-    return appModel.processors.selected.renderer
-    ?? SwiftMarkdownRenderer()
+    return Defaults.shared.resolvedRenderer
   }
 
-  func resolvedTemplate(appModel: AppModel) -> Template {
-    appModel.resolvedTemplate(templates: templates)
+  func resolvedTemplate() -> Template {
+    AppModel.resolvedTemplate(templates: templates)
   }
 
   /// Resolved document color scheme for the WebView. Per-document
   /// override wins when `enablePerDocumentOverrides` is on; otherwise
   /// the global default applies. visionOS-only — macOS adopts the
   /// system appearance directly.
-  func resolvedColorScheme(appModel: AppModel) -> ColorScheme {
+  func resolvedColorScheme() -> ColorScheme {
 #if os(macOS)
     isRenderingNewTemplate
     || !Defaults.shared.tintWindowWithPageBackground
     ? .userSystem
-    : (pageBackgroundColor(appModel: appModel).isLuminanceDark ? .dark : .light)
+    : (pageBackgroundColor().isLuminanceDark ? .dark : .light)
 #else
     if Defaults.shared.enablePerDocumentOverrides {
       return colorSchemes.selected.value.colorScheme
     }
-    return appModel.colorSchemes.selected.colorScheme
+    return Defaults.shared.colorScheme?.id.colorScheme ?? .userSystem
 #endif
   }
 
@@ -53,12 +52,12 @@ extension DocumentModel {
   /// color is the best available placeholder) and when the painted
   /// template's id no longer resolves in the global catalog
   /// (template uninstalled mid-session).
-  func renderedTemplate(appModel: AppModel) -> Template {
+  func renderedTemplate() -> Template {
     if let id = renderedTemplateID,
        let template = TemplateStore.shared.existingTemplate(forID: id)
     {
       return template
     }
-    return resolvedTemplate(appModel: appModel)
+    return resolvedTemplate()
   }
 }

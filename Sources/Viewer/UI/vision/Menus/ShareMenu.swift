@@ -11,7 +11,6 @@ import GalleyCoreKit
 
 struct ShareMenu: View {
   @Bindable var model: DocumentModel
-  @Environment(AppModel.self) var appModel
 
   var body: some View {
     Menu {
@@ -26,9 +25,9 @@ struct ShareMenu: View {
         .accessibilityIdentifier(ViewerA11yID.Toolbar.shareMarkdown)
       }
       ShareLink(
-        item: model.pdfExport(appModel: appModel),
+        item: model.pdfExport(),
         preview: SharePreview(
-          model.pdfExport(appModel: appModel).suggestedName,
+          model.pdfExport().suggestedName,
           image: Image(systemName: "doc.richtext"))
       ) {
         Label("Rendered PDF", systemImage: "doc.richtext")

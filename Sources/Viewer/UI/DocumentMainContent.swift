@@ -11,7 +11,6 @@ import WebKit
 
 struct DocumentMainContent: View {
   @Bindable var model: DocumentModel
-  @Environment(AppModel.self) var appModel
 
   var body: some View {
     WebView(model.page)
@@ -26,7 +25,7 @@ struct DocumentMainContent: View {
     // flips true via the BackgroundColorBridge post-layout fire.
       .overlay {
         if !model.isPageRendered {
-          model.pageBackgroundColor(appModel: appModel).allowsHitTesting(false)
+          model.pageBackgroundColor().allowsHitTesting(false)
         }
       }
       .safeAreaInset(edge: .top, spacing: 0) {

@@ -82,6 +82,10 @@ final class AppModel {
       initialSelection: Defaults.shared.editor) { name in
         Self.notify(.editor, name)
       }
+    persistenceTokens = persistenceTokens
+    + Property(editors, \.selectionRepresentation, label: "Viewer.editors")
+      .bind(
+        toAndFrom: Defaults.shared.property(\.editor), checkSettled: true)
     /// The AppKit tab-bar "+" runs the Open panel and fires each pick as an
     /// activity URL. The "+" only exists when windows are already tabbed
     /// (new-tab behavior → `syncWindowTabbing` left the toggle on), so the
@@ -175,20 +179,20 @@ final class AppModel {
     }
   }
 
-  public func resolvedTemplate(
+  public static func resolvedTemplate(
     templates: SceneTemplateChoice?) -> Template
   {
     if let templates, Defaults.shared.enablePerDocumentOverrides {
       return templates.selected.value
     }
-    return self.templates.selected
+    return Defaults.shared.resolvedTemplate
   }
 
   public func urlSchemeHandler(
     templates: SceneTemplateChoice) -> [URLScheme: AnySchemeHandler]
   {
     let localHandler = PreviewSchemeHandler { [weak templates] in
-      self.resolvedTemplate(templates: templates)
+      Self.resolvedTemplate(templates: templates)
     }.schemeHandler
 #if ENABLE_TUNNEL
     return [
