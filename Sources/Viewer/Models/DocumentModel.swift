@@ -5,6 +5,7 @@ import OSLog
 import SwiftUI
 import WebKit
 import UserNotifications
+import KosmosHTTPTunnel
 
 /// Per-document state for the native viewer. Owns the WebPage, the
 /// file watcher, and the editor bridge. Renderer and template come
@@ -28,7 +29,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
       Bundle.main.bundleURL.safe.absoluteString)
   }
   var canRename: Bool { isRegular && documentURL.isFileURL }
-  var canOpenInEditor: Bool { isRegular && documentURL.isFileURL }
+  var canOpenInEditor: Bool { true }
   var title: String {
     isRegular ? documentURL.lastPathComponent : String(localized: "Help")
   }
@@ -304,7 +305,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     self.zoom = zoom
     zoom.model = self
 
-    wireBridges()
+    wireBridges(appModel: appModel)
 
     // Seed scroll/TOC/zoom; render fire-and-forget — no reveal gate.
     showsTOC = initialShowsTOC
@@ -317,7 +318,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// `init` so the constructor stays under SwiftLint's body-length
   /// budget; called once, immediately after `self` is fully
   /// initialized.
-  private func wireBridges() {
+  private func wireBridges(appModel: AppModel) {
     // Browser-style navigation: clicking a markdown link in the
     // rendered preview pushes onto our history and rebinds this same
     // model rather than opening a new document window.
@@ -326,8 +327,9 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     }
     // Cmd-click in the preview: route through the model so we read
     // the current `EditorChoice` from appModel on every click.
-    editorBridge.onEditorClick = { [weak self] line in
-      self?.openInEditor(line: line)
+    editorBridge.onEditorClick = { [weak self, weak appModel] line in
+      guard let appModel else { return }
+      self?.openInEditor(line: line, kosmos: appModel.kosmos)
     }
     backgroundBridge.onColor = { [weak self] color, templateID in
       self?.onBackgroundColor(color, templateID)
@@ -372,13 +374,14 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// not a visionOS concept. On non-macOS this is a no-op so callers
   /// (cmd-click bridge handler, File > Open in Editor menu item)
   /// don't need to platform-guard at the call site.
-  func openInEditor(line: Int? = nil) {
+  func openInEditor(line: Int? = nil, kosmos: ViewerKosmosService) {
     guard canOpenInEditor else { return }
-    Task { await _openInEditor(line: line) }
+    Task { await _openInEditor(line: line, kosmos: kosmos) }
   }
 
-  private func _openInEditor(line: Int? = nil) async {
-#if os(macOS)
+  private func _openInEditor(
+    line: Int? = nil, kosmos: ViewerKosmosService) async
+  {
     let url = documentURL
     let resolvedLine: Int?
     if let line {
@@ -386,11 +389,15 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     } else {
       resolvedLine = await topmostVisibleSourceLine()
     }
-    await Defaults.shared.resolvedEditor.openFileInEditor(
-      url, line: resolvedLine)
-#else
-    _ = line
+    if url.scheme == TunnelScheme.name {
+      _ = try? await kosmos.openInEditor(DocumentTarget(
+        url: url, scrollLine: resolvedLine))
+    } else {
+#if os(macOS)
+      await Defaults.shared.resolvedEditor.openFileInEditor(
+        url, line: resolvedLine)
 #endif
+    }
   }
 
   /// Find the smallest source line of any block currently in (or

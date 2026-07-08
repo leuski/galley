@@ -124,6 +124,15 @@ extension ViewerKosmosService {
     return try await host.send(RouteToAVP(target: target), to: serverPeer)
   }
 
+  @discardableResult
+  func openInEditor(
+    _ target: DocumentTarget) async throws -> OpenInEditor.Reply
+  {
+    guard host.client != nil else { throw RouteError.notReady }
+    guard let serverPeer else { throw RouteError.noServer }
+    return try await host.send(OpenInEditor(target: target), to: serverPeer)
+  }
+
   enum RouteError: LocalizedError {
     /// `KosmosClient` not yet constructed — `start()` either hasn't
     /// been called, or its bootstrap is still pending.

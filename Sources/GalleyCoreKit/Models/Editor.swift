@@ -315,14 +315,14 @@ private func openURL(template: String, fileURL: URL, line: Int?)
     template, fileURL: fileURL, line: line)
   guard let url = URL(string: urlString) else {
     logger.error("""
-          Editor URL is not a valid URL: \(urlString, privacy: .public)
-          """)
+      Editor URL is not a valid URL: \(urlString, privacy: .public)
+      """)
     return
   }
   if !NSWorkspace.shared.open(url) {
     logger.error("""
-          No handler accepted editor URL: \(urlString, privacy: .public)
-          """)
+      No handler accepted editor URL: \(urlString, privacy: .public)
+      """)
   }
 }
 
@@ -423,7 +423,7 @@ public final class EditorStore {
   }
 
   public func anyEditor(forID id: Editor.ID?) -> Editor {
-    editors.first { $0.id == id } ?? defaultEditor
+    editors.first { $0.id == id } ?? editors.first ?? defaultEditor
   }
 }
 
@@ -434,7 +434,7 @@ public struct EditorPolicy: @MainActor SelectablePolicy<Editor> {
   private let store: EditorStore
   public var elements: [Element] { store.editors }
   public var defaultSelection: Selection {
-    store.editors.first ?? store.defaultEditor }
+    store.anyEditor(forID: nil) }
   public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
     store.editors.first { $0.id == value.id }
   }

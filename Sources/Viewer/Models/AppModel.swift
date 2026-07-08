@@ -54,6 +54,18 @@ final class AppModel {
   @ObservationIgnored
   lazy var windowModelManager = WindowModelManager(appModel: self)
 
+  private static func startInit() {
+    warmCache()
+    logInit(
+      bundle: Bundle.main.bundleIdentifier,
+      renderer: Defaults.shared.renderer,
+      template: Defaults.shared.template)
+#if os(macOS)
+    URL.createLocalizedApplicationSupportDirectory()
+    UserDefaults.forceTabs()
+#endif
+  }
+
   /// The app's single boot point (replaces the old `AppBoot`). Builds
   /// synchronously: choices decode from the shared defaults suite now,
   /// and processor discovery runs *after* in a background task — the
@@ -62,15 +74,8 @@ final class AppModel {
   /// the suite both ways (Server writes propagate via
   /// `limitToInstance: false`).
   init() {
-    Self.warmCache()
-    Self.logInit(
-      bundle: Bundle.main.bundleIdentifier,
-      renderer: Defaults.shared.renderer,
-      template: Defaults.shared.template)
-
+    Self.startInit()
 #if os(macOS)
-    URL.createLocalizedApplicationSupportDirectory()
-    UserDefaults.forceTabs()
     persistenceTokens.append(onObservedChange {
       _ = Defaults.shared.openBehavior
     } onChange: {
@@ -82,6 +87,7 @@ final class AppModel {
       initialSelection: Defaults.shared.editor) { name in
         Self.notify(.editor, name)
       }
+    // swiftlint:disable:next shorthand_operator
     persistenceTokens = persistenceTokens
     + Property(editors, \.selectionRepresentation, label: "Viewer.editors")
       .bind(
@@ -126,8 +132,8 @@ final class AppModel {
         toAndFrom: Defaults.shared.property(\.renderer), checkSettled: true)
     + Property(
       colorSchemes, \.selectionRepresentation, label: "Viewer.colorScheme")
-      .bind(
-        toAndFrom: Defaults.shared.property(\.colorScheme), checkSettled: true)
+    .bind(
+      toAndFrom: Defaults.shared.property(\.colorScheme), checkSettled: true)
 
     Self.logDefaultsDidChange()
 

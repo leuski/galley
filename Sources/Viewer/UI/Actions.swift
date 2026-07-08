@@ -198,7 +198,7 @@ extension Action {
     Action(
       title: "Open in Editor",
       image: "arrow.up.forward.app",
-      perform: { _ in model?.openInEditor(line: nil) },
+      perform: { _ in model?.openInEditor(line: nil, kosmos: appModel.kosmos) },
       isEnabled: { model?.canOpenInEditor == true },
       shortcut: .init("e", modifiers: [.command, .option]),
       accessibilityID: ViewerA11yID.FileMenu.openInEditor

@@ -150,5 +150,16 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
         request.target, deviceType: .vision) == true)
       return RouteToAVP.Reply(accepted: dispatched)
     }
+
+    await host.handle(OpenInEditor.self)
+    { @MainActor _, request -> OpenInEditor.Reply in
+      guard let parsed = PreviewRoute(path: request.target.documentURL.path),
+            case let .documentAsset(url) = parsed else {
+        return OpenInEditor.Reply(accepted: false)
+      }
+      await Defaults.shared.resolvedEditor.openFileInEditor(
+        url, line: request.target.scrollLine)
+      return OpenInEditor.Reply(accepted: true)
+    }
   }
 }

@@ -13,7 +13,7 @@ public struct TemplatePolicy: SelectablePolicy<Template> {
 
   private let store: TemplateStore
   public var elements: [Template] { store.templates }
-  public var defaultSelection: Template { .bundledDefault }
+  public var defaultSelection: Template { store.anyTemplate(forID: nil) }
   public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
     store.existingTemplate(forID: value.id)
   }

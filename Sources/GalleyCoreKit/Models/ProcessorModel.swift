@@ -11,7 +11,7 @@ public struct ProcessorPolicy: SelectablePolicy<Processor> {
 
   private let store: ProcessorStore
   public var elements: [Processor] { store.processors }
-  public var defaultSelection: Processor { .builtIn }
+  public var defaultSelection: Processor { store.anyProcessor(forID: nil) }
   public var isReady: Bool { store.isReady }
   public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
     store.existingProcessor(forID: value.id)

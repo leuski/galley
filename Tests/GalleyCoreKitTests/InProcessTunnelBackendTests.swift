@@ -28,7 +28,7 @@ struct InProcessTunnelBackendTests {
   /// via the public initializer (which decodes the path into `.path`).
   private func proxyRequest(path: String) throws -> ProxyHTTPRequest {
     var components = URLComponents()
-    components.scheme = "kosmos"
+    components.scheme = TunnelScheme.name
     components.host = "local"
     components.path = path
     let url = try #require(components.url)
