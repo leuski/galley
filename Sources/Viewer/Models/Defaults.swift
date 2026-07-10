@@ -32,7 +32,8 @@ import OSLog
 final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults,
-                      GalleyEditorDefaults
+                      GalleyEditorDefaults,
+                      GalleyKosmosDefaults
 {
   var renderer: ProcessorChoice.PersistentSelectionRepresentation?
   var template: TemplateChoice.PersistentSelectionRepresentation?
@@ -122,6 +123,16 @@ final class Defaults: GalleyRenderDefaults,
   /// reader. Quicklook reads the same plist through its own
   /// `Defaults` class.
   var serverHTTPPort: UInt16 = 0
+
+  /// OS-assigned TCP port of the running Server's Kosmos link, paired
+  /// with `serverKosmosDeviceID`. Published by the Server; read here at
+  /// link-build time so the macOS Viewer can eager-dial the Server as a
+  /// Kosmos seed peer (skipping Bonjour browse+resolve). 0 / nil means
+  /// "nothing to seed" — the Viewer falls back to plain discovery.
+  var serverKosmosPort: UInt16 = 0
+  /// The running Server's Kosmos `deviceID` (UUID string), paired with
+  /// `serverKosmosPort`. See `serverKosmosPort`.
+  var serverKosmosDeviceID: DeviceID?
 
   @MainActor static let shared = Defaults()
 

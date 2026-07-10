@@ -50,6 +50,20 @@ extension GalleyEditorDefaults {
 }
 #endif
 
+public protocol GalleyKosmosDefaults: GalleyDefaults {
+  /// OS-assigned TCP port the running Server's Kosmos link bound to,
+  /// paired with `serverKosmosDeviceID`. Published here so a same-Mac
+  /// Viewer can eager-dial the Kosmos mesh (seed peer) instead of
+  /// waiting on Bonjour browse+resolve. 0 means "not published"
+  /// (Server stopped / link not up). Written by this process only.
+  var serverKosmosPort: UInt16 { get set }
+  /// The running Server's Kosmos `deviceID` (UUID string), paired with
+  /// `serverKosmosPort`. Lets the Viewer key the seed peer up front so
+  /// the eager dial and a later Bonjour discovery of the same Server
+  /// don't form two sessions. `nil` when no link is published.
+  var serverKosmosDeviceID: DeviceID? { get set }
+}
+
 public let bundleIdentifier = Bundle.main.bundleIdentifier
 ?? GalleyConstants.suiteName
 

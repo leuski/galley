@@ -21,7 +21,8 @@ private let defaultsLog = Logger(
 final class Defaults: GalleyRenderDefaults,
                       HTTPServerDefaults,
                       BroadcastedDefaults,
-                      GalleyEditorDefaults
+                      GalleyEditorDefaults,
+                      GalleyKosmosDefaults
 {
   var renderer: ProcessorChoice.PersistentSelectionRepresentation?
   var template: TemplateChoice.PersistentSelectionRepresentation?
@@ -37,6 +38,17 @@ final class Defaults: GalleyRenderDefaults,
   /// stopped or failed). Written by this process only; everyone else
   /// reads.
   var serverHTTPPort: UInt16 = 0
+  /// OS-assigned TCP port the running Server's Kosmos link bound to,
+  /// paired with `serverKosmosDeviceID`. Published here so a same-Mac
+  /// Viewer can eager-dial the Kosmos mesh (seed peer) instead of
+  /// waiting on Bonjour browse+resolve. 0 means "not published"
+  /// (Server stopped / link not up). Written by this process only.
+  var serverKosmosPort: UInt16 = 0
+  /// The running Server's Kosmos `deviceID` (UUID string), paired with
+  /// `serverKosmosPort`. Lets the Viewer key the seed peer up front so
+  /// the eager dial and a later Bonjour discovery of the same Server
+  /// don't form two sessions. `nil` when no link is published.
+  var serverKosmosDeviceID: DeviceID?
 
   @MainActor static let shared = Defaults()
 
