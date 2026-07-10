@@ -16,8 +16,12 @@
 
 import AppKit
 import Foundation
-import GalleyCoreKit
+import KosmosTransport
 import Testing
+// `substituteEditorTemplate` / `substituteCommandArg` are internal to
+// GalleyCoreKit (they back the live editor-open path; the tests share
+// the same rules), so reach them via `@testable`.
+@testable import GalleyCoreKit
 @testable import Galley
 
 @Test("Galley module loads")
@@ -175,9 +179,10 @@ struct EditorSubstitutionTests {
 struct EditorStoreTests {
   @Test("Roster always includes the two static editors")
   func rosterHasStaticEditors() {
-    let ids = EditorStore.shared.editors.map(\.id)
-    #expect(ids.contains(Editor.customURLScheme.id))
-    #expect(ids.contains(Editor.otherApplication.id))
+    let store = EditorStore.shared
+    let ids = store.editors.map(\.id)
+    #expect(ids.contains(store.customURLScheme.id))
+    #expect(ids.contains(store.otherApplication.id))
   }
 
   /// Every roster entry must carry a non-empty `persistentID` — it is
@@ -208,8 +213,8 @@ struct EditorStoreTests {
   @Test("Resolved built-in editors key off a reverse-DNS bundle id")
   func builtInEditorsUseBundleIDs() {
     let staticIDs: Set = [
-      Editor.customURLScheme.id,
-      Editor.otherApplication.id
+      EditorStore.shared.customURLScheme.id,
+      EditorStore.shared.otherApplication.id
     ]
     for editor in EditorStore.shared.editors
     where !staticIDs.contains(editor.id) {

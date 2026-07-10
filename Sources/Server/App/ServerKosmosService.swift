@@ -59,6 +59,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
 
   func stop() {
     tunnelResponder.stop()
+    clearKosmosEndpoint()
     Task { await host.stop() }
   }
 
@@ -71,6 +72,36 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   func configure(host: ServiceHost, client: KosmosClient) async {
     await registerHandlers(host: host)
     tunnelResponder.install(on: host, client: client)
+  }
+
+  /// Once the link is up, publish the Kosmos `deviceID` + bound TCP port
+  /// into the shared defaults so a same-Mac Viewer can eager-dial us as
+  /// a seed peer instead of waiting on Bonjour browse+resolve. Cleared
+  /// on `stop()`.
+  func linkDidStart(_ error: (any Error)?) {
+    guard error == nil else { return }
+    Task { [weak self] in
+      guard let self else { return }
+      let port = await self.host.listeningPort() ?? 0
+      self.publishKosmosEndpoint(port: port)
+    }
+  }
+
+  private func publishKosmosEndpoint(port: UInt16) {
+    Defaults.shared.serverKosmosDeviceID = host.deviceID
+    Defaults.shared.serverKosmosPort = port
+    Defaults.shared.post()
+    log.notice("""
+      published Kosmos endpoint: \
+      deviceID=\(self.host.deviceID, privacy: .public) \
+      port=\(port, privacy: .public)
+      """)
+  }
+
+  private func clearKosmosEndpoint() {
+    Defaults.shared.serverKosmosPort = 0
+    Defaults.shared.serverKosmosDeviceID = nil
+    Defaults.shared.post()
   }
 
   func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
@@ -101,7 +132,11 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
         """)
       return false
     }
-    let destination = TunnelScheme.originURL
+    // Stamp our own Kosmos id as the tunnel URL's host, so the AVP can
+    // address follow-up requests (open-in-editor) back to *this* Mac by
+    // reading `documentURL.host` — no side-table, no host-UUID lookup.
+    let destination = TunnelScheme
+      .originURL(forPeer: PeerID(host.deviceID))
       .appending(.documentAsset(target.documentURL))
     let target = DocumentTarget(url: destination, scrollLine: target.scrollLine)
     let message = RouteToTunnelClient(target: target)

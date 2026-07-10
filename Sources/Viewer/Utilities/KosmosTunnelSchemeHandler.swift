@@ -38,9 +38,17 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
     for request: URLRequest
   ) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
     var stamped = request
+    // Echo the request's own host into the origin so the Mac's
+    // `<base href>` (and every sub-resource fetch) stays on the same
+    // `kosmos://<server-id>` authority the document was served from,
+    // rather than collapsing to the `local` sentinel. Falls back to the
+    // sentinel origin when the request carries no host.
+    let origin = request.url
+      .flatMap { $0.host() }
+      .map { TunnelScheme.originURL(for: $0) }
+      ?? TunnelScheme.originURL
     stamped.setValue(
-      TunnelScheme.originURL.absoluteString,
-      forHTTPHeaderField: TunnelHeaders.origin)
+      origin.absoluteString, forHTTPHeaderField: TunnelHeaders.origin)
     return tunnel.reply(for: stamped)
   }
 }

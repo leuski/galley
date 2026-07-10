@@ -36,11 +36,6 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
   let tunnel: Client
 #endif
 
-  /// `kosmos.host` of this Mac, used to recognise the local Server
-  /// out of any other Servers reachable on the network.
-  @ObservationIgnored private let localHostUUID = UUID.hostStable?
-    .uuidString.lowercased()
-
 #if os(macOS)
   @ObservationIgnored private let host = ServiceHost(role: .macViewer)
 #else
@@ -68,7 +63,24 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
   // MARK: - KosmosService
 
   func makeLink() async -> KosmosClient {
-    await host.makeLink()
+    let seeds: [LoomKosmosLink.Configuration.SeedPeer]
+    if
+      Defaults.shared.serverKosmosPort != 0,
+      let deviceID = Defaults.shared.serverKosmosDeviceID
+    {
+      // Eager-dial this Mac's Server (if it has published its Kosmos
+      // endpoint) so the Server session comes up without waiting on
+      // Bonjour browse+resolve. Empty when nothing's published — the link
+      // still advertises + browses, so discovery covers the Server (and
+      // the AVP) either way.
+      seeds = [.init(
+        deviceID: deviceID,
+        host: GalleyConstants.defaultHost,
+        port: Defaults.shared.serverKosmosPort)]
+    } else {
+      seeds = []
+    }
+    return await host.makeLink(seedPeers: seeds)
   }
 
   func configure(host: ServiceHost, client: KosmosClient) async {
@@ -93,53 +105,43 @@ final class ViewerKosmosService: KosmosService<GalleyKosmosRole> {
 }
 
 extension ViewerKosmosService {
-#if os(macOS)
-  /// This Mac's local Server, if present. `onHost:` restricts the
-  /// match to a Server on *this* Mac (others on the LAN are visible but
-  /// ignored), and `presentPeer(role:)` is product-scoped, so a Dot
-  /// Server on the same machine never matches.
-  var serverPeer: PeerID? {
-    host.presentPeer(role: .server, onHost: localHostUUID)
-  }
 
-  /// Drives the "Show on Vision Pro" menu enabledness. Same resume-
-  /// gated reachability the Server uses for dispatch, so the menu is
-  /// enabled exactly when a route would actually land on AVP (rather
-  /// than silently falling back to the Mac).
-  var isAVPReachable: Bool {
-    host.reachablePeer(deviceType: .vision) != nil
-  }
-
-  // MARK: - Outbound
-
-  /// Send `RouteToAVP` to the local Server. Server decides where the
-  /// file lands (AVP if reachable, else `NSWorkspace.open(galley://)`
-  /// to the Mac Viewer's own LSHandler).
-  /// Send `RouteToAVP` to this Mac's Server. The host logs the request,
-  /// reply, and any transport error uniformly.
-  @discardableResult
-  func routeToAVP(_ target: DocumentTarget) async throws -> RouteToAVP.Reply {
+  private func peer(for url: URL) throws -> PeerID {
     guard host.client != nil else { throw RouteError.notReady }
-    guard let serverPeer else { throw RouteError.noServer }
-    return try await host.send(RouteToAVP(target: target), to: serverPeer)
+    guard let peerHost = url.host()?.lowercased(),
+          !peerHost.isEmpty,
+          let deviceID = DeviceID(peerHost)
+    else { throw RouteError.noServer }
+    let peer = PeerID(deviceID)
+    guard host.peers[peer] != nil else { throw RouteError.noServer }
+    return peer
   }
 
+  /// Ask the Mac that hosts this document to open it in its editor.
+  ///
+  /// The document is a Mac-hosted tunnel URL
+  /// (`kosmos://<server-id>/…`), and that host component *is* the
+  /// serving Server's `PeerID` — the Server stamped its own Kosmos id
+  /// there when it routed the document. So the request goes straight
+  /// back to the exact Mac that owns the file, addressed by reading the
+  /// URL host: no discovery, no side-table, no Mac host-UUID lookup, and
+  /// correct with any number of Macs on the mesh. Only AVP shows tunnel
+  /// documents, but the addressing is platform-independent.
   @discardableResult
   func openInEditor(
     _ target: DocumentTarget) async throws -> OpenInEditor.Reply
   {
-    guard host.client != nil else { throw RouteError.notReady }
-    guard let serverPeer else { throw RouteError.noServer }
-    return try await host.send(OpenInEditor(target: target), to: serverPeer)
+    try await host
+      .send(OpenInEditor(target: target), to: peer(for: target.documentURL))
   }
 
   enum RouteError: LocalizedError {
     /// `KosmosClient` not yet constructed — `start()` either hasn't
     /// been called, or its bootstrap is still pending.
     case notReady
-    /// No peer with `role=.server` matching this Mac's host UUID is
-    /// in `client.peers`. Usually means Galley Server isn't running,
-    /// or Local Network permission isn't granted to this app.
+    /// The document carried no serving-Server host, or no peer with
+    /// that id is connected. Usually means Galley Server isn't running,
+    /// or Local Network permission isn't granted.
     case noServer
 
     var errorDescription: String? {
@@ -154,6 +156,43 @@ extension ViewerKosmosService {
         """
       }
     }
+  }
+
+#if os(macOS)
+  /// This Mac's own Server, if connected. The `net.leuski.galley`
+  /// defaults are machine-local, so the Server's published
+  /// `serverKosmosDeviceID` unambiguously names *this* Mac's Server —
+  /// we address it by that id directly. No LAN host-UUID
+  /// disambiguation, and no dependence on `UUID.hostStable` (which can
+  /// be nil, silently disabling the old `onHost:` filter so it would
+  /// match a foreign Server). Drives the `routeToAVP` target for
+  /// "Show on Vision Pro".
+  var serverPeer: PeerID? {
+    guard let deviceID = Defaults.shared.serverKosmosDeviceID
+    else { return nil }
+    let peer = PeerID(deviceID)
+    return host.peers[peer] != nil ? peer : nil
+  }
+
+  /// Drives the "Show on Vision Pro" menu enabledness. Same resume-
+  /// gated reachability the Server uses for dispatch, so the menu is
+  /// enabled exactly when a route would actually land on AVP (rather
+  /// than silently falling back to the Mac).
+  var isAVPReachable: Bool {
+    host.reachablePeer(deviceType: .vision) != nil
+  }
+
+  // MARK: - Outbound
+
+  /// Send `RouteToAVP` to this Mac's Server. Server decides where the
+  /// file lands (AVP if reachable, else `NSWorkspace.open(galley://)`
+  /// to the Mac Viewer's own LSHandler). The host logs the request,
+  /// reply, and any transport error uniformly.
+  @discardableResult
+  func routeToAVP(_ target: DocumentTarget) async throws -> RouteToAVP.Reply {
+    guard host.client != nil else { throw RouteError.notReady }
+    guard let serverPeer else { throw RouteError.noServer }
+    return try await host.send(RouteToAVP(target: target), to: serverPeer)
   }
 #else
 

@@ -18,10 +18,10 @@
 //      ("KosmosServiceHost — peer selection").
 //
 //  What's left is the one thing only Galley can own: the `RouteToAVP`
-//  wire-format contract. Those `messageType` strings are field
-//  identifiers — once a built Server and a built Mac Viewer are
-//  deployed, changing them silently breaks the "Show on Vision Pro"
-//  routing path. Pin them.
+//  wire round-trip. `messageType` uses the default type-name identifier
+//  (`String(reflecting:)`), so the contract pinned here is behavioral —
+//  each type carries a distinct, non-empty envelope tag and round-trips
+//  through `AnyMessage` — rather than a specific literal string.
 //
 
 import Foundation
@@ -31,11 +31,14 @@ import Testing
 
 @Suite("RouteToAVP wire format")
 struct RouteToAVPWireFormatTests {
-  @Test("messageType identifiers are the agreed strings")
-  func messageTypeIdentifiers() {
-    #expect(RouteToAVP.messageType == "net.leuski.galley.route-to-avp.v1")
-    #expect(RouteToAVP.Reply.messageType ==
-      "net.leuski.galley.route-to-avp.reply.v1")
+  @Test("RouteToAVP and its Reply carry distinct, non-empty message types")
+  func messageTypesAreDistinct() {
+    // Type-name identifiers (`String(reflecting:)`), not pinned literals.
+    // The invariant that matters is that request and reply route to
+    // different envelope tags, so a reply is never mistaken for a request.
+    #expect(!RouteToAVP.messageType.isEmpty)
+    #expect(!RouteToAVP.Reply.messageType.isEmpty)
+    #expect(RouteToAVP.messageType != RouteToAVP.Reply.messageType)
   }
 
   @Test("RouteToAVP round-trips through AnyMessage")
