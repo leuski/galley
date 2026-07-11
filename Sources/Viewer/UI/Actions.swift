@@ -258,7 +258,6 @@ extension Action {
       },
       isEnabled: {
         appModel.kosmos.isAVPReachable
-        && model?.documentURL.isFileURL == true
       },
       shortcut: .init("3", modifiers: [.command, .control]),
       accessibilityID: ViewerA11yID.WindowMenu.showOnVisionPro
