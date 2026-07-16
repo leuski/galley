@@ -56,7 +56,8 @@ private let customURLSchemeID = "customURLScheme"
 private let otherApplicationID = "otherApplication"
 
 @MainActor
-public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
+public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
+                      @MainActor CustomLocalizedStringResourceConvertible
 {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     switch (lhs.id, rhs.id) {
@@ -96,6 +97,8 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable
         } ?? "Other Application…"
     )
   }
+
+  public var localizedStringResource: LocalizedStringResource { name }
 
   public let section: Int
   public nonisolated let id: String
@@ -366,11 +369,12 @@ private func runEditorCommand(
 
 @Observable
 @MainActor
-public final class EditorStore {
-  public let editors: [Editor]
+public final class EditorStore: StoreProtocol<Editor> {
+  public let values: [Editor]
   public let customURLScheme: Editor
   public let otherApplication: Editor
-  public let defaultEditor: Editor
+  private let defaultEditor: Editor
+  public var defaultValue: Editor { values.first ?? defaultEditor }
 
   public init<D>(_ defaults: D)
   where D: GalleyEditorDefaults
@@ -378,7 +382,7 @@ public final class EditorStore {
     self.otherApplication = .otherApplication(defaults)
     self.customURLScheme = .customURLScheme(defaults)
     self.defaultEditor = customURLScheme
-    self.editors = [
+    self.values = [
         Editor(
           bundleIdentifiers: ["com.barebones.bbedit"],
           invocation: .urlTemplate("x-bbedit://open?url={url}&line={line}"),
@@ -421,36 +425,14 @@ public final class EditorStore {
         otherApplication
       ].compactMap { $0 }
   }
-
-  public func anyEditor(forID id: Editor.ID?) -> Editor {
-    editors.first { $0.id == id } ?? editors.first ?? defaultEditor
-  }
 }
 
-public struct EditorPolicy: @MainActor SelectablePolicy<Editor> {
-  public typealias PersistentSelectionRepresentation = NamedPair<Editor.ID>
-  public typealias Selection = Editor
-
-  private let store: EditorStore
-  public var elements: [Element] { store.editors }
-  public var defaultSelection: Selection {
-    store.anyEditor(forID: nil) }
-  public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
-    store.editors.first { $0.id == value.id }
-  }
-  public func encode(_ value: Selection) -> PersistentSelectionRepresentation {
-    .init(id: value.id, name: String(localized: value.name))
-  }
-  public func contains(_ value: Selection) -> Bool {
-    store.editors.first { $0.id == value.id } != nil
-  }
-  public init(_ store: EditorStore) {
-    self.store = store
-  }
-  public init<D>(_ defaults: D)
+public typealias EditorPolicy = SelectableStorePolicy<EditorStore>
+public extension EditorPolicy {
+  init<D>(_ defaults: D)
   where D: GalleyEditorDefaults
   {
-    self.init(EditorStore(defaults))
+    self.init(store: EditorStore(defaults))
   }
 }
 

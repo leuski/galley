@@ -8,21 +8,10 @@ public struct Processor: Sendable, Identifiable,
                          CustomLocalizedStringResourceConvertible,
                          Equatable
 {
-  public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
-    public static func < (lhs: Self, rhs: Self) -> Bool {
-      lhs.rawValue < rhs.rawValue
-    }
-
+  public struct ID: UniversalID {
     public let rawValue: String
     public init(rawValue: String) {
       self.rawValue = rawValue
-    }
-    public init(from decoder: any Decoder) throws {
-      self.rawValue = try decoder.singleValueContainer().decode(String.self)
-    }
-    public func encode(to encoder: any Encoder) throws {
-      var container = encoder.singleValueContainer()
-      try container.encode(rawValue)
     }
   }
 
@@ -70,30 +59,23 @@ public struct Processor: Sendable, Identifiable,
 /// first discovery completes.
 @Observable
 @MainActor
-public final class ProcessorStore {
+public final class ProcessorStore: StoreProtocol<Processor> {
   public static let shared = ProcessorStore()
+  public var defaultValue: Processor { .builtIn }
 
-  public private(set) var processors: [Processor]
+  public private(set) var values: [Processor]
 
   public init() {
-    self.processors = [.builtIn]
+    self.values = [.builtIn]
   }
 
   public func discover() async {
-    self.processors = await Self.discoverAll()
+    self.values = await Self.discoverAll()
     self.isReady = true
   }
 
   public func rediscover() {
     Task { await discover() }
-  }
-
-  public func existingProcessor(forID id: Processor.ID?) -> Processor? {
-    processors.first(where: { $0.id == id })
-  }
-
-  public func anyProcessor(forID id: Processor.ID?) -> Processor {
-    existingProcessor(forID: id) ?? .builtIn
   }
 
   private(set) var isReady: Bool = false

@@ -54,7 +54,7 @@ extension DocumentModel {
   /// (template uninstalled mid-session).
   func renderedTemplate() -> Template {
     if let id = renderedTemplateID,
-       let template = TemplateStore.shared.existingTemplate(forID: id)
+       let template = TemplateStore.shared.existing(forID: id)
     {
       return template
     }

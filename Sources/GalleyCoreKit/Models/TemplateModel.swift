@@ -7,24 +7,10 @@
 
 import Foundation
 
-public struct TemplatePolicy: SelectablePolicy<Template> {
-  public typealias PersistentSelectionRepresentation = NamedPair<Template.ID>
-  public typealias Selection = Template
-
-  private let store: TemplateStore
-  public var elements: [Template] { store.templates }
-  public var defaultSelection: Template { store.anyTemplate(forID: nil) }
-  public func decode(_ value: PersistentSelectionRepresentation) -> Selection? {
-    store.existingTemplate(forID: value.id)
-  }
-  public func encode(_ value: Selection) -> PersistentSelectionRepresentation {
-    .init(id: value.id, name: String(localized: value.name))
-  }
-  public func contains(_ value: Selection) -> Bool {
-    store.existingTemplate(forID: value.id) != nil
-  }
-  public init(_ store: TemplateStore = .shared) {
-    self.store = store
+public typealias TemplatePolicy = SelectableStorePolicy<TemplateStore>
+public extension TemplatePolicy {
+  init() {
+    self.init(store: .shared)
   }
 }
 

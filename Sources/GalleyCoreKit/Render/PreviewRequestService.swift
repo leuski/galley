@@ -173,7 +173,7 @@ public struct PreviewRequestService: Sendable {
   -> PreviewResponse
   {
     guard let template = await TemplateStore.shared
-      .existingTemplate(forID: templateID)
+      .existing(forID: templateID)
     else {
       return .notFound("Template not found: \(templateID)")
     }

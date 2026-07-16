@@ -25,10 +25,10 @@ public protocol GalleyRenderDefaults: GalleyDefaults {
 
 extension GalleyRenderDefaults {
   @MainActor public var resolvedTemplate: Template {
-    TemplateStore.shared.anyTemplate(forID: template?.id)
+    TemplateStore.shared.any(forID: template?.id)
   }
   @MainActor public var resolvedRenderer: any MarkdownRenderer {
-    ProcessorStore.shared.anyProcessor(forID: renderer?.id).renderer
+    ProcessorStore.shared.any(forID: renderer?.id).renderer
     ?? SwiftMarkdownRenderer()
   }
 }

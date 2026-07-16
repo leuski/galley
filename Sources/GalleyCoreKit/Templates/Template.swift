@@ -12,24 +12,13 @@ public struct Template: Sendable, Identifiable,
                         CustomLocalizedStringResourceConvertible,
                         Equatable
 {
-  public struct ID: RawRepresentable, Sendable, Hashable, Codable, Comparable {
-    public static func < (lhs: Self, rhs: Self) -> Bool {
-      lhs.rawValue < rhs.rawValue
-    }
-
+  public struct ID: UniversalID {
     public let rawValue: String
     public init(rawValue: String) {
       self.rawValue = rawValue
     }
     public init(sourceIndex: Int, name: String) {
       self.init(rawValue: "\(sourceIndex).\(name)")
-    }
-    public init(from decoder: any Decoder) throws {
-      self.rawValue = try decoder.singleValueContainer().decode(String.self)
-    }
-    public func encode(to encoder: any Encoder) throws {
-      var container = encoder.singleValueContainer()
-      try container.encode(rawValue)
     }
   }
 
@@ -86,25 +75,6 @@ public struct Template: Sendable, Identifiable,
     return candidate.path.hasPrefix(directoryURL.path.appendingSlash)
       ? candidate : nil
   }
-}
-
-public extension Template {
-  /// Fallback for callers that need a known-good template without a
-  /// store handy (e.g. the Server's renderer-provider closure when
-  /// the template choice has been GC'd). Resolves the bundled
-  /// "Default" entry directly off the kit's bundle resources.
-  static let bundledDefault: Template = {
-    guard let template = Template(
-      sourceURL: .bundleTemplatesDirectoryURL,
-      sourceIndex: TemplateStore.bundleSourceIndex,
-      name: "Default.html",
-      nameResource: LocalizedStringResource(
-        "Default", bundle: .galleyCoreKit))
-    else {
-      fatalError("GalleyCoreKit bundle missing Templates.bundle/Default.html")
-    }
-    return template
-  }()
 }
 
 /// Result of composing a preview page. Pairs the final HTML with the

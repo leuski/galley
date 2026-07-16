@@ -13,12 +13,12 @@ extension EditorStore {
 }
 
 extension EditorPolicy {
-  static let shared = EditorPolicy(EditorStore.shared)
+  static let shared = EditorPolicy(store: EditorStore.shared)
 }
 
 extension Defaults {
   @MainActor public var resolvedEditor: Editor {
-    EditorStore.shared.anyEditor(forID: editor?.id)
+    EditorStore.shared.any(forID: editor?.id)
   }
 }
 

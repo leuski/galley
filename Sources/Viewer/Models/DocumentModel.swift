@@ -351,7 +351,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     // mid-render — extremely rare), fall back to the selected
     // template; better a slightly-stale write than no write.
     let painted = templateID.flatMap {
-      TemplateStore.shared.existingTemplate(forID: $0)
+      TemplateStore.shared.existing(forID: $0)
     } ?? resolvedTemplate()
     renderedTemplateID = painted.id
     // Always persist — `color: nil` records a sentinel so a

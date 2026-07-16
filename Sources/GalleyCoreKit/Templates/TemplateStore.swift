@@ -8,140 +8,36 @@ import AppKit
 private let log = Logger(
   subsystem: bundleIdentifier, category: "TemplateStore")
 
-@Observable
-@MainActor
-public final class TemplateStore {
-  /// Process-wide singleton. Two sources by default:
-  /// - **Index 0**: the kit's bundled `Templates/` directory (read-only,
-  ///   contains the `Default` template).
-  /// - **Index 1**: `~/Library/Application Support/<suite>/Templates/`,
-  ///   where users drop their own templates. Watched for filesystem
-  ///   events.
-  ///
-  /// IDs are stamped `<index>.<name>` so a user template named
-  /// "Default" coexists with the bundled "Default" without collision.
-  /// Tests should construct their own instances via `init(directoryURLs:)`
-  /// against tmp dirs and seed whatever entries they need.
-  public static let shared = TemplateStore(
-    directoryURLs: [
-      .bundleTemplatesDirectoryURL,
-      GalleyConstants.applicationSupportDirectory / "Templates"
-    ],
-    watchedSourceIndices: [TemplateStore.userSourceIndex])
+public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
 
   /// Source index of the kit's bundled templates. Stable contract —
   /// the bundled `Default` template's ID prefix derives from this.
   /// `nonisolated` so the `Template.bundledDefault` static (which has
   /// no actor context) can use it without hopping main.
-  public nonisolated static let bundleSourceIndex: Int = 0
+  nonisolated static let bundleSourceIndex: Int = 0
   /// Source index of the user-installed templates folder for the
   /// production singleton. Tests may use any indexing they want.
-  public nonisolated static let userSourceIndex: Int = 1
+  nonisolated static let userSourceIndex: Int = 1
 
-  public private(set) var templates: [Template] = []
-
-  /// Ordered list of source directories. Index in this array is the
-  /// source's `sourceIndex` and ends up as the prefix of every
-  /// resulting template's `id`.
-  @ObservationIgnored public let directoryURLs: [URL]
-  @ObservationIgnored private let watchedSourceIndices: Set<Int>
-  @ObservationIgnored private var watcherTasks: [Task<Void, Never>] = []
-
-  /// The directory the user is expected to drop their own templates
-  /// into. By convention this is the last entry in `directoryURLs`
-  /// (the production singleton has user-installed at index 1, after
-  /// the bundle at index 0). Used by `revealFolder()` and by Settings
-  /// UI that links to "Open Templates Folder".
-  public var userDirectoryURL: URL {
-    directoryURLs.last ?? directoryURLs[0]
+  private static func nameResource(
+    for url: URL, at index: Int) -> LocalizedStringResource?
+  {
+    guard index == bundleSourceIndex else { return nil }
+    let ext = url.pathExtension.lowercased()
+    let base = (ext == "html" || ext == "htm")
+    ? url.deletingPathExtension().lastPathComponent
+    : url.lastPathComponent
+    return bundledNameResources[base]
   }
 
-  /// Fires after every `reload()` completes (initial + watcher-driven).
-  /// `ProcessorStore.discover()` is awaited directly, but template
-  /// reloads happen inside the file-system watcher, so callers that
-  /// need to react (e.g. to run reconciliation) hook in here.
-  @ObservationIgnored public var onReload: (@MainActor () -> Void)?
-
-  public init(
-    directoryURLs: [URL],
-    watchedSourceIndices: Set<Int> = []
-  ) {
-    self.directoryURLs = directoryURLs
-    self.watchedSourceIndices = watchedSourceIndices
-
-    // Non-fatal: bundled templates still work if user dir creation fails.
-    for index in watchedSourceIndices
-    where directoryURLs.indices.contains(index) {
-      try? directoryURLs[index].createDirectory()
-    }
-
-    reload()
-    startWatching()
+  public static func load(from url: URL, sourceIndex: Int) throws -> Template? {
+    Template(
+      entryURL: url,
+      sourceIndex: sourceIndex,
+      nameResource: nameResource(for: url, at: sourceIndex))
   }
 
-  public func existingTemplate(forID id: Template.ID?) -> Template? {
-    guard let id else { return nil }
-    return templates.first { $0.id == id }
-  }
-
-  public func anyTemplate(forID id: Template.ID?) -> Template {
-    existingTemplate(forID: id) ?? .bundledDefault
-  }
-
-  public func revealFolder() {
-    #if os(macOS)
-    NSWorkspace.shared.activateFileViewerSelecting([userDirectoryURL])
-    #endif
-  }
-
-  public func reload() {
-    func dirContents(at dir: URL) -> [URL] {
-      let dir = dir.safe
-      do {
-        return try dir.contentsOfDirectory(
-          includingPropertiesForKeys: [.isDirectoryKey],
-          options: [.skipsHiddenFiles])
-      } catch CocoaError.fileReadNoSuchFile {
-        // Directory hasn't been created yet — expected for the user
-        // templates dir on a fresh install.
-        return []
-      } catch {
-        log.error("""
-          Templates dir \(dir.path, privacy: .private) unreadable: \
-          \(error.localizedDescription, privacy: .public)
-          """)
-        return []
-      }
-    }
-
-    let sorted = directoryURLs
-      .enumerated()
-      .flatMap { index, dir in
-        let nameResourceProvider = makeNameResourceProvider(forSource: index)
-        return dirContents(at: dir)
-          .compactMap { url in
-          Template(
-            entryURL: url,
-            sourceIndex: index,
-            nameResource: nameResourceProvider(url.lastPathComponent))
-        }
-      }
-      .sorted {
-        // Group by source first (so bundled appear before user), then
-        // by display name within the source.
-        if $0.sourceIndex != $1.sourceIndex {
-          return $0.sourceIndex < $1.sourceIndex
-        }
-        return String(localized: $0.name)
-          .localizedCaseInsensitiveCompare(
-            String(localized: $1.name)) == .orderedAscending
-      }
-
-    if sorted.map(\.id) != templates.map(\.id) {
-      templates = sorted
-    }
-    onReload?()
-  }
+  public static let defaultValue: Template = .bundledDefault
 
   /// Literal `LocalizedStringResource`s for every bundled template so
   /// Xcode's catalog extraction picks the labels up. Keyed by the
@@ -149,7 +45,7 @@ public final class TemplateStore {
   /// `Tufte/` → `"Tufte"`). Add a row when adding a new bundled
   /// template; the rest of the discovery path is filename-driven.
   private static let bundledNameResources:
-    [String: LocalizedStringResource] = [
+  [String: LocalizedStringResource] = [
     "Default": LocalizedStringResource(
       "Default", bundle: .galleyCoreKit),
     "GitHub": LocalizedStringResource(
@@ -169,40 +65,45 @@ public final class TemplateStore {
     "Tufte": LocalizedStringResource(
       "Tufte", bundle: .galleyCoreKit)
   ]
+}
 
-  /// For the bundled source, look the translatable label up in
-  /// `bundledNameResources`. User-source templates fall back to the
-  /// runtime `LocalizationValue` derived from the filename.
-  private func makeNameResourceProvider(
-    forSource index: Int
-  ) -> (String) -> LocalizedStringResource? {
-    guard index == Self.bundleSourceIndex else { return { _ in nil } }
-    return { entryName in
-      // Strip `.html` / `.htm` so file-shape bundled templates and
-      // folder-shape bundled templates resolve to the same key.
-      let url = URL(fileURLWithPath: entryName)
-      let ext = url.pathExtension.lowercased()
-      let base = (ext == "html" || ext == "htm")
-        ? url.deletingPathExtension().lastPathComponent
-        : entryName
-      return Self.bundledNameResources[base]
-    }
-  }
+public typealias TemplateStore = FolderBasedStore<TemplateStorePolicy>
 
-  private func startWatching() {
-    #if os(macOS)
-    for index in watchedSourceIndices {
-      guard directoryURLs.indices.contains(index) else { continue }
-      let url = directoryURLs[index]
-      let task = Task { [weak self] in
-        let events = url.fileEvents(eventMask: .all)
-          .debounce(for: .milliseconds(150))
-        for await _ in events {
-          self?.reload()
-        }
-      }
-      watcherTasks.append(task)
+public extension TemplateStore {
+  /// Process-wide singleton. Two sources by default:
+  /// - **Index 0**: the kit's bundled `Templates/` directory (read-only,
+  ///   contains the `Default` template).
+  /// - **Index 1**: `~/Library/Application Support/<suite>/Templates/`,
+  ///   where users drop their own templates. Watched for filesystem
+  ///   events.
+  ///
+  /// IDs are stamped `<index>.<name>` so a user template named
+  /// "Default" coexists with the bundled "Default" without collision.
+  /// Tests should construct their own instances via `init(directoryURLs:)`
+  /// against tmp dirs and seed whatever entries they need.
+  static let shared = TemplateStore(
+    directoryURLs: [
+      .bundleTemplatesDirectoryURL,
+      GalleyConstants.applicationSupportDirectory / "Templates"
+    ],
+    watchedSourceIndices: [TemplateStorePolicy.userSourceIndex])
+}
+
+public extension Template {
+  /// Fallback for callers that need a known-good template without a
+  /// store handy (e.g. the Server's renderer-provider closure when
+  /// the template choice has been GC'd). Resolves the bundled
+  /// "Default" entry directly off the kit's bundle resources.
+  static let bundledDefault: Template = {
+    guard let template = Template(
+      sourceURL: .bundleTemplatesDirectoryURL,
+      sourceIndex: TemplateStorePolicy.bundleSourceIndex,
+      name: "Default.html",
+      nameResource: LocalizedStringResource(
+        "Default", bundle: .galleyCoreKit))
+    else {
+      fatalError("GalleyCoreKit bundle missing Templates.bundle/Default.html")
     }
-    #endif
-  }
+    return template
+  }()
 }

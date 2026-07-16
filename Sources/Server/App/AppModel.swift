@@ -61,7 +61,7 @@ extension EditorStore {
 }
 extension GalleyEditorDefaults {
   @MainActor public var resolvedEditor: Editor {
-    EditorStore.shared.anyEditor(forID: editor?.id)
+    EditorStore.shared.any(forID: editor?.id)
   }
 }
 #endif
@@ -88,11 +88,10 @@ final class AppModel {
 
     let previewService = PreviewRequestService(
       selectedTemplate: { @MainActor in
-        TemplateStore.shared.anyTemplate(forID: Defaults.shared.template?.id)
+        TemplateStore.shared.any(forID: Defaults.shared.template?.id)
       },
       renderer: { @MainActor in
-        ProcessorStore.shared
-          .anyProcessor(forID: Defaults.shared.renderer?.id).renderer
+        ProcessorStore.shared.any(forID: Defaults.shared.renderer?.id).renderer
       })
 
     /// File watcher feeding the SSE live-reload of **both** the optional
