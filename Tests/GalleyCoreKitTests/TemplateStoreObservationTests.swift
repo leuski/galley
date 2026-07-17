@@ -35,13 +35,13 @@ struct TemplateStoreObservationTests {
     defer { try? tmp.remove() }
     let store = TemplateStore(directoryURLs: [tmp])
 
-    #expect(store.templates.isEmpty)
+    #expect(store.values.isEmpty)
 
     try writeFolderTemplate(at: tmp, name: "MyTheme")
     store.reload()
 
-    #expect(store.templates.count == 1)
-    #expect(store.templates.contains(where: { $0.id.rawValue == "0.MyTheme" }))
+    #expect(store.values.count == 1)
+    #expect(store.values.contains(where: { $0.id.rawValue == "0.MyTheme" }))
   }
 
   @Test("reload() drops a deleted folder template")
@@ -50,12 +50,12 @@ struct TemplateStoreObservationTests {
     defer { try? tmp.remove() }
     try writeFolderTemplate(at: tmp, name: "Doomed")
     let store = TemplateStore(directoryURLs: [tmp])
-    #expect(store.templates.count == 1)
+    #expect(store.values.count == 1)
 
     try tmp.appending(path: "Doomed").remove()
     store.reload()
 
-    #expect(store.templates.isEmpty)
+    #expect(store.values.isEmpty)
   }
 
   @Test("multi-source: bundled and user templates with same name coexist")
@@ -70,7 +70,7 @@ struct TemplateStoreObservationTests {
     try writeFolderTemplate(at: userSim, name: "Default")
     let store = TemplateStore(directoryURLs: [bundleSim, userSim])
 
-    let ids = store.templates.map(\.id).sorted().map(\.rawValue)
+    let ids = store.values.map(\.id).sorted().map(\.rawValue)
     #expect(ids == ["0.Default", "1.Default"])
   }
 
@@ -78,6 +78,6 @@ struct TemplateStoreObservationTests {
   // omitted. FSEvents is unreliable for short-lived tmp directories
   // under `/var/folders/...` (latency, coalescing, exclusion lists),
   // and the observation chain it feeds — `reload()` mutating
-  // `store.templates`, which propagates to `Choice.values` — is
+  // `store.values`, which propagates to `Choice.values` — is
   // already covered in KosmosAppKit by calling `reload()` directly.
 }

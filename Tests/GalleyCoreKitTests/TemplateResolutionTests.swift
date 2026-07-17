@@ -4,7 +4,7 @@ import Testing
 internal import ALFoundation
 
 /// Pins the resolution contract the Quick Look in-process path relies on:
-/// `existingTemplate(forID:) ?? .bundledDefault` — use the stored
+/// `existing(forID:) ?? .bundledDefault` — use the stored
 /// template when it resolves, otherwise the bundled default.
 @Suite("Stored-template resolution")
 @MainActor
@@ -24,7 +24,7 @@ struct TemplateResolutionTests {
   func resolvesKnownID() throws {
     let (store, tmp) = try seededStore(name: "MyTheme")
     defer { try? tmp.remove() }
-    let resolved = store.existingTemplate(forID: .init(rawValue: "0.MyTheme"))
+    let resolved = store.existing(forID: .init(rawValue: "0.MyTheme"))
       ?? .bundledDefault
     #expect(resolved.id.rawValue == "0.MyTheme")
   }
@@ -33,7 +33,7 @@ struct TemplateResolutionTests {
   func fallsBackOnUnknownID() throws {
     let (store, tmp) = try seededStore(name: "MyTheme")
     defer { try? tmp.remove() }
-    let resolved = store.existingTemplate(forID: .init(rawValue: "9.Missing"))
+    let resolved = store.existing(forID: .init(rawValue: "9.Missing"))
       ?? .bundledDefault
     #expect(resolved.id == Template.bundledDefault.id)
   }
@@ -42,7 +42,7 @@ struct TemplateResolutionTests {
   func fallsBackOnNilID() throws {
     let (store, tmp) = try seededStore(name: "MyTheme")
     defer { try? tmp.remove() }
-    let resolved = store.existingTemplate(forID: nil) ?? .bundledDefault
+    let resolved = store.existing(forID: nil) ?? .bundledDefault
     #expect(resolved.id == Template.bundledDefault.id)
   }
 }

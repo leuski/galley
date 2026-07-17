@@ -168,7 +168,7 @@ struct EditorSubstitutionTests {
 
 // MARK: - EditorStore roster
 
-/// `EditorStore.editors` is the live picker roster: the built-in
+/// `EditorStore.values` is the live picker roster: the built-in
 /// editors whose app LaunchServices can resolve on this machine, plus
 /// the two always-present static rows (Custom URL Scheme, Other
 /// Application…). The per-editor invariants below guard the picker and
@@ -180,7 +180,7 @@ struct EditorStoreTests {
   @Test("Roster always includes the two static editors")
   func rosterHasStaticEditors() {
     let store = EditorStore.shared
-    let ids = store.editors.map(\.id)
+    let ids = store.values.map(\.id)
     #expect(ids.contains(store.customURLScheme.id))
     #expect(ids.contains(store.otherApplication.id))
   }
@@ -190,7 +190,7 @@ struct EditorStoreTests {
   /// would collide across editors and corrupt the saved selection.
   @Test("Every editor has a non-empty persistent id")
   func everyEditorHasPersistentID() {
-    for editor in EditorStore.shared.editors {
+    for editor in EditorStore.shared.values {
       #expect(!editor.id.isEmpty)
     }
   }
@@ -201,7 +201,7 @@ struct EditorStoreTests {
   /// pin the non-empty invariant.
   @Test("Every editor resolves a non-empty menu title")
   func everyEditorHasName() {
-    for editor in EditorStore.shared.editors {
+    for editor in EditorStore.shared.values {
       #expect(!String(localized: editor.name).isEmpty)
     }
   }
@@ -216,7 +216,7 @@ struct EditorStoreTests {
       EditorStore.shared.customURLScheme.id,
       EditorStore.shared.otherApplication.id
     ]
-    for editor in EditorStore.shared.editors
+    for editor in EditorStore.shared.values
     where !staticIDs.contains(editor.id) {
       #expect(
         editor.id.contains("."),
@@ -231,7 +231,7 @@ struct EditorStoreTests {
   @Test("Every URL-template roster editor produces a parseable URL")
   func rosterTemplatesParse() {
     let url = URL(fileURLWithPath: "/tmp/note.md")
-    for editor in EditorStore.shared.editors {
+    for editor in EditorStore.shared.values {
       guard case .urlTemplate(let template) = editor.invocation,
             !template.isEmpty
       else { continue }
