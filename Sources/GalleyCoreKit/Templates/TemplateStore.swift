@@ -9,6 +9,9 @@ private let log = Logger(
   subsystem: bundleIdentifier, category: "TemplateStore")
 
 public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
+  public static func defaultValue(_ values: [Template]) -> Template {
+    .bundledDefault
+  }
 
   /// Source index of the kit's bundled templates. Stable contract —
   /// the bundled `Default` template's ID prefix derives from this.
@@ -36,8 +39,6 @@ public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
       sourceIndex: sourceIndex,
       nameResource: nameResource(for: url, at: sourceIndex))
   }
-
-  public static let defaultValue: Template = .bundledDefault
 
   /// Literal `LocalizedStringResource`s for every bundled template so
   /// Xcode's catalog extraction picks the labels up. Keyed by the

@@ -69,7 +69,7 @@ struct MarkdownSettingsView: View {
             model: appModel.editors,
             onRequestAppPicker: { showAppPicker = true })
         } label: {
-          EditorChoiceElement(model: appModel.editors.selected)
+          EditorChoiceElement(model: appModel.editors.selection)
         }
         .fixedSize()
       } label: {
@@ -78,9 +78,9 @@ struct MarkdownSettingsView: View {
       .modifier(InstallScriptsPickerModifier(
         isPresented: $showScriptPicker,
         errorMessage: $scriptInstallError,
-        defaultDestination: appModel.editors.selected
+        defaultDestination: appModel.editors.selection
           .scriptPickerDefaultDirectory,
-        customizationID: appModel.editors.selected
+        customizationID: appModel.editors.selection
           .scriptPickerCustomizationID,
         onCompletion: handlePickedScriptDestination))
       detailFields
@@ -96,7 +96,7 @@ struct MarkdownSettingsView: View {
     guard case .success(let urls) = result, let url = urls.first
     else { return }
     Defaults.shared.editorOtherApplication = url
-    appModel.editors.selected = EditorStore.shared.otherApplication
+    appModel.editors.selection = EditorStore.shared.otherApplication
   }
 
   private func handlePickedScriptDestination(
@@ -105,7 +105,7 @@ struct MarkdownSettingsView: View {
     guard case .success(let urls) = result, let destination = urls.first
     else { return }
     do {
-      let editor = appModel.editors.selected
+      let editor = appModel.editors.selection
       guard editor.scriptBundleName != nil else { return }
       try editor.installScripts(to: destination)
       editor.presentInstalledScripts(at: destination)
@@ -116,7 +116,7 @@ struct MarkdownSettingsView: View {
 
   @ViewBuilder
   private var detailFields: some View {
-    switch appModel.editors.selected {
+    switch appModel.editors.selection {
     case let value where value.scriptBundleName != nil:
       HStack {
         Spacer()
@@ -159,7 +159,7 @@ struct MarkdownSettingsView: View {
     Menu {
       SelectableMenuCore(model: appModel.templates)
     } label: {
-      Text(appModel.templates.selected.description)
+      Text(appModel.templates.selection.description)
     }
   }
 
@@ -168,7 +168,7 @@ struct MarkdownSettingsView: View {
     Menu {
       SelectableMenuCore(model: appModel.processors)
     } label: {
-      Text(appModel.processors.selected.description)
+      Text(appModel.processors.selection.description)
     }
   }
 
@@ -322,17 +322,17 @@ struct EditorMenuCore: View {
 
   private func binding(for value: EditorChoice.Element) -> Binding<Bool> {
     Binding(
-      get: { model.selected.id == value.id },
+      get: { model.selection.id == value.id },
       set: { newValue in
         guard newValue else { return }
         if value == EditorStore.shared.otherApplication {
           if nil != Defaults.shared.editorOtherApplication {
-            model.selected = EditorStore.shared.otherApplication
+            model.selection = EditorStore.shared.otherApplication
           } else {
             onRequestAppPicker()
           }
         } else {
-          model.selected = value
+          model.selection = value
         }
       }
     )

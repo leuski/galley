@@ -189,7 +189,7 @@ final class AppModel {
     templates: SceneTemplateChoice?) -> Template
   {
     if let templates, Defaults.shared.enablePerDocumentOverrides {
-      return templates.selected.value
+      return templates.selection.value
     }
     return Defaults.shared.resolvedTemplate
   }

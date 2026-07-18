@@ -167,12 +167,12 @@ extension DocumentModel {
     reloadObservation = onObservedChange(
       track: { [weak self, weak appModel] in
         guard let self, let appModel else { return }
-        _ = appModel.processors.selected
-        _ = appModel.templates.selected
+        _ = appModel.processors.selection
+        _ = appModel.templates.selection
         _ = Defaults.shared.enablePerDocumentOverrides
-        _ = self.templates.selected
-        _ = self.processors.selected
-        _ = self.colorSchemes.selected
+        _ = self.templates.selection
+        _ = self.processors.selection
+        _ = self.colorSchemes.selection
       },
       onChange: { [weak self] in
         Task { await self?.reload() }

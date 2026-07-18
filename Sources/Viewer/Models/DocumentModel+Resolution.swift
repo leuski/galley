@@ -15,7 +15,7 @@ extension DocumentModel {
   /// always use the global selection.
   func resolvedRenderer() -> any MarkdownRenderer {
     if Defaults.shared.enablePerDocumentOverrides == true,
-       let renderer = processors.selected.value.renderer
+       let renderer = processors.selection.value.renderer
     {
       return renderer
     }
