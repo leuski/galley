@@ -145,7 +145,7 @@ public struct PreviewRequestService: Sendable {
       return .html(composed.html, documentURL: documentURL)
     } catch {
       return .failure(.template(
-        name: String(localized: template.name),
+        name: template.description,
         detail: error.localizedDescription,
         source: renderedBody))
     }
@@ -179,7 +179,7 @@ public struct PreviewRequestService: Sendable {
     }
     guard let assetURL = template.resolveAsset(file: file) else {
       return .notFound(
-        "No such asset in template '\(template.name)': \(file)")
+        "No such asset in template '\(template)': \(file)")
     }
     return serveFile(at: assetURL, cache: cachePolicy)
   }

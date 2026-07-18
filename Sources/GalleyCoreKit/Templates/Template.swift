@@ -9,7 +9,7 @@ import Foundation
 /// (a user template named "Default" coexists with the bundled "Default"
 /// because their source indices differ).
 public struct Template: Sendable, Identifiable,
-                        CustomLocalizedStringResourceConvertible,
+                        CustomStringConvertible,
                         Equatable
 {
   public struct ID: UniversalID {
@@ -31,7 +31,7 @@ public struct Template: Sendable, Identifiable,
   /// `LocalizedStringResource` so Xcode's catalog extraction picks the
   /// label up; user templates wrap their filename in a runtime
   /// `LocalizationValue` so filenames stay out of the strings catalog.
-  public let name: LocalizedStringResource
+  public let description: String
   /// Where to resolve sibling assets from. For folder templates this is
   /// the template's own folder; for file templates (BBEdit convention)
   /// this is the *parent* directory the file sits in, which is shared
@@ -47,19 +47,17 @@ public struct Template: Sendable, Identifiable,
 
   public init(
     id: ID,
-    name: LocalizedStringResource,
+    name: String,
     directoryURL: URL,
     htmlURL: URL,
     sourceIndex: Int
   ) {
     self.id = id
-    self.name = name
+    self.description = name
     self.directoryURL = directoryURL
     self.htmlURL = htmlURL
     self.sourceIndex = sourceIndex
   }
-
-  public var localizedStringResource: LocalizedStringResource { name }
 
   public func loadHTML() throws -> String {
     try String(contentsOf: htmlURL, encoding: .utf8)

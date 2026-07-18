@@ -159,7 +159,7 @@ struct MarkdownSettingsView: View {
     Menu {
       SelectableMenuCore(model: appModel.templates)
     } label: {
-      Text(appModel.templates.selected.name)
+      Text(appModel.templates.selected.description)
     }
   }
 
@@ -168,7 +168,7 @@ struct MarkdownSettingsView: View {
     Menu {
       SelectableMenuCore(model: appModel.processors)
     } label: {
-      Text(appModel.processors.selected.name)
+      Text(appModel.processors.selected.description)
     }
   }
 
@@ -277,14 +277,14 @@ struct EditorChoiceElement: View {
   var body: some View {
     if let image = model.url?.icon {
       Label {
-        Text(model.name)
+        Text(model.description)
       } icon: {
         image
           .resizable()
           .frame(width: 16, height: 16)
       }
     } else {
-      Text(model.name)
+      Text(model.description)
     }
   }
 }

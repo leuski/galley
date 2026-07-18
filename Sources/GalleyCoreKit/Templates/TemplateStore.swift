@@ -20,7 +20,7 @@ public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
   nonisolated static let userSourceIndex: Int = 1
 
   private static func nameResource(
-    for url: URL, at index: Int) -> LocalizedStringResource?
+    for url: URL, at index: Int) -> String?
   {
     guard index == bundleSourceIndex else { return nil }
     let ext = url.pathExtension.lowercased()
@@ -45,26 +45,17 @@ public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
   /// `Tufte/` → `"Tufte"`). Add a row when adding a new bundled
   /// template; the rest of the discovery path is filename-driven.
   private static let bundledNameResources:
-  [String: LocalizedStringResource] = [
-    "Default": LocalizedStringResource(
-      "Default", bundle: .galleyCoreKit),
-    "GitHub": LocalizedStringResource(
-      "GitHub", bundle: .galleyCoreKit),
-    "HighContrast": LocalizedStringResource(
-      "High Contrast", bundle: .galleyCoreKit),
-    "LaTeX": LocalizedStringResource(
-      "LaTeX", bundle: .galleyCoreKit),
-    "Manuscript": LocalizedStringResource(
-      "Manuscript", bundle: .galleyCoreKit),
-    "Sepia": LocalizedStringResource(
-      "Sepia", bundle: .galleyCoreKit),
-    "Solarized": LocalizedStringResource(
-      "Solarized", bundle: .galleyCoreKit),
-    "Terminal": LocalizedStringResource(
-      "Terminal", bundle: .galleyCoreKit),
-    "Tufte": LocalizedStringResource(
-      "Tufte", bundle: .galleyCoreKit)
-  ]
+  [String: String] = [
+    "Default": "Default",
+    "GitHub": "GitHub",
+    "HighContrast": "High Contrast",
+    "LaTeX": "LaTeX",
+    "Manuscript": "Manuscript",
+    "Sepia": "Sepia",
+    "Solarized": "Solarized",
+    "Terminal": "Terminal",
+    "Tufte": "Tufte"
+  ].mapValues { value in String(localized: value, bundle: .galleyCoreKit) }
 }
 
 public typealias TemplateStore = FolderBasedStore<TemplateStorePolicy>
@@ -99,8 +90,7 @@ public extension Template {
       sourceURL: .bundleTemplatesDirectoryURL,
       sourceIndex: TemplateStorePolicy.bundleSourceIndex,
       name: "Default.html",
-      nameResource: LocalizedStringResource(
-        "Default", bundle: .galleyCoreKit))
+      nameResource: String(localized: "Default", bundle: .galleyCoreKit))
     else {
       fatalError("GalleyCoreKit bundle missing Templates.bundle/Default.html")
     }

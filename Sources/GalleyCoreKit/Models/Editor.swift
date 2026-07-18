@@ -56,8 +56,9 @@ private let customURLSchemeID = "customURLScheme"
 private let otherApplicationID = "otherApplication"
 
 @MainActor
-public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
-                      @MainActor CustomLocalizedStringResourceConvertible
+public struct Editor: @MainActor SectionedChoiceValue, Identifiable,
+                      @MainActor Equatable,
+                      @MainActor CustomStringConvertible
 {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     switch (lhs.id, rhs.id) {
@@ -78,7 +79,7 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
       id: customURLSchemeID,
       url: nil,
       invocation: .urlTemplate(defaults.editorCustomURL),
-      name: "Custom URL Scheme"
+      name: String(localized: "Custom URL Scheme", bundle: .galleyCoreKit)
     )
   }
 
@@ -91,14 +92,10 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
       url: defaults.editorOtherApplication,
       invocation: .open,
       name: defaults
-        .editorOtherApplication.map { url in
-          LocalizedStringResource(
-            String.LocalizationValue(url.displayName))
-        } ?? "Other Application…"
+        .editorOtherApplication.map { url in url.displayName }
+      ?? String(localized: "Other Application…", bundle: .galleyCoreKit)
     )
   }
-
-  public var localizedStringResource: LocalizedStringResource { name }
 
   public let section: Int
   public nonisolated let id: String
@@ -106,8 +103,8 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
   public var url: URL? { _url() }
   private let _invocation: () -> InvocationStyle
   public var invocation: InvocationStyle { _invocation() }
-  private let _name: () -> LocalizedStringResource
-  public var name: LocalizedStringResource { _name() }
+  private let _name: () -> String
+  public var description: String { _name() }
   public let scriptBundleName: String?
   public let defaultScriptDestination: URL?
   public let postInstall: (@MainActor () -> Void)?
@@ -117,7 +114,7 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
     id: String,
     url: @escaping @autoclosure () -> URL?,
     invocation: @escaping @autoclosure () -> InvocationStyle,
-    name: @escaping @autoclosure () -> LocalizedStringResource,
+    name: @escaping @autoclosure () -> String,
     scriptBundleName: String? = nil,
     defaultScriptDestination: URL? = nil,
     postInstall: (@MainActor () -> Void)? = nil
@@ -150,8 +147,7 @@ public struct Editor: SectionedChoiceValue, Identifiable, @MainActor Equatable,
       id: id,
       url: url,
       invocation: invocation,
-      name: LocalizedStringResource(
-        String.LocalizationValue(url.displayName)),
+      name: url.displayName,
       scriptBundleName: scriptBundleName,
       defaultScriptDestination: defaultScriptDestination,
       postInstall: postInstall

@@ -29,7 +29,7 @@ extension Template {
   init?(
     entryURL: URL,
     sourceIndex: Int,
-    nameResource: LocalizedStringResource? = nil
+    nameResource: String? = nil
   ) {
     let resolved = entryURL.safe
 
@@ -71,7 +71,7 @@ extension Template {
     sourceURL: URL,
     sourceIndex: Int,
     name: String,
-    nameResource: LocalizedStringResource? = nil
+    nameResource: String? = nil
   ) {
     self.init(
       entryURL: sourceURL / name,
@@ -82,7 +82,7 @@ extension Template {
   /// Wraps a runtime filename in a `LocalizationValue` so the strings
   /// catalog skips it; lookup falls back to the raw name, which is
   /// what the user sees.
-  static func runtimeName(for raw: String) -> LocalizedStringResource {
-    LocalizedStringResource(String.LocalizationValue("\(raw)"))
+  static func runtimeName(for raw: String) -> String {
+    raw
   }
 }

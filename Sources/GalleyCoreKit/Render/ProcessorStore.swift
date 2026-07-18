@@ -5,7 +5,7 @@ import Observation
 /// when the underlying tool is not installed; the row is still shown so
 /// the user can see what is available and how to install it.
 public struct Processor: Sendable, Identifiable,
-                         CustomLocalizedStringResourceConvertible,
+                         CustomStringConvertible,
                          Equatable
 {
   public struct ID: UniversalID {
@@ -20,19 +20,18 @@ public struct Processor: Sendable, Identifiable,
   }
 
   public let id: ID
-  public let name: LocalizedStringResource
   public let installHint: String?
   public let renderer: (any MarkdownRenderer)?
-  public var localizedStringResource: LocalizedStringResource { name }
+  public let description: String
 
   public init(
     id: ID,
-    name: LocalizedStringResource,
+    name: String,
     installHint: String?,
     renderer: (any MarkdownRenderer)?
   ) {
     self.id = id
-    self.name = name
+    self.description = name
     self.installHint = installHint
     self.renderer = renderer
   }
@@ -46,7 +45,7 @@ public struct Processor: Sendable, Identifiable,
   /// `ProcessorChoice.selected` non-optional.
   public static let builtIn = Processor(
     id: ID(rawValue: "swift-markdown"),
-    name: LocalizedStringResource("Built-in", bundle: .galleyCoreKit),
+    name: String(localized: "Built-in", bundle: .galleyCoreKit),
     installHint: nil,
     renderer: SwiftMarkdownRenderer())
 }
@@ -170,7 +169,7 @@ public final class ProcessorStore: StoreProtocol<Processor> {
       let renderer = await spec.discover()
       entries.append(Processor(
         id: Processor.ID(rawValue: spec.id),
-        name: LocalizedStringResource(String.LocalizationValue("\(spec.name)")),
+        name: spec.name,
         installHint: spec.installHint,
         renderer: renderer))
     }

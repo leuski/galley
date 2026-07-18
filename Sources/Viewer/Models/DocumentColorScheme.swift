@@ -22,7 +22,7 @@ import SwiftUI
 /// platforms, which lets the same on-disk plist round-trip cleanly
 /// through the Server (macOS) suite.
 enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
-                          Hashable, Sendable
+                          Hashable, Sendable, CustomStringConvertible
 {
   case light
   case dark
@@ -31,10 +31,10 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
 
   /// User-facing name. Strings live in the per-target catalog so each
   /// shipped locale can translate independently.
-  var name: LocalizedStringResource {
+  var description: String {
     switch self {
-    case .light: "Light"
-    case .dark:  "Dark"
+    case .light: String(localized: "Light")
+    case .dark: String(localized: "Dark")
     }
   }
 

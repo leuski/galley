@@ -19,7 +19,7 @@ struct ColorSchemePolicy: SelectablePolicy<DocumentColorScheme> {
     value.id
   }
   func encode(_ value: Selection) -> PersistentSelectionRepresentation {
-    .init(id: value.id, name: String(localized: value.name))
+    .init(id: value.id, name: value.description)
   }
   func contains(_ value: Selection) -> Bool {
     true
