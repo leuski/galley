@@ -195,14 +195,14 @@ struct EditorStoreTests {
     }
   }
 
-  /// The menu row shows `name`; an empty title would be a silent
+  /// The menu row shows `description`; an empty title would be a silent
   /// regression. The value itself is environment-dependent (built-in
   /// editors resolve the installed app's display name), so we only
   /// pin the non-empty invariant.
   @Test("Every editor resolves a non-empty menu title")
   func everyEditorHasName() {
     for editor in EditorStore.shared.values {
-      #expect(!String(localized: editor.name).isEmpty)
+      #expect(!editor.description.isEmpty)
     }
   }
 

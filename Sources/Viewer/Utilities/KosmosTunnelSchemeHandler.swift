@@ -24,7 +24,7 @@ import WebKit
 /// this scheme handler. The shared `Client` is product-neutral and
 /// doesn't stamp it; Galley stamps it here on every outbound request.
 @MainActor
-struct KosmosTunnelSchemeHandler: URLSchemeHandler {
+struct KosmosTunnelSchemeHandler: URLSchemeTaskResultHandler {
   /// Force-unwrap is safe — `TunnelScheme.name` is a constant
   /// string that's guaranteed to satisfy `URLScheme`'s validation
   /// (alphanumeric + dash, lowercase ASCII).
@@ -36,7 +36,7 @@ struct KosmosTunnelSchemeHandler: URLSchemeHandler {
   nonisolated
   func reply(
     for request: URLRequest
-  ) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
+  ) -> URLSchemeTaskResultStream {
     var stamped = request
     // Echo the request's own host into the origin so the Mac's
     // `<base href>` (and every sub-resource fetch) stays on the same

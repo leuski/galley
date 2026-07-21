@@ -7,11 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		620A41EF2FD7D955003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41EE2FD7D955003676A2 /* Kosmos */; };
-		620A41F02FD7D955003676A2 /* Kosmos in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 620A41EE2FD7D955003676A2 /* Kosmos */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		620A41F22FD7D97C003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41F12FD7D97C003676A2 /* Kosmos */; };
-		620A41FC2FD7D9D7003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41FB2FD7D9D7003676A2 /* Kosmos */; };
-		620A42002FD7D9EE003676A2 /* Kosmos in Frameworks */ = {isa = PBXBuildFile; productRef = 620A41FF2FD7D9EE003676A2 /* Kosmos */; };
 		62564F322FA857A400FF0F84 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62564F312FA857A400FF0F84 /* Quartz.framework */; };
 		62564F3E2FA857A400FF0F84 /* Quicklook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 62564F302FA857A400FF0F84 /* Quicklook.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62564F442FA857C400FF0F84 /* GalleyCoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */; };
@@ -138,7 +133,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				62D5E4B12FA5DA4800CADD72 /* GalleyCoreKit.framework in Embed Frameworks */,
-				620A41F02FD7D955003676A2 /* Kosmos in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -279,7 +273,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				620A41F22FD7D97C003676A2 /* Kosmos in Frameworks */,
 				62D5E4392FA5D93700CADD72 /* GalleyCoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -289,7 +282,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				62FE000100000000CADD7201 /* GalleyCoreKit.framework in Frameworks */,
-				620A42002FD7D9EE003676A2 /* Kosmos in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,7 +298,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				62D5E4B72FA5DB9800CADD72 /* GalleyCoreKit.framework in Frameworks */,
-				620A41EF2FD7D955003676A2 /* Kosmos in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -314,7 +305,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				620A41FC2FD7D9D7003676A2 /* Kosmos in Frameworks */,
 				6273A0762FCA2B9100205507 /* KosmosAppKit in Frameworks */,
 				62A127162FC6BDD6002FDFD7 /* MarkdownHTMLKit in Frameworks */,
 				62FA000300000000CADD7300 /* ObservableDefaults in Frameworks */,
@@ -434,7 +424,6 @@
 			);
 			name = Server;
 			packageProductDependencies = (
-				620A41F12FD7D97C003676A2 /* Kosmos */,
 			);
 			productName = "Galley Server";
 			productReference = 626E8D4F2F9DD1C700BD51F9 /* Galley Server.app */;
@@ -459,7 +448,6 @@
 			);
 			name = Tests;
 			packageProductDependencies = (
-				620A41FF2FD7D9EE003676A2 /* Kosmos */,
 			);
 			productName = GalleyTests;
 			productReference = 626E8D5C2F9DD1C800BD51F9 /* Tests.xctest */;
@@ -514,7 +502,6 @@
 			);
 			name = Viewer;
 			packageProductDependencies = (
-				620A41EE2FD7D955003676A2 /* Kosmos */,
 			);
 			productName = Galley;
 			productReference = 62D5CA192FA048F000CADD72 /* Galley.app */;
@@ -533,7 +520,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				620A41FA2FD7D9CA003676A2 /* PBXTargetDependency */,
+				62DAE265301002AB00F96C19 /* PBXTargetDependency */,
 				62913BA02FBC39AE00088C1F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
@@ -544,7 +531,6 @@
 				62FA000200000000CADD7300 /* ObservableDefaults */,
 				62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */,
 				6273A0752FCA2B9100205507 /* KosmosAppKit */,
-				620A41FB2FD7D9D7003676A2 /* Kosmos */,
 			);
 			productName = GalleyCoreKit;
 			productReference = 62D5E4332FA5D93700CADD72 /* GalleyCoreKit.framework */;
@@ -764,10 +750,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		620A41FA2FD7D9CA003676A2 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 620A41F92FD7D9CA003676A2 /* Kosmos */;
-		};
 		62564F3D2FA857A400FF0F84 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			platformFilters = (
@@ -807,6 +789,10 @@
 			);
 			target = 626E8D4E2F9DD1C700BD51F9 /* Server */;
 			targetProxy = 62D5E7682FA5E20100CADD72 /* PBXContainerItemProxy */;
+		};
+		62DAE265301002AB00F96C19 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 62DAE264301002AB00F96C19 /* KosmosAppKit */;
 		};
 		62EB9F292FEEEC8100545769 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1353,31 +1339,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		620A41EE2FD7D955003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
-		620A41F12FD7D97C003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
-		620A41F92FD7D9CA003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
-		620A41FB2FD7D9D7003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
-		620A41FF2FD7D9EE003676A2 /* Kosmos */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 629117662FBC28DB00088C1F /* XCLocalSwiftPackageReference "../Kosmos" */;
-			productName = Kosmos;
-		};
 		6273A0752FCA2B9100205507 /* KosmosAppKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = KosmosAppKit;
@@ -1390,6 +1351,11 @@
 		62A127152FC6BDD6002FDFD7 /* MarkdownHTMLKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MarkdownHTMLKit;
+		};
+		62DAE264301002AB00F96C19 /* KosmosAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6273A0742FCA2B9100205507 /* XCLocalSwiftPackageReference "../KosmosAppKit" */;
+			productName = KosmosAppKit;
 		};
 		62FA000200000000CADD7300 /* ObservableDefaults */ = {
 			isa = XCSwiftPackageProductDependency;

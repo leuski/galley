@@ -24,7 +24,7 @@ func colorSchemeChoiceCatalog() {
 
   #expect(choice.elements.contains(.light))
   #expect(choice.elements.contains(.dark))
-  #expect(choice.selected == .light)
+  #expect(choice.selection == .light)
 }
 
 @MainActor
@@ -36,5 +36,5 @@ func colorSchemeChoiceHydratesDark() {
 
   let choice = ColorSchemeChoice(initialSelection: persisted)
 
-  #expect(choice.selected == .dark)
+  #expect(choice.selection == .dark)
 }

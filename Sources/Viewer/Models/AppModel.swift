@@ -48,7 +48,6 @@ final class AppModel {
   // only after phase-1 init); resolved on first use in `urlSchemeHandler`.
   @ObservationIgnored private lazy var tunnelHandler =
   KosmosTunnelSchemeHandler(tunnel: kosmos.tunnel)
-    .schemeHandler
 #endif
 
   @ObservationIgnored
@@ -195,11 +194,12 @@ final class AppModel {
   }
 
   public func urlSchemeHandler(
-    templates: SceneTemplateChoice) -> [URLScheme: AnySchemeHandler]
+    templates: SceneTemplateChoice)
+  -> [URLScheme: any URLSchemeTaskResultHandler]
   {
     let localHandler = PreviewSchemeHandler { [weak templates] in
       Self.resolvedTemplate(templates: templates)
-    }.schemeHandler
+    }
 #if ENABLE_TUNNEL
     return [
       PreviewSchemeHandler.scheme: localHandler,

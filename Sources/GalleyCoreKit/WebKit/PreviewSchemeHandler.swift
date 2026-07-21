@@ -16,49 +16,57 @@ import OSLog
 public enum PreviewScheme {
   public static let name = "x-galley"
   public static let originURL: URL = "x-galley://local"
+}
 
+extension URLRequest {
   /// Shared resolution used by every in-process consumer:
   /// the Viewer's visible `WebPage`, its offscreen print/export
   /// `WKWebView`, and the QuickLook extension's fallback render.
   @MainActor
-  public static func resolve(
-    request: URLRequest,
-    templateProvider: () -> Template
-  ) throws -> ResolvedBytes {
-    guard let url = request.url else { throw URLError(.badURL) }
+  public func resolve(using templateProvider: () -> Template) throws
+  -> (HTTPURLResponse, Data)
+  {
+    guard let url = self.url else { throw URLError(.badURL) }
     guard let route = PreviewRoute(path: url.path) else {
       throw URLError(.unsupportedURL)
     }
-    let assetURL = try resolveAssetURL(
-      for: route, templateProvider: templateProvider)
-    let data = try Data(contentsOf: assetURL)
-    // The route kind decides cacheability: template assets are static (bounded
-    // cache), document-relative siblings are live-edited (`no-store`).
-    return ResolvedBytes(
-      data: data,
-      mime: MIMETypes.mimeType(for: assetURL),
-      cache: route.cachePolicy)
-  }
 
-  @MainActor
-  private static func resolveAssetURL(
-    for route: PreviewRoute,
-    templateProvider: () -> Template
-  ) throws -> URL {
+    let assetURL: URL
+
     switch route {
     case .templateAsset(let id, let file):
       let template = templateProvider()
       guard template.id == id,
-            let assetURL = template.resolveAsset(file: file)
+            let url = template.resolveAsset(file: file)
       else { throw URLError(.fileDoesNotExist) }
-      return assetURL
+      assetURL = url
     case .documentAsset(let url):
-      return url
+      assetURL = url
     case .events:
       // Live-reload (SSE) is an HTTP / Kosmos-tunnel concern; the in-process
       // scheme handler serves only static asset bytes.
       throw URLError(.unsupportedURL)
     }
+
+    let data = try Data(contentsOf: assetURL)
+    // The route kind decides cacheability: template assets are static (bounded
+    // cache), document-relative siblings are live-edited (`no-store`).
+
+    // An `HTTPURLResponse` (not a bare `URLResponse`) so we can carry the
+    // resolver's `Cache-Control` — lets WebKit reuse static template assets
+    // instead of re-resolving them on every navigation.
+    guard let response = HTTPURLResponse(
+      url: url,
+      statusCode: 200,
+      httpVersion: "HTTP/1.1",
+      headerFields: HTTPHeaders(
+        contentType: MIMETypes.mimeType(for: assetURL),
+        contentLength: data.count,
+        cacheControl: route.cachePolicy))
+    else {
+      throw URLError(.badURL)
+    }
+    return (response, data)
   }
 }
 
@@ -88,27 +96,10 @@ public final class ClassicPreviewSchemeHandler:
     _ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask
   ) {
     do {
-      let resolved = try PreviewScheme.resolve(
-        request: urlSchemeTask.request,
-        templateProvider: templateProvider)
-      // An `HTTPURLResponse` (not a bare `URLResponse`) so we can carry the
-      // resolver's `Cache-Control` — lets WebKit reuse static template assets
-      // instead of re-resolving them on every navigation.
-      guard let url = urlSchemeTask.request.url,
-            let response = HTTPURLResponse(
-              url: url,
-              statusCode: 200,
-              httpVersion: "HTTP/1.1",
-              headerFields: [
-                "Content-Type": resolved.mime,
-                "Content-Length": "\(resolved.data.count)",
-                "Cache-Control": resolved.cache.cacheControl
-              ])
-      else {
-        throw URLError(.badURL)
-      }
+      let (response, data) = try urlSchemeTask.request
+        .resolve(using: templateProvider)
       urlSchemeTask.didReceive(response)
-      urlSchemeTask.didReceive(resolved.data)
+      urlSchemeTask.didReceive(data)
       urlSchemeTask.didFinish()
     } catch {
       Self.logAssetLoadFailed(

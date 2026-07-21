@@ -42,10 +42,10 @@ struct InProcessTunnelBackendTests {
   @MainActor
   private func run(
     _ backend: InProcessTunnelBackend, path: String
-  ) async throws -> (status: Int?, headers: [String: String], body: Data) {
+  ) async throws -> (status: Int?, headers: HTTPHeaders, body: Data) {
     let request = try proxyRequest(path: path)
     var status: Int?
-    var headers: [String: String] = [:]
+    var headers: HTTPHeaders = [:]
     var body = Data()
     for try await event in backend.resolve(request) {
       switch event {
@@ -73,9 +73,7 @@ struct InProcessTunnelBackendTests {
     let html = String(decoding: result.body, as: UTF8.self)
     #expect(html.contains("<p>BODY</p>"))
     #expect(html.contains("EventSource"))   // reload script injected
-    let contentType = result.headers.first {
-      $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
-    }?.value ?? ""
+    let contentType = result.headers["Content-Type"] ?? ""
     #expect(contentType.lowercased().contains("text/html"))
   }
 

@@ -19,7 +19,7 @@ import OSLog
 /// `PlaceholderContext.substitute`; templates without it fall back
 /// to the page baseURL and end up at the same place.
 @MainActor
-struct PreviewSchemeHandler: SchemeHandler {
+struct PreviewSchemeHandler: URLSchemeTaskResultHandler {
   static let scheme = URLScheme(PreviewScheme.name)
   !! "Failed to make URLScheme for \(PreviewScheme.name)"
   static var originURL: URL { PreviewScheme.originURL }
@@ -36,38 +36,11 @@ struct PreviewSchemeHandler: SchemeHandler {
   nonisolated
   func reply(
     for request: URLRequest
-  ) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
-    AsyncThrowingStream { continuation in
-      let task = Task { @MainActor in
-        do {
-          let resolved = try PreviewScheme.resolve(
-            request: request,
-            templateProvider: templateProvider)
-          // An `HTTPURLResponse` so we can carry the resolver's `Cache-Control`
-          // — lets WebKit reuse static template assets instead of re-resolving
-          // them on every navigation.
-          guard let url = request.url,
-                let response = HTTPURLResponse(
-                  url: url,
-                  statusCode: 200,
-                  httpVersion: "HTTP/1.1",
-                  headerFields: [
-                    "Content-Type": resolved.mime,
-                    "Content-Length": "\(resolved.data.count)",
-                    "Cache-Control": resolved.cache.cacheControl
-                  ])
-          else {
-            throw URLError(.badURL)
-          }
-          continuation.yield(.response(response))
-          continuation.yield(.data(resolved.data))
-          continuation.finish()
-        } catch {
-          Self.logAssetLoadFailed(request: request, error: error)
-          continuation.finish(throwing: error)
-        }
-      }
-      continuation.onTermination = { _ in task.cancel() }
+  ) -> URLSchemeTaskResultStream {
+    URLSchemeTaskResultStream { @MainActor continuation in
+      let (response, data) = try request.resolve(using: templateProvider)
+      continuation.yield(.response(response))
+      continuation.yield(.data(data))
     }
   }
 
