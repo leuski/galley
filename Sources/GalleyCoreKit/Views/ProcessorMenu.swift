@@ -5,14 +5,13 @@ where Model: Selectable,
       Model.Element == Model.Selection,
       Model.Element: SectionedChoiceValue & Identifiable
 {
-  let title: LocalizedStringResource
+  let title: String
   let model: Model
 
   public init(
     title: LocalizedStringResource? = nil, model: Model)
   {
-    self.title = title ?? LocalizedStringResource(
-      "Processor", bundle: .galleyCoreKit)
+    self.title = title.map { String(localized: $0) } ?? localized("Processor")
     self.model = model
   }
 
@@ -21,8 +20,7 @@ where Model: Selectable,
       SelectableMenuCore(model: model)
       Divider()
       Button(
-        LocalizedStringResource(
-          "Rescan Installed Processors", bundle: .galleyCoreKit),
+        localized("Rescan Installed Processors"),
         systemImage: "arrow.trianglehead.2.clockwise.rotate.90") {
           ProcessorStore.shared.rediscover()
         }

@@ -23,14 +23,11 @@ extension UNUserNotificationCenter {
     /// " unavailable" is not a safe word-by-word concatenation in
     /// many languages. The notifier resolves to `String` at the
     /// `UNNotificationContent.title` boundary.
-    var title: LocalizedStringResource {
+    fileprivate var title: String {
       switch self {
-      case .processor: LocalizedStringResource(
-        "Markdown processor unavailable", bundle: .galleyCoreKit)
-      case .template: LocalizedStringResource(
-        "Template unavailable", bundle: .galleyCoreKit)
-      case .editor: LocalizedStringResource(
-        "Editor unavailable", bundle: .galleyCoreKit)
+      case .processor: localized("Markdown processor unavailable")
+      case .template: localized("Template unavailable")
+      case .editor: localized("Editor unavailable")
       }
     }
   }
@@ -48,8 +45,8 @@ extension UNUserNotificationCenter {
   /// key with the displaced name as the runtime substitution.
   public static func post(kind: Kind, displaced: String) {
     post(
-      title: String(localized: kind.title),
-      body: "\(displaced) is no longer available — switched to the default."
-        .localized(in: .galleyCoreKit))
+      title: kind.title,
+      body: localized(
+        "\(displaced) is no longer available — switched to the default."))
   }
 }

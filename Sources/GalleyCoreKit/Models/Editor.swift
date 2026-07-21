@@ -79,7 +79,7 @@ public struct Editor: @MainActor SectionedChoiceValue, Identifiable,
       id: customURLSchemeID,
       url: nil,
       invocation: .urlTemplate(defaults.editorCustomURL),
-      name: String(localized: "Custom URL Scheme", bundle: .galleyCoreKit)
+      name: localized("Custom URL Scheme")
     )
   }
 
@@ -93,7 +93,7 @@ public struct Editor: @MainActor SectionedChoiceValue, Identifiable,
       invocation: .open,
       name: defaults
         .editorOtherApplication.map { url in url.displayName }
-      ?? String(localized: "Other Application…", bundle: .galleyCoreKit)
+      ?? localized("Other Application…")
     )
   }
 

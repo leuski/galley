@@ -31,7 +31,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   var canRename: Bool { isRegular && documentURL.isFileURL }
   var canOpenInEditor: Bool { true }
   var title: String {
-    isRegular ? documentURL.lastPathComponent : String(localized: "Help")
+    isRegular ? documentURL.lastPathComponent : localized("Help")
   }
   var toolbarID: String { isRegular ? "viewer.main" : "viewer.help" }
 
@@ -478,7 +478,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
       // a notice so a stray menu trigger gives feedback instead of
       // failing silently.
       report(
-        String(localized: "Remote documents can’t be renamed."),
+        localized("Remote documents can’t be renamed."),
         lifetime: .ephemeral)
       return oldURL
     }
@@ -494,8 +494,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     } catch {
       report(
         failure: error, context: "rename",
-        message: String(
-          localized: "Rename failed: \(error.localizedDescription)"),
+        message: localized("Rename failed: \(error.localizedDescription)"),
         lifetime: .ephemeral)
       throw error
     }

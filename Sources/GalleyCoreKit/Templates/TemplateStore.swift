@@ -56,7 +56,7 @@ public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
     "Solarized": "Solarized",
     "Terminal": "Terminal",
     "Tufte": "Tufte"
-  ].mapValues { value in String(localized: value, bundle: .galleyCoreKit) }
+  ].mapValues { value in localized(value) }
 }
 
 public typealias TemplateStore = FolderBasedStore<TemplateStorePolicy>
@@ -91,7 +91,7 @@ public extension Template {
       sourceURL: .bundleTemplatesDirectoryURL,
       sourceIndex: TemplateStorePolicy.bundleSourceIndex,
       name: "Default.html",
-      nameResource: String(localized: "Default", bundle: .galleyCoreKit))
+      nameResource: localized("Default"))
     else {
       fatalError("GalleyCoreKit bundle missing Templates.bundle/Default.html")
     }

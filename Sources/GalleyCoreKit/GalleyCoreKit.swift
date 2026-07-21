@@ -11,3 +11,7 @@ private final class Helper: NSObject {}
 public extension Bundle {
   static let galleyCoreKit = Bundle(for: Helper.self)
 }
+
+func localized(_ string: String.LocalizationValue) -> String {
+  String(localized: string, bundle: .galleyCoreKit)
+}

@@ -26,3 +26,10 @@ struct ViewerApp: App {
       .environment(appModel)
   }
 }
+
+func localized(
+  _ string: String.LocalizationValue,
+  comment: StaticString? = nil) -> String
+{
+  String(localized: string, comment: comment)
+}

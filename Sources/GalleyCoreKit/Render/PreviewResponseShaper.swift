@@ -127,7 +127,3 @@ public struct PreviewResponseShaper: Sendable {
   Bundle.galleyCoreKit.requiredString(
     forResource: "ErrorPage", withExtension: "html")
 }
-
-private func localized(_ value: String.LocalizationValue) -> String {
-  String(localized: value, bundle: .galleyCoreKit)
-}

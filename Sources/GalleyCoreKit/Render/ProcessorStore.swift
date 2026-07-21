@@ -45,7 +45,7 @@ public struct Processor: Sendable, Identifiable,
   /// `ProcessorChoice.selected` non-optional.
   public static let builtIn = Processor(
     id: ID(rawValue: "swift-markdown"),
-    name: String(localized: "Built-in", bundle: .galleyCoreKit),
+    name: localized("Built-in"),
     installHint: nil,
     renderer: SwiftMarkdownRenderer())
 }

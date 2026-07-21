@@ -33,8 +33,8 @@ enum DocumentColorScheme: String, Codable, CaseIterable, Identifiable,
   /// shipped locale can translate independently.
   var description: String {
     switch self {
-    case .light: String(localized: "Light")
-    case .dark: String(localized: "Dark")
+    case .light: localized("Light")
+    case .dark: localized("Dark")
     }
   }
 

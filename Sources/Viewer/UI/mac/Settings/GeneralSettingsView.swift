@@ -18,7 +18,7 @@ struct GeneralSettingsView: View {
         Spacer()
         Picker(selection: $defaults.openBehavior) {
           ForEach(OpenBehavior.allCases) { behavior in
-            Text(behavior.displayName).tag(behavior)
+            Text(behavior.description).tag(behavior)
           }
         } label: {
           EmptyView()
