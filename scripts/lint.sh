@@ -10,7 +10,7 @@ export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 cd "${SRCROOT:-$(dirname "$0")/..}"
 
 if which swiftlint > /dev/null; then
-    swiftlint --config swiftlint.yml Sources
+    swiftlint --config swiftlint.yml Sources ../Kosmos/Sources ../KosmosAppKit/Sources
 else
     echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
 fi

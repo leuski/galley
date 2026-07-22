@@ -84,9 +84,12 @@ struct PreviewResponseShaperTests {
 
   @Test("SSE frames match the live-reload protocol")
   func sseFrames() {
-    #expect(String(decoding: PreviewSSE.connectPrelude, as: UTF8.self)
-      == ": connected\n\n")
-    #expect(String(decoding: PreviewSSE.reloadFrame, as: UTF8.self)
+    guard case .body(let prelude) = TunnelResponseEvent.connectPrelude,
+          case .body(let reload) = TunnelResponseEvent.reloadFrame else {
+      Issue.record("expected .body events"); return
+    }
+    #expect(String(decoding: prelude, as: UTF8.self) == ": connected\n\n")
+    #expect(String(decoding: reload, as: UTF8.self)
       == "event: reload\ndata: ok\n\n")
   }
 }
