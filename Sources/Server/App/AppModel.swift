@@ -76,10 +76,8 @@ final class AppModel {
   static let shared = AppModel()
 
   private init() {
-    Self.logInit(
-      bundle: Bundle.main.bundleIdentifier,
-      renderer: Defaults.shared.renderer,
-      template: Defaults.shared.template)
+    Defaults.shared.logRenderDefaults(
+      prefix: "Server", bundle: Bundle.main.bundleIdentifier, to: defaultsLog)
 
     SingleProcessInstance.enforceSingleInstance()
     Task { @MainActor in
@@ -110,17 +108,8 @@ final class AppModel {
     // cross-process change observation actually work.
     Defaults.shared.startListening()
 
-    NotificationCenter.default.addObserver(
-      forName: UserDefaults.didChangeNotification,
-      object: nil,
-      queue: .main
-    ) { _ in
-      MainActor.assumeIsolated {
-        Self.logDidChange(
-          renderer: Defaults.shared.renderer,
-          template: Defaults.shared.template)
-      }
-    }
+    Defaults.observeRenderDefaultsChanges(
+      Defaults.shared, prefix: "Server", logger: defaultsLog)
 
     startServer(service: previewService, watcher: watcher)
     publishGalleyAppHash()
@@ -157,29 +146,6 @@ final class AppModel {
     _ kind: UNUserNotificationCenter.Kind, _ name: String)
   {
     UNUserNotificationCenter.post(kind: kind, displaced: name)
-  }
-
-  private static func logInit(
-    bundle: String?, renderer: Any?, template: Any?
-  ) {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    defaultsLog.notice("""
-      Server AppModel init pid=\(pid) \
-      bundle=\(bundle ?? "?", privacy: .public) \
-      renderer=\(String(describing: renderer), privacy: .public) \
-      template=\(String(describing: template), privacy: .public)
-      """)
-  }
-
-  private static func logDidChange(
-    renderer: Any?, template: Any?
-  ) {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    defaultsLog.debug("""
-      Server didChange pid=\(pid) \
-      renderer=\(String(describing: renderer), privacy: .public) \
-      template=\(String(describing: template), privacy: .public)
-      """)
   }
 
   private func startServer(

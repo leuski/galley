@@ -18,11 +18,9 @@ extension Action {
   /// `@ObservableDefaults` pipeline.
   static func toggleStatusBar() -> Action {
     Action(
-      title: {
-        Defaults.shared.showsStatusBar
+      title: Defaults.shared.showsStatusBar
         ? "Hide Status Bar"
-        : "Show Status Bar"
-      },
+        : "Show Status Bar",
       image: "ruler",
       perform: { env in
         withAnimationAsNeeded(env.reduceMotion) {
@@ -41,11 +39,9 @@ extension Action {
   /// label.
   static func toggleTOC(_ model: DocumentModel?) -> Action {
     Action(
-      title: {
-        (model?.showsTOC ?? false)
+      title: (model?.showsTOC ?? false)
         ? "Hide Table of Contents"
-        : "Show Table of Contents"
-      },
+        : "Show Table of Contents",
       image: "sidebar.left",
       perform: { env in
         guard let model else { return }
@@ -95,7 +91,7 @@ extension Action {
     recents: RecentDocumentsModel
   ) -> Action {
     Action(
-      title: { "\(url.lastPathComponent)" },
+      title: "\(url.lastPathComponent)",
       help: { "\(url.absoluteString)" },
       image: {
         if url.isFileURL {
@@ -246,7 +242,7 @@ extension Action {
     _ model: DocumentModel?, appModel: AppModel) -> Action
   {
     Action(
-      title: { "Show on Vision Pro" },
+      title: "Show on Vision Pro",
       help: {
         appModel.kosmos.isAVPReachable
         ? "Open this document on the connected Vision Pro."
@@ -290,7 +286,7 @@ extension Action {
     Action(
       title: "Open…",
       image: "arrow.up.forward",
-      perform: {
+      perform: { _ in
         if isPresented != nil {
           isPresented?.wrappedValue = true
         } else {

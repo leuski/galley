@@ -70,6 +70,10 @@ extension URLRequest {
   }
 }
 
+private let logger = Logger(
+  subsystem: bundleIdentifier,
+  category: "PreviewSchemeHandler")
+
 /// Adapter that exposes `PreviewScheme.resolve` to a classic
 /// `WKWebView`. SwiftUI's `URLSchemeHandler` (used by `WebPage`) is a
 /// distinct protocol, so the Viewer's visible preview keeps its own
@@ -80,10 +84,6 @@ public final class ClassicPreviewSchemeHandler:
   NSObject, WKURLSchemeHandler
 {
   private let templateProvider: @MainActor @Sendable () -> Template
-
-  private static let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "PreviewSchemeHandler")
 
   public init(
     templateProvider: @escaping @MainActor @Sendable () -> Template
@@ -102,8 +102,8 @@ public final class ClassicPreviewSchemeHandler:
       urlSchemeTask.didReceive(data)
       urlSchemeTask.didFinish()
     } catch {
-      Self.logAssetLoadFailed(
-        request: urlSchemeTask.request, error: error)
+      logAssetLoadFailed(
+        request: urlSchemeTask.request, error: error, to: logger)
       urlSchemeTask.didFailWithError(error)
     }
   }
@@ -113,14 +113,14 @@ public final class ClassicPreviewSchemeHandler:
   ) {
     // No async work to cancel — resolve runs synchronously.
   }
+}
 
-  private static func logAssetLoadFailed(
-    request: URLRequest, error: any Error
-  ) {
-    logger.warning("""
-      asset load failed for \
-      \(request.url?.absoluteString ?? "?", privacy: .public): \
-      \(error.localizedDescription, privacy: .public)
-      """)
-  }
+public func logAssetLoadFailed(
+  request: URLRequest, error: any Error, to logger: os.Logger)
+{
+  logger.warning("""
+    asset load failed for \
+    \(request.url?.absoluteString ?? "?", privacy: .public): \
+    \(error.localizedDescription, privacy: .public)
+    """)
 }

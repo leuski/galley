@@ -55,10 +55,9 @@ final class AppModel {
 
   private static func startInit() {
     warmCache()
-    logInit(
-      bundle: Bundle.main.bundleIdentifier,
-      renderer: Defaults.shared.renderer,
-      template: Defaults.shared.template)
+    Defaults.shared.logRenderDefaults(
+      prefix: "Viewer", bundle: Bundle.main.bundleIdentifier, to: defaultsLog)
+
 #if os(macOS)
     URL.createLocalizedApplicationSupportDirectory()
     UserDefaults.forceTabs()
@@ -134,7 +133,8 @@ final class AppModel {
     .bind(
       toAndFrom: Defaults.shared.property(\.colorScheme), checkSettled: true)
 
-    Self.logDefaultsDidChange()
+    Defaults.observeRenderDefaultsChanges(
+      Defaults.shared, prefix: "Viewer", logger: defaultsLog)
 
     // Boot side-effects (formerly `AppBoot.init`). Fired in parallel so
     // they never block the first scene; the processor catalog expands
@@ -164,24 +164,6 @@ final class AppModel {
       }
     }
 #endif
-  }
-
-  static func logDefaultsDidChange() {
-    // Log every ObservableDefaults notification arriving in this
-    // process — that's the signal bindPersistent's inbound side
-    // listens to. If this fires but the choice doesn't update,
-    // the gap is in bindPersistent or downstream observation.
-    NotificationCenter.default.addObserver(
-      forName: UserDefaults.didChangeNotification,
-      object: nil,
-      queue: .main
-    ) { _ in
-      MainActor.assumeIsolated {
-        Self.logDidChange(
-          renderer: Defaults.shared.renderer,
-          template: Defaults.shared.template)
-      }
-    }
   }
 
   public static func resolvedTemplate(
@@ -235,29 +217,6 @@ final class AppModel {
     NotificationCenter.default.post(
       name: UserDefaults.didChangeNotification,
       object: UserDefaults.standard)
-  }
-
-  private static func logInit(
-    bundle: String?, renderer: Any?, template: Any?
-  ) {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    defaultsLog.notice("""
-      Viewer AppModel init pid=\(pid) \
-      bundle=\(bundle ?? "?", privacy: .public) \
-      renderer=\(String(describing: renderer), privacy: .public) \
-      template=\(String(describing: template), privacy: .public)
-      """)
-  }
-
-  private static func logDidChange(
-    renderer: Any?, template: Any?
-  ) {
-    let pid = ProcessInfo.processInfo.processIdentifier
-    defaultsLog.debug("""
-      Viewer didChange pid=\(pid) \
-      renderer=\(String(describing: renderer), privacy: .public) \
-      template=\(String(describing: template), privacy: .public)
-      """)
   }
 
 #if os(visionOS)

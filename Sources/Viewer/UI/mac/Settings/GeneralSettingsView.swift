@@ -7,7 +7,7 @@ struct GeneralSettingsView: View {
 
   var body: some View {
     openDocumentPicker
-    statusBarSettings
+    ReadingSpeedStepper(spacing: 4)
   }
 
   @ViewBuilder
@@ -44,28 +44,6 @@ struct GeneralSettingsView: View {
             Paints the page background color behind the window \
             toolbar and sidebar. When the template does not declare a \
             background color, the default system color is used.
-            """
-      )
-      .subtitle()
-    }
-  }
-
-  @ViewBuilder
-  private var statusBarSettings: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      LabeledContent("Reading speed") {
-        Stepper(
-          value: $defaults.readingWordsPerMinute,
-          in: 50...600,
-          step: 10
-        ) {
-          Text("\(defaults.readingWordsPerMinute) wpm")
-            .monospacedDigit()
-        }
-      }
-      Text("""
-            Words per minute used to estimate reading time in the \
-            status bar.
             """
       )
       .subtitle()

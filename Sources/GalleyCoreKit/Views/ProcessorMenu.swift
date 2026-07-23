@@ -5,13 +5,11 @@ where Model: Selectable,
       Model.Element == Model.Selection,
       Model.Element: SectionedChoiceValue & Identifiable
 {
-  let title: String
+  let title: LocalizedStringResource
   let model: Model
 
-  public init(
-    title: LocalizedStringResource? = nil, model: Model)
-  {
-    self.title = title.map { String(localized: $0) } ?? localized("Processor")
+  public init(title: LocalizedStringResource, model: Model) {
+    self.title = title
     self.model = model
   }
 

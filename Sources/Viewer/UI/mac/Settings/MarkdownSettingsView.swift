@@ -306,36 +306,23 @@ struct EditorMenuCore: View {
   let onRequestAppPicker: () -> Void
 
   var body: some View {
-    let values = model.elements
-      .reduce(into: [:]) { result, value in
-        result[value.section, default: []].append(value)
-      }
-      .sorted { $0.key < $1.key }
-      .map { $0.value }
-    DividedSections(sections: values, id: \.id) { value in
-      Toggle(isOn: binding(for: value)) {
-        EditorChoiceElement(model: value)
-      }
-      .disabled(!value.isAvailable)
-    }
-  }
-
-  private func binding(for value: EditorChoice.Element) -> Binding<Bool> {
-    Binding(
-      get: { model.selection.id == value.id },
-      set: { newValue in
-        guard newValue else { return }
-        if value == EditorStore.shared.otherApplication {
-          if nil != Defaults.shared.editorOtherApplication {
-            model.selection = EditorStore.shared.otherApplication
+    SelectableMenuCore(model: model) { value in
+      Binding(
+        get: { model.selection.id == value.id },
+        set: { newValue in
+          guard newValue else { return }
+          if value == EditorStore.shared.otherApplication {
+            if nil != Defaults.shared.editorOtherApplication {
+              model.selection = EditorStore.shared.otherApplication
+            } else {
+              onRequestAppPicker()
+            }
           } else {
-            onRequestAppPicker()
+            model.selection = value
           }
-        } else {
-          model.selection = value
         }
-      }
-    )
+      )
+    }
   }
 }
 

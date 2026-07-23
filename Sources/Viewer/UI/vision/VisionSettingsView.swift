@@ -41,7 +41,7 @@ struct VisionSettingsView: View {
             // either revive it (Safari-style tabs) or cut it from
             // the enum entirely.
             ForEach(visionOpenBehaviors) { behavior in
-              Text(behavior.displayName).tag(behavior)
+              Text(behavior.description).tag(behavior)
             }
           } label: { EmptyView() }
             .pickerStyle(.menu)
@@ -89,23 +89,7 @@ struct VisionSettingsView: View {
         .subtitle()
       }
 
-      VStack(alignment: .leading, spacing: subtitleSpacing) {
-        LabeledContent("Reading speed") {
-          Stepper(
-            value: $defaults.readingWordsPerMinute,
-            in: 50...600,
-            step: 10
-          ) {
-            Text("\(defaults.readingWordsPerMinute) wpm")
-              .monospacedDigit()
-          }
-        }
-        Text("""
-          Words per minute used to estimate reading time in the \
-          status bar.
-          """)
-        .subtitle()
-      }
+      ReadingSpeedStepper(spacing: subtitleSpacing)
     }
   }
 
@@ -154,7 +138,7 @@ where Model: Selectable & Observable,
     Menu {
       SelectableMenuCore(model: model)
     } label: {
-      Text(model.selected.name)
+      Text(model.selection.description)
     }
     .labelsHidden()
   }

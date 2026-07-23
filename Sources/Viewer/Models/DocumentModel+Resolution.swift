@@ -39,7 +39,7 @@ extension DocumentModel {
     : (pageBackgroundColor().isLuminanceDark ? .dark : .light)
 #else
     if Defaults.shared.enablePerDocumentOverrides {
-      return colorSchemes.selected.value.colorScheme
+      return colorSchemes.selection.value.colorScheme
     }
     return Defaults.shared.colorScheme?.id.colorScheme ?? .userSystem
 #endif

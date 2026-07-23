@@ -62,21 +62,8 @@ extension PeerInfo.Metadata.Key where Value == URL {
 /// dispatch this file." Server's `RouteToAVP` handler resolves the
 /// filepath to a URL and runs it through the same dispatch path
 /// `application(_:open:)` already uses.
-public struct RouteToAVP: KosmosMessage, Equatable {
-  public let target: DocumentTarget
-
-  public init(target: DocumentTarget) {
-    self.target = target
-  }
-
-  public struct Reply: KosmosMessage, Equatable {
-    public let accepted: Bool
-
-    public init(accepted: Bool) {
-      self.accepted = accepted
-    }
-  }
-}
+public struct RouteToAVPMarker {}
+public typealias RouteToAVP = TargetMessage<RouteToAVPMarker>
 
 /// Mac Viewer → Server. "Show on Vision Pro". The reply
 /// reports whether a reachable AVP peer accepted it, so the Mac Viewer
@@ -99,7 +86,7 @@ public struct RouteToTunnelClient: KosmosMessage, Equatable {
   }
 }
 
-public struct OpenInEditor: KosmosMessage, Equatable {
+public struct TargetMessage<Marker>: KosmosMessage, Equatable {
   public let target: DocumentTarget
 
   public init(target: DocumentTarget) {
@@ -114,3 +101,6 @@ public struct OpenInEditor: KosmosMessage, Equatable {
     }
   }
 }
+
+public struct OpenInEditorMarker {}
+public typealias OpenInEditor = TargetMessage<OpenInEditorMarker>

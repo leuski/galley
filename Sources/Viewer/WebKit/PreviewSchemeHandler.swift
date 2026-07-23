@@ -3,6 +3,10 @@ import GalleyCoreKit
 import WebKit
 import OSLog
 
+private let logger = Logger(
+  subsystem: bundleIdentifier,
+  category: "PreviewSchemeHandler")
+
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible
 /// `WebPage`. The actual asset resolution lives in
 /// `GalleyCoreKit.PreviewScheme.resolve` and is shared with the
@@ -29,10 +33,6 @@ struct PreviewSchemeHandler: URLSchemeTaskResultHandler {
   /// up the new directory.
   let templateProvider: @MainActor @Sendable () -> Template
 
-  private static let logger = Logger(
-    subsystem: bundleIdentifier,
-    category: "PreviewSchemeHandler")
-
   nonisolated
   func reply(
     for request: URLRequest
@@ -41,16 +41,8 @@ struct PreviewSchemeHandler: URLSchemeTaskResultHandler {
       let (response, data) = try request.resolve(using: templateProvider)
       continuation.yield(.response(response))
       continuation.yield(.data(data))
+    } onError: {
+      logAssetLoadFailed(request: request, error: $0, to: logger)
     }
-  }
-
-  private static func logAssetLoadFailed(
-    request: URLRequest, error: any Error
-  ) {
-    logger.warning("""
-      asset load failed for \
-      \(request.url?.absoluteString ?? "?", privacy: .public): \
-      \(error.localizedDescription, privacy: .public)
-      """)
   }
 }

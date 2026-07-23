@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Shared defaults contract between the Viewer and Server apps.
 /// Both AppModels conform to this protocol. The Viewer backs it with
@@ -30,6 +31,47 @@ extension GalleyRenderDefaults {
   @MainActor public var resolvedRenderer: any MarkdownRenderer {
     ProcessorStore.shared.any(forID: renderer?.id).renderer
     ?? SwiftMarkdownRenderer()
+  }
+
+  public func logRenderDefaults(
+    prefix: String, bundle: String?, to logger: os.Logger)
+  {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    logger.debug("""
+      \(prefix) init pid=\(pid) \
+      bundle=\(bundle ?? "?", privacy: .public) \
+      renderer=\(String(describing: self.renderer), privacy: .public) \
+      template=\(String(describing: self.template), privacy: .public)
+      """)
+  }
+
+  private func logRenderDefaults(prefix: String, to logger: os.Logger) {
+    let pid = ProcessInfo.processInfo.processIdentifier
+    logger.debug("""
+      \(prefix) didChange pid=\(pid) \
+      renderer=\(String(describing: self.renderer), privacy: .public) \
+      template=\(String(describing: self.template), privacy: .public)
+      """)
+  }
+
+  @MainActor
+  public static func observeRenderDefaultsChanges(
+    _ defaults: @escaping @autoclosure @MainActor () -> GalleyRenderDefaults,
+    prefix: String, logger: os.Logger?) {
+    guard let logger else { return }
+    // Log every ObservableDefaults notification arriving in this
+    // process — that's the signal bindPersistent's inbound side
+    // listens to. If this fires but the choice doesn't update,
+    // the gap is in bindPersistent or downstream observation.
+    NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      MainActor.assumeIsolated {
+        defaults().logRenderDefaults(prefix: prefix, to: logger)
+      }
+    }
   }
 }
 

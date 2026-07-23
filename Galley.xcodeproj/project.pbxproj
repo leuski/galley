@@ -483,6 +483,7 @@
 			buildPhases = (
 				62D5CA152FA048F000CADD72 /* Sources */,
 				62D5E0A62FA5BFB000CADD72 /* Lint */,
+				62DAF28530115E3200F96C19 /* Detect duplicates */,
 				62D5CA162FA048F000CADD72 /* Frameworks */,
 				62D5CA172FA048F000CADD72 /* Resources */,
 				62D5E0A82FA5BFB000CADD72 /* Compile AppleScripts */,
@@ -701,6 +702,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/Scripts/embed-server-as-galley.sh\"\n";
+		};
+		62DAF28530115E3200F96C19 /* Detect duplicates */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Detect duplicates";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/Scripts/detect-duplication.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
