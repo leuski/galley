@@ -8,45 +8,62 @@
 import GalleyCoreKit
 import SwiftUI
 
+@MainActor
+func menuPolicy<Local, Global>(
+  appModel: Global,
+  documentModel: Local?,
+  localTitle: LocalizedStringResource,
+  globalTitle: LocalizedStringResource)
+// swiftlint:disable:next large_tuple
+-> (LocalizedStringResource, Local?, Global)
+where Local: Selectable,
+      Local.Element == Local.Selection,
+      Local.Element: SectionedChoiceValue & Identifiable,
+      Global: Selectable,
+      Global.Element == Global.Selection,
+      Global.Element: SectionedChoiceValue & Identifiable
+{
+  if let documentModel, Defaults.shared.enablePerDocumentOverrides {
+    return (localTitle, documentModel, appModel)
+  }
+  return (
+    Defaults.shared.enablePerDocumentOverrides
+    && documentModel == nil ? globalTitle : localTitle,
+    documentModel, appModel)
+}
+
 struct TemplateMenu: View {
-  private let title: LocalizedStringResource
-  private let documentModel: DocumentModel?
+  let documentModel: DocumentModel?
   @Environment(AppModel.self) var appModel
 
-  init(documentModel: DocumentModel? = nil) {
-    self.documentModel = documentModel
-    self.title = Defaults.shared.enablePerDocumentOverrides
-    && documentModel == nil ? "Global Template" : "Template"
-  }
-
   var body: some View {
-    if let documentModel,
-       Defaults.shared.enablePerDocumentOverrides {
-      TemplateMenuContent(title: title, model: documentModel.templates)
+    let (title, local, global) = menuPolicy(
+      appModel: appModel.templates,
+      documentModel: documentModel?.templates,
+      localTitle: "Template",
+      globalTitle: "Global Template")
+    if let local {
+      templateMenuContent(title: title, model: local)
     } else {
-      TemplateMenuContent(title: title, model: appModel.templates)
+      templateMenuContent(title: title, model: global)
     }
   }
 }
 
 struct ProcessorMenu: View {
-  private let title: LocalizedStringResource
-  private let documentModel: DocumentModel?
+  let documentModel: DocumentModel?
   @Environment(AppModel.self) var appModel
 
-  init(documentModel: DocumentModel? = nil) {
-    self.documentModel = documentModel
-    self.title = Defaults.shared.enablePerDocumentOverrides
-    && documentModel == nil
-    ? "Global Markdown Processor" : "Markdown Processor"
-  }
-
   var body: some View {
-    if let documentModel,
-       Defaults.shared.enablePerDocumentOverrides {
-      ProcessorMenuContent(title: title, model: documentModel.processors)
+    let (title, local, global) = menuPolicy(
+      appModel: appModel.processors,
+      documentModel: documentModel?.processors,
+      localTitle: "Markdown Processor",
+      globalTitle: "Global Markdown Processor")
+    if let local {
+      processorMenuContent(title: title, model: local)
     } else {
-      ProcessorMenuContent(title: title, model: appModel.processors)
+      processorMenuContent(title: title, model: global)
     }
   }
 }
@@ -59,22 +76,19 @@ struct ProcessorMenu: View {
 /// (which already exposes a `.global(...)` sentinel row); otherwise
 /// it drives the AppModel's global `ColorSchemeChoice`.
 struct ColorSchemeMenu: View {
-  private let title: LocalizedStringResource
-  private let documentModel: DocumentModel?
+  let documentModel: DocumentModel?
   @Environment(AppModel.self) var appModel
 
-  init(documentModel: DocumentModel? = nil) {
-    self.documentModel = documentModel
-    self.title = Defaults.shared.enablePerDocumentOverrides
-    && documentModel == nil ? "Global Color Scheme" : "Color Scheme"
-  }
-
   var body: some View {
-    if let documentModel,
-       Defaults.shared.enablePerDocumentOverrides {
-      ColorSchemeMenuContent(title: title, model: documentModel.colorSchemes)
+    let (title, local, global) = menuPolicy(
+      appModel: appModel.colorSchemes,
+      documentModel: documentModel?.colorSchemes,
+      localTitle: "Color Scheme",
+      globalTitle: "Global Color Scheme")
+    if let local {
+      colorSchemeMenuContent(title: title, model: local)
     } else {
-      ColorSchemeMenuContent(title: title, model: appModel.colorSchemes)
+      colorSchemeMenuContent(title: title, model: global)
     }
   }
 }
