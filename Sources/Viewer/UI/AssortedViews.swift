@@ -9,18 +9,14 @@ import GalleyCoreKit
 import SwiftUI
 
 struct TemplateMenu: View {
-  private let title: LocalizedStringResource?
+  private let title: LocalizedStringResource
   private let documentModel: DocumentModel?
   @Environment(AppModel.self) var appModel
 
-  init(
-    title: LocalizedStringResource? = "Template",
-    globalTitle: LocalizedStringResource? = "Global Template",
-    documentModel: DocumentModel? = nil)
-  {
+  init(documentModel: DocumentModel? = nil) {
     self.documentModel = documentModel
-    self.title = (Defaults.shared.enablePerDocumentOverrides
-                  && documentModel == nil ? globalTitle : nil) ?? title
+    self.title = Defaults.shared.enablePerDocumentOverrides
+    && documentModel == nil ? "Global Template" : "Template"
   }
 
   var body: some View {
