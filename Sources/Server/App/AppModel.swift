@@ -4,8 +4,7 @@ import GalleyCoreKit
 import OSLog
 import UserNotifications
 
-private let defaultsLog = Logger(
-  subsystem: bundleIdentifier, category: "Defaults")
+private let defaultsLog = Logger(category: "Defaults")
 
 /// App-wide state for the Server. Port, processor, and template come
 /// from the `net.leuski.galley` suite — the same plist the Viewer
@@ -112,33 +111,9 @@ final class AppModel {
       Defaults.shared, prefix: "Server", logger: defaultsLog)
 
     startServer(service: previewService, watcher: watcher)
-    publishGalleyAppHash()
-  }
-
-  /// Compute the SHA256 of the Galley.app bundle that contains this
-  /// Server.app and write it to the shared suite. The Viewer reads
-  /// this on its launch and compares with its own hash; on mismatch
-  /// it terminates and relaunches us so a stale Server doesn't
-  /// clobber the Viewer's choices through the bindPersistent
-  /// round-trip. (Server.app lives at
-  /// `<Galley.app>/Contents/Resources/Galley Server.app`, so the
-  /// containing app bundle is three levels up.)
-  private func publishGalleyAppHash() {
-    let serverBundle = Bundle.main.bundleURL
-    let galleyApp = serverBundle.parent.parent.parent
-    Task.detached(priority: .userInitiated) {
-      do {
-        let hash = try await galleyApp.computeHash()
-        await MainActor.run {
-          Defaults.shared.serverGalleyHash = hash
-          Defaults.shared.post()
-        }
-      } catch {
-        defaultsLog.error("""
-          Server publishGalleyAppHash failed: \
-          \(error.localizedDescription, privacy: .public)
-          """)
-      }
+    publishAppHash(at: Bundle.main.bundleURL.parent.parent.parent) { hash in
+      Defaults.shared.serverGalleyHash = hash
+      Defaults.shared.post()
     }
   }
 

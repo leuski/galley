@@ -5,8 +5,7 @@ import OSLog
 import UserNotifications
 import WebKit
 
-private let defaultsLog = Logger(
-  subsystem: bundleIdentifier, category: "Defaults")
+private let defaultsLog = Logger(category: "Defaults")
 
 @MainActor @Observable
 final class AppModel {
@@ -252,11 +251,7 @@ extension ActiveServerAgent {
 
 extension Bundle {
   public var serverBundle: Bundle? {
-    urls(forResourcesWithExtension: "app", subdirectory: nil)?
-      .compactMap { url in Bundle(url: url) }
-      .filter { bundle in
-        bundle.bundleIdentifier == "net.leuski.galley.server" }
-      .first
+    helper(bundleID: "net.leuski.galley.server")
   }
 }
 #endif

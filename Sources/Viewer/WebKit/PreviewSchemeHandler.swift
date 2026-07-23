@@ -3,9 +3,7 @@ import GalleyCoreKit
 import WebKit
 import OSLog
 
-private let logger = Logger(
-  subsystem: bundleIdentifier,
-  category: "PreviewSchemeHandler")
+private let logger = Logger(category: "PreviewSchemeHandler")
 
 /// SwiftUI-flavored `URLSchemeHandler` for the Viewer's visible
 /// `WebPage`. The actual asset resolution lives in

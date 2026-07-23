@@ -5,8 +5,7 @@ import OSLog
 import AppKit
 #endif
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "TemplateStore")
+private let logger = Logger(category: "TemplateStore")
 
 public struct TemplateStorePolicy: FolderBasedStorePolicy<Template> {
   public static func defaultValue(_ values: [Template]) -> Template {

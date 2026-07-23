@@ -201,8 +201,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// when this flips true.
   var isRenameRequested: Bool = false
 
-  let logger = Logger(
-    subsystem: bundleIdentifier, category: "DocumentModel")
+  let logger = Logger(category: "DocumentModel")
 
   convenience init(
     appModel: AppModel,

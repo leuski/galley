@@ -4,8 +4,7 @@ import WebKit
 import GalleyCoreKit
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "QuicklookPreview")
+private let logger = Logger(category: "QuicklookPreview")
 
 /// Quick Look preview for Markdown files.
 ///
@@ -52,7 +51,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         return
       } catch {
         // Fall through to in-process render.
-        log.debug("""
+        logger.debug("""
           QuickLook server path failed; falling back in-process: \
           \(error.localizedDescription, privacy: .public)
           """)

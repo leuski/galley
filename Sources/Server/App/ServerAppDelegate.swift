@@ -2,8 +2,7 @@ import AppKit
 import GalleyCoreKit
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "ServerAppDelegate")
+private let logger = Logger(category: "ServerAppDelegate")
 
 /// File-open dispatch for Galley Server.
 ///
@@ -39,13 +38,13 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate {
       if let activity = GalleyRequestActivity(from: url) {
         return activity.target
       }
-      log.error("""
+      logger.error("""
         Ignoring open request with unrecognized URL scheme: \
         \(url.absoluteString, privacy: .public)
         """)
       return nil
     }
-    log.notice("""
+    logger.notice("""
       application(_:open:) received=\(urls.count, privacy: .public) \
       resolved=\(targets.count, privacy: .public)
       """)

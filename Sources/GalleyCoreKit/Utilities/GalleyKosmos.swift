@@ -6,37 +6,13 @@ import KosmosTransport
 /// standard `kosmos.role` metadata on the peer's Loom advertisement so
 /// other peers can classify each other without an extra Kosmos
 /// message.
-public enum GalleyKosmosRole: String, Role {
+public enum GalleyKosmosRole: String, TripleRole {
   case server
   case macViewer = "mac-viewer"
   case visionViewer = "vision-viewer"
 
   public var product: String {
-    "galley"
-  }
-
-  public var identifier: String {
-    rawValue
-  }
-
-  public var deviceType: DeviceType {
-    switch self {
-    case .server, .macViewer: .mac
-    case .visionViewer: .vision
-    }
-  }
-
-  public var defaultDeviceName: String {
-    switch self {
-#if os(macOS)
-    case .server: Host.current().localizedName ?? "Galley"
-    case .macViewer: Host.current().localizedName ?? "Mac"
-#else
-    case .server: "Galley"
-    case .macViewer: "Mac"
-#endif
-    case .visionViewer: "Apple Vision Pro"
-    }
+    "Galley"
   }
 }
 
@@ -65,28 +41,7 @@ extension PeerInfo.Metadata.Key where Value == URL {
 public struct RouteToAVPMarker {}
 public typealias RouteToAVP = TargetMessage<RouteToAVPMarker>
 
-/// Mac Viewer → Server. "Show on Vision Pro". The reply
-/// reports whether a reachable AVP peer accepted it, so the Mac Viewer
-/// can fall back to local presentation when it didn't.
-public struct RouteToTunnelClient: KosmosMessage, Equatable {
-  public let target: DocumentTarget
-  public let deviceType: DeviceType?
-
-  public init(target: DocumentTarget, deviceType: DeviceType? = nil) {
-    self.target = target
-    self.deviceType = deviceType
-  }
-
-  public struct Reply: KosmosMessage, Equatable {
-    public let accepted: Bool
-
-    public init(accepted: Bool) {
-      self.accepted = accepted
-    }
-  }
-}
-
-public struct TargetMessage<Marker>: KosmosMessage, Equatable {
+public struct TargetMessage<Marker>: KosmosMessageWithReply, Equatable {
   public let target: DocumentTarget
 
   public init(target: DocumentTarget) {
@@ -104,3 +59,5 @@ public struct TargetMessage<Marker>: KosmosMessage, Equatable {
 
 public struct OpenInEditorMarker {}
 public typealias OpenInEditor = TargetMessage<OpenInEditorMarker>
+
+public typealias RouteToClientMessage = RouteToTunnelClient<DocumentTarget>

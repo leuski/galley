@@ -6,8 +6,7 @@ import KosmosTransport
 import Observation
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "ServerKosmosService")
+private let logger = Logger(category: "ServerKosmosService")
 
 /// One per Server process. Owns the `KosmosServiceHost`, the
 /// `PeerReachabilityTracker` that mirrors peer roles + AVP
@@ -34,21 +33,21 @@ private let log = Logger(
 /// a file falls back to the local app.
 @MainActor
 @Observable
-final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
-  /// AVP currently reachable: a same-product `vision` peer is connected
-  /// AND its last lifecycle message was a resume. Resolved by the host.
-  var isAVPReachable: Bool { host.reachablePeer(deviceType: .vision) != nil }
-
-  @ObservationIgnored private let host = ServiceHost(role: .server)
+final class ServerKosmosService: KosmosAppKit
+  .ServerKosmosService<GalleyKosmosRole>
+{
+  @ObservationIgnored
+  let host = ServiceHost(role: .server)
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
   /// peers and renders each in-process via `InProcessTunnelBackend` —
   /// no loopback HTTP listener involved, so the tunnel works with or
   /// without the optional HTTP server.
-  @ObservationIgnored private let tunnelResponder: Responder
+  @ObservationIgnored
+  let tunnel: Responder?
 
   init(service: PreviewRequestService, watcher: DocumentWatcher) {
-    self.tunnelResponder = Responder(
+    self.tunnel = Responder(
       backend: InProcessTunnelBackend(service: service, watcher: watcher))
   }
 
@@ -58,20 +57,9 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
   }
 
   func stop() {
-    tunnelResponder.stop()
+    tunnel?.stop()
     clearKosmosEndpoint()
     Task { await host.stop() }
-  }
-
-  // MARK: - KosmosService
-
-  func makeLink() async -> KosmosClient {
-    await host.makeLink()
-  }
-
-  func configure(host: ServiceHost, client: KosmosClient) async {
-    await registerHandlers(host: host)
-    tunnelResponder.install(on: host, client: client)
   }
 
   /// Once the link is up, publish the Kosmos `deviceID` + bound TCP port
@@ -91,7 +79,7 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     Defaults.shared.serverKosmosDeviceID = host.deviceID
     Defaults.shared.serverKosmosPort = port
     Defaults.shared.post()
-    log.notice("""
+    logger.notice("""
       published Kosmos endpoint: \
       deviceID=\(self.host.deviceID, privacy: .public) \
       port=\(port, privacy: .public)
@@ -104,78 +92,23 @@ final class ServerKosmosService: KosmosService<GalleyKosmosRole> {
     Defaults.shared.post()
   }
 
-  func peersChanged(_ snapshot: [PeerID: PeerInfo]) {
-    // The host logs the snapshot and mirrors reachability; the Server's
-    // only reaction is to migrate any windows back to the Mac when the
-    // AVP they were delegated to drops out of the peer set.
-  }
-
-  private func reachablePeers() -> String {
-    host.peers.values
-      .map { $0.role ?? "?" }
-      .sorted()
-      .joined(separator: ", ")
-  }
-
-  /// Send a routing target to the reachable AVP peer. Returns false when
-  /// no AVP peer is reachable (caller falls back to the local Viewer).
-  @discardableResult
-  func dispatchToClient(
-    _ target: DocumentTarget, deviceType: DeviceType) -> Bool
+  func routeToTunnelClient(
+    _ target: DocumentTarget) -> RouteToClientMessage
   {
-    let peers = host.reachablePeers(deviceType: deviceType).asSet()
-    guard !peers.isEmpty else {
-      log.notice("""
-        dispatch: no reachable AVP peer — \
-        \(self.host.peers.count, privacy: .public) peer(s): \
-        [\(self.reachablePeers(), privacy: .public)]
-        """)
-      return false
-    }
-    // Stamp our own Kosmos id as the tunnel URL's host, so the AVP can
-    // address follow-up requests (open-in-editor) back to *this* Mac by
-    // reading `documentURL.host` — no side-table, no host-UUID lookup.
     let destination = TunnelScheme
       .originURL(forPeer: PeerID(host.deviceID))
       .appending(.documentAsset(target.documentURL))
     let target = DocumentTarget(url: destination, scrollLine: target.scrollLine)
-    let message = RouteToTunnelClient(target: target)
-    host.publish(message) { peers.contains($0) }
-    return true
+    return RouteToClientMessage(payload: target)
   }
 
-  @discardableResult
-  private func dispatch(_ target: DocumentTarget) async -> Bool
-  {
-    guard !dispatchToClient(target, deviceType: .vision) else {
-      return true
-    }
-    log.notice("""
-      dispatch → local Viewer (no AVP): \
-      \(target, privacy: .public)
-      """)
-    guard !dispatchToClient(target, deviceType: .mac) else {
-      return true
-    }
-    log.notice("""
-      dispatch → local Viewer (no tunnel): \
-      \(target, privacy: .public)
-      """)
-    GalleyViewerRequestActivity(target: target).open()
-    return false
-  }
-
-  public func dispatch(_ targets: [DocumentTarget]) {
-    Task {
-      for target in targets {
-        await self.dispatch(target)
-      }
-    }
+  func openInLocalViewer(_ request: DocumentTarget) {
+    GalleyViewerRequestActivity(target: request).open()
   }
 
   // MARK: - Subscription wiring
 
-  private func registerHandlers(host: ServiceHost) async {
+  func registerHandlers() async {
     // RouteToAVP: Mac Viewer asks "open this file wherever's best."
     // Reuses the same dispatch path Finder-opens use so the AVP-vs-Mac
     // decision stays in one place. The host logs the request and reply.

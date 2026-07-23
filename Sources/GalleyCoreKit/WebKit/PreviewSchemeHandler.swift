@@ -70,9 +70,7 @@ extension URLRequest {
   }
 }
 
-private let logger = Logger(
-  subsystem: bundleIdentifier,
-  category: "PreviewSchemeHandler")
+private let logger = Logger(category: "PreviewSchemeHandler")
 
 /// Adapter that exposes `PreviewScheme.resolve` to a classic
 /// `WKWebView`. SwiftUI's `URLSchemeHandler` (used by `WebPage`) is a

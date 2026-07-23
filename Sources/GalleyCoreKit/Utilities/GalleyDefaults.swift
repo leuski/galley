@@ -126,3 +126,9 @@ public enum GalleyConstants {
     URL.localizedApplicationSupportDirectory(suiteName)
   }
 }
+
+extension os.Logger {
+  public init(category: String) {
+    self.init(subsystem: bundleIdentifier, category: category)
+  }
+}

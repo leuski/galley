@@ -71,8 +71,7 @@ struct ExportModifier: ViewModifier {
 
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "DocumentView")
+private let logger = Logger(category: "DocumentView")
 
 struct RenameModifier: ViewModifier {
   @Bindable var model: DocumentModel
@@ -122,7 +121,7 @@ struct RenameModifier: ViewModifier {
         // `renameCurrentDocument` already posted a notice banner via
         // `report(failure:)`. Beep matches the prior NSAlert UX; log
         // the underlying error so support reports retain context.
-        log.error("""
+        logger.error("""
           Rename failed for \(model.documentURL.path, privacy: .private): \
           \(error.localizedDescription, privacy: .public)
           """)

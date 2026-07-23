@@ -14,8 +14,7 @@ import GalleyCoreKit
 import SwiftUI
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "DocumentSceneContent")
+private let logger = Logger(category: "DocumentSceneContent")
 
 struct DocumentSceneContent: View {
   let sceneID: DocumentSceneID
@@ -46,12 +45,12 @@ struct DocumentSceneContent: View {
       .onOpenURL(perform: handleOpenURL)
     // state-restored scene ID arrives late on macOS
       .onChange(of: sceneID) { old, new in
-        log.notice(
+        logger.notice(
           "scene id \(old, privacy: .public) -> \(new, privacy: .public)")
         guard let newModel = appModel.windowModelManager.forScene(id: new)
         else {
           if let model {
-            log.notice(
+            logger.notice(
               "relocating existing model")
             appModel.windowModelManager.relocate(model, to: new)
           }
@@ -65,7 +64,7 @@ struct DocumentSceneContent: View {
         // we are restoring the window. If we have a model assigned, it's
         // the wrong model. Evict it and ask the framework to re-open
         // the document.
-        log.notice(
+        logger.notice(
           "need to reopen requests \(oldRequests, privacy: .public)")
         oldRequests.forEach { request in
           GalleyViewerRequestActivity(target: request).open()
@@ -160,7 +159,7 @@ struct DocumentSceneContent: View {
 
     // Welcome window adopts the document in place (welcome → document).
     guard let model else {
-      log.notice("""
+      logger.notice("""
         no existing model. open \(target, privacy: .public) in \
         \(sceneID, privacy: .public)
         """)
@@ -174,7 +173,7 @@ struct DocumentSceneContent: View {
       $0.documentURL.standardizedFileURL
       == target.documentURL.standardizedFileURL
     }) {
-      log.notice("""
+      logger.notice("""
         activate existing model: \(target, privacy: .public) in \
         \(sceneID, privacy: .public)
         """)
@@ -208,7 +207,7 @@ struct DocumentSceneContent: View {
 
     // find an empty tab
     if let existing = model.tabs.first(where: { !$0.hasDocument }) {
-      log.notice("""
+      logger.notice("""
         filling out empty tab: \(target, privacy: .public) in \
         \(sceneID, privacy: .public)
         """)
@@ -216,7 +215,7 @@ struct DocumentSceneContent: View {
       return
     }
 
-    log.notice("""
+    logger.notice("""
         re-issue open request: \(target, privacy: .public) from \
         \(sceneID, privacy: .public)
         """)

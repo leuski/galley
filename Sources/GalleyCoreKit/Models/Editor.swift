@@ -10,8 +10,7 @@ import AppKit
 import Foundation
 import OSLog
 
-private let logger = Logger(
-  subsystem: bundleIdentifier, category: "Editor")
+private let logger = Logger(category: "Editor")
 
 private func bundleURL(_ bundleIdentifiers: [String]) -> URL? {
   bundleIdentifiers

@@ -3,9 +3,7 @@ import GalleyCoreKit
 import WebKit
 import OSLog
 
-private let logger = Logger(
-  subsystem: bundleIdentifier,
-  category: "LinkBridge")
+private let logger = Logger(category: "LinkBridge")
 
 /// Handles plain-click on `<a href>` elements inside the rendered
 /// preview: resolves relative paths against the current document, and

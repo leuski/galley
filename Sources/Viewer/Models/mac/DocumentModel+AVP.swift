@@ -10,8 +10,7 @@ import Foundation
 import GalleyCoreKit
 import OSLog
 
-private let log = Logger(
-  subsystem: bundleIdentifier, category: "DocumentModel+AVP")
+private let logger = Logger(category: "DocumentModel+AVP")
 
 extension DocumentModel {
   func showOnVisionPro(kosmos: ViewerKosmosService) {
@@ -22,12 +21,12 @@ extension DocumentModel {
         let reply = try await kosmos.routeToAVP(
           DocumentTarget(url: docURL))
         if reply.accepted {
-          log.notice("""
+          logger.notice("""
                 Show on Vision Pro: dispatched \
                 \(docURL.lastPathComponent, privacy: .public)
                 """)
         } else {
-          log.error("""
+          logger.error("""
                 Show on Vision Pro: Server declined for \
                 \(docURL.path, privacy: .public)
                 """)
@@ -39,7 +38,7 @@ extension DocumentModel {
         // `localizedDescription` even when LocalizedError is
         // wired up. Keep both — the bridged form is what the
         // user would see in a UI alert if we ever surface one.
-        log.error("""
+        logger.error("""
               Show on Vision Pro: routeToAVP failed. \
               type=\(String(reflecting: type(of: error)), privacy: .public) \
               case=\(String(reflecting: error), privacy: .public) \
