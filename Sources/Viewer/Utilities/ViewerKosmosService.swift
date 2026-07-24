@@ -25,7 +25,7 @@ import OSLog
 /// the protocol.
 @MainActor
 @Observable
-final class ViewerKosmosService: ClientKosmosService<GalleyKosmosRole> {
+final class ViewerKosmosService: ClientKosmosService {
   /// Viewer-side HTTP tunnel client. Exposed so `WebPage` configuration
   /// can hand it to the `KosmosTunnelSchemeHandler` it installs on
   /// the `galley://` scheme.
@@ -34,7 +34,8 @@ final class ViewerKosmosService: ClientKosmosService<GalleyKosmosRole> {
 #endif
 
   @ObservationIgnored
-  let host = ServiceHost(role: ViewerKosmosService.role)
+  let host = ServiceHost(config: ViewerKosmosService.config(
+    product: KosmosServiceHost.Config.product))
 
   init() {
   }

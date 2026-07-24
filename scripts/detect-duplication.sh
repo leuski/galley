@@ -29,7 +29,7 @@ npx --yes jscpd@latest \
   --reporters json --absolute \
   --output "$OUT" \
   --ignore "**/.build/**,**/build/**,**/*.xcodeproj/**,**/Probes/**" \
-  Sources ../Kosmos/Sources ../KosmosAppKit/Sources > /dev/null 2>&1 || true
+  Sources ../Kosmos/Sources ../KosmosAppKit/Sources ../Dot/Sources > /dev/null 2>&1 || true
 
 REPORT="$OUT/jscpd-report.json"
 if [ ! -f "$REPORT" ]; then

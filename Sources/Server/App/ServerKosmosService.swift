@@ -33,11 +33,11 @@ private let logger = Logger(category: "ServerKosmosService")
 /// a file falls back to the local app.
 @MainActor
 @Observable
-final class ServerKosmosService: KosmosAppKit
-  .ServerKosmosService<GalleyKosmosRole>
+final class ServerKosmosService: KosmosAppKit.ServerKosmosService
 {
   @ObservationIgnored
-  let host = ServiceHost(role: .server)
+  let host = ServiceHost(config: .server(
+    product: KosmosServiceHost.Config.product))
 
   /// HTTP tunnel responder. Subscribes to `ProxyHTTPRequest` from AVP
   /// peers and renders each in-process via `InProcessTunnelBackend` —

@@ -6,17 +6,14 @@ import KosmosTransport
 /// standard `kosmos.role` metadata on the peer's Loom advertisement so
 /// other peers can classify each other without an extra Kosmos
 /// message.
-public enum GalleyKosmosRole: String, TripleRole {
-  case server
-  case macViewer = "mac-viewer"
-  case visionViewer = "vision-viewer"
-
-  public var product: String {
-    "Galley"
-  }
+extension KosmosServiceHost.Config {
+  public static let product = "Galley"
+  public static let server = Self.server(product: product)
+  public static let macViewer = Self.macViewer(product: product)
+  public static let visionViewer = Self.visionViewer(product: product)
 }
 
-extension PeerInfo.Metadata.Key where Value == URL {
+extension PeerInfo.Key where Value == URL {
   /// Server's loopback HTTP base URL (`http://127.0.0.1:<port>`),
   /// published in peer metadata once the listener has bound, and read
   /// back as `peer.metadata[.httpURL]`. Lets Kosmos peers learn the
