@@ -57,7 +57,7 @@ struct WelcomeView: View {
       }
       .padding(6)
       .background(
-        RoundedRectangle(cornerRadius: Action.listCornerRadius)
+        RoundedRectangle(cornerRadius: ActionConstant.listCornerRadius)
           .fill(.background))
     }
   }

@@ -14,9 +14,10 @@ extension DocumentModel {
   ///
   /// Every field after `history`/`currentIndex` defaults to "unset" so a
   /// blank window (welcome) round-trips as an empty snapshot.
-  struct Snapshot: Codable {
+  @MainActor
+  struct Snapshot: @MainActor Codable {
     /// Back/forward stack in visit order.
-    var history: History
+    var history: WebPageHistory
     /// Resting scroll position of the current page.
     var scroll: Scroll = .top
     /// TOC sidebar visibility.
@@ -38,7 +39,7 @@ extension DocumentModel {
     /// The entry the window is currently showing, or `nil` for a blank
     /// window or an out-of-range index (format drift degrades, not traps).
     var currentURL: URL {
-      history.currentURL
+      history.currentItem?.url !! "No current item"
     }
 
     var droppingHistory: Self {
@@ -48,11 +49,11 @@ extension DocumentModel {
     }
 
     init(url: URL) {
-      self.init(history: History(url: url))
+      self.init(history: WebPageHistory(url: url))
     }
 
     init(
-      history: History,
+      history: WebPageHistory,
       scroll: Scroll = .top,
       showsTOC: Bool = false,
       pageZoom: Double = 1.0,

@@ -31,7 +31,9 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   var canRename: Bool { isRegular && documentURL.isFileURL }
   var canOpenInEditor: Bool { true }
   var title: String {
-    isRegular ? documentURL.lastPathComponent : localized("Help")
+    isRegular
+    ? (history.currentItem?.title ?? documentURL.lastPathComponent)
+    : localized("Help")
   }
   var toolbarID: String { isRegular ? "viewer.main" : "viewer.help" }
 
@@ -40,7 +42,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   @ObservationIgnored var lastRequest: DocumentTarget?
 
   /// True once this window holds a document (blank windows have no model).
-  var hasDocument: Bool { !history.isEmpty }
+  var hasDocument: Bool { history.currentItem != nil }
 
   @ObservationIgnored private let watcher = DocumentWatcher()
   @ObservationIgnored private let editorBridge = EditorBridge()
@@ -87,7 +89,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// from the WindowGroup's URL and updated synchronously at the
   /// start of every `rebindCurrent` (in-window navigation, restore,
   /// rename, reload).
-  var documentURL: URL { history.currentURL }
+  var documentURL: URL { history.currentItem?.url !! "DocumentModel: no URL" }
 
   /// Single user-visible error / status channel. Replaces the prior
   /// scattered `lastError = …` writes. `nil` means "no notice." Set
@@ -146,7 +148,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// `currentIndex` and rebind without truncating the stack — so
   /// pressing Forward after Back works. Mutated by the History
   /// extension's `navigate`/`goBack`/`goForward` and by `rename`.
-  var history: History
+  var history: WebPageHistory
 
   /// Increments on every `bind(to:)` call. Watcher loops captured by
   /// older bind invocations check this and bail out when superseded.
@@ -207,12 +209,14 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
     appModel: AppModel,
     url: URL)
   {
-    self.init(appModel: appModel, history: History(url: url))
+    self.init(
+      appModel: appModel,
+      history: WebPageHistory(url: url))
   }
 
   init(
     appModel: AppModel,
-    history: History,
+    history: WebPageHistory,
     templatePersistent: SceneTemplateChoice
       .PersistentSelectionRepresentation? = nil,
     processorPersistent: SceneProcessorChoice
@@ -438,7 +442,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// this bind; absent it, the first render lands at the top.
   /// Subsequent file-watcher reloads preserve current scroll normally.
   func bind(to target: DocumentTarget) async {
-    history = History(url: target.documentURL)
+    history = WebPageHistory(url: target.documentURL)
     await rebindCurrent(firstScroll: target.scroll ?? .top)
   }
 
@@ -526,7 +530,7 @@ final class DocumentModel: NavigationModel, ReloadableModel, Identifiable {
   /// the initial render and keeps reloading on file changes until
   /// another rebind supersedes this one.
   func rebindCurrent(firstScroll: Scroll) async {
-    let url = history.currentURL
+    guard let url = history.currentItem?.url else { return }
 
     bindGeneration &+= 1
     let myGeneration = bindGeneration

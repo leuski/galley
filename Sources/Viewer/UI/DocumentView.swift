@@ -59,6 +59,9 @@ struct DocumentView: View {
     .background(
       Defaults.shared.tintWindowWithPageBackground
       ? model.pageBackgroundColor() : defaultBackground)
+    .onChange(of: model.page.title) { _, new in
+      model.history.currentItem?.title = new
+    }
 #if os(macOS)
     // Paint the page's own background color into the window's
     // container background so the translucent toolbar / sidebar
