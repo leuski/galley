@@ -46,49 +46,12 @@ final class BackgroundColorBridge: JavaScriptBridge {
     // were transparent — so the host falls back to the system default.
     // A present-but-unparseable color also resolves to `nil` here.
     onColor?(
-      msg.color.flatMap(Self.parseCSSColor),
+      msg.color.flatMap{ SRGBColor(css: $0)?.color },
       msg.templateID.map(Template.ID.init(rawValue:)))
   }
 
   struct Value: Decodable {
     let color: String?
     let templateID: String?
-  }
-
-  /// Parses the two shapes `getComputedStyle(...).backgroundColor`
-  /// emits — `rgb(r, g, b)` and `rgba(r, g, b, a)`. Components may be
-  /// integers (0–255) or floats with a decimal; alpha is 0–1. Returns
-  /// `nil` for unparseable input or fully-transparent alpha.
-  static func parseCSSColor(_ string: String) -> Color? {
-    let lowered = string
-      .trimmingCharacters(in: .whitespaces)
-      .lowercased()
-    guard let openParen = lowered.firstIndex(of: "("),
-          let closeParen = lowered.lastIndex(of: ")")
-    else { return nil }
-    let inside = lowered[
-      lowered.index(after: openParen)..<closeParen]
-    let parts = inside
-      .split(separator: ",")
-      .map { $0.trimmingCharacters(in: .whitespaces) }
-    guard parts.count == 3 || parts.count == 4 else { return nil }
-    guard let red = Double(parts[0]),
-          let green = Double(parts[1]),
-          let blue = Double(parts[2])
-    else { return nil }
-    let alpha: Double
-    if parts.count == 4 {
-      guard let parsed = Double(parts[3]) else { return nil }
-      alpha = parsed
-    } else {
-      alpha = 1
-    }
-    guard alpha > 0 else { return nil }
-    return Color(
-      .sRGB,
-      red: red / 255,
-      green: green / 255,
-      blue: blue / 255,
-      opacity: alpha)
   }
 }

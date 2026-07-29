@@ -80,7 +80,7 @@ public enum TemplateBackgroundState: Codable, Equatable {
     case .some(let string):
       if string == templateBackgroundNoneSentinel {
         self = .resolved(.userSystemWindowBackground)
-      } else if let color = Color(galleyHex: string) {
+      } else if let color = SRGBColor(hex: string)?.color {
         self = .resolved(color)
       } else {
         self = .unresolved
@@ -104,7 +104,7 @@ public enum TemplateBackgroundState: Codable, Equatable {
       if color == .userSystemWindowBackground {
         templateBackgroundNoneSentinel
       } else {
-        color.galleyHex
+        color.srgb?.hex
       }
     }
     try container.encode(value)
@@ -132,36 +132,6 @@ extension Template {
       color ?? .userSystemWindowBackground)
     Defaults.shared.lastTemplateBackgroundColor = value
     Defaults.shared.templateBackgroundColors[id.rawValue] = value
-  }
-}
-
-extension Color {
-  /// Parse `"#RRGGBB"` or `"#RRGGBBAA"` into a `Color`. Strict —
-  /// returns `nil` for any other shape so a corrupt cache entry
-  /// can't poison the chrome silently.
-  init?(galleyHex hex: String) {
-    var stripped = hex
-    if stripped.hasPrefix("#") {
-      stripped = String(stripped.dropFirst())
-    }
-    guard stripped.count == 6 || stripped.count == 8,
-          let value = UInt64(stripped, radix: 16) else {
-      return nil
-    }
-    let red, green, blue, alpha: Double
-    if stripped.count == 8 {
-      red = Double((value >> 24) & 0xff) / 255
-      green = Double((value >> 16) & 0xff) / 255
-      blue = Double((value >> 8) & 0xff) / 255
-      alpha = Double(value & 0xff) / 255
-    } else {
-      red = Double((value >> 16) & 0xff) / 255
-      green = Double((value >> 8) & 0xff) / 255
-      blue = Double(value & 0xff) / 255
-      alpha = 1
-    }
-    self = Color(
-      .sRGB, red: red, green: green, blue: blue, opacity: alpha)
   }
 }
 
@@ -194,78 +164,7 @@ extension ColorScheme {
   }
 }
 
-#if os(macOS)
-typealias ALColor = NSColor
-#else
-typealias ALColor = UIColor
-#endif
-
-struct RGBColor: Sendable {
-  let red: CGFloat
-  let green: CGFloat
-  let blue: CGFloat
-  let alpha: CGFloat
-
-#if os(macOS)
-  init?(_ color: ALColor) {
-    guard let resolved = color.usingColorSpace(.sRGB) else {
-      return nil
-    }
-    self.red = resolved.redComponent
-    self.green = resolved.greenComponent
-    self.blue = resolved.blueComponent
-    self.alpha = resolved.alphaComponent
-  }
-#else
-  init?(_ color: ALColor) {
-    var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0
-    var alpha: CGFloat = 0
-    guard color.getRed(
-      &red, green: &green, blue: &blue, alpha: &alpha)
-    else { return nil }
-    self.red = red
-    self.green = green
-    self.blue = blue
-    self.alpha = alpha
-  }
-#endif
-
-  init?(color: Color) {
-    self.init(ALColor(color))
-  }
-}
-
 extension Color {
-  /// `"#RRGGBBAA"` representation of this color through `NSColor` in
-  /// sRGB. `nil` when the color can't be reduced to numeric
-  /// components (catalog colors with no sRGB form, etc.).
-  var galleyHex: String? {
-    guard let color = RGBColor(color: self) else {
-      return nil
-    }
-    let redByte = Int((color.red * 255).rounded())
-    let greenByte = Int((color.green * 255).rounded())
-    let blueByte = Int((color.blue * 255).rounded())
-    let alphaByte = Int((color.alpha * 255).rounded())
-    return String(
-      format: "#%02X%02X%02X%02X",
-      redByte, greenByte, blueByte, alphaByte)
-  }
-
-  /// Whether the color is dark enough that AppKit's default
-  /// system-dark text would disappear against it. Resolves through
-  /// `NSColor` in sRGB and applies ITU-R BT.601 luma weights. Falls
-  /// back to `false` when the conversion can't be made.
-  var isLuminanceDark: Bool {
-    guard let resolved = RGBColor(color: self) else {
-      return false
-    }
-    let luma = 0.299 * resolved.red
-    + 0.587 * resolved.green
-    + 0.114 * resolved.blue
-    return luma < 0.5
-  }
-
 #if os(macOS)
   /// Backing dynamic `NSColor` for `userSystemWindowBackground`.
   /// Resolves at draw time through the user's *system-wide*

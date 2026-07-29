@@ -36,7 +36,7 @@ extension DocumentModel {
     isRenderingNewTemplate
     || !Defaults.shared.tintWindowWithPageBackground
     ? .userSystem
-    : (pageBackgroundColor().isLuminanceDark ? .dark : .light)
+    : (pageBackgroundColor().srgb?.isLuminanceDark == true ? .dark : .light)
 #else
     if Defaults.shared.enablePerDocumentOverrides {
       return colorSchemes.selection.value.colorScheme

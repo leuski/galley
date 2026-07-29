@@ -16,16 +16,7 @@ struct GeneralSettingsView: View {
       HStack {
         Text("Open document")
         Spacer()
-        Picker(selection: $defaults.openBehavior) {
-          ForEach(OpenBehavior.allCases) { behavior in
-            Text(behavior.description).tag(behavior)
-          }
-        } label: {
-          EmptyView()
-        }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .fixedSize()
+        OpenBehaviorPicker(selection: $defaults.openBehavior)
       }
       Text("""
             Applies when opening files via Finder, the Open dialog, or \
