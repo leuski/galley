@@ -8,19 +8,21 @@ import SwiftUI
 /// any view that reads `template.backgroundColor` is automatically
 /// invalidated when `BackgroundColorBridge` writes a new entry.
 ///
+/// Hex parsing/encoding and the luminance test live on the shared
+/// `KosmosAppKit.SRGBColor` value type (`SRGBColor(hex:)` / `.hex`,
+/// `.isLuminanceDark`); this file only bridges those to SwiftUI `Color`
+/// and the platform window-chrome machinery below.
+///
 /// Platform split:
-/// - **Portable (this file)**: storage, the `TemplateBackgroundState`
-///   enum, `Template.backgroundState` / `setBackgroundColor`, and
-///   the hex string `Color(galleyHex:)` parser. Depends only on
-///   SwiftUI `Color` and `Defaults.shared.templateBackgroundColors`
-///   / `lastTemplateBackgroundColor` (each target's `Defaults` must
+/// - **Portable (this file, top half)**: storage, the
+///   `TemplateBackgroundState` enum, and `Template.backgroundState` /
+///   `setBackgroundColor`. Depends only on SwiftUI `Color`, `SRGBColor`,
+///   and `Defaults.shared.templateBackgroundColors` /
+///   `lastTemplateBackgroundColor` (each target's `Defaults` must
 ///   provide those two keys).
-/// - **macOS-only (`Template+BackgroundColor+macOS.swift`)**: the
-///   NSColor / NSAppearance machinery — `Color.galleyHex` getter,
-///   `Color.isLuminanceDark`, `Color.userSystemWindowBackground`,
+/// - **macOS-only (bottom half, `#if os(macOS)`)**: the NSColor /
+///   NSAppearance chrome machinery — `Color.userSystemWindowBackground`,
 ///   `ColorScheme.userSystem`.
-/// - **visionOS-only (`Sources/ViewerVisionOS/Models/`)**: UIColor
-///   equivalents of the same surface.
 
 /// Sentinel stored in `Defaults.shared.templateBackgroundColors`
 /// when a template has been rendered and explicitly declares no
@@ -73,41 +75,41 @@ public enum TemplateBackgroundState: Codable, Equatable {
     }
   }
 
-  public init(from decoder: Decoder) throws {
-    switch try decoder.singleValueContainer().decode(String?.self) {
-    case .none:
-      self = .unresolved
-    case .some(let string):
-      if string == templateBackgroundNoneSentinel {
-        self = .resolved(.userSystemWindowBackground)
-      } else if let color = SRGBColor(hex: string)?.color {
-        self = .resolved(color)
+  enum Stored: Codable {
+    case windowBackground
+    case color(SRGBColor)
+  }
+
+  private var stored: Stored? {
+    switch self {
+    case .unresolved: nil
+    case .resolved(let color):
+      if color == .userSystemWindowBackground {
+        .windowBackground
       } else {
-        self = .unresolved
+        color.srgb.map { .color($0) }
       }
     }
   }
 
+  private init(stored: Stored?) {
+    switch stored {
+    case .windowBackground:
+      self = .resolved(.userSystemWindowBackground)
+    case .color(let color):
+      self = .resolved(color.color)
+    case nil:
+      self = .unresolved
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    self.init(stored: try decoder.singleValueContainer().decode(Stored?.self))
+  }
+
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
-    let value: String? = switch self {
-    case .unresolved: nil
-    case .resolved(let color):
-      // `Color` equality compares the underlying storage, not the
-      // pixels rendered at draw time — so `Color
-      // .userSystemWindowBackground` (a single static reference
-      // wrapping a named dynamic NSColor / UIColor) is `==` only to
-      // itself, never to a hex-decoded literal that *happens to*
-      // render the same RGB. That property lets a single comparison
-      // separate "the deferred sentinel" from every real opaque
-      // color.
-      if color == .userSystemWindowBackground {
-        templateBackgroundNoneSentinel
-      } else {
-        color.srgb?.hex
-      }
-    }
-    try container.encode(value)
+    try container.encode(stored)
   }
 }
 
@@ -135,14 +137,13 @@ extension Template {
   }
 }
 
-/// macOS-only color machinery for the per-template background cache.
-/// The portable storage layer (`TemplateBackgroundState`, the
-/// `Template.backgroundState` / `setBackgroundColor` extensions, and
-/// the hex parser `Color(galleyHex:)`) lives in
-/// `Sources/ViewerShared/Models/Template+BackgroundColor.swift`.
-/// This file provides the macOS half of the surface the shared layer
-/// references: `Color.galleyHex`, `Color.isLuminanceDark`,
-/// `Color.userSystemWindowBackground`, `ColorScheme.userSystem`.
+/// macOS-only window-chrome machinery for the per-template background
+/// cache. The portable storage layer (`TemplateBackgroundState`, the
+/// `Template.backgroundState` / `setBackgroundColor` extensions) lives
+/// in the top half of this file; hex/luminance are on
+/// `KosmosAppKit.SRGBColor`. This section provides the macOS-only
+/// surface the shared layer references: `Color.userSystemWindowBackground`
+/// and `ColorScheme.userSystem`.
 
 extension ColorScheme {
   /// The user's system-wide preferred color scheme, ignoring any

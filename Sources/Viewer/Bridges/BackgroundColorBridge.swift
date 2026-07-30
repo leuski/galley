@@ -46,7 +46,7 @@ final class BackgroundColorBridge: JavaScriptBridge {
     // were transparent — so the host falls back to the system default.
     // A present-but-unparseable color also resolves to `nil` here.
     onColor?(
-      msg.color.flatMap{ SRGBColor(css: $0)?.color },
+      msg.color.flatMap{ CSSColor($0)?.srgb.color },
       msg.templateID.map(Template.ID.init(rawValue:)))
   }
 
