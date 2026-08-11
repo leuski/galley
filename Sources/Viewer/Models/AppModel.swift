@@ -73,11 +73,11 @@ final class AppModel {
   init() {
     Self.startInit()
 #if os(macOS)
+    NSWindow.setOpenBehavior(Defaults.shared.openBehavior)
     persistenceTokens.append(onObservedChange {
       _ = Defaults.shared.openBehavior
     } onChange: {
-      NSWindow.allowsAutomaticWindowTabbing = Defaults
-        .shared.openBehavior == .newTab
+      NSWindow.setOpenBehavior(Defaults.shared.openBehavior)
     })
     self.editors = EditorChoice(
       source: .shared,

@@ -25,7 +25,6 @@ struct DocumentSceneContent: View {
   @State private var model: WindowModel?
 
   @Environment(AppModel.self) var appModel
-  @Environment(\.openWindow) private var openWindow
 
   init(sceneID: DocumentSceneID, appModel: AppModel) {
     self.sceneID = sceneID
