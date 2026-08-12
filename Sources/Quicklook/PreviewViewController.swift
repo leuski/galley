@@ -44,7 +44,33 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     self.view = webView
   }
 
+  /// Bounds for the preview panel, as fractions of the screen's
+  /// visible frame. The width is a ceiling, not a target — the actual
+  /// width is measured from the laid-out document (see
+  /// `measuredContentWidth`).
+  private enum PanelSize {
+    static let heightFraction = 0.95
+    static let maxWidthFraction = 0.7
+    static let minWidth: Double = 480
+  }
+
   func preparePreviewOfFile(at url: URL) async throws {
+    let limit = panelLimit()
+    // Lay the document out at the ceiling width so a template with its
+    // own column width reports that width, while a fluid template
+    // simply fills — and so clamps to the ceiling.
+    webView.frame = NSRect(origin: .zero, size: limit)
+
+    try await load(file: url)
+
+    // Quick Look holds its spinner until this function returns, so
+    // sizing here lands before the panel is shown — no visible resize.
+    preferredContentSize = NSSize(
+      width: await measuredContentWidth(limit: limit.width),
+      height: limit.height)
+  }
+
+  private func load(file url: URL) async throws {
     if let endpoint = Defaults.shared.serverEndpointURL {
       do {
         try await loadFromServer(endpoint.appending(.documentAsset(url)))
@@ -58,6 +84,52 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
       }
     }
     try await loadInProcess(file: url)
+  }
+
+  // MARK: - Panel sizing
+
+  /// The largest panel we will ask for, from the screen's visible
+  /// frame (menu bar and Dock already excluded).
+  @MainActor
+  private func panelLimit() -> NSSize {
+    guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+      return NSSize(width: PanelSize.minWidth, height: PanelSize.minWidth)
+    }
+    let visible = screen.visibleFrame
+    return NSSize(
+      width: visible.width * PanelSize.maxWidthFraction,
+      height: visible.height * PanelSize.heightFraction)
+  }
+
+  /// Script source lives in `Scripts/contentWidth.js` — see there for
+  /// how the width is derived. `callJavaScript` wraps it in an async
+  /// function and captures a top-level `return`, so the script must
+  /// NOT be wrapped in an IIFE.
+
+  private struct ContentWidthScript: JavaScriptCallable<Double?> {
+    static let script = Bundle.main.jsScript(name: "contentWidth")
+    var body: String { Self.script }
+  }
+
+  /// The width the laid-out document actually wants, clamped to
+  /// `PanelSize.minWidth ... limit`. Falls back to `limit` when the
+  /// page yields no usable geometry.
+  @MainActor
+  private func measuredContentWidth(limit: CGFloat) async -> CGFloat {
+    do {
+      guard let width = try await webView.callJavaScript(
+        ContentWidthScript())
+      else {
+        return limit
+      }
+      return min(max(width, PanelSize.minWidth), limit)
+    } catch {
+      logger.debug("""
+        contentWidth JS failed: \
+        \(error.localizedDescription, privacy: .public)
+        """)
+      return limit
+    }
   }
 
   // MARK: - Server path
