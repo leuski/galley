@@ -95,11 +95,8 @@ final class ServerKosmosService: KosmosAppKit.ServerKosmosService
   func routeToTunnelClient(
     _ target: DocumentTarget) -> RouteToClientMessage
   {
-    let destination = TunnelScheme
-      .originURL(forPeer: PeerID(host.deviceID))
-      .appending(.documentAsset(target.documentURL))
-    let target = DocumentTarget(url: destination, scrollLine: target.scrollLine)
-    return RouteToClientMessage(payload: target)
+    RouteToClientMessage(
+      payload: target.tunneled(via: PeerID(host.deviceID)))
   }
 
   func openInLocalViewer(_ request: DocumentTarget) {

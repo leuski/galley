@@ -50,8 +50,15 @@ final class ViewerKosmosService: ClientKosmosService {
 
   func configure(host: ServiceHost, client: KosmosClient) async {
 #if ENABLE_TUNNEL
+    // With no AVP reachable, the Server falls back to routing a tunnel
+    // URL to any reachable Mac peer — including the Viewer on its own
+    // Mac. When that Server is this Mac's own, the file is local — open it
+    // as `file://` so the tab renders in-process and the window's
+    // represented document is the file, not `kosmos://…/preview/…`.
     host.subscribe(RouteToClientMessage.self) { _, message in
-      GalleyViewerRequestActivity(target: message.payload).open()
+      let target = message.payload.resolvingLocalTunnel(
+        servedBy: Defaults.shared.serverKosmosDeviceID)
+      GalleyViewerRequestActivity(target: target).open()
     }
 
     configureTunnel(client: client)

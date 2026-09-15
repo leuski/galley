@@ -22,7 +22,7 @@ struct WelcomeView: View {
       VStack(spacing: 8) {
         Image("AppIconImage")
           .resizable()
-          .aspectRatio(contentMode: .fit)
+          .scaledToFit()
           .frame(width: 256)
         Text("Galley")
           .font(.largeTitle.bold())

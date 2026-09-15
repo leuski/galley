@@ -8,12 +8,20 @@
 import GalleyCoreKit
 import SwiftUI
 
+/// Decide which choice model a template / processor / color-scheme
+/// menu drives. Returns the window-local model only when per-document
+/// overrides are enabled *and* a document is supplied — that is the
+/// only case the render path (`DocumentModel.resolvedRenderer()` /
+/// `resolvedTemplate()`) consults the local choice. Otherwise the menu
+/// must drive the global model, or picks land on an ignored override
+/// and the document never changes.
 @MainActor
 func menuPolicy<Local, Global>(
   appModel: Global,
   documentModel: Local?,
   localTitle: LocalizedStringResource,
-  globalTitle: LocalizedStringResource)
+  globalTitle: LocalizedStringResource,
+  overridesEnabled: Bool = Defaults.shared.enablePerDocumentOverrides)
 // swiftlint:disable:next large_tuple
 -> (LocalizedStringResource, Local?, Global)
 where Local: Selectable,
@@ -23,13 +31,13 @@ where Local: Selectable,
       Global.Element == Global.Selection,
       Global.Element: SectionedChoiceValue & Identifiable
 {
-  if let documentModel, Defaults.shared.enablePerDocumentOverrides {
+  guard overridesEnabled else {
+    return (localTitle, nil, appModel)
+  }
+  if let documentModel {
     return (localTitle, documentModel, appModel)
   }
-  return (
-    Defaults.shared.enablePerDocumentOverrides
-    && documentModel == nil ? globalTitle : localTitle,
-    documentModel, appModel)
+  return (globalTitle, nil, appModel)
 }
 
 struct TemplateMenu: View {

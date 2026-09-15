@@ -47,4 +47,54 @@ struct TunnelHostAddressingTests {
     #expect(
       TunnelScheme.originURL(for: "not a host") == TunnelScheme.originURL)
   }
+
+  // MARK: - DocumentTarget ⇄ tunnel round-trip
+
+  private let localDoc = URL(fileURLWithPath: "/Users/me/my notes/a b.md")
+
+  @Test("tunneled(via:) rebinds onto kosmos://<server>/preview/<path>")
+  func tunneledTargetShape() throws {
+    let target = DocumentTarget(url: localDoc, scrollLine: 7)
+    let tunneled = target.tunneled(via: try serverPeer())
+    #expect(tunneled.documentURL.scheme == TunnelScheme.name)
+    #expect(tunneled.documentURL.host()?.lowercased() == serverID)
+    #expect(tunneled.documentURL.path() == "/preview" + localDoc.path())
+    #expect(tunneled.scrollLine == 7)
+  }
+
+  @Test("a tunnel URL served by this Mac's own Server resolves to file://")
+  func localTunnelResolvesToFile() throws {
+    let target = DocumentTarget(url: localDoc, scrollLine: 7)
+    let resolved = target
+      .tunneled(via: try serverPeer())
+      .resolvingLocalTunnel(servedBy: try #require(DeviceID(serverID)))
+    #expect(resolved.documentURL.isFileURL)
+    #expect(resolved.documentURL.path == localDoc.path)
+    #expect(resolved.scrollLine == 7)
+    #expect(resolved.documentURL.pathComponents.first { $0 == "preview" }
+            == nil)
+  }
+
+  @Test("a tunnel URL served by another Mac stays a tunnel URL")
+  func foreignTunnelStaysTunneled() throws {
+    let tunneled = DocumentTarget(url: localDoc)
+      .tunneled(via: try serverPeer())
+    let other = try #require(
+      DeviceID("9c7b6a5f-4e3d-2c1b-0a99-887766554433"))
+    #expect(tunneled.resolvingLocalTunnel(servedBy: other) == tunneled)
+  }
+
+  @Test("no known local Server → target is untouched")
+  func unknownServerLeavesTargetAlone() throws {
+    let tunneled = DocumentTarget(url: localDoc)
+      .tunneled(via: try serverPeer())
+    #expect(tunneled.resolvingLocalTunnel(servedBy: nil) == tunneled)
+  }
+
+  @Test("a plain file target is untouched by local-tunnel resolution")
+  func fileTargetIsUntouched() throws {
+    let target = DocumentTarget(url: localDoc, scrollLine: 3)
+    let server = try #require(DeviceID(serverID))
+    #expect(target.resolvingLocalTunnel(servedBy: server) == target)
+  }
 }

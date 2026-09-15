@@ -1,5 +1,6 @@
 import Foundation
 import KosmosCore
+import KosmosHTTPTunnel
 import KosmosTransport
 
 /// Which Galley surface a Kosmos peer represents. Published as the
@@ -58,3 +59,40 @@ public struct OpenInEditorMarker {}
 public typealias OpenInEditor = TargetMessage<OpenInEditorMarker>
 
 public typealias RouteToClientMessage = RouteToTunnelClient<DocumentTarget>
+
+// MARK: - DocumentTarget ⇄ tunnel URL
+
+extension DocumentTarget {
+  /// The same document, addressed through `server`'s Kosmos tunnel:
+  /// `kosmos://<server-id>/preview/<absolute-path>`. The Server builds
+  /// this when it routes a file to a tunnel client, stamping its own
+  /// id as the host so the client can address follow-ups (open in
+  /// editor) straight back to the Mac that owns the file.
+  /// `resolvingLocalTunnel(servedBy:)` is the inverse; keep the two
+  /// together so the route shape can't drift.
+  public func tunneled(via server: PeerID) -> DocumentTarget {
+    DocumentTarget(
+      url: TunnelScheme.originURL(forPeer: server)
+        .appending(.documentAsset(documentURL)),
+      scrollLine: scrollLine)
+  }
+
+  /// If this is a tunnel URL served by *this* Mac's own Server
+  /// (`server` is the id the Server published into the shared
+  /// defaults), rebind onto the local `file://` URL it wraps — the
+  /// Mac Viewer renders its own machine's files in-process, and the
+  /// window's represented document must be the file, not
+  /// `kosmos://…/preview/…`. Anything else — a file URL, a tunnel URL
+  /// from another Mac, no known local Server — comes back unchanged.
+  public func resolvingLocalTunnel(
+    servedBy server: DeviceID?) -> DocumentTarget
+  {
+    guard
+      let server,
+      documentURL.scheme == TunnelScheme.name,
+      documentURL.host()?.lowercased() == server.description,
+      case let .documentAsset(file)? = PreviewRoute(path: documentURL.path)
+    else { return self }
+    return DocumentTarget(url: file, scrollLine: scrollLine)
+  }
+}
