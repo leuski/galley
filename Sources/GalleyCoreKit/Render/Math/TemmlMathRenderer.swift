@@ -62,9 +62,14 @@ public actor TemmlMathRenderer: TeXMathRenderer {
 
   public func render(_ span: MathSpan) throws(TeXMathError) -> String {
     let function = try loadedRenderToString()
+    // `annotate` (keep the TeX in an `<annotation>`) is deliberately
+    // off: it wraps the output in `<semantics>`, and WebKit lays out a
+    // percentage-width `mtable` inside `<semantics>` — Temml's shape
+    // for `\tag{…}` and numbered environments — as an empty box, so
+    // every tagged formula vanished. Without the wrapper they render.
     let options: [String: Any] = [
       "displayMode": span.isDisplay,
-      "annotate": true,
+      "annotate": false,
       "throwOnError": false
     ]
     let result = function.call(withArguments: [span.tex, options])

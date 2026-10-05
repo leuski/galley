@@ -14,7 +14,7 @@ import Testing
 
 @Suite("TemmlMathRenderer")
 struct TemmlMathRendererTests {
-  @Test("Inline TeX renders to a MathML element with an annotation")
+  @Test("Inline TeX renders to a bare MathML element")
   func inline() async throws {
     let renderer = TemmlMathRenderer()
 
@@ -24,9 +24,24 @@ struct TemmlMathRendererTests {
     #expect(mathML.hasPrefix("<math"))
     #expect(mathML.hasSuffix("</math>"))
     #expect(mathML.contains("<msubsup>") || mathML.contains("<msup>"))
-    #expect(mathML.contains("<annotation encoding=\"application/x-tex\">"))
-    #expect(mathML.contains("x_i^2"))
+    // No <semantics>/<annotation> wrapper — see TemmlMathRenderer:
+    // WebKit renders a tagged equation inside <semantics> as a blank.
+    #expect(!mathML.contains("<semantics>"))
+    #expect(!mathML.contains("<annotation"))
     #expect(!mathML.contains("display=\"block\""))
+  }
+
+  @Test("A tagged equation is an unwrapped table with the tag cell")
+  func taggedEquation() async throws {
+    let renderer = TemmlMathRenderer()
+
+    let mathML = try await renderer.render(
+      MathSpan(tex: #"E = mc^2 \tag{1}"#, isDisplay: true))
+
+    #expect(mathML.hasPrefix("<math display=\"block\""))
+    #expect(mathML.contains("<mtable"))
+    #expect(mathML.contains("<mtext class=\"tml-tag\">(1)</mtext>"))
+    #expect(!mathML.contains("<semantics>"))
   }
 
   @Test("Display TeX renders in block mode")

@@ -25,7 +25,7 @@ struct SwiftMarkdownRendererMathTests {
 
     #expect(html.contains("<span class=\"math inline\"><math"))
     #expect(html.contains("<em>em</em>"))
-    #expect(html.contains("a_1 * b_2"))
+    #expect(html.contains("<msub><mi>a</mi><mn"))
     #expect(!html.contains("<em>b</em>"))
     #expect(!html.contains("$"))
   }
