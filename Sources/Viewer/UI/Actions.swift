@@ -143,11 +143,22 @@ extension Action {
     NSApp.mainWindow ?? NSApp.keyWindow ?? visibleWindows.first
   }
 
-  /// Visible windows, used by Close All. The Welcome bootstrap anchor
-  /// sits at `alphaValue = 0` and reports not-visible, so it never
-  /// shows up here.
+  /// Windows on screen, used by Close All. `isVisible` drops only
+  /// ordered-out windows — an empty window sits at `alphaValue = 0`
+  /// but still reports visible, so ⌘W closes it like any other.
   private static var visibleWindows: [NSWindow] {
     NSApp.windows.filter(\.isVisible)
+  }
+
+  /// Registers an observation on `WindowPresence` so SwiftUI
+  /// re-evaluates the caller when the window set changes. `NSApp`'s
+  /// own window properties are invisible to SwiftUI, so an
+  /// `isEnabled` closure that only read them was evaluated once —
+  /// during the first menu-bar build, when the app has no windows —
+  /// and stayed stuck at that answer.
+  private static func observingWindows(_ isEnabled: () -> Bool) -> Bool {
+    _ = WindowPresence.shared.revision
+    return isEnabled()
   }
 
   static func close() -> Action {
@@ -155,7 +166,7 @@ extension Action {
       title: "Close",
       image: "xmark",
       perform: { _ in frontWindow?.performClose(nil) },
-      isEnabled: { frontWindow != nil },
+      isEnabled: { observingWindows { frontWindow != nil } },
       shortcut: .init("w", modifiers: .command),
       accessibilityID: ViewerA11yID.FileMenu.close
     )
@@ -172,7 +183,7 @@ extension Action {
           window.performClose(nil)
         }
       },
-      isEnabled: { !visibleWindows.isEmpty },
+      isEnabled: { observingWindows { !visibleWindows.isEmpty } },
       shortcut: .init("w", modifiers: [.command, .option]),
       accessibilityID: ViewerA11yID.FileMenu.closeAll
     )
