@@ -8,8 +8,9 @@
 #if os(macOS)
 import AppKit
 import GalleyCoreKit
-import WebKit
 import OSLog
+import Synchronization
+import WebKit
 
 extension DocumentModel {
   // MARK: - Print / Export
@@ -29,7 +30,7 @@ extension DocumentModel {
   func exportPDF() async throws -> URL {
     let destination = URL.temporaryDirectory / "\(UUID().uuidString).pdf"
     let host = Self.makeOffscreenHostWindow()
-    try await runPrintOperation(
+    let didSucceed = try await runPrintOperation(
       jobTitle: documentURL.lastPathComponent,
       on: host
     ) { operation, _ in
@@ -39,6 +40,13 @@ extension DocumentModel {
       = destination as NSURL
       operation.showsPrintPanel = false
       operation.showsProgressPanel = false
+    }
+    // The caller hands this URL to SwiftUI's exporter, which opens it
+    // at once — so never return a path with nothing behind it.
+    guard didSucceed, destination.itemExists else {
+      throw CocoaError(
+        .fileNoSuchFile,
+        userInfo: [NSFilePathErrorKey: destination.path])
     }
     return destination
   }
@@ -50,7 +58,7 @@ extension DocumentModel {
   /// panel's "PDF ▾" submenu produces a paginated PDF for free.
   func runPrintPanel(on window: NSWindow?) async {
     do {
-      try await runPrintOperation(
+      _ = try await runPrintOperation(
         jobTitle: documentURL.lastPathComponent,
         on: window
       ) { operation, _ in
@@ -96,11 +104,19 @@ extension DocumentModel {
   ///    variant does. Despite the name, we're not displaying a
   ///    sheet for the save path — the print panel is suppressed by
   ///    the export path's configurator.
+  /// 3. `runModal(for:…)` returns *before* the job has finished — the
+  ///    spool is written on a separate thread
+  ///    (`NSPrintOperation.canSpawnSeparateThread`) and the file lands
+  ///    on disk a moment later. The only completion signal is the
+  ///    `didRun:` selector, so this suspends on it and returns the
+  ///    operation's success flag; returning on `runModal` alone handed
+  ///    Export-as-PDF a destination that did not exist yet.
+  @discardableResult
   private func runPrintOperation(
     jobTitle: String,
     on window: NSWindow?,
     configure: (NSPrintOperation, NSPrintInfo) -> Void
-  ) async throws {
+  ) async throws -> Bool {
     let template = resolvedTemplate()
     let composed = try await buildComposedPreview(
       template: template)
@@ -135,17 +151,50 @@ extension DocumentModel {
     let host = window
     ?? NSApp.keyWindow
     ?? Self.makeOffscreenHostWindow()
-    operation.runModal(
-      for: host,
-      delegate: nil as Any?,
-      didRun: nil as Selector?,
-      contextInfo: nil)
+    let completion = PrintCompletionBridge()
+    let didSucceed = await withCheckedContinuation { continuation in
+      completion.arm(continuation)
+      operation.runModal(
+        for: host,
+        delegate: completion,
+        didRun: #selector(
+          PrintCompletionBridge.printOperationDidRun(_:success:contextInfo:)),
+        contextInfo: nil)
+    }
 
-    // Hold the web view until runModal returns — `printOperation`
-    // captures its view, but the implicit retain cycle through
-    // configuration → handler can otherwise drop early on some
-    // builds. Belt-and-braces.
-    withExtendedLifetime(webView) {}
+    // Hold the web view and the delegate until the job has finished —
+    // `printOperation` captures its view, but the implicit retain
+    // cycle through configuration → handler can otherwise drop early
+    // on some builds, and `runModal` keeps only an unretained delegate.
+    withExtendedLifetime((webView, completion)) {}
+    return didSucceed
+  }
+
+  /// Bridges `NSPrintOperation`'s `didRun:` selector callback into a
+  /// continuation. AppKit delivers the callback on the operation's
+  /// own spool thread (`NSConcretePrintOperation
+  /// _finishModalOperation` off an `NSThread`), so this type is
+  /// deliberately not main-actor-isolated — resuming a continuation is
+  /// legal from any thread, and the lock makes the one-shot handoff
+  /// race-free. Fires once; a second callback is ignored.
+  private final class PrintCompletionBridge: NSObject, @unchecked Sendable {
+    private let state = Mutex<CheckedContinuation<Bool, Never>?>(nil)
+
+    func arm(_ continuation: CheckedContinuation<Bool, Never>) {
+      state.withLock { $0 = continuation }
+    }
+
+    @objc func printOperationDidRun(
+      _ printOperation: NSPrintOperation,
+      success: Bool,
+      contextInfo: UnsafeMutableRawPointer?
+    ) {
+      let continuation = state.withLock { slot in
+        defer { slot = nil }
+        return slot
+      }
+      continuation?.resume(returning: success)
+    }
   }
 
   /// Last-resort host window for `runModal(for:)` when no other
