@@ -50,7 +50,24 @@ Sources/
                                 # ServerStatus (.disabled / .starting / .running(URL) /
                                 # .notResponding).
     Render/                     # MarkdownRenderer, SwiftMarkdownRenderer (over
-                                # MarkdownHTMLKit), ExternalProcessRenderer (macOS),
+                                # MarkdownHTMLKit; wraps the parse in the TeX-math
+                                # pipeline below), ExternalProcessRenderer (macOS),
+      Math/                     # TeX math for the built-in processor — swift-markdown
+                                # has no math syntax, so `$…$` / `$$…$$` are lifted
+                                # out BEFORE parsing: MathSpanExtractor (source →
+                                # private-use sentinels + MathSpan list; pandoc
+                                # tex_math_dollars rules; skips code spans/fences;
+                                # keeps line count so data-source-line survives),
+                                # TemmlMathRenderer (actor; vendored Temml.bundle/
+                                # temml.min.js evaluated in JavaScriptCore → <math>
+                                # MathML, no page-side JS, works on macOS + visionOS
+                                # + Quick Look + tunnel), MathHTMLSubstitutor
+                                # (sentinels in rendered HTML → pandoc-shaped
+                                # <span class="math inline"> / <div class="math
+                                # display">, plus the engine-failure fallback
+                                # markup). Temml.bundle sits here next to the code;
+                                # re-sync with Scripts/sync-temml.sh (manifest
+                                # section in docs/vendored-templates.md).
                                 # ProcessorStore (singleton .shared), HTMLHeadings,
                                 # PreviewRequestService (transport-neutral single
                                 # source of truth for /preview, /template, /events, /

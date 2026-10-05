@@ -34,7 +34,13 @@ public enum HTMLHeadings {
       options: .caseInsensitive)
     else { return nil }
     let inner = String(bodyAfterOpen[..<closeRange.lowerBound])
-    let stripped = inner.replacingOccurrences(
+    // MathML keeps the TeX source in `<annotation>`; it is not rendered
+    // text and must not leak into the title (`x2x^2`).
+    let withoutAnnotations = inner.replacingOccurrences(
+      of: #"(?s)<annotation(?:\s[^>]*)?>.*?</annotation>"#,
+      with: "",
+      options: .regularExpression)
+    let stripped = withoutAnnotations.replacingOccurrences(
       of: #"<[^>]+>"#,
       with: "",
       options: .regularExpression)

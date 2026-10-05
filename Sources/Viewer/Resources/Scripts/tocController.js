@@ -31,12 +31,21 @@
   document.querySelectorAll('[id]').forEach(function(el) {
     used.add(el.id);
   });
+  // MathML keeps the TeX source in <annotation>, which textContent
+  // would include; drop it so a TOC entry shows only rendered text.
+  function headingText(node) {
+    var clone = node.cloneNode(true);
+    clone.querySelectorAll('annotation, annotation-xml').forEach(function (el) {
+      el.remove();
+    });
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+  }
   var nodes = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
   var items = [];
   var headingEls = [];
   for (var i = 0; i < nodes.length; i++) {
     var node = nodes[i];
-    var text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+    var text = headingText(node);
     if (!text) continue;
     if (!node.id) {
       node.id = slugify(text, used);

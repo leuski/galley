@@ -63,3 +63,22 @@ class; `LaTeX.html` ships a one-line script that toggles it on
 stays the single source of truth.
 
 <!-- END: latex-css -->
+
+<!-- BEGIN: temml -->
+
+## temml
+
+- Source: <https://github.com/ronkok/Temml>
+- License: MIT (see `Temml.bundle/LICENSE`)
+- Pinned version: `0.13.5`
+- Vendored: `Temml.bundle/temml.min.js` (168222 bytes, SHA-256 `1ab19148afe0dbc836b7a74f344071b3f3a70a7a8259ae4049e76894fcdf8d95`)
+- Last sync: 2026-10-05
+- Sync command: `./Scripts/sync-temml.sh`
+
+Not a template: Temml is the TeX → MathML converter the built-in
+Markdown processor runs inside JavaScriptCore (`TemmlMathRenderer`).
+Only the browser build + license are vendored; Temml's optional
+CSS/font files are intentionally omitted so templates need no
+changes and WebKit uses the system math font.
+
+<!-- END: temml -->
